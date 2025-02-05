@@ -1,8 +1,19 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Book } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown, ChevronUp } from "lucide-react";
+import { useState } from "react";
 
 const Education = () => {
+  const [openDays, setOpenDays] = useState<{ [key: string]: boolean }>({});
+
+  const toggleDay = (phaseIndex: number, dayIndex: number) => {
+    const key = `phase${phaseIndex}-day${dayIndex}`;
+    setOpenDays(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
   return (
     <div className="space-y-6">
       <Card className="w-full max-w-2xl mx-auto">
@@ -29,54 +40,70 @@ const Education = () => {
                     <p className="text-gray-600">{phase.description}</p>
                   </div>
 
-                  <div className="grid gap-6">
-                    {phase.dailyRoutine.map((day, dayIndex) => (
-                      <div
-                        key={dayIndex}
-                        className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden"
-                      >
-                        <div className="bg-primary-100 px-4 py-2">
-                          <h4 className="font-medium text-primary-700">
-                            Dia {dayIndex + 1}
-                          </h4>
-                        </div>
-                        <div className="p-4 space-y-4">
-                          {Object.entries(day.meals).map(([time, meal]) => (
-                            <div key={time} className="space-y-2">
-                              <h5 className="font-medium text-gray-700">{time}</h5>
-                              <div className="pl-4 text-gray-600">
-                                {meal.map((item, i) => (
-                                  <div
-                                    key={i}
-                                    className="flex items-center space-x-2 py-1"
-                                  >
-                                    <div className="w-2 h-2 rounded-full bg-primary-300" />
-                                    <span>{item}</span>
-                                  </div>
-                                ))}
-                              </div>
+                  <div className="grid gap-4">
+                    {phase.dailyRoutine.map((day, dayIndex) => {
+                      const key = `phase${phaseIndex}-day${dayIndex}`;
+                      const isOpen = openDays[key];
+
+                      return (
+                        <Collapsible
+                          key={dayIndex}
+                          open={isOpen}
+                          onOpenChange={() => toggleDay(phaseIndex, dayIndex)}
+                          className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden"
+                        >
+                          <CollapsibleTrigger className="w-full">
+                            <div className="bg-primary-100 px-4 py-3 flex justify-between items-center">
+                              <h4 className="font-medium text-primary-700">
+                                Dia {dayIndex + 1}
+                              </h4>
+                              {isOpen ? (
+                                <ChevronUp className="h-5 w-5 text-primary-500" />
+                              ) : (
+                                <ChevronDown className="h-5 w-5 text-primary-500" />
+                              )}
                             </div>
-                          ))}
-                          
-                          <div className="mt-4 pt-4 border-t border-gray-100">
-                            <h5 className="font-medium text-gray-700 mb-2">
-                              Suplementos do dia
-                            </h5>
-                            <div className="pl-4 space-y-2">
-                              {day.supplements.map((supplement, i) => (
-                                <div
-                                  key={i}
-                                  className="flex items-center space-x-2"
-                                >
-                                  <div className="w-2 h-2 rounded-full bg-secondary-400" />
-                                  <span className="text-gray-600">{supplement}</span>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <div className="p-4 space-y-4">
+                              {Object.entries(day.meals).map(([time, meal]) => (
+                                <div key={time} className="space-y-2">
+                                  <h5 className="font-medium text-gray-700">{time}</h5>
+                                  <div className="pl-4 text-gray-600">
+                                    {meal.map((item, i) => (
+                                      <div
+                                        key={i}
+                                        className="flex items-center space-x-2 py-1"
+                                      >
+                                        <div className="w-2 h-2 rounded-full bg-primary-300" />
+                                        <span>{item}</span>
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
                               ))}
+                              
+                              <div className="mt-4 pt-4 border-t border-gray-100">
+                                <h5 className="font-medium text-gray-700 mb-2">
+                                  Suplementos do dia
+                                </h5>
+                                <div className="pl-4 space-y-2">
+                                  {day.supplements.map((supplement, i) => (
+                                    <div
+                                      key={i}
+                                      className="flex items-center space-x-2"
+                                    >
+                                      <div className="w-2 h-2 rounded-full bg-secondary-400" />
+                                      <span className="text-gray-600">{supplement}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                          </CollapsibleContent>
+                        </Collapsible>
+                      );
+                    })}
                   </div>
                 </div>
               </TabsContent>
