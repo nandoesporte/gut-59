@@ -1,81 +1,21 @@
-
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CircularProgressbar, buildStyles } from 'react-circular-progressbar';
 import 'react-circular-progressbar/dist/styles.css';
-import { useState } from "react";
-import { supabase } from "@/lib/supabase";
 
 const FoodDiary = () => {
   const { toast } = useToast();
-  const [mealType, setMealType] = useState("");
-  const [phase, setPhase] = useState("");
-  const [foods, setFoods] = useState("");
-  const [waterPercentage, setWaterPercentage] = useState(55);
-  const [isLoading, setIsLoading] = useState(false);
 
-  const handleFoodLog = async () => {
-    if (!mealType || !phase || !foods) {
-      toast({
-        title: "Campos obrigatórios",
-        description: "Por favor, preencha todos os campos.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const { error } = await supabase
-        .from('food_diary')
-        .insert([{
-          meal_type: mealType,
-          phase,
-          foods,
-          water_percentage: waterPercentage,
-          created_at: new Date().toISOString()
-        }]);
-
-      if (error) throw error;
-
-      toast({
-        title: "Refeição registrada",
-        description: "Seu registro alimentar foi salvo com sucesso.",
-      });
-
-      // Reset form
-      setMealType("");
-      setPhase("");
-      setFoods("");
-    } catch (error) {
-      console.error('Error:', error);
-      toast({
-        title: "Erro ao salvar",
-        description: "Não foi possível salvar seu registro. Tente novamente.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
+  const handleFoodLog = () => {
+    toast({
+      title: "Refeição registrada",
+      description: "Seu registro alimentar foi salvo com sucesso.",
+    });
   };
 
-  const handleAddWater = () => {
-    const newPercentage = Math.min(waterPercentage + 12.5, 100);
-    setWaterPercentage(newPercentage);
-    
-    // Opcional: Salvar no Supabase
-    supabase
-      .from('water_intake')
-      .insert([{
-        percentage: newPercentage,
-        created_at: new Date().toISOString()
-      }])
-      .then(({ error }) => {
-        if (error) console.error('Error saving water intake:', error);
-      });
-  };
+  const waterPercentage = 55;
 
   return (
     <div className="space-y-6">
@@ -84,7 +24,7 @@ const FoodDiary = () => {
           <div className="space-y-6">
             <div>
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Refeição atual</h2>
-              <Select value={mealType} onValueChange={setMealType}>
+              <Select>
                 <SelectTrigger className="w-full bg-gray-50 border-gray-200">
                   <SelectValue placeholder="Selecione a refeição" />
                 </SelectTrigger>
@@ -113,7 +53,7 @@ const FoodDiary = () => {
               </div>
               <div className="mt-4 flex justify-center">
                 <Button
-                  onClick={handleAddWater}
+                  onClick={() => {}}
                   className="bg-primary-50 hover:bg-primary-100 text-primary-500"
                   variant="ghost"
                 >
@@ -127,7 +67,7 @@ const FoodDiary = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Fase do Protocolo
                 </label>
-                <Select value={phase} onValueChange={setPhase}>
+                <Select>
                   <SelectTrigger className="w-full bg-gray-50 border-gray-200">
                     <SelectValue placeholder="Selecione a fase" />
                   </SelectTrigger>
@@ -143,7 +83,7 @@ const FoodDiary = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Alimentos Consumidos
                 </label>
-                <Select value={foods} onValueChange={setFoods}>
+                <Select>
                   <SelectTrigger className="w-full bg-gray-50 border-gray-200">
                     <SelectValue placeholder="Selecione os alimentos" />
                   </SelectTrigger>
@@ -158,10 +98,9 @@ const FoodDiary = () => {
 
             <Button
               onClick={handleFoodLog}
-              disabled={isLoading}
               className="w-full bg-primary-500 hover:bg-primary-600 text-white"
             >
-              {isLoading ? "Salvando..." : "Registrar Refeição"}
+              Registrar Refeição
             </Button>
           </div>
         </CardContent>
