@@ -1,8 +1,55 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { LineChart as LineChartIcon } from "lucide-react";
+import { LineChartIcon } from "lucide-react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 const Progress = () => {
+  const [symptomData, setSymptomData] = useState<any[]>([]);
+  const [stats, setStats] = useState({
+    daysLogged: 0,
+    averageDiscomfort: 0
+  });
+
+  useEffect(() => {
+    fetchSymptomData();
+  }, []);
+
+  const fetchSymptomData = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('symptoms')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      if (data) {
+        const formattedData = data.map(item => ({
+          date: new Date(item.created_at).toLocaleDateString('pt-BR', { 
+            day: '2-digit', 
+            month: '2-digit' 
+          }),
+          discomfort: item.discomfort_level
+        }));
+
+        setSymptomData(formattedData);
+
+        // Calculate stats
+        const uniqueDays = new Set(formattedData.map(item => item.date)).size;
+        const avgDiscomfort = formattedData.reduce((acc, curr) => acc + curr.discomfort, 0) / formattedData.length;
+
+        setStats({
+          daysLogged: uniqueDays,
+          averageDiscomfort: Number(avgDiscomfort.toFixed(1))
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching symptom data:', error);
+    }
+  };
+
   return (
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader className="flex flex-row items-center space-x-2">
@@ -17,7 +64,7 @@ const Progress = () => {
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={symptomData}>
                 <XAxis dataKey="date" />
-                <YAxis />
+                <YAxis domain={[0, 10]} />
                 <Tooltip />
                 <Line
                   type="monotone"
@@ -29,8 +76,8 @@ const Progress = () => {
             </ResponsiveContainer>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <StatCard title="Dias Registrados" value="14" />
-            <StatCard title="Média de Sintomas" value="3.5" />
+            <StatCard title="Dias Registrados" value={stats.daysLogged.toString()} />
+            <StatCard title="Média de Sintomas" value={stats.averageDiscomfort.toString()} />
           </div>
         </div>
       </CardContent>
@@ -44,15 +91,5 @@ const StatCard = ({ title, value }: { title: string; value: string }) => (
     <p className="text-2xl font-semibold text-primary-500">{value}</p>
   </div>
 );
-
-const symptomData = [
-  { date: "01/03", discomfort: 7 },
-  { date: "02/03", discomfort: 6 },
-  { date: "03/03", discomfort: 5 },
-  { date: "04/03", discomfort: 4 },
-  { date: "05/03", discomfort: 3 },
-  { date: "06/03", discomfort: 4 },
-  { date: "07/03", discomfort: 2 },
-];
 
 export default Progress;
