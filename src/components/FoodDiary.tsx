@@ -25,14 +25,25 @@ const FoodDiary = () => {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">
+              Fase do Protocolo
+            </label>
+            <select className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+              <option>Fase 1 - Remoção e Desintoxicação</option>
+              <option>Fase 2 - Reequilíbrio da Microbiota</option>
+              <option>Fase 3 - Reparo e Manutenção</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
               Refeição
             </label>
             <select className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
               <option>Café da manhã</option>
+              <option>Lanche da manhã</option>
               <option>Almoço</option>
-              <option>Lanche</option>
+              <option>Lanche da tarde</option>
               <option>Jantar</option>
-              <option>Ceia</option>
+              <option>Antes de dormir</option>
             </select>
           </div>
           <div>
@@ -53,6 +64,40 @@ const FoodDiary = () => {
               type="time"
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Checklist de Hábitos
+            </label>
+            <div className="mt-2 space-y-2">
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  className="rounded text-primary-500"
+                />
+                <span className="ml-2 text-sm text-gray-700">
+                  Bebi 2-3L de água
+                </span>
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  className="rounded text-primary-500"
+                />
+                <span className="ml-2 text-sm text-gray-700">
+                  Mastiguei bem os alimentos
+                </span>
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  className="rounded text-primary-500"
+                />
+                <span className="ml-2 text-sm text-gray-700">
+                  Pratiquei atividade física
+                </span>
+              </label>
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">
