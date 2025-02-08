@@ -85,7 +85,7 @@ const Profile = () => {
   };
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
+    <Card className="w-full max-w-2xl mx-auto mt-2">
       <CardHeader>
         <CardTitle className="text-2xl text-primary-500">Seu Perfil</CardTitle>
       </CardHeader>
