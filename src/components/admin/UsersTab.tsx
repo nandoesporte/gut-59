@@ -53,22 +53,34 @@ export const UsersTab = () => {
 
   const handleViewDetails = async (user: User) => {
     try {
-      const [progress] = await Promise.all([
+      const [progress, meals, waterIntake] = await Promise.all([
         supabase
           .from('education_progress')
           .select('*')
           .eq('user_id', user.id)
           .order('updated_at', { ascending: false }),
+        supabase
+          .from('meals')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('meal_date', { ascending: false }),
+        supabase
+          .from('water_intake')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false }),
       ]);
 
       if (progress.error) throw progress.error;
+      if (meals.error) throw meals.error;
+      if (waterIntake.error) throw waterIntake.error;
 
       setSelectedUser({
         ...user,
-        meals: [],
+        meals: meals.data || [],
         symptoms: [],
-        water_intake: [],
-        education_progress: progress.data,
+        water_intake: waterIntake.data || [],
+        education_progress: progress.data || [],
       });
       setShowDetails(true);
     } catch (error) {

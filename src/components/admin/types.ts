@@ -1,3 +1,4 @@
+
 export interface User {
   id: string;
   name: string | null;
@@ -20,7 +21,7 @@ export interface Symptom {
 export interface DatabaseMeal {
   id: string;
   user_id: string;
-  meal_date: string;
+  meal_date: string | null;
   protocol_phase: number;
   meal_type: string;
   food_group_id: number;

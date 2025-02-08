@@ -36,6 +36,21 @@ export const UserDetailsDialog = ({
 }: UserDetailsDialogProps) => {
   if (!user) return null;
 
+  const getMealTypeDisplay = (mealType: string) => {
+    switch (mealType) {
+      case 'breakfast':
+        return 'Café da manhã';
+      case 'lunch':
+        return 'Almoço';
+      case 'dinner':
+        return 'Jantar';
+      case 'snack':
+        return 'Lanche';
+      default:
+        return mealType;
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
@@ -44,10 +59,12 @@ export const UserDetailsDialog = ({
         </DialogHeader>
         
         <Tabs defaultValue="profile" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="profile">Perfil</TabsTrigger>
             <TabsTrigger value="protocol">Protocolo</TabsTrigger>
             <TabsTrigger value="messages">Mensagens</TabsTrigger>
+            <TabsTrigger value="meals">Refeições</TabsTrigger>
+            <TabsTrigger value="water">Água</TabsTrigger>
           </TabsList>
 
           <TabsContent value="profile" className="space-y-4">
@@ -104,6 +121,58 @@ export const UserDetailsDialog = ({
                 onSendMessage={onSendMessage}
                 loading={loading}
               />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="meals">
+            <div className="space-y-4">
+              {user.meals.map((meal) => (
+                <Card key={meal.id} className="p-4">
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <div>
+                        <h3 className="font-medium">{getMealTypeDisplay(meal.meal_type || '')}</h3>
+                        <p className="text-sm text-gray-500">
+                          {meal.meal_date && format(new Date(meal.meal_date), 'dd/MM/yyyy')}
+                        </p>
+                      </div>
+                      {meal.protocol_phase && (
+                        <span className="text-sm text-gray-500">
+                          Fase {meal.protocol_phase}
+                        </span>
+                      )}
+                    </div>
+                    {meal.custom_food && (
+                      <p className="text-sm">{meal.custom_food}</p>
+                    )}
+                    {meal.description && (
+                      <p className="text-sm text-gray-600">{meal.description}</p>
+                    )}
+                    {meal.photo_url && (
+                      <img
+                        src={meal.photo_url}
+                        alt="Foto da refeição"
+                        className="w-full h-48 object-cover rounded-lg"
+                      />
+                    )}
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="water">
+            <div className="space-y-4">
+              {user.water_intake.map((intake) => (
+                <Card key={intake.id} className="p-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-500">
+                      {format(new Date(intake.created_at), 'dd/MM/yyyy HH:mm')}
+                    </span>
+                    <span className="font-medium">{intake.amount_ml}ml</span>
+                  </div>
+                </Card>
+              ))}
             </div>
           </TabsContent>
         </Tabs>
