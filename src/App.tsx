@@ -10,6 +10,7 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import Layout from "./components/Layout";
 import Progress from "./pages/Progress";
+import Store from "./pages/Store";
 
 const queryClient = new QueryClient();
 
@@ -58,11 +59,11 @@ function App() {
               }
             />
             <Route
-              path="/symptoms"
+              path="/store"
               element={
                 <ProtectedRoute>
                   <Layout>
-                    <Index />
+                    <Store />
                   </Layout>
                 </ProtectedRoute>
               }
