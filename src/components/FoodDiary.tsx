@@ -1,14 +1,12 @@
 
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
-import { Plus, History, List } from "lucide-react";
+import { History, List } from "lucide-react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import MealLogger from "./food-diary/MealLogger";
-import WaterTracker from "./food-diary/WaterTracker";
-import DailyMeals from "./food-diary/DailyMeals";
 import MealHistory from "./food-diary/MealHistory";
+import WaterTracker from "./food-diary/WaterTracker";
 import ProgressChart from "./food-diary/ProgressChart";
 
 interface ProtocolFood {
@@ -29,8 +27,6 @@ interface SavedMeal {
 
 const FoodDiary = () => {
   const { toast } = useToast();
-  const [date, setDate] = useState<Date>(new Date());
-  const [protocolFoods, setProtocolFoods] = useState<ProtocolFood[]>([]);
   const [savedMeals, setSavedMeals] = useState<SavedMeal[]>([]);
   const [symptomData, setSymptomData] = useState<any[]>([]);
   const [stats, setStats] = useState({
@@ -39,24 +35,9 @@ const FoodDiary = () => {
   });
 
   useEffect(() => {
-    fetchProtocolFoods();
     fetchSavedMeals();
     fetchSymptomHistory();
-  }, [date]);
-
-  const fetchProtocolFoods = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('protocol_foods')
-        .select('*')
-        .order('food_group');
-
-      if (error) throw error;
-      setProtocolFoods(data || []);
-    } catch (error) {
-      console.error('Error fetching protocol foods:', error);
-    }
-  };
+  }, []);
 
   const fetchSavedMeals = async () => {
     try {
@@ -66,7 +47,6 @@ const FoodDiary = () => {
           *,
           protocol_food:protocol_food_id (*)
         `)
-        .eq('meal_date', format(date, 'yyyy-MM-dd'))
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -124,18 +104,14 @@ const FoodDiary = () => {
   return (
     <div className="space-y-6">
       <div className="bg-gradient-to-r from-primary-50 to-primary-100 p-6 rounded-lg shadow-sm">
-        <h1 className="text-2xl font-bold text-primary-700 mb-2">Diário Alimentar</h1>
+        <h1 className="text-2xl font-bold text-primary-700 mb-2">Histórico Alimentar</h1>
         <p className="text-primary-600">
-          Acompanhe sua jornada de modulação intestinal registrando suas refeições diárias.
+          Acompanhe seu histórico alimentar e progresso dos sintomas.
         </p>
       </div>
 
-      <Tabs defaultValue="register" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="register" className="flex items-center gap-2">
-            <Plus className="w-4 h-4" />
-            Registrar
-          </TabsTrigger>
+      <Tabs defaultValue="history" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="history" className="flex items-center gap-2">
             <History className="w-4 h-4" />
             Histórico
@@ -146,23 +122,11 @@ const FoodDiary = () => {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="register" className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2">
-            <MealLogger
-              date={date}
-              setDate={setDate}
-              protocolFoods={protocolFoods}
-              onMealLogged={fetchSavedMeals}
-            />
-            <div className="space-y-6">
-              <WaterTracker />
-              <DailyMeals savedMeals={savedMeals} />
-            </div>
-          </div>
-        </TabsContent>
-
         <TabsContent value="history">
-          <MealHistory savedMeals={savedMeals} />
+          <div className="grid gap-6 md:grid-cols-2">
+            <MealHistory savedMeals={savedMeals} />
+            <WaterTracker />
+          </div>
         </TabsContent>
 
         <TabsContent value="progress">
