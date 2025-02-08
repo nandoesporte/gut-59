@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -41,67 +42,71 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return children;
 };
 
-const App = () => (
-  <BrowserRouter>
+function App() {
+  return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Routes>
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Index />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/symptoms"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Index />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/diary"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Index />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/education"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Index />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/progress"
-            element={
-              <ProtectedRoute>
-                <Progress />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-        <Toaster />
-        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Index />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/symptoms"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Index />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/diary"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Index />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/education"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Index />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/progress"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Progress />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+          <Toaster />
+          <Sonner />
+        </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
-  </BrowserRouter>
-);
+  );
+}
 
 export default App;
