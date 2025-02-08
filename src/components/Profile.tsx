@@ -1,14 +1,15 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Camera } from "lucide-react";
+import { Camera, LogOut } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useNavigate } from "react-router-dom";
 
 const Profile = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
   const [healthConditions, setHealthConditions] = useState("");
@@ -139,9 +140,37 @@ const Profile = () => {
     }
   };
 
+  const handleSignOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      navigate("/auth");
+      toast({
+        title: "Desconectado",
+        description: "Você foi desconectado com sucesso.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao sair",
+        description: "Não foi possível desconectar. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <Card className="w-full max-w-2xl mx-auto mt-2">
-      <CardHeader>
+      <CardHeader className="relative">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleSignOut}
+          className="absolute right-6 top-6"
+        >
+          <LogOut className="w-4 h-4 mr-2" />
+          Sair
+        </Button>
         <CardTitle className="text-2xl text-primary-500">Seu Perfil</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">

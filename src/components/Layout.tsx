@@ -1,13 +1,41 @@
 
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import Navigation from "./Navigation";
 import { Activity } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface LayoutProps {
   children: ReactNode;
 }
 
 const Layout = ({ children }: LayoutProps) => {
+  const [hasNewMessage, setHasNewMessage] = useState(false);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const channel = supabase
+        .channel('messages')
+        .on('postgres_changes', { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'messages',
+          filter: `receiver_id=eq.${user.id}`
+        }, () => {
+          setHasNewMessage(true);
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    };
+
+    fetchUser();
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white/70 backdrop-blur-lg shadow-sm fixed top-0 left-0 right-0 z-50 border-b border-gray-100">
@@ -22,6 +50,9 @@ const Layout = ({ children }: LayoutProps) => {
             <span className="text-sm font-medium text-gray-700">Katia Santin</span>
             <span className="text-xs font-medium text-gray-600">Nutricionista</span>
           </div>
+          {hasNewMessage && (
+            <div className="absolute top-4 right-4 w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+          )}
         </div>
       </header>
       <main className="w-full px-4 sm:px-6 lg:px-8 py-6 pb-28 animate-fadeIn mt-24">
