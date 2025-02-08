@@ -13,4 +13,4 @@ container.render(
   <React.StrictMode>
     <App />
   </React.StrictMode>
-);
+)
