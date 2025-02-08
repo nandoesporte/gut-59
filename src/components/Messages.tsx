@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Send } from "lucide-react";
+import { Send, MessageSquare } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface Message {
@@ -24,57 +24,68 @@ const Messages = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const [receiverId, setReceiverId] = useState<string | null>(null);
-  const [availableUsers, setAvailableUsers] = useState<any[]>([]);
+  const [adminId, setAdminId] = useState<string | null>(null);
+  const [hasNewMessage, setHasNewMessage] = useState(false);
 
   useEffect(() => {
-    fetchUsers();
-    const subscription = supabase
-      .channel('messages')
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'messages' 
-      }, payload => {
-        if (payload.new.receiver_id === receiverId || payload.new.sender_id === receiverId) {
-          fetchMessages();
-        }
-      })
-      .subscribe();
+    fetchAdmin();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      fetchAdmin();
+    });
 
     return () => {
-      subscription.unsubscribe();
+      subscription?.unsubscribe();
     };
-  }, [receiverId]);
+  }, []);
 
-  const fetchUsers = async () => {
+  useEffect(() => {
+    if (adminId) {
+      fetchMessages();
+      const channel = supabase
+        .channel('messages')
+        .on('postgres_changes', { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'messages' 
+        }, payload => {
+          const { data: { user } } = supabase.auth.getUser();
+          if (payload.new.receiver_id === user?.id) {
+            setHasNewMessage(true);
+            fetchMessages();
+          }
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [adminId]);
+
+  const fetchAdmin = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
       const { data, error } = await supabase
-        .from('profiles')
-        .select('id, name, photo_url')
-        .neq('id', user.id);
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'admin')
+        .single();
 
       if (error) throw error;
-      setAvailableUsers(data || []);
+      setAdminId(data.user_id);
     } catch (error) {
-      console.error('Error fetching users:', error);
+      console.error('Error fetching admin:', error);
       toast({
-        title: "Erro ao carregar usuários",
-        description: "Não foi possível carregar a lista de usuários.",
+        title: "Erro ao carregar informações do admin",
+        description: "Não foi possível carregar as informações do administrador.",
         variant: "destructive",
       });
     }
   };
 
   const fetchMessages = async () => {
-    if (!receiverId) return;
-
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user || !adminId) return;
 
       const { data, error } = await supabase
         .from('messages')
@@ -89,11 +100,12 @@ const Messages = () => {
             photo_url
           )
         `)
-        .or(`and(sender_id.eq.${user.id},receiver_id.eq.${receiverId}),and(sender_id.eq.${receiverId},receiver_id.eq.${user.id})`)
+        .or(`and(sender_id.eq.${user.id},receiver_id.eq.${adminId}),and(sender_id.eq.${adminId},receiver_id.eq.${user.id})`)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
       setMessages(data || []);
+      setHasNewMessage(false);
     } catch (error) {
       console.error('Error fetching messages:', error);
       toast({
@@ -105,7 +117,7 @@ const Messages = () => {
   };
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !receiverId) return;
+    if (!newMessage.trim() || !adminId) return;
 
     try {
       setLoading(true);
@@ -117,7 +129,7 @@ const Messages = () => {
         .insert({
           content: newMessage.trim(),
           sender_id: user.id,
-          receiver_id: receiverId,
+          receiver_id: adminId,
         });
 
       if (error) throw error;
@@ -140,88 +152,65 @@ const Messages = () => {
     }
   };
 
-  const selectUser = (userId: string) => {
-    setReceiverId(userId);
-    fetchMessages();
-  };
-
   return (
     <Card className="w-full max-w-2xl mx-auto mt-8">
       <CardHeader>
-        <CardTitle className="text-2xl text-primary-500">Mensagens</CardTitle>
+        <div className="flex items-center gap-2">
+          <MessageSquare className="w-5 h-5 text-primary-500" />
+          <CardTitle className="text-2xl text-primary-500">Mensagens da Nutricionista</CardTitle>
+        </div>
+        {hasNewMessage && (
+          <div className="absolute top-4 right-4 w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+        )}
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {availableUsers.map((user) => (
+        <div className="space-y-4 h-[400px] overflow-y-auto p-4 border rounded-lg">
+          {messages.map((message) => (
             <div
-              key={user.id}
-              onClick={() => selectUser(user.id)}
-              className={`flex flex-col items-center space-y-2 cursor-pointer p-2 rounded-lg ${
-                receiverId === user.id ? 'bg-primary-50' : ''
+              key={message.id}
+              className={`flex items-start gap-2 ${
+                message.sender_id === adminId ? 'flex-row' : 'flex-row-reverse'
               }`}
             >
-              <Avatar className="w-12 h-12">
-                <AvatarImage src={user.photo_url || undefined} alt={user.name} />
+              <Avatar className="w-8 h-8">
+                <AvatarImage
+                  src={message.profiles?.photo_url || undefined}
+                  alt={message.profiles?.name || ""}
+                />
                 <AvatarFallback>
-                  {user.name?.[0]?.toUpperCase() || '?'}
+                  {message.profiles?.name?.[0]?.toUpperCase() || '?'}
                 </AvatarFallback>
               </Avatar>
-              <span className="text-sm font-medium">{user.name || 'Usuário'}</span>
+              <div
+                className={`max-w-[70%] p-3 rounded-lg ${
+                  message.sender_id === adminId
+                    ? 'bg-gray-100'
+                    : 'bg-primary-500 text-white'
+                }`}
+              >
+                <p className="text-sm">{message.content}</p>
+              </div>
             </div>
           ))}
         </div>
 
-        {receiverId && (
-          <>
-            <div className="space-y-4 h-[400px] overflow-y-auto p-4 border rounded-lg">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex items-start gap-2 ${
-                    message.sender_id === receiverId ? 'flex-row' : 'flex-row-reverse'
-                  }`}
-                >
-                  <Avatar className="w-8 h-8">
-                    <AvatarImage
-                      src={message.profiles?.photo_url || undefined}
-                      alt={message.profiles?.name || ""}
-                    />
-                    <AvatarFallback>
-                      {message.profiles?.name?.[0]?.toUpperCase() || '?'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div
-                    className={`max-w-[70%] p-3 rounded-lg ${
-                      message.sender_id === receiverId
-                        ? 'bg-gray-100'
-                        : 'bg-primary-500 text-white'
-                    }`}
-                  >
-                    <p className="text-sm">{message.content}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                placeholder="Digite sua mensagem..."
-                className="flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
-              <Button
-                onClick={sendMessage}
-                disabled={loading || !newMessage.trim()}
-              >
-                <Send className="w-4 h-4 mr-2" />
-                Enviar
-              </Button>
-            </div>
-          </>
-        )}
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+            placeholder="Digite sua mensagem..."
+            className="flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+          />
+          <Button
+            onClick={sendMessage}
+            disabled={loading || !newMessage.trim()}
+          >
+            <Send className="w-4 h-4 mr-2" />
+            Enviar
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
