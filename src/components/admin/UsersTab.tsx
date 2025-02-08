@@ -18,12 +18,27 @@ export const UsersTab = () => {
   const { data: users, isLoading: usersLoading, refetch } = useQuery({
     queryKey: ['admin-users'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // First get the admin's user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Get all profiles and their unread message counts
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('*');
-      
-      if (error) throw error;
-      return data as User[];
+        .select(`
+          *,
+          unread_messages:messages!messages_receiver_id_fkey(count)
+        `)
+        .neq('id', user.id)
+        .eq('messages.read', false)
+        .eq('messages.receiver_id', 'id');
+
+      if (profilesError) throw profilesError;
+
+      return profiles.map(profile => ({
+        ...profile,
+        unread_messages: profile.unread_messages?.[0]?.count || 0
+      }));
     },
   });
 

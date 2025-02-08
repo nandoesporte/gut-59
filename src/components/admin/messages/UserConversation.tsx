@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Send } from "lucide-react";
@@ -13,6 +13,7 @@ interface Message {
   receiver_id: string;
   content: string;
   created_at: string;
+  read: boolean;
   profiles: {
     name: string | null;
     photo_url: string | null;
@@ -33,6 +34,33 @@ export const UserConversation = ({
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+
+  // Mark messages as read when viewing them
+  useEffect(() => {
+    const markMessagesAsRead = async () => {
+      if (!selectedUserId || messages.length === 0) return;
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const unreadMessages = messages.filter(
+        msg => !msg.read && msg.sender_id === selectedUserId
+      );
+
+      if (unreadMessages.length > 0) {
+        const { error } = await supabase
+          .from('messages')
+          .update({ read: true })
+          .in('id', unreadMessages.map(msg => msg.id));
+
+        if (error) {
+          console.error('Error marking messages as read:', error);
+        }
+      }
+    };
+
+    markMessagesAsRead();
+  }, [messages, selectedUserId]);
 
   const sendMessage = async () => {
     if (!newMessage.trim() || !selectedUserId) return;
