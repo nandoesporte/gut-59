@@ -1,4 +1,3 @@
-
 import { Phase } from '@/types/education';
 
 export const phase2: Phase = {
@@ -12,25 +11,19 @@ export const phase2: Phase = {
         "- 1 pitada de cúrcuma (açafrão)",
       ],
       "Café da manhã (07:00)": [
-        "Opções de Bebidas:",
-        "- Uma das opções de suco das receitas",
-        "- 1 xícara pequena (60ml) de café sem açúcar",
-        "",
-        "Frutas e Proteínas:",
-        "- 100g de mamão",
-        "- Até 2 ovos mexidos com 5ml de azeite de oliva extra virgem",
-        "",
-        "Tubérculos (escolher um):",
+        "Uma das opções de suco das receitas",
+        "100g de mamão",
+        "Até 2 ovos mexidos com 5ml de azeite de oliva extra virgem",
+        "1 pedaço de tubérculo (escolher um):",
         "- Mandioca",
         "- Batata doce",
         "- Inhame",
         "- Cará",
         "- Mandioquinha salsa",
+        "1 xícara pequena (60ml) de café sem açúcar",
       ],
       "Lanche (10:00)": [
-        "Bebida:",
-        "- Chá de folha de amora com cavalinha",
-        "",
+        "Chá de folha de amora com cavalinha",
         "Escolher uma opção:",
         "- Fruta gordurosa (coco ou abacate)",
         "- Petisco de legume (cenoura ou pepino)",
@@ -41,11 +34,8 @@ export const phase2: Phase = {
         "- 1 porção de folhas cruas (à vontade)",
         "- 1 porção de legumes cozidos, assados ou refogados (à vontade)",
         "- Peixe ou ovos",
-        "",
-        "Alternativa:",
-        "- 1 prato de sopa de abóbora funcional",
-        "",
-        "Importante: Evitar frituras",
+        "Alternativa: 1 prato de sopa de abóbora funcional",
+        "Observação: Evitar frituras",
       ],
       "Lanche 1 (15:00)": [
         "Escolher uma opção:",
@@ -55,19 +45,16 @@ export const phase2: Phase = {
       ],
       "Lanche 2 (17:00)": [
         "Se sentir fome:",
-        "- 1 ou 2 frutas da sua preferência",
+        "1 ou 2 frutas da sua preferência",
       ],
       "Jantar (18:30 ou 19:00)": [
-        "Opções de Refeição:",
-        "- Igual ao almoço",
-        "- Sopa de abóbora funcional (à vontade)",
-        "",
+        "Opção 1: Igual ao almoço",
+        "Opção 2: Sopa de abóbora funcional (à vontade)",
         "Importante: Fazer jejum de 12h entre o jantar e o café da manhã",
       ],
     },
     supplements: [
       "Alimentos Permitidos:",
-      "",
       "Hortaliças:",
       "- Abóbora, abobrinha, agrião, alface (lisa, crespa e roxa)",
       "- Alho, aspargo, berinjela, beterraba, brócolis",
