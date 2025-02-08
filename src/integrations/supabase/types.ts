@@ -9,7 +9,179 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      education_progress: {
+        Row: {
+          completed: boolean | null
+          created_at: string | null
+          day: number | null
+          id: string
+          phase: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean | null
+          created_at?: string | null
+          day?: number | null
+          id?: string
+          phase?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          completed?: boolean | null
+          created_at?: string | null
+          day?: number | null
+          id?: string
+          phase?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "education_progress_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meals: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          meal_type: string | null
+          protocol_phase: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          meal_type?: string | null
+          protocol_phase?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          meal_type?: string | null
+          protocol_phase?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          age: number | null
+          health_conditions: string | null
+          id: string
+          name: string | null
+        }
+        Insert: {
+          age?: number | null
+          health_conditions?: string | null
+          id: string
+          name?: string | null
+        }
+        Update: {
+          age?: number | null
+          health_conditions?: string | null
+          id?: string
+          name?: string | null
+        }
+        Relationships: []
+      }
+      symptoms: {
+        Row: {
+          created_at: string | null
+          discomfort_level: number | null
+          has_abdominal_pain: boolean | null
+          has_bloating: boolean | null
+          has_gas: boolean | null
+          has_nausea: boolean | null
+          id: string
+          notes: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          discomfort_level?: number | null
+          has_abdominal_pain?: boolean | null
+          has_bloating?: boolean | null
+          has_gas?: boolean | null
+          has_nausea?: boolean | null
+          id?: string
+          notes?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          discomfort_level?: number | null
+          has_abdominal_pain?: boolean | null
+          has_bloating?: boolean | null
+          has_gas?: boolean | null
+          has_nausea?: boolean | null
+          id?: string
+          notes?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "symptoms_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      water_intake: {
+        Row: {
+          amount_ml: number | null
+          created_at: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          amount_ml?: number | null
+          created_at?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          amount_ml?: number | null
+          created_at?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "water_intake_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
