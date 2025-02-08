@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -53,15 +54,15 @@ export const WaterTracker = () => {
     <Card className="bg-white shadow-sm border-none">
       <CardContent className="p-6">
         <div className="flex items-center gap-2 mb-4">
-          <Droplets className="w-5 h-5 text-primary-500" />
-          <h2 className="text-lg font-semibold text-gray-900">Ingestão de água</h2>
+          <Droplets className="w-6 h-6 text-primary-500" />
+          <h2 className="text-xl font-semibold text-gray-900">Ingestão de água</h2>
         </div>
         <div className="w-32 h-32 mx-auto">
           <CircularProgressbar
             value={waterPercentage}
             text={`${waterPercentage}%`}
             styles={buildStyles({
-              textSize: '16px',
+              textSize: '18px',
               pathColor: '#34D399',
               textColor: '#34D399',
               trailColor: '#E5E7EB',
@@ -71,10 +72,10 @@ export const WaterTracker = () => {
         <div className="mt-4 flex justify-center">
           <Button
             onClick={handleAddWater}
-            className="bg-primary-50 hover:bg-primary-100 text-primary-500"
+            className="bg-primary-50 hover:bg-primary-100 text-primary-500 text-base"
             variant="ghost"
           >
-            <Plus className="w-4 h-4 mr-2" />
+            <Plus className="w-5 h-5 mr-2" />
             Adicionar 200ml
           </Button>
         </div>
