@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
@@ -18,7 +19,7 @@ const SymptomTracker = () => {
       <CardHeader className="flex flex-row items-center space-x-2">
         <Activity className="w-6 h-6 text-primary-500" />
         <CardTitle className="text-2xl text-primary-500">
-          Registro de Sintomas
+          Registro de Sintomas Diários
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -43,6 +44,7 @@ const SymptomTracker = () => {
               Sintomas Específicos
             </label>
             <div className="grid grid-cols-2 gap-2 mt-2">
+              <SymptomCheckbox label="Normal" />
               <SymptomCheckbox label="Inchaço" />
               <SymptomCheckbox label="Gases" />
               <SymptomCheckbox label="Dor Abdominal" />
