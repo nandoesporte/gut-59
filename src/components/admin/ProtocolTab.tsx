@@ -1,4 +1,3 @@
-<lov-code>
 import { useState } from "react";
 import {
   Table,
@@ -1079,3 +1078,4 @@ export const ProtocolTab = () => {
         </div>
 
         <div className="rounded-md border">
+          <Table
