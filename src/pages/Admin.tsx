@@ -14,6 +14,7 @@ import { SymptomsTab } from "@/components/admin/SymptomsTab";
 import { ProtocolTab } from "@/components/admin/ProtocolTab";
 import { WaterIntakeTab } from "@/components/admin/WaterIntakeTab";
 import { MessagesTab } from "@/components/admin/MessagesTab";
+import { MealsTab } from "@/components/admin/MealsTab";
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -69,12 +70,13 @@ const Admin = () => {
       <h1 className="text-2xl font-bold mb-6">Painel Administrativo</h1>
       
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 mb-6">
+        <TabsList className="grid w-full grid-cols-6 mb-6">
           <TabsTrigger value="users">Usuários</TabsTrigger>
           <TabsTrigger value="symptoms">Sintomas</TabsTrigger>
           <TabsTrigger value="water">Ingestão de Água</TabsTrigger>
           <TabsTrigger value="protocol">Protocolo</TabsTrigger>
           <TabsTrigger value="messages">Mensagens</TabsTrigger>
+          <TabsTrigger value="meals">Refeições</TabsTrigger>
         </TabsList>
 
         <TabsContent value="users">
@@ -95,6 +97,10 @@ const Admin = () => {
 
         <TabsContent value="messages">
           <MessagesTab />
+        </TabsContent>
+
+        <TabsContent value="meals">
+          <MealsTab />
         </TabsContent>
       </Tabs>
     </div>
