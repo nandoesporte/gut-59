@@ -30,6 +30,7 @@ export interface DatabaseMeal {
   updated_at: string | null;
   description: string | null;
   protocol_food_id: string | null;
+  photo_url: string | null;
 }
 
 export interface WaterIntake {
