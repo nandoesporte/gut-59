@@ -21,6 +21,7 @@ interface MealsListProps {
 const MealsList = ({ meals }: MealsListProps) => {
   const isMobile = useIsMobile();
   const [visibleSections, setVisibleSections] = useState<string[]>(['carboidratos']);
+  const [visibleCombinations, setVisibleCombinations] = useState<string[]>(['opcao1']);
 
   const toggleSection = (section: string) => {
     setVisibleSections(prev => 
@@ -30,7 +31,16 @@ const MealsList = ({ meals }: MealsListProps) => {
     );
   };
 
+  const toggleCombination = (combination: string) => {
+    setVisibleCombinations(prev =>
+      prev.includes(combination)
+        ? prev.filter(c => c !== combination)
+        : [...prev, combination]
+    );
+  };
+
   const renderMealContent = (meal: string[]) => {
+    // Handle food groups table
     if (meal.some(item => item.includes("Carboidratos:") || item.includes("Proteínas:"))) {
       const sections: { [key: string]: string[] } = {
         carboidratos: [],
@@ -132,6 +142,76 @@ const MealsList = ({ meals }: MealsListProps) => {
       );
     }
 
+    // Handle combinations section
+    if (meal.some(item => item.startsWith("Opção"))) {
+      const combinations: { [key: string]: string[] } = {};
+      let currentOption = '';
+
+      meal.forEach(item => {
+        if (item.startsWith("Opção")) {
+          currentOption = `opcao${item.match(/\d+/)?.[0] || ''}`;
+          combinations[currentOption] = [item];
+        } else if (currentOption && item) {
+          combinations[currentOption].push(item);
+        }
+      });
+
+      if (isMobile) {
+        return (
+          <div className="space-y-4">
+            {Object.entries(combinations).map(([key, items]) => (
+              <div key={key} className="border rounded-lg overflow-hidden">
+                <Button
+                  variant="ghost"
+                  className="w-full flex justify-between items-center p-4 hover:bg-primary-50"
+                  onClick={() => toggleCombination(key)}
+                >
+                  <span className="font-semibold text-primary-700">
+                    {items[0]}
+                  </span>
+                  {visibleCombinations.includes(key) ? (
+                    <ChevronUp className="h-5 w-5" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5" />
+                  )}
+                </Button>
+                {visibleCombinations.includes(key) && (
+                  <div className="p-4 bg-white">
+                    <ul className="space-y-2">
+                      {items.slice(1).map((item, index) => (
+                        <li key={index} className="text-gray-700 flex items-center">
+                          <div className="w-2 h-2 rounded-full bg-primary-300 mr-3" />
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        );
+      }
+
+      return (
+        <div className="grid gap-4 md:grid-cols-2">
+          {Object.values(combinations).map((items, index) => (
+            <Card key={index} className="p-4">
+              <h6 className="font-semibold text-primary-700 mb-3">{items[0]}</h6>
+              <ul className="space-y-2">
+                {items.slice(1).map((item, idx) => (
+                  <li key={idx} className="text-gray-700 flex items-center">
+                    <div className="w-2 h-2 rounded-full bg-primary-300 mr-3" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          ))}
+        </div>
+      );
+    }
+
     // For regular meal content, render as before
     return (
       <table className="w-full">
@@ -168,3 +248,4 @@ const MealsList = ({ meals }: MealsListProps) => {
 };
 
 export default MealsList;
+
