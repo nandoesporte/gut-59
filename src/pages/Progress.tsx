@@ -51,7 +51,7 @@ const Progress = () => {
     try {
       const { data, error } = await supabase
         .from('meals')
-        .select(`
+        .select<string, SavedMeal>(`
           id,
           meal_type,
           description,
@@ -78,7 +78,7 @@ const Progress = () => {
     try {
       const { data, error } = await supabase
         .from('water_intake')
-        .select('*')
+        .select<string, WaterIntake>('*')
         .eq('created_at::date', format(date, 'yyyy-MM-dd'))
         .order('created_at', { ascending: false });
 
