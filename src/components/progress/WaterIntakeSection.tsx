@@ -5,11 +5,12 @@ import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface WaterIntake {
   id: string;
-  amount_ml: number | null;
-  created_at: string | null;
+  amount_ml: number;
+  created_at: string;
   user_id: string;
 }
 
@@ -27,16 +28,35 @@ const WaterIntakeSection = ({ date }: WaterIntakeSectionProps) => {
 
   const fetchWaterIntake = async () => {
     try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
+
+      const startOfDay = new Date(date);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
+
       const { data, error } = await supabase
         .from('water_intake')
         .select('id, amount_ml, created_at, user_id')
-        .eq('created_at::date', format(date, 'yyyy-MM-dd'))
+        .eq('user_id', user.id)
+        .gte('created_at', startOfDay.toISOString())
+        .lte('created_at', endOfDay.toISOString())
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
+
       setWaterIntake(data || []);
     } catch (error) {
       console.error('Error fetching water intake:', error);
+      toast.error("Erro ao carregar dados de consumo de água");
     }
   };
 
