@@ -24,11 +24,15 @@ import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { User, UserDetails } from "./types";
 import { format } from "date-fns";
+import { MessageList } from "./messages/MessageList";
+import { MessageInput } from "./messages/MessageInput";
 
 export const UsersTab = () => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [selectedUser, setSelectedUser] = useState<UserDetails | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [newMessage, setNewMessage] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const { data: users, isLoading: usersLoading, refetch } = useQuery({
     queryKey: ['admin-users'],
@@ -110,6 +114,41 @@ export const UsersTab = () => {
     }
   };
 
+  const sendMessage = async () => {
+    if (!newMessage.trim() || !selectedUser) return;
+
+    try {
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não encontrado");
+
+      const { error } = await supabase
+        .from('messages')
+        .insert({
+          content: newMessage.trim(),
+          sender_id: user.id,
+          receiver_id: selectedUser.id,
+        });
+
+      if (error) throw error;
+
+      setNewMessage("");
+      toast({
+        title: "Mensagem enviada",
+        description: "Sua mensagem foi enviada com sucesso.",
+      });
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast({
+        title: "Erro ao enviar mensagem",
+        description: "Não foi possível enviar sua mensagem.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {editingUser && (
@@ -157,8 +196,8 @@ export const UsersTab = () => {
               <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="profile">Perfil</TabsTrigger>
                 <TabsTrigger value="meals">Refeições</TabsTrigger>
-                <TabsTrigger value="symptoms">Sintomas</TabsTrigger>
-                <TabsTrigger value="progress">Progresso</TabsTrigger>
+                <TabsTrigger value="protocol">Protocolo</TabsTrigger>
+                <TabsTrigger value="messages">Mensagens</TabsTrigger>
               </TabsList>
 
               <TabsContent value="profile" className="space-y-4">
@@ -213,34 +252,7 @@ export const UsersTab = () => {
                 </div>
               </TabsContent>
 
-              <TabsContent value="symptoms">
-                <div className="space-y-4">
-                  {selectedUser.symptoms.map((symptom) => (
-                    <Card key={symptom.id} className="p-4">
-                      <div className="space-y-2">
-                        <p className="text-sm text-gray-500">
-                          {format(new Date(symptom.created_at), 'dd/MM/yyyy HH:mm')}
-                        </p>
-                        <div className="flex gap-2">
-                          <span className="text-sm font-medium">Nível de Desconforto:</span>
-                          <span>{symptom.discomfort_level}</span>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {symptom.has_nausea && <span className="text-sm bg-red-100 px-2 py-1 rounded">Náusea</span>}
-                          {symptom.has_abdominal_pain && <span className="text-sm bg-red-100 px-2 py-1 rounded">Dor Abdominal</span>}
-                          {symptom.has_gas && <span className="text-sm bg-yellow-100 px-2 py-1 rounded">Gases</span>}
-                          {symptom.has_bloating && <span className="text-sm bg-yellow-100 px-2 py-1 rounded">Inchaço</span>}
-                        </div>
-                        {symptom.notes && (
-                          <p className="text-sm mt-2">{symptom.notes}</p>
-                        )}
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              </TabsContent>
-
-              <TabsContent value="progress">
+              <TabsContent value="protocol">
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 gap-4">
                     {selectedUser.education_progress.map((progress) => (
@@ -262,6 +274,18 @@ export const UsersTab = () => {
                       </Card>
                     ))}
                   </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="messages">
+                <div className="flex flex-col h-[500px]">
+                  <MessageList messages={[]} selectedUserId={selectedUser.id} />
+                  <MessageInput
+                    newMessage={newMessage}
+                    onMessageChange={setNewMessage}
+                    onSendMessage={sendMessage}
+                    loading={loading}
+                  />
                 </div>
               </TabsContent>
             </Tabs>

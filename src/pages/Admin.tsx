@@ -10,11 +10,6 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { UsersTab } from "@/components/admin/UsersTab";
-import { SymptomsTab } from "@/components/admin/SymptomsTab";
-import { ProtocolTab } from "@/components/admin/ProtocolTab";
-import { WaterIntakeTab } from "@/components/admin/WaterIntakeTab";
-import { MessagesTab } from "@/components/admin/MessagesTab";
-import { MealsTab } from "@/components/admin/MealsTab";
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -68,41 +63,7 @@ const Admin = () => {
   return (
     <div className="container mx-auto py-6">
       <h1 className="text-2xl font-bold mb-6">Painel Administrativo</h1>
-      
-      <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-6 mb-6">
-          <TabsTrigger value="users">Usuários</TabsTrigger>
-          <TabsTrigger value="symptoms">Sintomas</TabsTrigger>
-          <TabsTrigger value="water">Ingestão de Água</TabsTrigger>
-          <TabsTrigger value="protocol">Protocolo</TabsTrigger>
-          <TabsTrigger value="messages">Mensagens</TabsTrigger>
-          <TabsTrigger value="meals">Refeições</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="users">
-          <UsersTab />
-        </TabsContent>
-
-        <TabsContent value="symptoms">
-          <SymptomsTab />
-        </TabsContent>
-
-        <TabsContent value="water">
-          <WaterIntakeTab />
-        </TabsContent>
-
-        <TabsContent value="protocol">
-          <ProtocolTab />
-        </TabsContent>
-
-        <TabsContent value="messages">
-          <MessagesTab />
-        </TabsContent>
-
-        <TabsContent value="meals">
-          <MealsTab />
-        </TabsContent>
-      </Tabs>
+      <UsersTab />
     </div>
   );
 };
