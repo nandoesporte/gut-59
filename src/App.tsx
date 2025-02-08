@@ -11,6 +11,7 @@ import NotFound from "./pages/NotFound";
 import Layout from "./components/Layout";
 import Progress from "./pages/Progress";
 import Store from "./pages/Store";
+import Admin from "./pages/Admin";
 
 const queryClient = new QueryClient();
 
@@ -84,6 +85,16 @@ function App() {
                 <ProtectedRoute>
                   <Layout>
                     <Progress />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Admin />
                   </Layout>
                 </ProtectedRoute>
               }

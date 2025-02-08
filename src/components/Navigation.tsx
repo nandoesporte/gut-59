@@ -1,14 +1,25 @@
 
 import { Link, useLocation } from "react-router-dom";
-import { Book, Home, LineChart, ShoppingBag } from "lucide-react";
+import { Book, Home, LineChart, ShoppingBag, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
+import { useEffect, useState } from "react";
 
 const Navigation = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const [isAdmin, setIsAdmin] = useState(false);
   const isActive = (path: string) => location.pathname === path;
+
+  useEffect(() => {
+    const checkAdminRole = async () => {
+      const { data } = await supabase.rpc('has_role', { role: 'admin' });
+      setIsAdmin(!!data);
+    };
+
+    checkAdminRole();
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -57,6 +68,14 @@ const Navigation = () => {
             text="Diário"
             active={isActive("/progress")}
           />
+          {isAdmin && (
+            <NavLink
+              to="/admin"
+              icon={<Settings className="w-6 h-6" />}
+              text="Admin"
+              active={isActive("/admin")}
+            />
+          )}
         </div>
       </div>
     </nav>
