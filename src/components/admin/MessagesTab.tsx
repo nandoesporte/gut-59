@@ -36,31 +36,41 @@ export const MessagesTab = () => {
   useEffect(() => {
     fetchUsers();
     
-    const subscription = supabase
-      .channel('messages')
+    // Subscribe to real-time updates
+    const channel = supabase
+      .channel('messages_channel')
       .on('postgres_changes', { 
         event: 'INSERT', 
         schema: 'public', 
-        table: 'messages' 
+        table: 'messages',
+        filter: selectedUser ? `receiver_id=eq.${selectedUser}` : undefined
       }, payload => {
-        if (payload.new.receiver_id === selectedUser) {
-          fetchMessages();
-        }
+        console.log('New message received:', payload);
+        fetchMessages();
       })
       .subscribe();
 
     return () => {
-      subscription.unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, [selectedUser]);
 
   const fetchUsers = async () => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, name, photo_url');
+        .select('id, name, photo_url')
+        .neq('id', user.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching users:', error);
+        throw error;
+      }
+      
+      console.log('Fetched users:', data);
       setUsers(data || []);
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -95,7 +105,12 @@ export const MessagesTab = () => {
         .or(`and(sender_id.eq.${user.id},receiver_id.eq.${selectedUser}),and(sender_id.eq.${selectedUser},receiver_id.eq.${user.id})`)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching messages:', error);
+        throw error;
+      }
+      
+      console.log('Fetched messages:', data);
       setMessages(data || []);
     } catch (error) {
       console.error('Error fetching messages:', error);
@@ -115,15 +130,22 @@ export const MessagesTab = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não encontrado");
 
+      const messageData = {
+        content: newMessage.trim(),
+        sender_id: user.id,
+        receiver_id: selectedUser,
+      };
+
+      console.log('Sending message:', messageData);
+
       const { error } = await supabase
         .from('messages')
-        .insert({
-          content: newMessage.trim(),
-          sender_id: user.id,
-          receiver_id: selectedUser,
-        });
+        .insert(messageData);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error sending message:', error);
+        throw error;
+      }
 
       setNewMessage("");
       await fetchMessages();
@@ -143,6 +165,12 @@ export const MessagesTab = () => {
     }
   };
 
+  useEffect(() => {
+    if (selectedUser) {
+      fetchMessages();
+    }
+  }, [selectedUser]);
+
   return (
     <Card className="p-6">
       <div className="flex gap-4">
@@ -152,10 +180,7 @@ export const MessagesTab = () => {
             {users.map((user) => (
               <div
                 key={user.id}
-                onClick={() => {
-                  setSelectedUser(user.id);
-                  fetchMessages();
-                }}
+                onClick={() => setSelectedUser(user.id)}
                 className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer ${
                   selectedUser === user.id ? 'bg-primary-50' : 'hover:bg-gray-50'
                 }`}
@@ -175,7 +200,7 @@ export const MessagesTab = () => {
         <div className="flex-1">
           {selectedUser ? (
             <>
-              <div className="h-[500px] overflow-y-auto mb-4 space-y-4">
+              <div className="h-[500px] overflow-y-auto mb-4 space-y-4 p-4">
                 {messages.map((message) => (
                   <div
                     key={message.id}
