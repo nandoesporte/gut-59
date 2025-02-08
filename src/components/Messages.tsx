@@ -74,9 +74,19 @@ const Messages = () => {
         .from('user_roles')
         .select('user_id')
         .eq('role', 'admin')
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
+      
+      if (!data) {
+        console.log('No admin user found');
+        toast({
+          title: "Informação",
+          description: "O administrador ainda não está disponível para mensagens.",
+        });
+        return;
+      }
+      
       setAdminId(data.user_id);
     } catch (error) {
       console.error('Error fetching admin:', error);
