@@ -4,6 +4,7 @@ import SymptomTracker from "@/components/SymptomTracker";
 import FoodDiary from "@/components/FoodDiary";
 import Education from "@/components/Education";
 import Messages from "@/components/Messages";
+import ShoppingList from "@/components/ShoppingList";
 
 const Index = () => {
   return (
@@ -21,6 +22,9 @@ const Index = () => {
         <FoodDiary />
       </div>
       <div className="w-full">
+        <ShoppingList />
+      </div>
+      <div className="w-full">
         <Education />
       </div>
     </div>
@@ -28,3 +32,4 @@ const Index = () => {
 };
 
 export default Index;
+
