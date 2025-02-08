@@ -3,12 +3,16 @@ import Profile from "@/components/Profile";
 import SymptomTracker from "@/components/SymptomTracker";
 import FoodDiary from "@/components/FoodDiary";
 import Education from "@/components/Education";
+import Messages from "@/components/Messages";
 
 const Index = () => {
   return (
     <div className="space-y-8 flex flex-col items-center">
       <div className="w-full">
         <Profile />
+      </div>
+      <div className="w-full">
+        <Messages />
       </div>
       <div className="w-full">
         <SymptomTracker />
