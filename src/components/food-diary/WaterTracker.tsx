@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
@@ -8,9 +8,67 @@ import { Droplets, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import 'react-circular-progressbar/dist/styles.css';
 
+const DAILY_GOAL_ML = 2500;
+const WATER_INCREMENT_ML = 200;
+
 export const WaterTracker = () => {
   const { toast } = useToast();
   const [waterPercentage, setWaterPercentage] = useState(0);
+
+  const loadDailyWaterIntake = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast({
+          title: "Erro",
+          description: "Usuário não encontrado. Por favor, faça login novamente.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const today = new Date().toISOString().split('T')[0]; // Get today's date in YYYY-MM-DD format
+
+      const { data, error } = await supabase
+        .from('water_intake')
+        .select('amount_ml')
+        .eq('user_id', user.id)
+        .eq('intake_date', today);
+
+      if (error) throw error;
+
+      const totalIntake = data?.reduce((sum, record) => sum + (record.amount_ml || 0), 0) || 0;
+      const percentage = Math.min(100, Math.round((totalIntake / DAILY_GOAL_ML) * 100));
+      setWaterPercentage(percentage);
+    } catch (error) {
+      console.error('Error loading water intake:', error);
+    }
+  };
+
+  useEffect(() => {
+    loadDailyWaterIntake();
+    
+    // Set up real-time subscription for water intake updates
+    const channel = supabase
+      .channel('water_intake_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'water_intake',
+        },
+        () => {
+          loadDailyWaterIntake();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const handleAddWater = async () => {
     try {
@@ -25,21 +83,31 @@ export const WaterTracker = () => {
         return;
       }
 
+      // Check if adding more water would exceed the daily goal
+      const newPercentage = (waterPercentage * DAILY_GOAL_ML + WATER_INCREMENT_ML) / DAILY_GOAL_ML * 100;
+      if (newPercentage > 100) {
+        toast({
+          title: "Limite diário atingido",
+          description: "Você já atingiu sua meta diária de água!",
+        });
+        return;
+      }
+
       const { error } = await supabase
         .from('water_intake')
         .insert({
           user_id: user.id,
-          amount_ml: 200,
+          amount_ml: WATER_INCREMENT_ML,
         });
 
       if (error) throw error;
 
-      setWaterPercentage(prev => Math.min(100, prev + 5));
-
       toast({
         title: "Água registrada",
-        description: "200ml de água registrados com sucesso.",
+        description: `${WATER_INCREMENT_ML}ml de água registrados com sucesso.`,
       });
+
+      await loadDailyWaterIntake();
     } catch (error) {
       console.error('Error:', error);
       toast({
@@ -76,7 +144,7 @@ export const WaterTracker = () => {
             variant="ghost"
           >
             <Plus className="w-5 h-5 mr-2" />
-            Adicionar 200ml
+            Adicionar {WATER_INCREMENT_ML}ml
           </Button>
         </div>
       </CardContent>
