@@ -21,8 +21,8 @@ const DailyRoutine = ({ day, dayIndex, isOpen, onToggle }: DailyRoutineProps) =>
       className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden"
     >
       <CollapsibleTrigger className="w-full">
-        <div className="bg-primary-100 px-4 py-3 flex justify-between items-center">
-          <h4 className="font-medium text-primary-700">
+        <div className="bg-gradient-to-r from-primary-100 to-primary-50 px-4 py-3 flex justify-between items-center">
+          <h4 className="font-semibold text-primary-700 text-lg">
             Dia {dayIndex + 1}
           </h4>
           {isOpen ? (
@@ -33,7 +33,7 @@ const DailyRoutine = ({ day, dayIndex, isOpen, onToggle }: DailyRoutineProps) =>
         </div>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="p-4 space-y-4">
+        <div className="p-6 space-y-6">
           <MealsList meals={day.meals} />
           <SupplementsList supplements={day.supplements} />
         </div>

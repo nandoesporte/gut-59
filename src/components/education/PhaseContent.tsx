@@ -15,11 +15,11 @@ const PhaseContent = ({ phase, phaseIndex, openDays, onToggleDay }: PhaseContent
   return (
     <TabsContent value={`fase${phaseIndex + 1}`}>
       <div className="space-y-6">
-        <div className="bg-primary-50 p-4 rounded-lg">
-          <h3 className="text-xl font-semibold text-primary-600 mb-2">
+        <div className="bg-gradient-to-r from-primary-50 to-primary-100 p-6 rounded-lg">
+          <h3 className="text-2xl font-semibold text-primary-700 mb-3">
             {phase.title}
           </h3>
-          <p className="text-gray-600">{phase.description}</p>
+          <p className="text-primary-600">{phase.description}</p>
         </div>
 
         <div className="grid gap-4">
