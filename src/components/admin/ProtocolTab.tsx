@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import {
   Table,
@@ -8,7 +9,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,41 +31,13 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import {
-  ProtocolPhase,
-  FoodGroup,
-  MealType,
-  ProtocolFood,
-  PhaseFormValues,
-  FoodGroupFormValues,
-  MealTypeFormValues,
-  ProtocolFoodFormValues,
-  DayData,
-  DayFormValues,
-} from "./types";
+import { ProtocolPhase, PhaseFormValues, DayData, DayFormValues } from "./types";
 
 const phaseFormSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório"),
   description: z.string().optional(),
   day_start: z.coerce.number().min(1, "Dia inicial é obrigatório"),
   day_end: z.coerce.number().min(1, "Dia final é obrigatório"),
-});
-
-const foodGroupFormSchema = z.object({
-  name: z.string().min(1, "Nome é obrigatório"),
-  display_name: z.string().min(1, "Nome de exibição é obrigatório"),
-});
-
-const mealTypeFormSchema = z.object({
-  name: z.string().min(1, "Nome é obrigatório"),
-  display_name: z.string().min(1, "Nome de exibição é obrigatório"),
-  phase: z.coerce.number().nullable(),
-});
-
-const protocolFoodFormSchema = z.object({
-  name: z.string().min(1, "Nome é obrigatório"),
-  phase_id: z.coerce.number().nullable(),
-  food_group_id: z.coerce.number().nullable(),
 });
 
 const dayFormSchema = z.object({
@@ -93,42 +65,6 @@ export const ProtocolTab = () => {
     },
   });
 
-  const { data: foodGroups, isLoading: foodGroupsLoading } = useQuery({
-    queryKey: ["food-groups"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("food_groups")
-        .select("*")
-        .order("name");
-      if (error) throw error;
-      return data as FoodGroup[];
-    },
-  });
-
-  const { data: mealTypes, isLoading: mealTypesLoading } = useQuery({
-    queryKey: ["meal-types"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("meal_types")
-        .select("*")
-        .order("name");
-      if (error) throw error;
-      return data as MealType[];
-    },
-  });
-
-  const { data: protocolFoods, isLoading: protocolFoodsLoading } = useQuery({
-    queryKey: ["protocol-foods"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("protocol_foods")
-        .select("*")
-        .order("name");
-      if (error) throw error;
-      return data as ProtocolFood[];
-    },
-  });
-
   const { data: days, isLoading: daysLoading } = useQuery({
     queryKey: ["protocol-days"],
     queryFn: async () => {
@@ -152,48 +88,6 @@ export const ProtocolTab = () => {
     },
     onError: () => {
       toast.error("Erro ao criar fase");
-    },
-  });
-
-  const createFoodGroup = useMutation({
-    mutationFn: async (values: FoodGroupFormValues) => {
-      const { error } = await supabase.from("food_groups").insert(values);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["food-groups"] });
-      toast.success("Grupo alimentar criado com sucesso!");
-    },
-    onError: () => {
-      toast.error("Erro ao criar grupo alimentar");
-    },
-  });
-
-  const createMealType = useMutation({
-    mutationFn: async (values: MealTypeFormValues) => {
-      const { error } = await supabase.from("meal_types").insert(values);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["meal-types"] });
-      toast.success("Tipo de refeição criado com sucesso!");
-    },
-    onError: () => {
-      toast.error("Erro ao criar tipo de refeição");
-    },
-  });
-
-  const createProtocolFood = useMutation({
-    mutationFn: async (values: ProtocolFoodFormValues) => {
-      const { error } = await supabase.from("protocol_foods").insert(values);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["protocol-foods"] });
-      toast.success("Alimento criado com sucesso!");
-    },
-    onError: () => {
-      toast.error("Erro ao criar alimento");
     },
   });
 
@@ -225,54 +119,6 @@ export const ProtocolTab = () => {
     },
     onError: () => {
       toast.error("Erro ao excluir fase");
-    },
-  });
-
-  const deleteFoodGroup = useMutation({
-    mutationFn: async (id: number) => {
-      const { error } = await supabase
-        .from("food_groups")
-        .delete()
-        .eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["food-groups"] });
-      toast.success("Grupo alimentar excluído com sucesso!");
-    },
-    onError: () => {
-      toast.error("Erro ao excluir grupo alimentar");
-    },
-  });
-
-  const deleteMealType = useMutation({
-    mutationFn: async (id: number) => {
-      const { error } = await supabase.from("meal_types").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["meal-types"] });
-      toast.success("Tipo de refeição excluído com sucesso!");
-    },
-    onError: () => {
-      toast.error("Erro ao excluir tipo de refeição");
-    },
-  });
-
-  const deleteProtocolFood = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("protocol_foods")
-        .delete()
-        .eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["protocol-foods"] });
-      toast.success("Alimento excluído com sucesso!");
-    },
-    onError: () => {
-      toast.error("Erro ao excluir alimento");
     },
   });
 
@@ -317,78 +163,6 @@ export const ProtocolTab = () => {
     },
   });
 
-  const updateFoodGroup = useMutation({
-    mutationFn: async ({
-      id,
-      values,
-    }: {
-      id: number;
-      values: FoodGroupFormValues;
-    }) => {
-      const { error } = await supabase
-        .from("food_groups")
-        .update(values)
-        .eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["food-groups"] });
-      toast.success("Grupo alimentar atualizado com sucesso!");
-      setEditingId(null);
-    },
-    onError: () => {
-      toast.error("Erro ao atualizar grupo alimentar");
-    },
-  });
-
-  const updateMealType = useMutation({
-    mutationFn: async ({
-      id,
-      values,
-    }: {
-      id: number;
-      values: MealTypeFormValues;
-    }) => {
-      const { error } = await supabase
-        .from("meal_types")
-        .update(values)
-        .eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["meal-types"] });
-      toast.success("Tipo de refeição atualizado com sucesso!");
-      setEditingId(null);
-    },
-    onError: () => {
-      toast.error("Erro ao atualizar tipo de refeição");
-    },
-  });
-
-  const updateProtocolFood = useMutation({
-    mutationFn: async ({
-      id,
-      values,
-    }: {
-      id: string;
-      values: ProtocolFoodFormValues;
-    }) => {
-      const { error } = await supabase
-        .from("protocol_foods")
-        .update(values)
-        .eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["protocol-foods"] });
-      toast.success("Alimento atualizado com sucesso!");
-      setEditingId(null);
-    },
-    onError: () => {
-      toast.error("Erro ao atualizar alimento");
-    },
-  });
-
   const updateDay = useMutation({
     mutationFn: async ({
       id,
@@ -423,32 +197,6 @@ export const ProtocolTab = () => {
     },
   });
 
-  const foodGroupForm = useForm<FoodGroupFormValues>({
-    resolver: zodResolver(foodGroupFormSchema),
-    defaultValues: {
-      name: "",
-      display_name: "",
-    },
-  });
-
-  const mealTypeForm = useForm<MealTypeFormValues>({
-    resolver: zodResolver(mealTypeFormSchema),
-    defaultValues: {
-      name: "",
-      display_name: "",
-      phase: null,
-    },
-  });
-
-  const protocolFoodForm = useForm<ProtocolFoodFormValues>({
-    resolver: zodResolver(protocolFoodFormSchema),
-    defaultValues: {
-      name: "",
-      phase_id: null,
-      food_group_id: null,
-    },
-  });
-
   const dayForm = useForm<DayFormValues>({
     resolver: zodResolver(dayFormSchema),
     defaultValues: {
@@ -462,11 +210,8 @@ export const ProtocolTab = () => {
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab}>
-      <TabsList className="grid w-full grid-cols-5">
-        <TabsTrigger value="phases">Fases</TabsTrigger>
-        <TabsTrigger value="food-groups">Grupos Alimentares</TabsTrigger>
-        <TabsTrigger value="meal-types">Tipos de Refeição</TabsTrigger>
-        <TabsTrigger value="foods">Alimentos</TabsTrigger>
+      <TabsList className="grid w-full grid-cols-2">
+        <TabsTrigger value="phases">Fases do Protocolo</TabsTrigger>
         <TabsTrigger value="modulation">Protocolo de Modulação</TabsTrigger>
       </TabsList>
 
@@ -497,7 +242,7 @@ export const ProtocolTab = () => {
                       <FormItem>
                         <FormLabel>Nome</FormLabel>
                         <FormControl>
-                          <Input {...field} />
+                          <input {...field} className="w-full p-2 border rounded" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -510,7 +255,7 @@ export const ProtocolTab = () => {
                       <FormItem>
                         <FormLabel>Descrição</FormLabel>
                         <FormControl>
-                          <Input {...field} />
+                          <input {...field} className="w-full p-2 border rounded" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -523,7 +268,7 @@ export const ProtocolTab = () => {
                       <FormItem>
                         <FormLabel>Dia Inicial</FormLabel>
                         <FormControl>
-                          <Input type="number" {...field} />
+                          <input type="number" {...field} className="w-full p-2 border rounded" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -536,7 +281,7 @@ export const ProtocolTab = () => {
                       <FormItem>
                         <FormLabel>Dia Final</FormLabel>
                         <FormControl>
-                          <Input type="number" {...field} />
+                          <input type="number" {...field} className="w-full p-2 border rounded" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -608,363 +353,6 @@ export const ProtocolTab = () => {
         </div>
       </TabsContent>
 
-      <TabsContent value="food-groups" className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h3 className="text-lg font-medium">Grupos Alimentares</h3>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button>Adicionar Grupo</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Novo Grupo Alimentar</DialogTitle>
-              </DialogHeader>
-              <Form {...foodGroupForm}>
-                <form
-                  onSubmit={foodGroupForm.handleSubmit((data) =>
-                    editingId
-                      ? updateFoodGroup.mutate({ id: editingId, values: data })
-                      : createFoodGroup.mutate(data)
-                  )}
-                  className="space-y-4"
-                >
-                  <FormField
-                    control={foodGroupForm.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nome</FormLabel>
-                        <FormControl>
-                          <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={foodGroupForm.control}
-                    name="display_name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nome de Exibição</FormLabel>
-                        <FormControl>
-                          <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button type="submit">
-                    {editingId ? "Atualizar" : "Salvar"}
-                  </Button>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Nome de Exibição</TableHead>
-                <TableHead>Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {foodGroupsLoading ? (
-                <TableRow>
-                  <TableCell colSpan={3} className="text-center">
-                    Carregando...
-                  </TableCell>
-                </TableRow>
-              ) : (
-                foodGroups?.map((group) => (
-                  <TableRow key={group.id}>
-                    <TableCell>{group.name}</TableCell>
-                    <TableCell>{group.display_name}</TableCell>
-                    <TableCell className="space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setEditingId(group.id);
-                          foodGroupForm.reset({
-                            name: group.name,
-                            display_name: group.display_name,
-                          });
-                        }}
-                      >
-                        Editar
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => deleteFoodGroup.mutate(group.id)}
-                      >
-                        Excluir
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </TabsContent>
-
-      <TabsContent value="meal-types" className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h3 className="text-lg font-medium">Tipos de Refeição</h3>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button>Adicionar Tipo</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Novo Tipo de Refeição</DialogTitle>
-              </DialogHeader>
-              <Form {...mealTypeForm}>
-                <form
-                  onSubmit={mealTypeForm.handleSubmit((data) =>
-                    editingId
-                      ? updateMealType.mutate({ id: editingId, values: data })
-                      : createMealType.mutate(data)
-                  )}
-                  className="space-y-4"
-                >
-                  <FormField
-                    control={mealTypeForm.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nome</FormLabel>
-                        <FormControl>
-                          <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={mealTypeForm.control}
-                    name="display_name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nome de Exibição</FormLabel>
-                        <FormControl>
-                          <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={mealTypeForm.control}
-                    name="phase"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Fase</FormLabel>
-                        <FormControl>
-                          <Input type="number" {...field} onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button type="submit">
-                    {editingId ? "Atualizar" : "Salvar"}
-                  </Button>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Nome de Exibição</TableHead>
-                <TableHead>Fase</TableHead>
-                <TableHead>Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {mealTypesLoading ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center">
-                    Carregando...
-                  </TableCell>
-                </TableRow>
-              ) : (
-                mealTypes?.map((type) => (
-                  <TableRow key={type.id}>
-                    <TableCell>{type.name}</TableCell>
-                    <TableCell>{type.display_name}</TableCell>
-                    <TableCell>{type.phase}</TableCell>
-                    <TableCell className="space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setEditingId(type.id);
-                          mealTypeForm.reset({
-                            name: type.name,
-                            display_name: type.display_name,
-                            phase: type.phase,
-                          });
-                        }}
-                      >
-                        Editar
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => deleteMealType.mutate(type.id)}
-                      >
-                        Excluir
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </TabsContent>
-
-      <TabsContent value="foods" className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h3 className="text-lg font-medium">Alimentos do Protocolo</h3>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button>Adicionar Alimento</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Novo Alimento</DialogTitle>
-              </DialogHeader>
-              <Form {...protocolFoodForm}>
-                <form
-                  onSubmit={protocolFoodForm.handleSubmit((data) =>
-                    editingId
-                      ? updateProtocolFood.mutate({
-                          id: editingId.toString(),
-                          values: data,
-                        })
-                      : createProtocolFood.mutate(data)
-                  )}
-                  className="space-y-4"
-                >
-                  <FormField
-                    control={protocolFoodForm.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nome</FormLabel>
-                        <FormControl>
-                          <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={protocolFoodForm.control}
-                    name="phase_id"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Fase</FormLabel>
-                        <FormControl>
-                          <Input type="number" {...field} onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={protocolFoodForm.control}
-                    name="food_group_id"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Grupo Alimentar</FormLabel>
-                        <FormControl>
-                          <Input type="number" {...field} onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button type="submit">
-                    {editingId ? "Atualizar" : "Salvar"}
-                  </Button>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Fase</TableHead>
-                <TableHead>Grupo Alimentar</TableHead>
-                <TableHead>Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {protocolFoodsLoading ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center">
-                    Carregando...
-                  </TableCell>
-                </TableRow>
-              ) : (
-                protocolFoods?.map((food) => (
-                  <TableRow key={food.id}>
-                    <TableCell>{food.name}</TableCell>
-                    <TableCell>{food.phase_id}</TableCell>
-                    <TableCell>{food.food_group_id}</TableCell>
-                    <TableCell className="space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setEditingId(Number(food.id));
-                          protocolFoodForm.reset({
-                            name: food.name,
-                            phase_id: food.phase_id,
-                            food_group_id: food.food_group_id,
-                          });
-                        }}
-                      >
-                        Editar
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => deleteProtocolFood.mutate(food.id)}
-                      >
-                        Excluir
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </TabsContent>
-
-      <TabsContent value="diary">
-        Dados do diário
-      </TabsContent>
-
       <TabsContent value="modulation" className="space-y-4">
         <div className="flex justify-between items-center">
           <h3 className="text-lg font-medium">Protocolo de Modulação</h3>
@@ -1018,7 +406,7 @@ export const ProtocolTab = () => {
                       <FormItem>
                         <FormLabel>Dia</FormLabel>
                         <FormControl>
-                          <Input type="number" {...field} onChange={(e) => field.onChange(parseInt(e.target.value))} />
+                          <input type="number" {...field} className="w-full p-2 border rounded" onChange={(e) => field.onChange(parseInt(e.target.value))} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1031,7 +419,7 @@ export const ProtocolTab = () => {
                       <FormItem>
                         <FormLabel>Título</FormLabel>
                         <FormControl>
-                          <Input {...field} />
+                          <input {...field} className="w-full p-2 border rounded" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1044,7 +432,7 @@ export const ProtocolTab = () => {
                       <FormItem>
                         <FormLabel>Descrição</FormLabel>
                         <FormControl>
-                          <Input {...field} />
+                          <input {...field} className="w-full p-2 border rounded" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1134,6 +522,7 @@ export const ProtocolTab = () => {
                                         onChange={(e) =>
                                           field.onChange(parseInt(e.target.value))
                                         }
+                                        value={day.phase_id}
                                       >
                                         <option value="">Selecione uma fase</option>
                                         {phases?.map((phase) => (
@@ -1154,7 +543,13 @@ export const ProtocolTab = () => {
                                   <FormItem>
                                     <FormLabel>Dia</FormLabel>
                                     <FormControl>
-                                      <Input type="number" {...field} onChange={(e) => field.onChange(parseInt(e.target.value))} />
+                                      <input 
+                                        type="number" 
+                                        {...field} 
+                                        className="w-full p-2 border rounded"
+                                        onChange={(e) => field.onChange(parseInt(e.target.value))}
+                                        value={day.day}
+                                      />
                                     </FormControl>
                                     <FormMessage />
                                   </FormItem>
@@ -1167,7 +562,11 @@ export const ProtocolTab = () => {
                                   <FormItem>
                                     <FormLabel>Título</FormLabel>
                                     <FormControl>
-                                      <Input {...field} />
+                                      <input 
+                                        {...field} 
+                                        className="w-full p-2 border rounded"
+                                        defaultValue={day.title}
+                                      />
                                     </FormControl>
                                     <FormMessage />
                                   </FormItem>
@@ -1180,7 +579,11 @@ export const ProtocolTab = () => {
                                   <FormItem>
                                     <FormLabel>Descrição</FormLabel>
                                     <FormControl>
-                                      <Input {...field} />
+                                      <input 
+                                        {...field} 
+                                        className="w-full p-2 border rounded"
+                                        defaultValue={day.description || ""}
+                                      />
                                     </FormControl>
                                     <FormMessage />
                                   </FormItem>
@@ -1197,15 +600,14 @@ export const ProtocolTab = () => {
                                         className="w-full p-2 border rounded"
                                         rows={5}
                                         {...field}
+                                        defaultValue={day.content}
                                       />
                                     </FormControl>
                                     <FormMessage />
                                   </FormItem>
                                 )}
                               />
-                              <Button type="submit">
-                                {editingId ? "Atualizar" : "Salvar"}
-                              </Button>
+                              <Button type="submit">Atualizar</Button>
                             </form>
                           </Form>
                         </DialogContent>
@@ -1227,4 +629,4 @@ export const ProtocolTab = () => {
       </TabsContent>
     </Tabs>
   );
-}
+};
