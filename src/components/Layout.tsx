@@ -24,7 +24,7 @@ const Layout = ({ children }: LayoutProps) => {
           </div>
         </div>
       </header>
-      <main className="w-full px-4 sm:px-6 lg:px-8 py-6 pb-24 animate-fadeIn mt-24">
+      <main className="w-full px-4 sm:px-6 lg:px-8 py-6 pb-24 animate-fadeIn mt-15">
         {children}
       </main>
       <Navigation />
@@ -33,4 +33,3 @@ const Layout = ({ children }: LayoutProps) => {
 };
 
 export default Layout;
-
