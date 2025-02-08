@@ -1,7 +1,6 @@
 
 import Profile from "@/components/Profile";
 import SymptomTracker from "@/components/SymptomTracker";
-import FoodDiary from "@/components/FoodDiary";
 import Education from "@/components/Education";
 
 const Index = () => {
@@ -12,9 +11,6 @@ const Index = () => {
       </div>
       <div className="w-full">
         <SymptomTracker />
-      </div>
-      <div className="w-full">
-        <FoodDiary />
       </div>
       <div className="w-full">
         <Education />
