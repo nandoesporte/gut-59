@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import {
   Table,
@@ -32,15 +31,15 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { 
-  ProtocolPhase, 
-  FoodGroup, 
-  MealType, 
+import {
+  ProtocolPhase,
+  FoodGroup,
+  MealType,
   ProtocolFood,
   PhaseFormValues,
   FoodGroupFormValues,
   MealTypeFormValues,
-  ProtocolFoodFormValues
+  ProtocolFoodFormValues,
 } from "./types";
 
 const phaseFormSchema = z.object({
@@ -69,9 +68,9 @@ const protocolFoodFormSchema = z.object({
 
 export const ProtocolTab = () => {
   const [activeTab, setActiveTab] = useState("phases");
+  const [editingId, setEditingId] = useState<number | null>(null);
   const queryClient = useQueryClient();
 
-  // Queries
   const { data: phases, isLoading: phasesLoading } = useQuery({
     queryKey: ["protocol-phases"],
     queryFn: async () => {
@@ -120,7 +119,6 @@ export const ProtocolTab = () => {
     },
   });
 
-  // Mutations
   const createPhase = useMutation({
     mutationFn: async (values: PhaseFormValues) => {
       const { error } = await supabase.from("protocol_phases").insert(values);
@@ -174,6 +172,167 @@ export const ProtocolTab = () => {
     },
     onError: () => {
       toast.error("Erro ao criar alimento");
+    },
+  });
+
+  const deletePhase = useMutation({
+    mutationFn: async (id: number) => {
+      const { error } = await supabase
+        .from("protocol_phases")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["protocol-phases"] });
+      toast.success("Fase excluída com sucesso!");
+    },
+    onError: () => {
+      toast.error("Erro ao excluir fase");
+    },
+  });
+
+  const deleteFoodGroup = useMutation({
+    mutationFn: async (id: number) => {
+      const { error } = await supabase
+        .from("food_groups")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["food-groups"] });
+      toast.success("Grupo alimentar excluído com sucesso!");
+    },
+    onError: () => {
+      toast.error("Erro ao excluir grupo alimentar");
+    },
+  });
+
+  const deleteMealType = useMutation({
+    mutationFn: async (id: number) => {
+      const { error } = await supabase.from("meal_types").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["meal-types"] });
+      toast.success("Tipo de refeição excluído com sucesso!");
+    },
+    onError: () => {
+      toast.error("Erro ao excluir tipo de refeição");
+    },
+  });
+
+  const deleteProtocolFood = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("protocol_foods")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["protocol-foods"] });
+      toast.success("Alimento excluído com sucesso!");
+    },
+    onError: () => {
+      toast.error("Erro ao excluir alimento");
+    },
+  });
+
+  const updatePhase = useMutation({
+    mutationFn: async ({
+      id,
+      values,
+    }: {
+      id: number;
+      values: PhaseFormValues;
+    }) => {
+      const { error } = await supabase
+        .from("protocol_phases")
+        .update(values)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["protocol-phases"] });
+      toast.success("Fase atualizada com sucesso!");
+      setEditingId(null);
+    },
+    onError: () => {
+      toast.error("Erro ao atualizar fase");
+    },
+  });
+
+  const updateFoodGroup = useMutation({
+    mutationFn: async ({
+      id,
+      values,
+    }: {
+      id: number;
+      values: FoodGroupFormValues;
+    }) => {
+      const { error } = await supabase
+        .from("food_groups")
+        .update(values)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["food-groups"] });
+      toast.success("Grupo alimentar atualizado com sucesso!");
+      setEditingId(null);
+    },
+    onError: () => {
+      toast.error("Erro ao atualizar grupo alimentar");
+    },
+  });
+
+  const updateMealType = useMutation({
+    mutationFn: async ({
+      id,
+      values,
+    }: {
+      id: number;
+      values: MealTypeFormValues;
+    }) => {
+      const { error } = await supabase
+        .from("meal_types")
+        .update(values)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["meal-types"] });
+      toast.success("Tipo de refeição atualizado com sucesso!");
+      setEditingId(null);
+    },
+    onError: () => {
+      toast.error("Erro ao atualizar tipo de refeição");
+    },
+  });
+
+  const updateProtocolFood = useMutation({
+    mutationFn: async ({
+      id,
+      values,
+    }: {
+      id: string;
+      values: ProtocolFoodFormValues;
+    }) => {
+      const { error } = await supabase
+        .from("protocol_foods")
+        .update(values)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["protocol-foods"] });
+      toast.success("Alimento atualizado com sucesso!");
+      setEditingId(null);
+    },
+    onError: () => {
+      toast.error("Erro ao atualizar alimento");
     },
   });
 
@@ -234,7 +393,14 @@ export const ProtocolTab = () => {
                 <DialogTitle>Nova Fase</DialogTitle>
               </DialogHeader>
               <Form {...phaseForm}>
-                <form onSubmit={phaseForm.handleSubmit((data) => createPhase.mutate(data))} className="space-y-4">
+                <form
+                  onSubmit={phaseForm.handleSubmit((data) =>
+                    editingId
+                      ? updatePhase.mutate({ id: editingId, values: data })
+                      : createPhase.mutate(data)
+                  )}
+                  className="space-y-4"
+                >
                   <FormField
                     control={phaseForm.control}
                     name="name"
@@ -287,7 +453,9 @@ export const ProtocolTab = () => {
                       </FormItem>
                     )}
                   />
-                  <Button type="submit">Salvar</Button>
+                  <Button type="submit">
+                    {editingId ? "Atualizar" : "Salvar"}
+                  </Button>
                 </form>
               </Form>
             </DialogContent>
@@ -302,12 +470,13 @@ export const ProtocolTab = () => {
                 <TableHead>Descrição</TableHead>
                 <TableHead>Dia Inicial</TableHead>
                 <TableHead>Dia Final</TableHead>
+                <TableHead>Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {phasesLoading ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center">
+                  <TableCell colSpan={5} className="text-center">
                     Carregando...
                   </TableCell>
                 </TableRow>
@@ -318,6 +487,30 @@ export const ProtocolTab = () => {
                     <TableCell>{phase.description}</TableCell>
                     <TableCell>{phase.day_start}</TableCell>
                     <TableCell>{phase.day_end}</TableCell>
+                    <TableCell className="space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setEditingId(phase.id);
+                          phaseForm.reset({
+                            name: phase.name,
+                            description: phase.description || "",
+                            day_start: phase.day_start,
+                            day_end: phase.day_end,
+                          });
+                        }}
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => deletePhase.mutate(phase.id)}
+                      >
+                        Excluir
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -338,7 +531,14 @@ export const ProtocolTab = () => {
                 <DialogTitle>Novo Grupo Alimentar</DialogTitle>
               </DialogHeader>
               <Form {...foodGroupForm}>
-                <form onSubmit={foodGroupForm.handleSubmit((data) => createFoodGroup.mutate(data))} className="space-y-4">
+                <form
+                  onSubmit={foodGroupForm.handleSubmit((data) =>
+                    editingId
+                      ? updateFoodGroup.mutate({ id: editingId, values: data })
+                      : createFoodGroup.mutate(data)
+                  )}
+                  className="space-y-4"
+                >
                   <FormField
                     control={foodGroupForm.control}
                     name="name"
@@ -365,7 +565,9 @@ export const ProtocolTab = () => {
                       </FormItem>
                     )}
                   />
-                  <Button type="submit">Salvar</Button>
+                  <Button type="submit">
+                    {editingId ? "Atualizar" : "Salvar"}
+                  </Button>
                 </form>
               </Form>
             </DialogContent>
@@ -378,12 +580,13 @@ export const ProtocolTab = () => {
               <TableRow>
                 <TableHead>Nome</TableHead>
                 <TableHead>Nome de Exibição</TableHead>
+                <TableHead>Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {foodGroupsLoading ? (
                 <TableRow>
-                  <TableCell colSpan={2} className="text-center">
+                  <TableCell colSpan={3} className="text-center">
                     Carregando...
                   </TableCell>
                 </TableRow>
@@ -392,6 +595,28 @@ export const ProtocolTab = () => {
                   <TableRow key={group.id}>
                     <TableCell>{group.name}</TableCell>
                     <TableCell>{group.display_name}</TableCell>
+                    <TableCell className="space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setEditingId(group.id);
+                          foodGroupForm.reset({
+                            name: group.name,
+                            display_name: group.display_name,
+                          });
+                        }}
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => deleteFoodGroup.mutate(group.id)}
+                      >
+                        Excluir
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -412,7 +637,14 @@ export const ProtocolTab = () => {
                 <DialogTitle>Novo Tipo de Refeição</DialogTitle>
               </DialogHeader>
               <Form {...mealTypeForm}>
-                <form onSubmit={mealTypeForm.handleSubmit((data) => createMealType.mutate(data))} className="space-y-4">
+                <form
+                  onSubmit={mealTypeForm.handleSubmit((data) =>
+                    editingId
+                      ? updateMealType.mutate({ id: editingId, values: data })
+                      : createMealType.mutate(data)
+                  )}
+                  className="space-y-4"
+                >
                   <FormField
                     control={mealTypeForm.control}
                     name="name"
@@ -452,7 +684,9 @@ export const ProtocolTab = () => {
                       </FormItem>
                     )}
                   />
-                  <Button type="submit">Salvar</Button>
+                  <Button type="submit">
+                    {editingId ? "Atualizar" : "Salvar"}
+                  </Button>
                 </form>
               </Form>
             </DialogContent>
@@ -466,12 +700,13 @@ export const ProtocolTab = () => {
                 <TableHead>Nome</TableHead>
                 <TableHead>Nome de Exibição</TableHead>
                 <TableHead>Fase</TableHead>
+                <TableHead>Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {mealTypesLoading ? (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center">
+                  <TableCell colSpan={4} className="text-center">
                     Carregando...
                   </TableCell>
                 </TableRow>
@@ -481,6 +716,29 @@ export const ProtocolTab = () => {
                     <TableCell>{type.name}</TableCell>
                     <TableCell>{type.display_name}</TableCell>
                     <TableCell>{type.phase}</TableCell>
+                    <TableCell className="space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setEditingId(type.id);
+                          mealTypeForm.reset({
+                            name: type.name,
+                            display_name: type.display_name,
+                            phase: type.phase,
+                          });
+                        }}
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => deleteMealType.mutate(type.id)}
+                      >
+                        Excluir
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -501,7 +759,17 @@ export const ProtocolTab = () => {
                 <DialogTitle>Novo Alimento</DialogTitle>
               </DialogHeader>
               <Form {...protocolFoodForm}>
-                <form onSubmit={protocolFoodForm.handleSubmit((data) => createProtocolFood.mutate(data))} className="space-y-4">
+                <form
+                  onSubmit={protocolFoodForm.handleSubmit((data) =>
+                    editingId
+                      ? updateProtocolFood.mutate({
+                          id: editingId.toString(),
+                          values: data,
+                        })
+                      : createProtocolFood.mutate(data)
+                  )}
+                  className="space-y-4"
+                >
                   <FormField
                     control={protocolFoodForm.control}
                     name="name"
@@ -541,7 +809,9 @@ export const ProtocolTab = () => {
                       </FormItem>
                     )}
                   />
-                  <Button type="submit">Salvar</Button>
+                  <Button type="submit">
+                    {editingId ? "Atualizar" : "Salvar"}
+                  </Button>
                 </form>
               </Form>
             </DialogContent>
@@ -555,12 +825,13 @@ export const ProtocolTab = () => {
                 <TableHead>Nome</TableHead>
                 <TableHead>Fase</TableHead>
                 <TableHead>Grupo Alimentar</TableHead>
+                <TableHead>Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {protocolFoodsLoading ? (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center">
+                  <TableCell colSpan={4} className="text-center">
                     Carregando...
                   </TableCell>
                 </TableRow>
@@ -570,6 +841,29 @@ export const ProtocolTab = () => {
                     <TableCell>{food.name}</TableCell>
                     <TableCell>{food.phase_id}</TableCell>
                     <TableCell>{food.food_group_id}</TableCell>
+                    <TableCell className="space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setEditingId(Number(food.id));
+                          protocolFoodForm.reset({
+                            name: food.name,
+                            phase_id: food.phase_id,
+                            food_group_id: food.food_group_id,
+                          });
+                        }}
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => deleteProtocolFood.mutate(food.id)}
+                      >
+                        Excluir
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
