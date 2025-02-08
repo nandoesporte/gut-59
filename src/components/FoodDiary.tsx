@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -19,27 +19,14 @@ const FoodDiary = () => {
   const [mealType, setMealType] = useState<string>("");
   const [phase, setPhase] = useState<string>("");
   const [date, setDate] = useState<Date>(new Date());
-  const [mealTypes, setMealTypes] = useState<MealType[]>([]);
+  const [mealTypes] = useState<MealType[]>([
+    { id: 1, name: 'breakfast', display_name: 'Café da Manhã', phase: null },
+    { id: 2, name: 'lunch', display_name: 'Almoço', phase: null },
+    { id: 3, name: 'dinner', display_name: 'Jantar', phase: null },
+    { id: 4, name: 'snack', display_name: 'Lanche', phase: null }
+  ]);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [currentPhotoFile, setCurrentPhotoFile] = useState<File | null>(null);
-
-  useEffect(() => {
-    fetchMealTypes();
-  }, []);
-
-  const fetchMealTypes = async () => {
-    try {
-      const { data: mealTypesData, error: mealTypesError } = await supabase
-        .from('meal_types')
-        .select('*')
-        .order('id');
-
-      if (mealTypesError) throw mealTypesError;
-      setMealTypes(mealTypesData || []);
-    } catch (error) {
-      console.error('Error fetching meal types:', error);
-    }
-  };
 
   const handlePhotoCapture = (file: File) => {
     setCurrentPhotoFile(file);
