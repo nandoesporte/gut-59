@@ -24,7 +24,7 @@ const Layout = ({ children }: LayoutProps) => {
           </div>
         </div>
       </header>
-      <main className="w-full px-4 sm:px-6 lg:px-8 py-6 pb-24 animate-fadeIn mt-[25px]">
+      <main className="w-full px-4 sm:px-6 lg:px-8 py-6 pb-24 animate-fadeIn mt-[35px]">
         {children}
       </main>
       <Navigation />
