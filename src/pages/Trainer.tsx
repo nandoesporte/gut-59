@@ -3,35 +3,46 @@ import { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { ScrollText, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-interface TrainingVideo {
-  id: number;
-  title: string;
-  description: string;
-  url: string;
-  module: string;
-}
-
-const trainingVideos: TrainingVideo[] = [
-  {
-    id: 1,
-    title: "Introdução ao Módulo 1",
-    description: "Aprenda os conceitos básicos e fundamentos iniciais.",
-    url: "https://www.youtube.com/embed/example1",
-    module: "Módulo 1"
-  },
-  {
-    id: 2,
-    title: "Técnicas Avançadas",
-    description: "Domine as técnicas mais avançadas do treinamento.",
-    url: "https://www.youtube.com/embed/example2",
-    module: "Módulo 2"
-  },
-  // Adicione mais vídeos conforme necessário
-];
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { TrainingModule, TrainingVideo } from '@/components/admin/types';
 
 const Trainer = () => {
   const [selectedVideo, setSelectedVideo] = useState<TrainingVideo | null>(null);
+
+  const { data: modules, isLoading: isLoadingModules } = useQuery({
+    queryKey: ['training-modules'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('training_modules')
+        .select('*')
+        .eq('status', 'active')
+        .order('display_order');
+      if (error) throw error;
+      return data as TrainingModule[];
+    }
+  });
+
+  const { data: videos, isLoading: isLoadingVideos } = useQuery({
+    queryKey: ['training-videos'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('training_videos')
+        .select('*')
+        .eq('status', 'active')
+        .order('created_at');
+      if (error) throw error;
+      return data as TrainingVideo[];
+    }
+  });
+
+  if (isLoadingModules || isLoadingVideos) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <p>Carregando...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -65,27 +76,29 @@ const Trainer = () => {
             </Card>
           </div>
         ) : (
-          trainingVideos.map((video) => (
-            <Card
-              key={video.id}
-              className="p-6 bg-white/70 backdrop-blur-lg border border-gray-100 shadow-lg hover:shadow-xl transition-all cursor-pointer"
-              onClick={() => setSelectedVideo(video)}
-            >
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-full bg-primary-100 flex items-center justify-center">
-                  <Play className="w-6 h-6 text-primary-500" />
+          videos?.map((video) => {
+            const module = modules?.find((m) => m.id === video.module_id);
+            return (
+              <Card
+                key={video.id}
+                className="p-6 bg-white/70 backdrop-blur-lg border border-gray-100 shadow-lg hover:shadow-xl transition-all cursor-pointer"
+                onClick={() => setSelectedVideo(video)}
+              >
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-full bg-primary-100 flex items-center justify-center">
+                    <Play className="w-6 h-6 text-primary-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg mb-1">{video.title}</h3>
+                    <p className="text-sm text-gray-600 mb-2">{video.description}</p>
+                    <span className="text-xs font-medium text-primary-500 bg-primary-50 px-2 py-1 rounded-full">
+                      {module?.name || 'Módulo não especificado'}
+                    </span>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-semibold text-lg mb-1">{video.title}</h3>
-                  <p className="text-sm text-gray-600 mb-2">{video.description}</p>
-                  <span className="text-xs font-medium text-primary-500 bg-primary-50 px-2 py-1 rounded-full">
-                    {video.module}
-                  </span>
-                </div>
-              </div>
-            </Card>
-          ))
-        )}
+              </Card>
+            ))
+          )}
       </div>
     </div>
   );
