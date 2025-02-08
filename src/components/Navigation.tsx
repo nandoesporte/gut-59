@@ -54,7 +54,7 @@ const Navigation = () => {
           <NavLink
             to="/progress"
             icon={<LineChart className="w-6 h-6" />}
-            text="Progresso"
+            text="Diário"
             active={isActive("/progress")}
           />
         </div>

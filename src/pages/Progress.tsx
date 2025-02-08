@@ -2,8 +2,6 @@
 import { useState } from "react";
 import { useLocation } from "react-router-dom";
 import ProgressChart from "@/components/Progress";
-import DiaryHistory from "@/components/DiaryHistory";
-import Layout from "@/components/Layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
@@ -56,89 +54,85 @@ const Progress = () => {
   };
 
   return (
-    <Layout>
-      <div className="container mx-auto px-4 py-6 space-y-8">
-        <ProgressChart />
-        <DiaryHistory />
-        
-        {/* Daily Meals Section */}
-        <Card className="bg-white shadow-sm border-none">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Utensils className="w-5 h-5 text-primary-500" />
-                <h2 className="text-lg font-semibold text-gray-900">Refeições do Dia</h2>
-              </div>
-              <div className="flex items-center gap-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="justify-start text-left font-normal"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {format(date, "dd/MM/yyyy")}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="end">
-                    <Calendar
-                      mode="single"
-                      selected={date}
-                      onSelect={(date) => date && setDate(date)}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setShowSavedMeals(!showSavedMeals)}
-                >
-                  {showSavedMeals ? (
-                    <ChevronUp className="h-5 w-5" />
-                  ) : (
-                    <ChevronDown className="h-5 w-5" />
-                  )}
-                </Button>
-              </div>
+    <div className="container mx-auto px-4 py-6 space-y-8">
+      {/* Daily Meals Section */}
+      <Card className="bg-white shadow-sm border-none">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Utensils className="w-5 h-5 text-primary-500" />
+              <h2 className="text-lg font-semibold text-gray-900">Refeições do Dia</h2>
             </div>
-            
-            {showSavedMeals && (
-              <div className="space-y-4">
-                {savedMeals.length === 0 ? (
-                  <p className="text-gray-500 text-center">Nenhuma refeição registrada para este dia.</p>
+            <div className="flex items-center gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="justify-start text-left font-normal"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {format(date, "dd/MM/yyyy")}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={(date) => date && setDate(date)}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowSavedMeals(!showSavedMeals)}
+              >
+                {showSavedMeals ? (
+                  <ChevronUp className="h-5 w-5" />
                 ) : (
-                  savedMeals.map((meal) => (
-                    <Card key={meal.id} className="bg-gray-50">
-                      <CardContent className="p-4">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="font-medium text-gray-900">
-                              {meal.meal_type === 'breakfast' && 'Café da manhã'}
-                              {meal.meal_type === 'lunch' && 'Almoço'}
-                              {meal.meal_type === 'dinner' && 'Jantar'}
-                              {meal.meal_type === 'snack' && 'Lanche'}
-                            </h3>
-                            <p className="text-sm text-gray-600">
-                              {meal.protocol_food?.name}
-                            </p>
-                          </div>
-                          <span className="text-sm text-gray-500">
-                            {format(new Date(meal.created_at), 'HH:mm')}
-                          </span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
+                  <ChevronDown className="h-5 w-5" />
                 )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </Layout>
+              </Button>
+            </div>
+          </div>
+          
+          {showSavedMeals && (
+            <div className="space-y-4">
+              {savedMeals.length === 0 ? (
+                <p className="text-gray-500 text-center">Nenhuma refeição registrada para este dia.</p>
+              ) : (
+                savedMeals.map((meal) => (
+                  <Card key={meal.id} className="bg-gray-50">
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-medium text-gray-900">
+                            {meal.meal_type === 'breakfast' && 'Café da manhã'}
+                            {meal.meal_type === 'lunch' && 'Almoço'}
+                            {meal.meal_type === 'dinner' && 'Jantar'}
+                            {meal.meal_type === 'snack' && 'Lanche'}
+                          </h3>
+                          <p className="text-sm text-gray-600">
+                            {meal.protocol_food?.name}
+                          </p>
+                        </div>
+                        <span className="text-sm text-gray-500">
+                          {format(new Date(meal.created_at), 'HH:mm')}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <ProgressChart />
+    </div>
   );
 };
 
 export default Progress;
-
