@@ -5,11 +5,10 @@ import { useToast } from "@/components/ui/use-toast";
 import { Activity } from "lucide-react";
 import { useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { useEffect } from "react";
 
 const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL!,
-  import.meta.env.VITE_SUPABASE_ANON_KEY!
+  "https://vdrbuawpzeqokdspwbnm.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkcmJ1YXdwemVxb2tkc3B3Ym5tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDk5MjA1MzcsImV4cCI6MjAyNTQ5NjUzN30.XS_XFoWc0Nw-vT6VlwQMwFWn2Dj7ExLuA47oHKu5k3M"
 );
 
 interface Symptom {
