@@ -10,25 +10,28 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CalendarIcon, ChevronDown, ChevronUp, Droplets, Utensils } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect } from "react";
+import { Database } from "@/integrations/supabase/types";
+
+interface ProtocolFood {
+  id: string;
+  name: string;
+  food_group: string;
+  phase: number;
+}
 
 interface SavedMeal {
   id: string;
   meal_type: string;
-  description: string;
-  meal_date: string;
-  created_at: string;
-  protocol_food: {
-    id: string;
-    name: string;
-    food_group: string;
-    phase: number;
-  };
+  description: string | null;
+  meal_date: string | null;
+  created_at: string | null;
+  protocol_food: ProtocolFood | null;
 }
 
 interface WaterIntake {
   id: string;
-  amount_ml: number;
-  created_at: string;
+  amount_ml: number | null;
+  created_at: string | null;
 }
 
 const Progress = () => {
@@ -49,8 +52,17 @@ const Progress = () => {
       const { data, error } = await supabase
         .from('meals')
         .select(`
-          *,
-          protocol_food:protocol_food_id (*)
+          id,
+          meal_type,
+          description,
+          meal_date,
+          created_at,
+          protocol_food:protocol_food_id (
+            id,
+            name,
+            food_group,
+            phase
+          )
         `)
         .eq('meal_date', format(date, 'yyyy-MM-dd'))
         .order('created_at', { ascending: false });
@@ -142,7 +154,7 @@ const Progress = () => {
                           </p>
                         </div>
                         <span className="text-sm text-gray-500">
-                          {format(new Date(meal.created_at), 'HH:mm')}
+                          {meal.created_at && format(new Date(meal.created_at), 'HH:mm')}
                         </span>
                       </div>
                     </CardContent>
@@ -185,7 +197,7 @@ const Progress = () => {
                     <CardContent className="p-4">
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-gray-500">
-                          {format(new Date(water.created_at), 'HH:mm')}
+                          {water.created_at && format(new Date(water.created_at), 'HH:mm')}
                         </span>
                         <div className="flex items-center gap-2">
                           <Droplets className="w-4 h-4 text-primary-500" />
@@ -217,3 +229,4 @@ const Progress = () => {
 };
 
 export default Progress;
+
