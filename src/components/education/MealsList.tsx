@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Meal } from '@/types/education';
 import { Card } from "@/components/ui/card";
 import {
@@ -10,14 +10,27 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { ChevronDown, ChevronUp } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface MealsListProps {
   meals: Meal;
 }
 
 const MealsList = ({ meals }: MealsListProps) => {
+  const isMobile = useIsMobile();
+  const [visibleSections, setVisibleSections] = useState<string[]>(['carboidratos']);
+
+  const toggleSection = (section: string) => {
+    setVisibleSections(prev => 
+      prev.includes(section) 
+        ? prev.filter(s => s !== section)
+        : [...prev, section]
+    );
+  };
+
   const renderMealContent = (meal: string[]) => {
-    // Check if the meal content looks like a table (has specific markers)
     if (meal.some(item => item.includes("Carboidratos:") || item.includes("Proteínas:"))) {
       const sections: { [key: string]: string[] } = {
         carboidratos: [],
@@ -38,9 +51,53 @@ const MealsList = ({ meals }: MealsListProps) => {
         } else if (item.includes("Frutas:")) {
           currentSection = 'frutas';
         } else if (item && currentSection && !item.startsWith("-")) {
-          sections[currentSection].push(item.replace("- ", ""));
+          sections[currentSection].push(item);
         }
       });
+
+      const sectionTitles = {
+        carboidratos: "Carboidratos",
+        proteinas: "Proteínas",
+        gorduras: "Gorduras",
+        frutas: "Frutas"
+      };
+
+      if (isMobile) {
+        return (
+          <div className="space-y-4">
+            {Object.entries(sections).map(([key, items]) => (
+              <div key={key} className="border rounded-lg overflow-hidden">
+                <Button
+                  variant="ghost"
+                  className="w-full flex justify-between items-center p-4 hover:bg-primary-50"
+                  onClick={() => toggleSection(key)}
+                >
+                  <span className="font-semibold text-primary-700">
+                    {sectionTitles[key as keyof typeof sectionTitles]}
+                  </span>
+                  {visibleSections.includes(key) ? (
+                    <ChevronUp className="h-5 w-5" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5" />
+                  )}
+                </Button>
+                {visibleSections.includes(key) && (
+                  <div className="p-4 bg-white">
+                    <ul className="space-y-2">
+                      {items.map((item, index) => (
+                        <li key={index} className="text-gray-700 flex items-center">
+                          <div className="w-2 h-2 rounded-full bg-primary-300 mr-3" />
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        );
+      }
 
       return (
         <div className="overflow-x-auto">
