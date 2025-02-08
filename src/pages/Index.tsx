@@ -8,10 +8,16 @@ import Education from "@/components/Education";
 const Index = () => {
   return (
     <Layout>
-      <div className="space-y-8">
-        <Profile />
-        <SymptomTracker />
-        <FoodDiary />
+      <div className="space-y-8 flex flex-col items-center">
+        <div className="w-full max-w-4xl">
+          <Profile />
+        </div>
+        <div className="w-full max-w-4xl">
+          <SymptomTracker />
+        </div>
+        <div className="w-full">
+          <FoodDiary />
+        </div>
         <Education />
       </div>
     </Layout>
@@ -19,3 +25,4 @@ const Index = () => {
 };
 
 export default Index;
+
