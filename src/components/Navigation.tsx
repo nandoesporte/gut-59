@@ -26,14 +26,12 @@ const Navigation = () => {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       navigate("/auth");
-      toast({
-        title: "Logout realizado",
+      toast("Logout realizado com sucesso", {
         description: "Você foi desconectado com sucesso.",
       });
     } catch (error) {
       console.error("Error logging out:", error);
-      toast({
-        title: "Erro ao desconectar",
+      toast("Erro ao desconectar", {
         description: "Ocorreu um erro ao tentar desconectar.",
         variant: "destructive",
       });
