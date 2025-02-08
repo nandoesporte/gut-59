@@ -160,6 +160,7 @@ export type Database = {
           id: string
           meal_date: string | null
           meal_type: string | null
+          photo_url: string | null
           protocol_food_id: string | null
           protocol_phase: number | null
           updated_at: string | null
@@ -173,6 +174,7 @@ export type Database = {
           id?: string
           meal_date?: string | null
           meal_type?: string | null
+          photo_url?: string | null
           protocol_food_id?: string | null
           protocol_phase?: number | null
           updated_at?: string | null
@@ -186,6 +188,7 @@ export type Database = {
           id?: string
           meal_date?: string | null
           meal_type?: string | null
+          photo_url?: string | null
           protocol_food_id?: string | null
           protocol_phase?: number | null
           updated_at?: string | null

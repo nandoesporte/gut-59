@@ -3,11 +3,10 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, Camera } from "lucide-react";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { FoodSelector } from "./FoodSelector";
 
 interface MealType {
   id: number;
@@ -16,64 +15,42 @@ interface MealType {
   phase: number | null;
 }
 
-interface FoodGroup {
-  id: number;
-  name: string;
-  display_name: string;
-}
-
-interface ProtocolFood {
-  id: string;
-  name: string;
-  food_group: string;
-  food_group_id: number;
-  phase: number;
-  phase_id: number;
-}
-
 interface MealFormProps {
   loading: boolean;
   mealTypes: MealType[];
-  foodGroups: FoodGroup[];
-  protocolFoods: ProtocolFood[];
   onSubmit: () => void;
   mealType: string;
   setMealType: (value: string) => void;
   phase: string;
   setPhase: (value: string) => void;
-  selectedFood: string;
-  setSelectedFood: (value: string) => void;
   date: Date;
   setDate: (value: Date) => void;
-  selectedFoodGroup: number | null;
-  setSelectedFoodGroup: (value: number | null) => void;
-  customFood: string;
-  setCustomFood: (value: string) => void;
-  showCustomFood: boolean;
-  setShowCustomFood: (value: boolean) => void;
+  photoUrl: string | null;
+  onPhotoCapture: (file: File) => void;
 }
 
 export const MealForm = ({
   loading,
   mealTypes,
-  foodGroups,
-  protocolFoods,
   onSubmit,
   mealType,
   setMealType,
   phase,
   setPhase,
-  selectedFood,
-  setSelectedFood,
   date,
   setDate,
-  selectedFoodGroup,
-  setSelectedFoodGroup,
-  customFood,
-  setCustomFood,
-  showCustomFood,
-  setShowCustomFood,
+  photoUrl,
+  onPhotoCapture,
 }: MealFormProps) => {
+  const fileInputRef = useState<HTMLInputElement | null>(null);
+
+  const handlePhotoCapture = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      onPhotoCapture(file);
+    }
+  };
+
   return (
     <Card className="bg-white shadow-sm border-none">
       <CardContent className="p-6">
@@ -134,43 +111,41 @@ export const MealForm = ({
               </Select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Grupo Alimentar
-              </label>
-              <Select 
-                value={selectedFoodGroup?.toString() || ""} 
-                onValueChange={(value) => setSelectedFoodGroup(Number(value))}
+            <div className="space-y-4">
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handlePhotoCapture}
+                className="hidden"
+                ref={(el) => fileInputRef[1](el)}
+              />
+              
+              <Button
+                type="button"
+                onClick={() => fileInputRef[0]?.click()}
+                className="w-full flex items-center justify-center gap-2"
+                variant="outline"
               >
-                <SelectTrigger className="w-full bg-gray-50 border-gray-200">
-                  <SelectValue placeholder="Selecione o grupo alimentar" />
-                </SelectTrigger>
-                <SelectContent>
-                  {foodGroups.map((group) => (
-                    <SelectItem key={group.id} value={group.id.toString()}>
-                      {group.display_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                <Camera className="w-5 h-5" />
+                Tirar Foto
+              </Button>
 
-            <FoodSelector
-              protocolFoods={protocolFoods}
-              phase={phase}
-              selectedFoodGroup={selectedFoodGroup}
-              selectedFood={selectedFood}
-              onSelectFood={setSelectedFood}
-              showCustomFood={showCustomFood}
-              customFood={customFood}
-              onCustomFoodChange={setCustomFood}
-              onToggleCustomFood={() => setShowCustomFood(!showCustomFood)}
-            />
+              {photoUrl && (
+                <div className="mt-4">
+                  <img 
+                    src={photoUrl} 
+                    alt="Foto da refeição" 
+                    className="w-full h-48 object-cover rounded-lg"
+                  />
+                </div>
+              )}
+            </div>
           </div>
 
           <Button
             onClick={onSubmit}
-            disabled={loading || !mealType || (!selectedFood && !customFood) || !selectedFoodGroup}
+            disabled={loading || !mealType || !photoUrl}
             className="w-full bg-primary-500 hover:bg-primary-600 text-white"
           >
             {loading ? "Registrando..." : "Registrar Refeição"}

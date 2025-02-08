@@ -1,24 +1,10 @@
-import { useState, useEffect } from "react";
+
+import { useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { WaterTracker } from "./food-diary/WaterTracker";
 import { MealForm } from "./food-diary/MealForm";
-
-interface ProtocolFood {
-  id: string;
-  name: string;
-  food_group: string;
-  food_group_id: number;
-  phase: number;
-  phase_id: number;
-}
-
-interface FoodGroup {
-  id: number;
-  name: string;
-  display_name: string;
-}
 
 interface MealType {
   id: number;
@@ -32,31 +18,17 @@ const FoodDiary = () => {
   const [loading, setLoading] = useState(false);
   const [mealType, setMealType] = useState<string>("");
   const [phase, setPhase] = useState<string>("");
-  const [selectedFood, setSelectedFood] = useState<string>("");
   const [date, setDate] = useState<Date>(new Date());
-  const [protocolFoods, setProtocolFoods] = useState<ProtocolFood[]>([]);
-  const [foodGroups, setFoodGroups] = useState<FoodGroup[]>([]);
   const [mealTypes, setMealTypes] = useState<MealType[]>([]);
-  const [selectedFoodGroup, setSelectedFoodGroup] = useState<number | null>(null);
-  const [customFood, setCustomFood] = useState("");
-  const [showCustomFood, setShowCustomFood] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [currentPhotoFile, setCurrentPhotoFile] = useState<File | null>(null);
 
   useEffect(() => {
-    fetchData();
+    fetchMealTypes();
   }, []);
 
-  const fetchData = async () => {
+  const fetchMealTypes = async () => {
     try {
-      // Fetch food groups
-      const { data: groupsData, error: groupsError } = await supabase
-        .from('food_groups')
-        .select('*')
-        .order('display_name');
-
-      if (groupsError) throw groupsError;
-      setFoodGroups(groupsData || []);
-
-      // Fetch meal types
       const { data: mealTypesData, error: mealTypesError } = await supabase
         .from('meal_types')
         .select('*')
@@ -64,18 +36,14 @@ const FoodDiary = () => {
 
       if (mealTypesError) throw mealTypesError;
       setMealTypes(mealTypesData || []);
-
-      // Fetch protocol foods
-      const { data: foodsData, error: foodsError } = await supabase
-        .from('protocol_foods')
-        .select('*')
-        .order('name');
-
-      if (foodsError) throw foodsError;
-      setProtocolFoods(foodsData || []);
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error fetching meal types:', error);
     }
+  };
+
+  const handlePhotoCapture = (file: File) => {
+    setCurrentPhotoFile(file);
+    setPhotoUrl(URL.createObjectURL(file));
   };
 
   const handleFoodLog = async () => {
@@ -92,16 +60,39 @@ const FoodDiary = () => {
         return;
       }
 
+      if (!currentPhotoFile) {
+        toast({
+          title: "Erro",
+          description: "Por favor, tire uma foto da refeição.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Upload photo to storage
+      const fileExt = currentPhotoFile.name.split('.').pop();
+      const filePath = `${user.id}/${crypto.randomUUID()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('meal-photos')
+        .upload(filePath, currentPhotoFile);
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL for the uploaded photo
+      const { data: { publicUrl } } = supabase.storage
+        .from('meal-photos')
+        .getPublicUrl(filePath);
+
+      // Save meal record with photo URL
       const { error } = await supabase
         .from('meals')
         .insert({
           user_id: user.id,
           meal_type: mealType,
           protocol_phase: phase ? parseInt(phase) : null,
-          protocol_food_id: showCustomFood ? null : selectedFood,
-          custom_food: showCustomFood ? customFood : null,
-          food_group_id: selectedFoodGroup,
           meal_date: format(date, 'yyyy-MM-dd'),
+          photo_url: publicUrl,
         });
 
       if (error) throw error;
@@ -113,10 +104,8 @@ const FoodDiary = () => {
 
       setMealType("");
       setPhase("");
-      setSelectedFood("");
-      setCustomFood("");
-      setShowCustomFood(false);
-      setSelectedFoodGroup(null);
+      setPhotoUrl(null);
+      setCurrentPhotoFile(null);
     } catch (error) {
       console.error('Error:', error);
       toast({
@@ -142,23 +131,15 @@ const FoodDiary = () => {
         <MealForm
           loading={loading}
           mealTypes={mealTypes}
-          foodGroups={foodGroups}
-          protocolFoods={protocolFoods}
           onSubmit={handleFoodLog}
           mealType={mealType}
           setMealType={setMealType}
           phase={phase}
           setPhase={setPhase}
-          selectedFood={selectedFood}
-          setSelectedFood={setSelectedFood}
           date={date}
           setDate={setDate}
-          selectedFoodGroup={selectedFoodGroup}
-          setSelectedFoodGroup={setSelectedFoodGroup}
-          customFood={customFood}
-          setCustomFood={setCustomFood}
-          showCustomFood={showCustomFood}
-          setShowCustomFood={setShowCustomFood}
+          photoUrl={photoUrl}
+          onPhotoCapture={handlePhotoCapture}
         />
         <WaterTracker />
       </div>

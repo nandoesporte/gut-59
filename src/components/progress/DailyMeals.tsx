@@ -9,20 +9,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CalendarIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
-interface ProtocolFood {
-  id: string;
-  name: string;
-  food_group: string;
-  phase: number;
-}
-
 interface SavedMeal {
   id: string;
   meal_type: string;
-  description: string | null;
   meal_date: string | null;
   created_at: string | null;
-  protocol_food: ProtocolFood | null;
+  photo_url: string | null;
+  protocol_phase: number | null;
 }
 
 interface DailyMealsProps {
@@ -42,7 +35,7 @@ const DailyMeals = ({ date, onDateChange }: DailyMealsProps) => {
     try {
       const { data, error } = await supabase
         .from('meals')
-        .select('*, protocol_food:protocol_food_id (id, name, food_group, phase)')
+        .select('*')
         .eq('meal_date', format(date, 'yyyy-MM-dd'))
         .order('created_at', { ascending: false });
 
@@ -50,6 +43,21 @@ const DailyMeals = ({ date, onDateChange }: DailyMealsProps) => {
       setSavedMeals(data || []);
     } catch (error) {
       console.error('Error fetching saved meals:', error);
+    }
+  };
+
+  const getMealTypeDisplay = (mealType: string) => {
+    switch (mealType) {
+      case 'breakfast':
+        return 'Café da manhã';
+      case 'lunch':
+        return 'Almoço';
+      case 'dinner':
+        return 'Jantar';
+      case 'snack':
+        return 'Lanche';
+      default:
+        return mealType;
     }
   };
 
@@ -103,21 +111,29 @@ const DailyMeals = ({ date, onDateChange }: DailyMealsProps) => {
               savedMeals.map((meal) => (
                 <Card key={meal.id} className="bg-gray-50">
                   <CardContent className="p-4">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-medium text-gray-900">
-                          {meal.meal_type === 'breakfast' && 'Café da manhã'}
-                          {meal.meal_type === 'lunch' && 'Almoço'}
-                          {meal.meal_type === 'dinner' && 'Jantar'}
-                          {meal.meal_type === 'snack' && 'Lanche'}
-                        </h3>
-                        <p className="text-sm text-gray-600">
-                          {meal.protocol_food?.name}
-                        </p>
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-medium text-gray-900">
+                            {getMealTypeDisplay(meal.meal_type)}
+                          </h3>
+                          {meal.protocol_phase && (
+                            <p className="text-sm text-gray-600">
+                              Fase {meal.protocol_phase}
+                            </p>
+                          )}
+                        </div>
+                        <span className="text-sm text-gray-500">
+                          {meal.created_at && format(new Date(meal.created_at), 'HH:mm')}
+                        </span>
                       </div>
-                      <span className="text-sm text-gray-500">
-                        {meal.created_at && format(new Date(meal.created_at), 'HH:mm')}
-                      </span>
+                      {meal.photo_url && (
+                        <img
+                          src={meal.photo_url}
+                          alt="Foto da refeição"
+                          className="w-full h-48 object-cover rounded-lg"
+                        />
+                      )}
                     </div>
                   </CardContent>
                 </Card>
