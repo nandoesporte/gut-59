@@ -52,11 +52,13 @@ const Progress = () => {
 
       setSymptomData(formattedData);
 
-      // Calculate statistics
+      // Calculate statistics and convert to number
       const totalDiscomfort = data.reduce((sum: number, item: any) => sum + (item.discomfort_level || 0), 0);
+      const avgDiscomfort = data.length > 0 ? Number((totalDiscomfort / data.length).toFixed(1)) : 0;
+      
       setStats({
         daysLogged: data.length,
-        averageDiscomfort: data.length > 0 ? (totalDiscomfort / data.length).toFixed(1) : 0,
+        averageDiscomfort: avgDiscomfort,
       });
 
     } catch (error) {
