@@ -14,7 +14,7 @@ import Store from "./pages/Store";
 import Admin from "./pages/Admin";
 import Trainer from "./pages/Trainer";
 
-// Create a client
+// Create a client outside the component to prevent recreation on each render
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
