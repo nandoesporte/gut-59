@@ -57,7 +57,17 @@ const phase2: Phase = {
           "Importante: Fazer jejum de 12h entre o jantar e o café da manhã",
         ],
       },
-      supplements: allowedFoods.map(category => category.join(", ")),
+      supplements: [
+        `Vegetais: ${allowedFoods.vegetables.join(", ")}`,
+        `Frutas: ${allowedFoods.fruits.join(", ")}`,
+        `Gorduras: ${allowedFoods.fats.join(", ")}`,
+        `Condimentos: ${allowedFoods.spices.join(", ")}`,
+        `Chás da manhã: ${allowedFoods.teas.morning.join(", ")}`,
+        `Chás após almoço: ${allowedFoods.teas.afterLunch.join(", ")}`,
+        `Chás antes de dormir: ${allowedFoods.teas.beforeBed.join(", ")}`,
+        `Tubérculos: ${allowedFoods.tubers.join(", ")}`,
+        `Proteínas: ${allowedFoods.proteins.join(", ")}`
+      ],
     },
   ],
 };
