@@ -1,4 +1,9 @@
 
+import Profile from "@/components/Profile";
+import SymptomTracker from "@/components/SymptomTracker";
+import FoodDiary from "@/components/FoodDiary";
+import Education from "@/components/Education";
+
 const Index = () => {
   return (
     <div className="space-y-8 flex flex-col items-center">
