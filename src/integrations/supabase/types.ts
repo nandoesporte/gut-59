@@ -157,6 +157,33 @@ export type Database = {
           },
         ]
       }
+      messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          read: boolean | null
+          receiver_id: string
+          sender_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          read?: boolean | null
+          receiver_id: string
+          sender_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          read?: boolean | null
+          receiver_id?: string
+          sender_id?: string
+        }
+        Relationships: []
+      }
       order_items: {
         Row: {
           created_at: string
@@ -301,18 +328,21 @@ export type Database = {
           health_conditions: string | null
           id: string
           name: string | null
+          photo_url: string | null
         }
         Insert: {
           age?: number | null
           health_conditions?: string | null
           id: string
           name?: string | null
+          photo_url?: string | null
         }
         Update: {
           age?: number | null
           health_conditions?: string | null
           id?: string
           name?: string | null
+          photo_url?: string | null
         }
         Relationships: []
       }
