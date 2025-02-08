@@ -1,3 +1,4 @@
+
 import { Phase } from '@/types/education';
 
 export const phases: Phase[] = [
@@ -285,7 +286,7 @@ export const phases: Phase[] = [
           "Rotina Matinal": [
             "Manter a rotina de tomar:",
             "- Água com limão ou vinagre com cúrcuma",
-            "- Ou suco verde",
+            "- Ou suco verde"
           ],
           "Café da Manhã (Grupos de Alimentos)": [
             "Carboidratos:",
@@ -324,7 +325,7 @@ export const phases: Phase[] = [
             "- Laranja",
             "- Mexerica",
             "- Poncã",
-            "- Manga",
+            "- Manga"
           ],
           "Café da Manhã (Combinações Sugeridas)": [
             "Opção 1:",
@@ -353,12 +354,12 @@ export const phases: Phase[] = [
             "",
             "Acompanhamentos:",
             "- 100ml de café sem açúcar ou",
-            "- 200ml de chá sem açúcar",
+            "- 200ml de chá sem açúcar"
           ],
           "Lanche da Manhã/Tarde": [
             "Opções:",
             "- Oleaginosas (8 castanhas-de-caju OU 3 castanhas-do-Brasil OU 3 nozes) + 1 fruta com canela em pó",
-            "- Pudim de chia (ver receitas)",
+            "- Pudim de chia (ver receitas)"
           ],
           "Almoço/Jantar (Grupos de Alimentos)": [
             "Carboidratos:",
@@ -409,7 +410,7 @@ export const phases: Phase[] = [
             "- Acelga",
             "- Tomate",
             "- Pepino",
-            "- Rabanete",
+            "- Rabanete"
           ],
           "Almoço/Jantar (Combinações Sugeridas)": [
             "Opção 1:",
@@ -438,12 +439,12 @@ export const phases: Phase[] = [
             "- 100g de carne de boi moída",
             "- 15ml de azeite de oliva",
             "- 100g de legume da sua preferência",
-            "- Salada crua à vontade",
+            "- Salada crua à vontade"
           ],
           "Ceia": [
             "- 1 kiwi",
-            "- 1 xícara de chá para o sono (camomila, erva-doce, cidreira ou melissa)",
-          ],
+            "- 1 xícara de chá para o sono (camomila, erva-doce, cidreira ou melissa)"
+          ]
         },
         supplements: [
           "Dicas Adicionais:",
@@ -459,9 +460,10 @@ export const phases: Phase[] = [
           "",
           "Observação para Emagrecimento:",
           "- Se o objetivo for emagrecer, no jantar,",
-          "  retirar os alimentos do Grupo 1 (carboidratos)",
+          "  retirar os alimentos do Grupo 1 (carboidratos)"
         ],
       },
     ],
   },
 ];
+
