@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +8,7 @@ import 'react-circular-progressbar/dist/styles.css';
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, ChevronDown, ChevronUp, Utensils, Water, Plus } from "lucide-react";
+import { CalendarIcon, ChevronDown, ChevronUp, Utensils, Droplets, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -294,7 +293,7 @@ const FoodDiary = () => {
           <Card className="bg-white shadow-sm border-none">
             <CardContent className="p-6">
               <div className="flex items-center gap-2 mb-4">
-                <Water className="w-5 h-5 text-primary-500" />
+                <Droplets className="w-5 h-5 text-primary-500" />
                 <h2 className="text-lg font-semibold text-gray-900">Ingestão de água</h2>
               </div>
               <div className="w-32 h-32 mx-auto">
@@ -378,4 +377,3 @@ const FoodDiary = () => {
 };
 
 export default FoodDiary;
-
