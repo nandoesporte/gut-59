@@ -1,7 +1,7 @@
 
 import { ReactNode } from "react";
 import Navigation from "./Navigation";
-import { Heart } from "lucide-react";
+import { Activity } from "lucide-react";
 
 interface LayoutProps {
   children: ReactNode;
@@ -14,7 +14,7 @@ const Layout = ({ children }: LayoutProps) => {
         <div className="max-w-lg mx-auto h-24 flex items-center justify-center relative px-4">
           <div className="flex flex-col items-center gap-1">
             <div className="flex items-center gap-3">
-              <Heart className="w-8 h-8 text-primary-500" />
+              <Activity className="w-8 h-8 text-primary-500" />
               <h1 className="text-2xl font-bold bg-gradient-to-r from-primary-500 to-primary-600 bg-clip-text text-transparent">
                 VitaGut
               </h1>
