@@ -32,6 +32,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { ProtocolPhase, PhaseFormValues, DayData, DayFormValues } from "./types";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 
 const phaseFormSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório"),
@@ -268,7 +270,11 @@ export const ProtocolTab = () => {
                       <FormItem>
                         <FormLabel>Dia Inicial</FormLabel>
                         <FormControl>
-                          <input type="number" {...field} className="w-full p-2 border rounded" />
+                          <input
+                            type="number"
+                            {...field}
+                            className="w-full p-2 border rounded"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -281,7 +287,11 @@ export const ProtocolTab = () => {
                       <FormItem>
                         <FormLabel>Dia Final</FormLabel>
                         <FormControl>
-                          <input type="number" {...field} className="w-full p-2 border rounded" />
+                          <input
+                            type="number"
+                            {...field}
+                            className="w-full p-2 border rounded"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -322,21 +332,98 @@ export const ProtocolTab = () => {
                     <TableCell>{phase.day_start}</TableCell>
                     <TableCell>{phase.day_end}</TableCell>
                     <TableCell className="space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setEditingId(phase.id);
-                          phaseForm.reset({
-                            name: phase.name,
-                            description: phase.description || "",
-                            day_start: phase.day_start,
-                            day_end: phase.day_end,
-                          });
-                        }}
-                      >
-                        Editar
-                      </Button>
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            Editar
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Editar Fase</DialogTitle>
+                          </DialogHeader>
+                          <Form {...phaseForm}>
+                            <form
+                              onSubmit={phaseForm.handleSubmit((data) =>
+                                updatePhase.mutate({ id: phase.id, values: data })
+                              )}
+                              className="space-y-4"
+                            >
+                              <FormField
+                                control={phaseForm.control}
+                                name="name"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Nome</FormLabel>
+                                    <FormControl>
+                                      <input
+                                        {...field}
+                                        className="w-full p-2 border rounded"
+                                        defaultValue={phase.name}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={phaseForm.control}
+                                name="description"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Descrição</FormLabel>
+                                    <FormControl>
+                                      <input
+                                        {...field}
+                                        className="w-full p-2 border rounded"
+                                        defaultValue={phase.description || ""}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={phaseForm.control}
+                                name="day_start"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Dia Inicial</FormLabel>
+                                    <FormControl>
+                                      <input
+                                        type="number"
+                                        {...field}
+                                        className="w-full p-2 border rounded"
+                                        defaultValue={phase.day_start}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={phaseForm.control}
+                                name="day_end"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Dia Final</FormLabel>
+                                    <FormControl>
+                                      <input
+                                        type="number"
+                                        {...field}
+                                        className="w-full p-2 border rounded"
+                                        defaultValue={phase.day_end}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <Button type="submit">Atualizar</Button>
+                            </form>
+                          </Form>
+                        </DialogContent>
+                      </Dialog>
                       <Button
                         variant="destructive"
                         size="sm"
@@ -360,7 +447,7 @@ export const ProtocolTab = () => {
             <DialogTrigger asChild>
               <Button>Adicionar Dia</Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-3xl">
               <DialogHeader>
                 <DialogTitle>Novo Dia do Protocolo</DialogTitle>
               </DialogHeader>
@@ -406,7 +493,11 @@ export const ProtocolTab = () => {
                       <FormItem>
                         <FormLabel>Dia</FormLabel>
                         <FormControl>
-                          <input type="number" {...field} className="w-full p-2 border rounded" onChange={(e) => field.onChange(parseInt(e.target.value))} />
+                          <input
+                            type="number"
+                            {...field}
+                            className="w-full p-2 border rounded"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -445,9 +536,8 @@ export const ProtocolTab = () => {
                       <FormItem>
                         <FormLabel>Conteúdo</FormLabel>
                         <FormControl>
-                          <textarea
-                            className="w-full p-2 border rounded"
-                            rows={5}
+                          <Textarea
+                            className="min-h-[200px]"
                             {...field}
                           />
                         </FormControl>
@@ -472,13 +562,14 @@ export const ProtocolTab = () => {
                 <TableHead>Dia</TableHead>
                 <TableHead>Título</TableHead>
                 <TableHead>Descrição</TableHead>
+                <TableHead>Conteúdo</TableHead>
                 <TableHead>Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {daysLoading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center">
+                  <TableCell colSpan={6} className="text-center">
                     Carregando...
                   </TableCell>
                 </TableRow>
@@ -491,6 +582,11 @@ export const ProtocolTab = () => {
                     <TableCell>{day.day}</TableCell>
                     <TableCell>{day.title}</TableCell>
                     <TableCell>{day.description}</TableCell>
+                    <TableCell>
+                      <ScrollArea className="h-[100px] w-[300px]">
+                        <div className="p-4">{day.content}</div>
+                      </ScrollArea>
+                    </TableCell>
                     <TableCell className="space-x-2">
                       <Dialog>
                         <DialogTrigger asChild>
@@ -498,7 +594,7 @@ export const ProtocolTab = () => {
                             Editar
                           </Button>
                         </DialogTrigger>
-                        <DialogContent>
+                        <DialogContent className="max-w-3xl">
                           <DialogHeader>
                             <DialogTitle>Editar Dia do Protocolo</DialogTitle>
                           </DialogHeader>
@@ -522,7 +618,7 @@ export const ProtocolTab = () => {
                                         onChange={(e) =>
                                           field.onChange(parseInt(e.target.value))
                                         }
-                                        value={day.phase_id}
+                                        defaultValue={day.phase_id}
                                       >
                                         <option value="">Selecione uma fase</option>
                                         {phases?.map((phase) => (
@@ -543,12 +639,11 @@ export const ProtocolTab = () => {
                                   <FormItem>
                                     <FormLabel>Dia</FormLabel>
                                     <FormControl>
-                                      <input 
-                                        type="number" 
-                                        {...field} 
+                                      <input
+                                        type="number"
+                                        {...field}
                                         className="w-full p-2 border rounded"
-                                        onChange={(e) => field.onChange(parseInt(e.target.value))}
-                                        value={day.day}
+                                        defaultValue={day.day}
                                       />
                                     </FormControl>
                                     <FormMessage />
@@ -562,8 +657,8 @@ export const ProtocolTab = () => {
                                   <FormItem>
                                     <FormLabel>Título</FormLabel>
                                     <FormControl>
-                                      <input 
-                                        {...field} 
+                                      <input
+                                        {...field}
                                         className="w-full p-2 border rounded"
                                         defaultValue={day.title}
                                       />
@@ -579,8 +674,8 @@ export const ProtocolTab = () => {
                                   <FormItem>
                                     <FormLabel>Descrição</FormLabel>
                                     <FormControl>
-                                      <input 
-                                        {...field} 
+                                      <input
+                                        {...field}
                                         className="w-full p-2 border rounded"
                                         defaultValue={day.description || ""}
                                       />
@@ -596,9 +691,8 @@ export const ProtocolTab = () => {
                                   <FormItem>
                                     <FormLabel>Conteúdo</FormLabel>
                                     <FormControl>
-                                      <textarea
-                                        className="w-full p-2 border rounded"
-                                        rows={5}
+                                      <Textarea
+                                        className="min-h-[200px]"
                                         {...field}
                                         defaultValue={day.content}
                                       />

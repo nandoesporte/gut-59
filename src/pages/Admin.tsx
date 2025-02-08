@@ -11,9 +11,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { UsersTab } from "@/components/admin/UsersTab";
 import { SymptomsTab } from "@/components/admin/SymptomsTab";
-import { MealsTab } from "@/components/admin/MealsTab";
-import { WaterIntakeTab } from "@/components/admin/WaterIntakeTab";
 import { ProtocolTab } from "@/components/admin/ProtocolTab";
+import { WaterIntakeTab } from "@/components/admin/WaterIntakeTab";
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -69,10 +68,9 @@ const Admin = () => {
       <h1 className="text-2xl font-bold mb-6">Painel Administrativo</h1>
       
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 mb-6">
+        <TabsList className="grid w-full grid-cols-4 mb-6">
           <TabsTrigger value="users">Usuários</TabsTrigger>
           <TabsTrigger value="symptoms">Sintomas</TabsTrigger>
-          <TabsTrigger value="meals">Diário Alimentar</TabsTrigger>
           <TabsTrigger value="water">Ingestão de Água</TabsTrigger>
           <TabsTrigger value="protocol">Protocolo</TabsTrigger>
         </TabsList>
@@ -83,10 +81,6 @@ const Admin = () => {
 
         <TabsContent value="symptoms">
           <SymptomsTab />
-        </TabsContent>
-
-        <TabsContent value="meals">
-          <MealsTab />
         </TabsContent>
 
         <TabsContent value="water">
