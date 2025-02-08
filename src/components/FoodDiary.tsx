@@ -1,15 +1,15 @@
 
 import { useState, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
-import { CircularProgressbar, buildStyles } from 'react-circular-progressbar';
-import 'react-circular-progressbar/dist/styles.css';
+import { Plus, History, List } from "lucide-react";
 import { format } from "date-fns";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, ChevronDown, ChevronUp, Utensils, Droplets } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import MealLogger from "./food-diary/MealLogger";
+import WaterTracker from "./food-diary/WaterTracker";
+import DailyMeals from "./food-diary/DailyMeals";
+import MealHistory from "./food-diary/MealHistory";
+import ProgressChart from "./food-diary/ProgressChart";
 
 interface ProtocolFood {
   id: string;
@@ -29,14 +29,34 @@ interface SavedMeal {
 
 const FoodDiary = () => {
   const { toast } = useToast();
-  const [waterPercentage, setWaterPercentage] = useState(55);
   const [date, setDate] = useState<Date>(new Date());
+  const [protocolFoods, setProtocolFoods] = useState<ProtocolFood[]>([]);
   const [savedMeals, setSavedMeals] = useState<SavedMeal[]>([]);
-  const [showSavedMeals, setShowSavedMeals] = useState(false);
+  const [symptomData, setSymptomData] = useState<any[]>([]);
+  const [stats, setStats] = useState({
+    daysLogged: 0,
+    averageDiscomfort: 0,
+  });
 
   useEffect(() => {
+    fetchProtocolFoods();
     fetchSavedMeals();
+    fetchSymptomHistory();
   }, [date]);
+
+  const fetchProtocolFoods = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('protocol_foods')
+        .select('*')
+        .order('food_group');
+
+      if (error) throw error;
+      setProtocolFoods(data || []);
+    } catch (error) {
+      console.error('Error fetching protocol foods:', error);
+    }
+  };
 
   const fetchSavedMeals = async () => {
     try {
@@ -56,7 +76,7 @@ const FoodDiary = () => {
     }
   };
 
-  const handleAddWater = async () => {
+  const fetchSymptomHistory = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
@@ -69,28 +89,35 @@ const FoodDiary = () => {
         return;
       }
 
-      const { error } = await supabase
-        .from('water_intake')
-        .insert({
-          user_id: user.id,
-          amount_ml: 200,
-        });
+      const { data, error } = await supabase
+        .from('symptoms')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true });
 
       if (error) throw error;
 
-      setWaterPercentage(prev => Math.min(100, prev + 5));
+      const formattedData = data.map(item => ({
+        date: format(new Date(item.created_at), 'dd/MM'),
+        discomfort: item.discomfort_level,
+        bloating: item.has_bloating ? 1 : 0,
+        gas: item.has_gas ? 1 : 0,
+        abdominalPain: item.has_abdominal_pain ? 1 : 0,
+        nausea: item.has_nausea ? 1 : 0,
+      }));
 
-      toast({
-        title: "Água registrada",
-        description: "200ml de água registrados com sucesso.",
+      setSymptomData(formattedData);
+
+      const totalDiscomfort = data.reduce((sum: number, item: any) => sum + (item.discomfort_level || 0), 0);
+      const avgDiscomfort = data.length > 0 ? Number((totalDiscomfort / data.length).toFixed(1)) : 0;
+      
+      setStats({
+        daysLogged: data.length,
+        averageDiscomfort: avgDiscomfort,
       });
+
     } catch (error) {
-      console.error('Error:', error);
-      toast({
-        title: "Erro ao registrar",
-        description: "Não foi possível registrar a água. Tente novamente.",
-        variant: "destructive",
-      });
+      console.error('Error fetching symptom history:', error);
     }
   };
 
@@ -99,103 +126,51 @@ const FoodDiary = () => {
       <div className="bg-gradient-to-r from-primary-50 to-primary-100 p-6 rounded-lg shadow-sm">
         <h1 className="text-2xl font-bold text-primary-700 mb-2">Diário Alimentar</h1>
         <p className="text-primary-600">
-          Histórico de refeições e consumo de água.
+          Acompanhe sua jornada de modulação intestinal registrando suas refeições diárias.
         </p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card className="bg-white shadow-sm border-none">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Utensils className="w-5 h-5 text-primary-500" />
-                <h2 className="text-lg font-semibold text-gray-900">Refeições do Dia</h2>
-              </div>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="justify-start text-left font-normal"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {format(date, "dd/MM/yyyy")}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="end">
-                  <Calendar
-                    mode="single"
-                    selected={date}
-                    onSelect={(date) => date && setDate(date)}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-            
-            <div className="space-y-4">
-              {savedMeals.length === 0 ? (
-                <p className="text-gray-500 text-center">Nenhuma refeição registrada para este dia.</p>
-              ) : (
-                savedMeals.map((meal) => (
-                  <Card key={meal.id} className="bg-gray-50">
-                    <CardContent className="p-4">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="font-medium text-gray-900">
-                            {meal.meal_type === 'breakfast' && 'Café da manhã'}
-                            {meal.meal_type === 'lunch' && 'Almoço'}
-                            {meal.meal_type === 'dinner' && 'Jantar'}
-                            {meal.meal_type === 'snack' && 'Lanche'}
-                          </h3>
-                          <p className="text-sm text-gray-600">
-                            {meal.protocol_food?.name}
-                          </p>
-                        </div>
-                        <span className="text-sm text-gray-500">
-                          {format(new Date(meal.created_at), 'HH:mm')}
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-              )}
-            </div>
-          </CardContent>
-        </Card>
+      <Tabs defaultValue="register" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="register" className="flex items-center gap-2">
+            <Plus className="w-4 h-4" />
+            Registrar
+          </TabsTrigger>
+          <TabsTrigger value="history" className="flex items-center gap-2">
+            <History className="w-4 h-4" />
+            Histórico
+          </TabsTrigger>
+          <TabsTrigger value="progress" className="flex items-center gap-2">
+            <List className="w-4 h-4" />
+            Progresso
+          </TabsTrigger>
+        </TabsList>
 
-        <Card className="bg-white shadow-sm border-none">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Droplets className="w-5 h-5 text-primary-500" />
-              <h2 className="text-lg font-semibold text-gray-900">Ingestão de água</h2>
+        <TabsContent value="register" className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-2">
+            <MealLogger
+              date={date}
+              setDate={setDate}
+              protocolFoods={protocolFoods}
+              onMealLogged={fetchSavedMeals}
+            />
+            <div className="space-y-6">
+              <WaterTracker />
+              <DailyMeals savedMeals={savedMeals} />
             </div>
-            <div className="w-32 h-32 mx-auto">
-              <CircularProgressbar
-                value={waterPercentage}
-                text={`${waterPercentage}%`}
-                styles={buildStyles({
-                  textSize: '16px',
-                  pathColor: '#34D399',
-                  textColor: '#34D399',
-                  trailColor: '#E5E7EB',
-                })}
-              />
-            </div>
-            <div className="mt-4 flex justify-center">
-              <Button
-                onClick={handleAddWater}
-                className="bg-primary-50 hover:bg-primary-100 text-primary-500"
-                variant="ghost"
-              >
-                <span className="text-sm">+ 200ml</span>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="history">
+          <MealHistory savedMeals={savedMeals} />
+        </TabsContent>
+
+        <TabsContent value="progress">
+          <ProgressChart symptomData={symptomData} stats={stats} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
 
 export default FoodDiary;
-
