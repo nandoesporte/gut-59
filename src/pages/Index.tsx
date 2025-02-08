@@ -9,16 +9,18 @@ const Index = () => {
   return (
     <Layout>
       <div className="space-y-8 flex flex-col items-center">
-        <div className="w-full max-w-4xl">
+        <div className="w-full">
           <Profile />
         </div>
-        <div className="w-full max-w-4xl">
+        <div className="w-full">
           <SymptomTracker />
         </div>
         <div className="w-full">
           <FoodDiary />
         </div>
-        <Education />
+        <div className="w-full">
+          <Education />
+        </div>
       </div>
     </Layout>
   );
