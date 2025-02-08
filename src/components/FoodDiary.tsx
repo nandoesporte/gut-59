@@ -14,12 +14,28 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 
 interface ProtocolFood {
   id: string;
   name: string;
   food_group: string;
+  food_group_id: number;
   phase: number;
+  phase_id: number;
+}
+
+interface FoodGroup {
+  id: number;
+  name: string;
+  display_name: string;
+}
+
+interface MealType {
+  id: number;
+  name: string;
+  display_name: string;
+  phase: number | null;
 }
 
 const FoodDiary = () => {
@@ -31,22 +47,46 @@ const FoodDiary = () => {
   const [waterPercentage, setWaterPercentage] = useState(0);
   const [date, setDate] = useState<Date>(new Date());
   const [protocolFoods, setProtocolFoods] = useState<ProtocolFood[]>([]);
+  const [foodGroups, setFoodGroups] = useState<FoodGroup[]>([]);
+  const [mealTypes, setMealTypes] = useState<MealType[]>([]);
+  const [selectedFoodGroup, setSelectedFoodGroup] = useState<number | null>(null);
+  const [customFood, setCustomFood] = useState("");
+  const [showCustomFood, setShowCustomFood] = useState(false);
 
   useEffect(() => {
-    fetchProtocolFoods();
+    fetchData();
   }, []);
 
-  const fetchProtocolFoods = async () => {
+  const fetchData = async () => {
     try {
-      const { data, error } = await supabase
+      // Fetch food groups
+      const { data: groupsData, error: groupsError } = await supabase
+        .from('food_groups')
+        .select('*')
+        .order('display_name');
+
+      if (groupsError) throw groupsError;
+      setFoodGroups(groupsData || []);
+
+      // Fetch meal types
+      const { data: mealTypesData, error: mealTypesError } = await supabase
+        .from('meal_types')
+        .select('*')
+        .order('id');
+
+      if (mealTypesError) throw mealTypesError;
+      setMealTypes(mealTypesData || []);
+
+      // Fetch protocol foods
+      const { data: foodsData, error: foodsError } = await supabase
         .from('protocol_foods')
         .select('*')
-        .order('food_group');
+        .order('name');
 
-      if (error) throw error;
-      setProtocolFoods(data || []);
+      if (foodsError) throw foodsError;
+      setProtocolFoods(foodsData || []);
     } catch (error) {
-      console.error('Error fetching protocol foods:', error);
+      console.error('Error fetching data:', error);
     }
   };
 
@@ -70,7 +110,9 @@ const FoodDiary = () => {
           user_id: user.id,
           meal_type: mealType,
           protocol_phase: phase ? parseInt(phase) : null,
-          protocol_food_id: selectedFood,
+          protocol_food_id: showCustomFood ? null : selectedFood,
+          custom_food: showCustomFood ? customFood : null,
+          food_group_id: selectedFoodGroup,
           meal_date: format(date, 'yyyy-MM-dd'),
         });
 
@@ -84,6 +126,9 @@ const FoodDiary = () => {
       setMealType("");
       setPhase("");
       setSelectedFood("");
+      setCustomFood("");
+      setShowCustomFood(false);
+      setSelectedFoodGroup(null);
     } catch (error) {
       console.error('Error:', error);
       toast({
@@ -134,15 +179,6 @@ const FoodDiary = () => {
     }
   };
 
-  const groupedFoods = protocolFoods.reduce((acc, food) => {
-    const key = food.food_group;
-    if (!acc[key]) {
-      acc[key] = [];
-    }
-    acc[key].push(food);
-    return acc;
-  }, {} as Record<string, ProtocolFood[]>);
-
   return (
     <div className="space-y-6">
       <div className="bg-gradient-to-r from-primary-50 to-primary-100 p-6 rounded-lg shadow-sm">
@@ -187,10 +223,11 @@ const FoodDiary = () => {
                   <SelectValue placeholder="Selecione a refeição" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="breakfast">Café da manhã</SelectItem>
-                  <SelectItem value="lunch">Almoço</SelectItem>
-                  <SelectItem value="dinner">Jantar</SelectItem>
-                  <SelectItem value="snack">Lanche</SelectItem>
+                  {mealTypes.map((type) => (
+                    <SelectItem key={type.id} value={type.name}>
+                      {type.display_name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
 
@@ -213,44 +250,77 @@ const FoodDiary = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Alimentos do Protocolo
+                    Grupo Alimentar
                   </label>
-                  <Accordion type="single" collapsible className="w-full">
-                    {Object.entries(groupedFoods).map(([group, foods]) => (
-                      <AccordionItem key={group} value={group}>
-                        <AccordionTrigger className="text-sm hover:no-underline">
-                          {group.charAt(0).toUpperCase() + group.slice(1)}
-                        </AccordionTrigger>
-                        <AccordionContent>
-                          <ScrollArea className="h-[200px] w-full rounded-md border p-4">
-                            <div className="space-y-2">
-                              {foods
-                                .filter(food => !phase || food.phase === parseInt(phase))
-                                .map((food) => (
-                                  <div
-                                    key={food.id}
-                                    className={cn(
-                                      "flex items-center space-x-2 rounded-lg p-2 cursor-pointer hover:bg-gray-100",
-                                      selectedFood === food.id && "bg-primary-50"
-                                    )}
-                                    onClick={() => setSelectedFood(food.id)}
-                                  >
-                                    <div className="w-2 h-2 rounded-full bg-primary-300" />
-                                    <span className="text-sm text-gray-700">{food.name}</span>
-                                  </div>
-                                ))}
+                  <Select 
+                    value={selectedFoodGroup?.toString() || ""} 
+                    onValueChange={(value) => setSelectedFoodGroup(Number(value))}
+                  >
+                    <SelectTrigger className="w-full bg-gray-50 border-gray-200">
+                      <SelectValue placeholder="Selecione o grupo alimentar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {foodGroups.map((group) => (
+                        <SelectItem key={group.id} value={group.id.toString()}>
+                          {group.display_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Alimentos
+                    </label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowCustomFood(!showCustomFood)}
+                      className="text-primary-600 hover:text-primary-700"
+                    >
+                      {showCustomFood ? "Escolher dos alimentos permitidos" : "Adicionar alimento personalizado"}
+                    </Button>
+                  </div>
+
+                  {showCustomFood ? (
+                    <Input
+                      placeholder="Digite o nome do alimento"
+                      value={customFood}
+                      onChange={(e) => setCustomFood(e.target.value)}
+                      className="w-full"
+                    />
+                  ) : (
+                    <ScrollArea className="h-[200px] w-full rounded-md border p-4">
+                      <div className="space-y-2">
+                        {protocolFoods
+                          .filter(food => 
+                            (!phase || food.phase === parseInt(phase)) &&
+                            (!selectedFoodGroup || food.food_group_id === selectedFoodGroup)
+                          )
+                          .map((food) => (
+                            <div
+                              key={food.id}
+                              className={cn(
+                                "flex items-center space-x-2 rounded-lg p-2 cursor-pointer hover:bg-gray-100",
+                                selectedFood === food.id && "bg-primary-50"
+                              )}
+                              onClick={() => setSelectedFood(food.id)}
+                            >
+                              <div className="w-2 h-2 rounded-full bg-primary-300" />
+                              <span className="text-sm text-gray-700">{food.name}</span>
                             </div>
-                          </ScrollArea>
-                        </AccordionContent>
-                      </AccordionItem>
-                    ))}
-                  </Accordion>
+                          ))}
+                      </div>
+                    </ScrollArea>
+                  )}
                 </div>
               </div>
 
               <Button
                 onClick={handleFoodLog}
-                disabled={loading || !mealType || !selectedFood}
+                disabled={loading || !mealType || (!selectedFood && !customFood) || !selectedFoodGroup}
                 className="w-full bg-primary-500 hover:bg-primary-600 text-white"
               >
                 {loading ? "Registrando..." : "Registrar Refeição"}

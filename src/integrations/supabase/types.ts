@@ -47,10 +47,59 @@ export type Database = {
           },
         ]
       }
+      food_groups: {
+        Row: {
+          display_name: string
+          id: number
+          name: string
+        }
+        Insert: {
+          display_name: string
+          id?: number
+          name: string
+        }
+        Update: {
+          display_name?: string
+          id?: number
+          name?: string
+        }
+        Relationships: []
+      }
+      meal_types: {
+        Row: {
+          display_name: string
+          id: number
+          name: string
+          phase: number | null
+        }
+        Insert: {
+          display_name: string
+          id?: number
+          name: string
+          phase?: number | null
+        }
+        Update: {
+          display_name?: string
+          id?: number
+          name?: string
+          phase?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meal_types_phase_fkey"
+            columns: ["phase"]
+            isOneToOne: false
+            referencedRelation: "protocol_phases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meals: {
         Row: {
           created_at: string | null
+          custom_food: string | null
           description: string | null
+          food_group_id: number | null
           id: string
           meal_date: string | null
           meal_type: string | null
@@ -61,7 +110,9 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          custom_food?: string | null
           description?: string | null
+          food_group_id?: number | null
           id?: string
           meal_date?: string | null
           meal_type?: string | null
@@ -72,7 +123,9 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          custom_food?: string | null
           description?: string | null
+          food_group_id?: number | null
           id?: string
           meal_date?: string | null
           meal_type?: string | null
@@ -82,6 +135,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "meals_food_group_id_fkey"
+            columns: ["food_group_id"]
+            isOneToOne: false
+            referencedRelation: "food_groups"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "meals_protocol_food_id_fkey"
             columns: ["protocol_food_id"]
@@ -122,24 +182,69 @@ export type Database = {
       protocol_foods: {
         Row: {
           created_at: string | null
-          food_group: string
+          food_group: string | null
+          food_group_id: number | null
           id: string
           name: string
-          phase: number
+          phase: number | null
+          phase_id: number | null
         }
         Insert: {
           created_at?: string | null
-          food_group: string
+          food_group?: string | null
+          food_group_id?: number | null
           id?: string
           name: string
-          phase: number
+          phase?: number | null
+          phase_id?: number | null
         }
         Update: {
           created_at?: string | null
-          food_group?: string
+          food_group?: string | null
+          food_group_id?: number | null
           id?: string
           name?: string
-          phase?: number
+          phase?: number | null
+          phase_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "protocol_foods_food_group_id_fkey"
+            columns: ["food_group_id"]
+            isOneToOne: false
+            referencedRelation: "food_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "protocol_foods_phase_id_fkey"
+            columns: ["phase_id"]
+            isOneToOne: false
+            referencedRelation: "protocol_phases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      protocol_phases: {
+        Row: {
+          day_end: number
+          day_start: number
+          description: string | null
+          id: number
+          name: string
+        }
+        Insert: {
+          day_end: number
+          day_start: number
+          description?: string | null
+          id?: number
+          name: string
+        }
+        Update: {
+          day_end?: number
+          day_start?: number
+          description?: string | null
+          id?: number
+          name?: string
         }
         Relationships: []
       }
