@@ -33,7 +33,7 @@ const Navigation = () => {
       console.error("Error logging out:", error);
       toast("Erro ao desconectar", {
         description: "Ocorreu um erro ao tentar desconectar.",
-        variant: "destructive",
+        style: { background: 'red', color: 'white' }
       });
     }
   };
