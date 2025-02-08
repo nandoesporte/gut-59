@@ -1,4 +1,3 @@
-
 export interface User {
   id: string;
   name: string | null;
@@ -110,4 +109,21 @@ export interface DayFormValues {
   title: string;
   description?: string;
   content: string;
+}
+
+export interface UserDetails extends User {
+  meals: DatabaseMeal[];
+  symptoms: Symptom[];
+  water_intake: WaterIntake[];
+  education_progress: EducationProgress[];
+}
+
+export interface EducationProgress {
+  id: string;
+  user_id: string;
+  phase: number | null;
+  day: number | null;
+  completed: boolean;
+  created_at: string;
+  updated_at: string;
 }
