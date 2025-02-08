@@ -69,16 +69,6 @@ function App() {
               }
             />
             <Route
-              path="/diary"
-              element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Index />
-                  </Layout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
               path="/education"
               element={
                 <ProtectedRoute>
