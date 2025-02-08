@@ -1,15 +1,13 @@
 
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
-import { Plus, History, List } from "lucide-react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import MealLogger from "./food-diary/MealLogger";
+import { Card, CardContent } from "@/components/ui/card";
 import WaterTracker from "./food-diary/WaterTracker";
-import DailyMeals from "./food-diary/DailyMeals";
 import MealHistory from "./food-diary/MealHistory";
-import ProgressChart from "./food-diary/ProgressChart";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { History, Droplets, LineChart as LineChartIcon } from "lucide-react";
 
 interface ProtocolFood {
   id: string;
@@ -30,7 +28,6 @@ interface SavedMeal {
 const FoodDiary = () => {
   const { toast } = useToast();
   const [date, setDate] = useState<Date>(new Date());
-  const [protocolFoods, setProtocolFoods] = useState<ProtocolFood[]>([]);
   const [savedMeals, setSavedMeals] = useState<SavedMeal[]>([]);
   const [symptomData, setSymptomData] = useState<any[]>([]);
   const [stats, setStats] = useState({
@@ -39,24 +36,9 @@ const FoodDiary = () => {
   });
 
   useEffect(() => {
-    fetchProtocolFoods();
     fetchSavedMeals();
     fetchSymptomHistory();
   }, [date]);
-
-  const fetchProtocolFoods = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('protocol_foods')
-        .select('*')
-        .order('food_group');
-
-      if (error) throw error;
-      setProtocolFoods(data || []);
-    } catch (error) {
-      console.error('Error fetching protocol foods:', error);
-    }
-  };
 
   const fetchSavedMeals = async () => {
     try {
@@ -126,51 +108,106 @@ const FoodDiary = () => {
       <div className="bg-gradient-to-r from-primary-50 to-primary-100 p-6 rounded-lg shadow-sm">
         <h1 className="text-2xl font-bold text-primary-700 mb-2">Diário Alimentar</h1>
         <p className="text-primary-600">
-          Acompanhe sua jornada de modulação intestinal registrando suas refeições diárias.
+          Acompanhe sua jornada registrando suas refeições e sintomas diários.
         </p>
       </div>
 
-      <Tabs defaultValue="register" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="register" className="flex items-center gap-2">
-            <Plus className="w-4 h-4" />
-            Registrar
-          </TabsTrigger>
-          <TabsTrigger value="history" className="flex items-center gap-2">
-            <History className="w-4 h-4" />
-            Histórico
-          </TabsTrigger>
-          <TabsTrigger value="progress" className="flex items-center gap-2">
-            <List className="w-4 h-4" />
-            Progresso
-          </TabsTrigger>
-        </TabsList>
+      <div className="grid gap-6 md:grid-cols-2">
+        <div className="space-y-6">
+          <Card className="bg-white shadow-sm border-none">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <History className="w-5 h-5 text-primary-500" />
+                <h2 className="text-lg font-semibold text-gray-900">Histórico Alimentar</h2>
+              </div>
+              <MealHistory savedMeals={savedMeals} />
+            </CardContent>
+          </Card>
+          <WaterTracker />
+        </div>
 
-        <TabsContent value="register" className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2">
-            <MealLogger
-              date={date}
-              setDate={setDate}
-              protocolFoods={protocolFoods}
-              onMealLogged={fetchSavedMeals}
-            />
-            <div className="space-y-6">
-              <WaterTracker />
-              <DailyMeals savedMeals={savedMeals} />
+        <Card className="bg-white shadow-sm border-none">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <LineChartIcon className="w-5 h-5 text-primary-500" />
+              <h2 className="text-lg font-semibold text-gray-900">Progresso dos Sintomas</h2>
             </div>
-          </div>
-        </TabsContent>
+            
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={symptomData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="date"
+                    stroke="#666"
+                    tick={{ fill: '#666' }}
+                  />
+                  <YAxis
+                    stroke="#666"
+                    tick={{ fill: '#666' }}
+                    domain={[0, 10]}
+                  />
+                  <Tooltip />
+                  <Line
+                    type="monotone"
+                    dataKey="discomfort"
+                    name="Nível de Desconforto"
+                    stroke="#1976D2"
+                    strokeWidth={2}
+                    dot={{ r: 4 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="bloating"
+                    name="Inchaço"
+                    stroke="#2E7D32"
+                    strokeWidth={2}
+                    dot={{ r: 4 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="gas"
+                    name="Gases"
+                    stroke="#ED6C02"
+                    strokeWidth={2}
+                    dot={{ r: 4 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="abdominalPain"
+                    name="Dor Abdominal"
+                    stroke="#D32F2F"
+                    strokeWidth={2}
+                    dot={{ r: 4 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="nausea"
+                    name="Náusea"
+                    stroke="#9C27B0"
+                    strokeWidth={2}
+                    dot={{ r: 4 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
 
-        <TabsContent value="history">
-          <MealHistory savedMeals={savedMeals} />
-        </TabsContent>
-
-        <TabsContent value="progress">
-          <ProgressChart symptomData={symptomData} stats={stats} />
-        </TabsContent>
-      </Tabs>
+            <div className="mt-4 grid grid-cols-2 gap-4">
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <h4 className="text-sm text-gray-600">Dias Registrados</h4>
+                <p className="text-2xl font-semibold text-primary-500">{stats.daysLogged}</p>
+              </div>
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <h4 className="text-sm text-gray-600">Média de Desconforto</h4>
+                <p className="text-2xl font-semibold text-primary-500">{stats.averageDiscomfort}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
 
 export default FoodDiary;
+
