@@ -22,7 +22,7 @@ export const UsersTab = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Get all profiles and their unread message counts
+      // Get all profiles and count their unread messages
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select(`
@@ -30,8 +30,7 @@ export const UsersTab = () => {
           unread_messages:messages!messages_receiver_id_fkey(count)
         `)
         .neq('id', user.id)
-        .eq('messages.read', false)
-        .eq('messages.receiver_id', 'id');
+        .eq('messages.read', false);
 
       if (profilesError) throw profilesError;
 
@@ -165,3 +164,4 @@ export const UsersTab = () => {
     </div>
   );
 };
+
