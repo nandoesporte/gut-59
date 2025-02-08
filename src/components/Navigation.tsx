@@ -1,6 +1,6 @@
 
 import { Link, useLocation } from "react-router-dom";
-import { Activity, Book, Home, UtensilsCrossed, LineChart } from "lucide-react";
+import { Activity, Book, Home, LineChart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/use-toast";
@@ -44,12 +44,6 @@ const Navigation = () => {
             icon={<Activity className="w-6 h-6" />}
             text="Sintomas"
             active={isActive("/symptoms")}
-          />
-          <NavLink
-            to="/diary"
-            icon={<UtensilsCrossed className="w-6 h-6" />}
-            text="Diário"
-            active={isActive("/diary")}
           />
           <NavLink
             to="/education"
