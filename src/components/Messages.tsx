@@ -47,8 +47,8 @@ const Messages = () => {
           event: 'INSERT', 
           schema: 'public', 
           table: 'messages' 
-        }, payload => {
-          const { data: { user } } = supabase.auth.getUser();
+        }, async (payload) => {
+          const { data: { user } } = await supabase.auth.getUser();
           if (payload.new.receiver_id === user?.id) {
             setHasNewMessage(true);
             fetchMessages();
