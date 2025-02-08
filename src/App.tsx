@@ -12,6 +12,7 @@ import Layout from "./components/Layout";
 import Progress from "./pages/Progress";
 import Store from "./pages/Store";
 import Admin from "./pages/Admin";
+import Trainer from "./pages/Trainer";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -77,11 +78,11 @@ function App() {
               }
             />
             <Route
-              path="/education"
+              path="/trainer"
               element={
                 <ProtectedRoute>
                   <Layout>
-                    <Index />
+                    <Trainer />
                   </Layout>
                 </ProtectedRoute>
               }
