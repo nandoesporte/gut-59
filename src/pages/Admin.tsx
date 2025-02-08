@@ -42,14 +42,18 @@ interface Symptom {
   notes: string | null;
 }
 
-interface Meal {
+interface DatabaseMeal {
   id: string;
   user_id: string;
   meal_date: string;
   protocol_phase: number;
   meal_type: string;
-  food_group: string;
+  food_group_id: number;
   custom_food: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  description: string | null;
+  protocol_food_id: string | null;
 }
 
 interface WaterIntake {
@@ -119,7 +123,7 @@ const Admin = () => {
         .order('meal_date', { ascending: false });
       
       if (error) throw error;
-      return data as Meal[];
+      return data as DatabaseMeal[];
     },
   });
 
@@ -306,14 +310,13 @@ const Admin = () => {
                   <TableHead>Data</TableHead>
                   <TableHead>Fase</TableHead>
                   <TableHead>Tipo</TableHead>
-                  <TableHead>Grupo Alimentar</TableHead>
                   <TableHead>Alimento</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {mealsLoading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center">
+                    <TableCell colSpan={4} className="text-center">
                       Carregando...
                     </TableCell>
                   </TableRow>
@@ -325,7 +328,6 @@ const Admin = () => {
                       </TableCell>
                       <TableCell>Fase {meal.protocol_phase}</TableCell>
                       <TableCell>{meal.meal_type}</TableCell>
-                      <TableCell>{meal.food_group}</TableCell>
                       <TableCell>{meal.custom_food || '-'}</TableCell>
                     </TableRow>
                   ))
