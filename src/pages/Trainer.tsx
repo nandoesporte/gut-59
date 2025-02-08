@@ -1,4 +1,5 @@
 
+import * as React from 'react';
 import { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { ScrollText, Play } from "lucide-react";
@@ -7,7 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { TrainingModule, TrainingVideo } from '@/components/admin/types';
 
-const Trainer = () => {
+const Trainer: React.FC = () => {
   const [selectedVideo, setSelectedVideo] = useState<TrainingVideo | null>(null);
 
   const { data: modules, isLoading: isLoadingModules } = useQuery({
@@ -97,8 +98,9 @@ const Trainer = () => {
                   </div>
                 </div>
               </Card>
-            ))
-          )}
+            );
+          })
+        )}
       </div>
     </div>
   );
