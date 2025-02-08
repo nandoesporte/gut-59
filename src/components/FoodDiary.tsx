@@ -9,8 +9,7 @@ import 'react-circular-progressbar/dist/styles.css';
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, ChevronDown, ChevronUp, Utensils, Droplets, Plus } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { CalendarIcon, Utensils, Droplets, Plus } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,31 +21,19 @@ interface ProtocolFood {
   phase: number;
 }
 
-interface SavedMeal {
-  id: string;
-  meal_type: string;
-  description: string;
-  meal_date: string;
-  created_at: string;
-  protocol_food: ProtocolFood;
-}
-
 const FoodDiary = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [mealType, setMealType] = useState<string>("");
   const [phase, setPhase] = useState<string>("");
   const [selectedFood, setSelectedFood] = useState<string>("");
-  const [waterPercentage, setWaterPercentage] = useState(55);
+  const [waterPercentage, setWaterPercentage] = useState(0);
   const [date, setDate] = useState<Date>(new Date());
   const [protocolFoods, setProtocolFoods] = useState<ProtocolFood[]>([]);
-  const [savedMeals, setSavedMeals] = useState<SavedMeal[]>([]);
-  const [showSavedMeals, setShowSavedMeals] = useState(false);
 
   useEffect(() => {
     fetchProtocolFoods();
-    fetchSavedMeals();
-  }, [date]);
+  }, []);
 
   const fetchProtocolFoods = async () => {
     try {
@@ -59,24 +46,6 @@ const FoodDiary = () => {
       setProtocolFoods(data || []);
     } catch (error) {
       console.error('Error fetching protocol foods:', error);
-    }
-  };
-
-  const fetchSavedMeals = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('meals')
-        .select(`
-          *,
-          protocol_food:protocol_food_id (*)
-        `)
-        .eq('meal_date', format(date, 'yyyy-MM-dd'))
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setSavedMeals(data || []);
-    } catch (error) {
-      console.error('Error fetching saved meals:', error);
     }
   };
 
@@ -114,7 +83,6 @@ const FoodDiary = () => {
       setMealType("");
       setPhase("");
       setSelectedFood("");
-      fetchSavedMeals();
     } catch (error) {
       console.error('Error:', error);
       toast({
@@ -290,88 +258,36 @@ const FoodDiary = () => {
           </CardContent>
         </Card>
 
-        <div className="space-y-6">
-          <Card className="bg-white shadow-sm border-none">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Droplets className="w-5 h-5 text-primary-500" />
-                <h2 className="text-lg font-semibold text-gray-900">Ingestão de água</h2>
-              </div>
-              <div className="w-32 h-32 mx-auto">
-                <CircularProgressbar
-                  value={waterPercentage}
-                  text={`${waterPercentage}%`}
-                  styles={buildStyles({
-                    textSize: '16px',
-                    pathColor: '#34D399',
-                    textColor: '#34D399',
-                    trailColor: '#E5E7EB',
-                  })}
-                />
-              </div>
-              <div className="mt-4 flex justify-center">
-                <Button
-                  onClick={handleAddWater}
-                  className="bg-primary-50 hover:bg-primary-100 text-primary-500"
-                  variant="ghost"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Adicionar 200ml
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white shadow-sm border-none">
-            <CardContent className="p-6">
-              <button
-                onClick={() => setShowSavedMeals(!showSavedMeals)}
-                className="flex items-center justify-between w-full text-left"
+        <Card className="bg-white shadow-sm border-none">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Droplets className="w-5 h-5 text-primary-500" />
+              <h2 className="text-lg font-semibold text-gray-900">Ingestão de água</h2>
+            </div>
+            <div className="w-32 h-32 mx-auto">
+              <CircularProgressbar
+                value={waterPercentage}
+                text={`${waterPercentage}%`}
+                styles={buildStyles({
+                  textSize: '16px',
+                  pathColor: '#34D399',
+                  textColor: '#34D399',
+                  trailColor: '#E5E7EB',
+                })}
+              />
+            </div>
+            <div className="mt-4 flex justify-center">
+              <Button
+                onClick={handleAddWater}
+                className="bg-primary-50 hover:bg-primary-100 text-primary-500"
+                variant="ghost"
               >
-                <div className="flex items-center gap-2">
-                  <Utensils className="w-5 h-5 text-primary-500" />
-                  <h2 className="text-lg font-semibold text-gray-900">Refeições do Dia</h2>
-                </div>
-                {showSavedMeals ? (
-                  <ChevronUp className="h-5 w-5" />
-                ) : (
-                  <ChevronDown className="h-5 w-5" />
-                )}
-              </button>
-              
-              {showSavedMeals && (
-                <div className="mt-4 space-y-4">
-                  {savedMeals.length === 0 ? (
-                    <p className="text-gray-500 text-center">Nenhuma refeição registrada para este dia.</p>
-                  ) : (
-                    savedMeals.map((meal) => (
-                      <Card key={meal.id} className="bg-gray-50">
-                        <CardContent className="p-4">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h3 className="font-medium text-gray-900">
-                                {meal.meal_type === 'breakfast' && 'Café da manhã'}
-                                {meal.meal_type === 'lunch' && 'Almoço'}
-                                {meal.meal_type === 'dinner' && 'Jantar'}
-                                {meal.meal_type === 'snack' && 'Lanche'}
-                              </h3>
-                              <p className="text-sm text-gray-600">
-                                {meal.protocol_food?.name}
-                              </p>
-                            </div>
-                            <span className="text-sm text-gray-500">
-                              {format(new Date(meal.created_at), 'HH:mm')}
-                            </span>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                <Plus className="w-4 h-4 mr-2" />
+                Adicionar 200ml
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
