@@ -14,6 +14,7 @@ import Store from "./pages/Store";
 import Admin from "./pages/Admin";
 import Trainer from "./pages/Trainer";
 
+// Move queryClient outside of the component
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
