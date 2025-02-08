@@ -9,10 +9,11 @@ import 'react-circular-progressbar/dist/styles.css';
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Utensils, Droplets, Plus } from "lucide-react";
+import { CalendarIcon, Droplets, Plus } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 
 interface ProtocolFood {
   id: string;
@@ -157,7 +158,7 @@ const FoodDiary = () => {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Utensils className="w-5 h-5 text-primary-500" />
+                  <CalendarIcon className="w-5 h-5 text-primary-500" />
                   <h2 className="text-lg font-semibold text-gray-900">Nova Refeição</h2>
                 </div>
                 <Popover>
