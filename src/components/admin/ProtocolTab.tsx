@@ -32,7 +32,16 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { ProtocolPhase, FoodGroup, MealType, ProtocolFood } from "./types";
+import { 
+  ProtocolPhase, 
+  FoodGroup, 
+  MealType, 
+  ProtocolFood,
+  PhaseFormValues,
+  FoodGroupFormValues,
+  MealTypeFormValues,
+  ProtocolFoodFormValues
+} from "./types";
 
 const phaseFormSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório"),
@@ -113,7 +122,7 @@ export const ProtocolTab = () => {
 
   // Mutations
   const createPhase = useMutation({
-    mutationFn: async (values: z.infer<typeof phaseFormSchema>) => {
+    mutationFn: async (values: PhaseFormValues) => {
       const { error } = await supabase.from("protocol_phases").insert(values);
       if (error) throw error;
     },
@@ -127,7 +136,7 @@ export const ProtocolTab = () => {
   });
 
   const createFoodGroup = useMutation({
-    mutationFn: async (values: z.infer<typeof foodGroupFormSchema>) => {
+    mutationFn: async (values: FoodGroupFormValues) => {
       const { error } = await supabase.from("food_groups").insert(values);
       if (error) throw error;
     },
@@ -141,7 +150,7 @@ export const ProtocolTab = () => {
   });
 
   const createMealType = useMutation({
-    mutationFn: async (values: z.infer<typeof mealTypeFormSchema>) => {
+    mutationFn: async (values: MealTypeFormValues) => {
       const { error } = await supabase.from("meal_types").insert(values);
       if (error) throw error;
     },
@@ -155,7 +164,7 @@ export const ProtocolTab = () => {
   });
 
   const createProtocolFood = useMutation({
-    mutationFn: async (values: z.infer<typeof protocolFoodFormSchema>) => {
+    mutationFn: async (values: ProtocolFoodFormValues) => {
       const { error } = await supabase.from("protocol_foods").insert(values);
       if (error) throw error;
     },
@@ -165,6 +174,42 @@ export const ProtocolTab = () => {
     },
     onError: () => {
       toast.error("Erro ao criar alimento");
+    },
+  });
+
+  const phaseForm = useForm<PhaseFormValues>({
+    resolver: zodResolver(phaseFormSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      day_start: 1,
+      day_end: 1,
+    },
+  });
+
+  const foodGroupForm = useForm<FoodGroupFormValues>({
+    resolver: zodResolver(foodGroupFormSchema),
+    defaultValues: {
+      name: "",
+      display_name: "",
+    },
+  });
+
+  const mealTypeForm = useForm<MealTypeFormValues>({
+    resolver: zodResolver(mealTypeFormSchema),
+    defaultValues: {
+      name: "",
+      display_name: "",
+      phase: null,
+    },
+  });
+
+  const protocolFoodForm = useForm<ProtocolFoodFormValues>({
+    resolver: zodResolver(protocolFoodFormSchema),
+    defaultValues: {
+      name: "",
+      phase_id: null,
+      food_group_id: null,
     },
   });
 
@@ -188,11 +233,10 @@ export const ProtocolTab = () => {
               <DialogHeader>
                 <DialogTitle>Nova Fase</DialogTitle>
               </DialogHeader>
-              <Form {...useForm<z.infer<typeof phaseFormSchema>>({
-                resolver: zodResolver(phaseFormSchema),
-              })} onSubmit={(values) => createPhase.mutate(values)}>
-                <div className="space-y-4">
+              <Form {...phaseForm}>
+                <form onSubmit={phaseForm.handleSubmit((data) => createPhase.mutate(data))} className="space-y-4">
                   <FormField
+                    control={phaseForm.control}
                     name="name"
                     render={({ field }) => (
                       <FormItem>
@@ -205,6 +249,7 @@ export const ProtocolTab = () => {
                     )}
                   />
                   <FormField
+                    control={phaseForm.control}
                     name="description"
                     render={({ field }) => (
                       <FormItem>
@@ -217,6 +262,7 @@ export const ProtocolTab = () => {
                     )}
                   />
                   <FormField
+                    control={phaseForm.control}
                     name="day_start"
                     render={({ field }) => (
                       <FormItem>
@@ -229,6 +275,7 @@ export const ProtocolTab = () => {
                     )}
                   />
                   <FormField
+                    control={phaseForm.control}
                     name="day_end"
                     render={({ field }) => (
                       <FormItem>
@@ -241,7 +288,7 @@ export const ProtocolTab = () => {
                     )}
                   />
                   <Button type="submit">Salvar</Button>
-                </div>
+                </form>
               </Form>
             </DialogContent>
           </Dialog>
@@ -290,11 +337,10 @@ export const ProtocolTab = () => {
               <DialogHeader>
                 <DialogTitle>Novo Grupo Alimentar</DialogTitle>
               </DialogHeader>
-              <Form {...useForm<z.infer<typeof foodGroupFormSchema>>({
-                resolver: zodResolver(foodGroupFormSchema),
-              })} onSubmit={(values) => createFoodGroup.mutate(values)}>
-                <div className="space-y-4">
+              <Form {...foodGroupForm}>
+                <form onSubmit={foodGroupForm.handleSubmit((data) => createFoodGroup.mutate(data))} className="space-y-4">
                   <FormField
+                    control={foodGroupForm.control}
                     name="name"
                     render={({ field }) => (
                       <FormItem>
@@ -307,6 +353,7 @@ export const ProtocolTab = () => {
                     )}
                   />
                   <FormField
+                    control={foodGroupForm.control}
                     name="display_name"
                     render={({ field }) => (
                       <FormItem>
@@ -319,7 +366,7 @@ export const ProtocolTab = () => {
                     )}
                   />
                   <Button type="submit">Salvar</Button>
-                </div>
+                </form>
               </Form>
             </DialogContent>
           </Dialog>
@@ -364,11 +411,10 @@ export const ProtocolTab = () => {
               <DialogHeader>
                 <DialogTitle>Novo Tipo de Refeição</DialogTitle>
               </DialogHeader>
-              <Form {...useForm<z.infer<typeof mealTypeFormSchema>>({
-                resolver: zodResolver(mealTypeFormSchema),
-              })} onSubmit={(values) => createMealType.mutate(values)}>
-                <div className="space-y-4">
+              <Form {...mealTypeForm}>
+                <form onSubmit={mealTypeForm.handleSubmit((data) => createMealType.mutate(data))} className="space-y-4">
                   <FormField
+                    control={mealTypeForm.control}
                     name="name"
                     render={({ field }) => (
                       <FormItem>
@@ -381,6 +427,7 @@ export const ProtocolTab = () => {
                     )}
                   />
                   <FormField
+                    control={mealTypeForm.control}
                     name="display_name"
                     render={({ field }) => (
                       <FormItem>
@@ -393,19 +440,20 @@ export const ProtocolTab = () => {
                     )}
                   />
                   <FormField
+                    control={mealTypeForm.control}
                     name="phase"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Fase</FormLabel>
                         <FormControl>
-                          <Input type="number" {...field} />
+                          <Input type="number" {...field} onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                   <Button type="submit">Salvar</Button>
-                </div>
+                </form>
               </Form>
             </DialogContent>
           </Dialog>
@@ -452,11 +500,10 @@ export const ProtocolTab = () => {
               <DialogHeader>
                 <DialogTitle>Novo Alimento</DialogTitle>
               </DialogHeader>
-              <Form {...useForm<z.infer<typeof protocolFoodFormSchema>>({
-                resolver: zodResolver(protocolFoodFormSchema),
-              })} onSubmit={(values) => createProtocolFood.mutate(values)}>
-                <div className="space-y-4">
+              <Form {...protocolFoodForm}>
+                <form onSubmit={protocolFoodForm.handleSubmit((data) => createProtocolFood.mutate(data))} className="space-y-4">
                   <FormField
+                    control={protocolFoodForm.control}
                     name="name"
                     render={({ field }) => (
                       <FormItem>
@@ -469,31 +516,33 @@ export const ProtocolTab = () => {
                     )}
                   />
                   <FormField
+                    control={protocolFoodForm.control}
                     name="phase_id"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Fase</FormLabel>
                         <FormControl>
-                          <Input type="number" {...field} />
+                          <Input type="number" {...field} onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                   <FormField
+                    control={protocolFoodForm.control}
                     name="food_group_id"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Grupo Alimentar</FormLabel>
                         <FormControl>
-                          <Input type="number" {...field} />
+                          <Input type="number" {...field} onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                   <Button type="submit">Salvar</Button>
-                </div>
+                </form>
               </Form>
             </DialogContent>
           </Dialog>

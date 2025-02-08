@@ -69,3 +69,27 @@ export interface ProtocolFood {
   food_group_id: number | null;
   created_at: string | null;
 }
+
+export interface PhaseFormValues {
+  name: string;
+  description?: string;
+  day_start: number;
+  day_end: number;
+}
+
+export interface FoodGroupFormValues {
+  name: string;
+  display_name: string;
+}
+
+export interface MealTypeFormValues {
+  name: string;
+  display_name: string;
+  phase: number | null;
+}
+
+export interface ProtocolFoodFormValues {
+  name: string;
+  phase_id: number | null;
+  food_group_id: number | null;
+}
