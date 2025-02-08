@@ -45,8 +45,8 @@ export const WaterTracker = () => {
       // Calculate total water intake for today
       const totalWater = waterIntake?.reduce((sum, record) => sum + (record.amount_ml || 0), 0) || 0;
       
-      // Assuming 4000ml as daily goal (100%)
-      const percentage = Math.min(100, Math.round((totalWater / 4000) * 100));
+      // Using 2500ml as daily goal (100%)
+      const percentage = Math.min(100, Math.round((totalWater / 2500) * 100));
       setWaterPercentage(percentage);
 
     } catch (error) {
