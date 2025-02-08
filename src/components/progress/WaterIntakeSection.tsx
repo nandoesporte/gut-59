@@ -29,7 +29,7 @@ const WaterIntakeSection = ({ date }: WaterIntakeSectionProps) => {
     try {
       const { data, error } = await supabase
         .from('water_intake')
-        .select<'water_intake', WaterIntake>('*')
+        .select('id, amount_ml, created_at, user_id')
         .eq('created_at::date', format(date, 'yyyy-MM-dd'))
         .order('created_at', { ascending: false });
 
