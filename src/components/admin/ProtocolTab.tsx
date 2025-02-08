@@ -1078,4 +1078,64 @@ export const ProtocolTab = () => {
         </div>
 
         <div className="rounded-md border">
-          <Table
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Fase</TableHead>
+                <TableHead>Dia</TableHead>
+                <TableHead>Título</TableHead>
+                <TableHead>Descrição</TableHead>
+                <TableHead>Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {daysLoading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center">
+                    Carregando...
+                  </TableCell>
+                </TableRow>
+              ) : (
+                days?.map((day) => (
+                  <TableRow key={day.id}>
+                    <TableCell>
+                      {phases?.find((phase) => phase.id === day.phase_id)?.name}
+                    </TableCell>
+                    <TableCell>{day.day}</TableCell>
+                    <TableCell>{day.title}</TableCell>
+                    <TableCell>{day.description}</TableCell>
+                    <TableCell className="space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setEditingId(day.id);
+                          dayForm.reset({
+                            phase_id: day.phase_id,
+                            day: day.day,
+                            title: day.title,
+                            description: day.description || "",
+                            content: day.content,
+                          });
+                        }}
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => deleteDay.mutate(day.id)}
+                      >
+                        Excluir
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </TabsContent>
+    </Tabs>
+  );
+}
