@@ -1,11 +1,11 @@
 
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Send } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserList } from "./messages/UserList";
+import { MessageList } from "./messages/MessageList";
+import { MessageInput } from "./messages/MessageInput";
 
 interface User {
   id: string;
@@ -36,7 +36,6 @@ export const MessagesTab = () => {
   useEffect(() => {
     fetchUsers();
     
-    // Subscribe to real-time updates
     const channel = supabase
       .channel('messages_channel')
       .on('postgres_changes', { 
@@ -174,79 +173,25 @@ export const MessagesTab = () => {
   return (
     <Card className="p-6">
       <div className="flex gap-4">
-        <div className="w-1/3 border-r pr-4">
-          <h3 className="text-lg font-medium mb-4">Usuários</h3>
-          <div className="space-y-2">
-            {users.map((user) => (
-              <div
-                key={user.id}
-                onClick={() => setSelectedUser(user.id)}
-                className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer ${
-                  selectedUser === user.id ? 'bg-primary-50' : 'hover:bg-gray-50'
-                }`}
-              >
-                <Avatar className="w-10 h-10">
-                  <AvatarImage src={user.photo_url || undefined} alt={user.name || ''} />
-                  <AvatarFallback>
-                    {user.name?.[0]?.toUpperCase() || '?'}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="font-medium">{user.name || 'Usuário sem nome'}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        <UserList
+          users={users}
+          selectedUser={selectedUser}
+          onUserSelect={setSelectedUser}
+        />
 
         <div className="flex-1">
           {selectedUser ? (
             <>
-              <div className="h-[500px] overflow-y-auto mb-4 space-y-4 p-4">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex items-start gap-2 ${
-                      message.sender_id === selectedUser ? 'flex-row' : 'flex-row-reverse'
-                    }`}
-                  >
-                    <Avatar className="w-8 h-8">
-                      <AvatarImage
-                        src={message.profiles?.photo_url || undefined}
-                        alt={message.profiles?.name || ""}
-                      />
-                      <AvatarFallback>
-                        {message.profiles?.name?.[0]?.toUpperCase() || '?'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div
-                      className={`max-w-[70%] p-3 rounded-lg ${
-                        message.sender_id === selectedUser
-                          ? 'bg-gray-100'
-                          : 'bg-primary-500 text-white'
-                      }`}
-                    >
-                      <p className="text-sm">{message.content}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                  placeholder="Digite sua mensagem..."
-                  className="flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
-                <Button
-                  onClick={sendMessage}
-                  disabled={loading || !newMessage.trim()}
-                >
-                  <Send className="w-4 h-4 mr-2" />
-                  Enviar
-                </Button>
-              </div>
+              <MessageList
+                messages={messages}
+                selectedUserId={selectedUser}
+              />
+              <MessageInput
+                newMessage={newMessage}
+                onMessageChange={setNewMessage}
+                onSendMessage={sendMessage}
+                loading={loading}
+              />
             </>
           ) : (
             <div className="h-full flex items-center justify-center text-gray-500">
