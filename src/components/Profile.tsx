@@ -1,8 +1,11 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Camera } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const Profile = () => {
   const { toast } = useToast();
@@ -10,6 +13,7 @@ const Profile = () => {
   const [age, setAge] = useState("");
   const [healthConditions, setHealthConditions] = useState("");
   const [loading, setLoading] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
   useEffect(() => {
     fetchProfile();
@@ -23,7 +27,7 @@ const Profile = () => {
 
       const { data, error } = await supabase
         .from('profiles')
-        .select('name, age, health_conditions')
+        .select('name, age, health_conditions, photo_url')
         .eq('id', user.id)
         .single();
 
@@ -36,9 +40,61 @@ const Profile = () => {
         setName(data.name || "");
         setAge(data.age?.toString() || "");
         setHealthConditions(data.health_conditions || "");
+        setPhotoUrl(data.photo_url);
       }
     } catch (error) {
       console.error('Error:', error);
+    }
+  };
+
+  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      setLoading(true);
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("No user found");
+
+      // Upload to Storage
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${user.id}/${crypto.randomUUID()}.${fileExt}`;
+
+      const { error: uploadError, data } = await supabase.storage
+        .from('profile_photos')
+        .upload(filePath, file, {
+          upsert: true
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('profile_photos')
+        .getPublicUrl(filePath);
+
+      // Update profile with new photo URL
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ photo_url: publicUrl })
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+
+      setPhotoUrl(publicUrl);
+      toast({
+        title: "Foto atualizada",
+        description: "Sua foto de perfil foi atualizada com sucesso.",
+      });
+    } catch (error) {
+      console.error('Error uploading photo:', error);
+      toast({
+        title: "Erro ao atualizar foto",
+        description: "Não foi possível atualizar sua foto de perfil.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -89,6 +145,31 @@ const Profile = () => {
         <CardTitle className="text-2xl text-primary-500">Seu Perfil</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
+        <div className="flex flex-col items-center space-y-4">
+          <Avatar className="w-24 h-24">
+            <AvatarImage src={photoUrl || undefined} alt="Foto de perfil" />
+            <AvatarFallback>{name?.[0]?.toUpperCase() || '?'}</AvatarFallback>
+          </Avatar>
+          <div className="flex items-center gap-2">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handlePhotoUpload}
+              className="hidden"
+              id="photo-upload"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => document.getElementById('photo-upload')?.click()}
+              disabled={loading}
+            >
+              <Camera className="w-4 h-4 mr-2" />
+              {loading ? "Carregando..." : "Alterar foto"}
+            </Button>
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">
