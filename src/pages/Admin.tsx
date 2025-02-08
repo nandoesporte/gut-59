@@ -18,29 +18,45 @@ import { ProtocolTab } from "@/components/admin/ProtocolTab";
 const Admin = () => {
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const checkAdminRole = async () => {
-      const { data, error } = await supabase.rpc('has_role', { role: 'admin' });
-      
-      if (error) {
-        console.error('Error checking admin role:', error);
+      try {
+        const session = await supabase.auth.getSession();
+        if (!session.data.session) {
+          toast.error('Você precisa estar logado para acessar esta página');
+          navigate('/');
+          return;
+        }
+
+        const { data, error } = await supabase.rpc('has_role', { role: 'admin' });
+        
+        if (error) {
+          console.error('Error checking admin role:', error);
+          toast.error('Erro ao verificar permissões');
+          navigate('/');
+          return;
+        }
+
+        setIsAdmin(data);
+        if (!data) {
+          toast.error('Acesso não autorizado');
+          navigate('/');
+        }
+      } catch (error) {
+        console.error('Error in checkAdminRole:', error);
         toast.error('Erro ao verificar permissões');
         navigate('/');
-        return;
-      }
-
-      setIsAdmin(data);
-      if (!data) {
-        toast.error('Acesso não autorizado');
-        navigate('/');
+      } finally {
+        setIsLoading(false);
       }
     };
 
     checkAdminRole();
   }, [navigate]);
 
-  if (isAdmin === null) {
+  if (isLoading) {
     return <div className="flex items-center justify-center min-h-screen">Carregando...</div>;
   }
 
@@ -86,3 +102,4 @@ const Admin = () => {
 };
 
 export default Admin;
+

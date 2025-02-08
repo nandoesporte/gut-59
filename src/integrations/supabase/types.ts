@@ -374,6 +374,47 @@ export type Database = {
         }
         Relationships: []
       }
+      protocol_days: {
+        Row: {
+          content: string
+          created_at: string
+          day: number
+          description: string | null
+          id: number
+          phase_id: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          day: number
+          description?: string | null
+          id?: number
+          phase_id: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          day?: number
+          description?: string | null
+          id?: number
+          phase_id?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "protocol_days_phase_id_fkey"
+            columns: ["phase_id"]
+            isOneToOne: false
+            referencedRelation: "protocol_phases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       protocol_foods: {
         Row: {
           created_at: string | null
