@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
@@ -11,53 +11,6 @@ import 'react-circular-progressbar/dist/styles.css';
 export const WaterTracker = () => {
   const { toast } = useToast();
   const [waterPercentage, setWaterPercentage] = useState(0);
-
-  useEffect(() => {
-    fetchTodayWaterIntake();
-  }, []);
-
-  const fetchTodayWaterIntake = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        toast({
-          title: "Erro",
-          description: "Usuário não encontrado. Por favor, faça login novamente.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Get today's date in Brasilia timezone
-      const today = new Date();
-      const brasiliaDate = new Date(today.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
-      brasiliaDate.setHours(0, 0, 0, 0);
-
-      const { data: waterIntake, error } = await supabase
-        .from('water_intake')
-        .select('amount_ml')
-        .eq('user_id', user.id)
-        .eq('intake_date', brasiliaDate.toISOString().split('T')[0]);
-
-      if (error) throw error;
-
-      // Calculate total water intake for today
-      const totalWater = waterIntake?.reduce((sum, record) => sum + (record.amount_ml || 0), 0) || 0;
-      
-      // Using 2500ml as daily goal (100%)
-      const percentage = Math.min(100, Math.round((totalWater / 2500) * 100));
-      setWaterPercentage(percentage);
-
-    } catch (error) {
-      console.error('Error fetching water intake:', error);
-      toast({
-        title: "Erro ao carregar",
-        description: "Não foi possível carregar o consumo de água.",
-        variant: "destructive",
-      });
-    }
-  };
 
   const handleAddWater = async () => {
     try {
@@ -72,21 +25,16 @@ export const WaterTracker = () => {
         return;
       }
 
-      // Get current date in Brasilia timezone
-      const brasiliaDate = new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' });
-
       const { error } = await supabase
         .from('water_intake')
         .insert({
           user_id: user.id,
           amount_ml: 200,
-          intake_date: new Date(brasiliaDate).toISOString().split('T')[0]
         });
 
       if (error) throw error;
 
-      // Update the percentage after adding water
-      await fetchTodayWaterIntake();
+      setWaterPercentage(prev => Math.min(100, prev + 5));
 
       toast({
         title: "Água registrada",

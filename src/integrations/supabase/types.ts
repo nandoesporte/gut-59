@@ -570,21 +570,18 @@ export type Database = {
           amount_ml: number | null
           created_at: string | null
           id: string
-          intake_date: string
           user_id: string
         }
         Insert: {
           amount_ml?: number | null
           created_at?: string | null
           id?: string
-          intake_date?: string
           user_id: string
         }
         Update: {
           amount_ml?: number | null
           created_at?: string | null
           id?: string
-          intake_date?: string
           user_id?: string
         }
         Relationships: [
