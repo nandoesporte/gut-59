@@ -10,6 +10,7 @@ interface WaterIntake {
   id: string;
   amount_ml: number | null;
   created_at: string | null;
+  user_id: string;
 }
 
 interface WaterIntakeSectionProps {
@@ -28,7 +29,7 @@ const WaterIntakeSection = ({ date }: WaterIntakeSectionProps) => {
     try {
       const { data, error } = await supabase
         .from('water_intake')
-        .select('*')
+        .select<'water_intake', WaterIntake>('*')
         .eq('created_at::date', format(date, 'yyyy-MM-dd'))
         .order('created_at', { ascending: false });
 
