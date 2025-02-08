@@ -1,4 +1,3 @@
-
 export interface User {
   id: string;
   name: string | null;
@@ -127,4 +126,40 @@ export interface EducationProgress {
   completed: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface TrainingModule {
+  id: string;
+  name: string;
+  description: string | null;
+  display_order: number;
+  status: 'active' | 'inactive';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TrainingVideo {
+  id: string;
+  title: string;
+  description: string | null;
+  module_id: string;
+  url: string;
+  status: 'active' | 'inactive';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TrainingModuleFormValues {
+  name: string;
+  description?: string;
+  display_order: number;
+  status: 'active' | 'inactive';
+}
+
+export interface TrainingVideoFormValues {
+  title: string;
+  description?: string;
+  module_id: string;
+  url: string;
+  status: 'active' | 'inactive';
 }

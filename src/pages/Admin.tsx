@@ -10,6 +10,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { UsersTab } from "@/components/admin/UsersTab";
+import { TrainingTab } from "@/components/admin/TrainingTab";
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -63,7 +64,18 @@ const Admin = () => {
   return (
     <div className="container mx-auto py-6">
       <h1 className="text-2xl font-bold mb-6">Painel Administrativo</h1>
-      <UsersTab />
+      <Tabs defaultValue="users">
+        <TabsList>
+          <TabsTrigger value="users">Usuários</TabsTrigger>
+          <TabsTrigger value="training">Instruções</TabsTrigger>
+        </TabsList>
+        <TabsContent value="users">
+          <UsersTab />
+        </TabsContent>
+        <TabsContent value="training">
+          <TrainingTab />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

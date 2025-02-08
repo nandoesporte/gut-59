@@ -473,6 +473,77 @@ export type Database = {
           },
         ]
       }
+      training_modules: {
+        Row: {
+          created_at: string
+          description: string | null
+          display_order: number
+          id: string
+          name: string
+          status: Database["public"]["Enums"]["module_status"] | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          display_order: number
+          id?: string
+          name: string
+          status?: Database["public"]["Enums"]["module_status"] | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          name?: string
+          status?: Database["public"]["Enums"]["module_status"] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      training_videos: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          module_id: string | null
+          status: Database["public"]["Enums"]["module_status"] | null
+          title: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          module_id?: string | null
+          status?: Database["public"]["Enums"]["module_status"] | null
+          title: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          module_id?: string | null
+          status?: Database["public"]["Enums"]["module_status"] | null
+          title?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_videos_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "training_modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -537,6 +608,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      module_status: "active" | "inactive"
     }
     CompositeTypes: {
       [_ in never]: never
