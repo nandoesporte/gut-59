@@ -462,12 +462,11 @@ export const ProtocolTab = () => {
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab}>
-      <TabsList className="grid w-full grid-cols-6">
+      <TabsList className="grid w-full grid-cols-5">
         <TabsTrigger value="phases">Fases</TabsTrigger>
         <TabsTrigger value="food-groups">Grupos Alimentares</TabsTrigger>
         <TabsTrigger value="meal-types">Tipos de Refeição</TabsTrigger>
         <TabsTrigger value="foods">Alimentos</TabsTrigger>
-        <TabsTrigger value="diary">Dados do Diário</TabsTrigger>
         <TabsTrigger value="modulation">Protocolo de Modulação</TabsTrigger>
       </TabsList>
 
@@ -1105,22 +1104,112 @@ export const ProtocolTab = () => {
                     <TableCell>{day.title}</TableCell>
                     <TableCell>{day.description}</TableCell>
                     <TableCell className="space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setEditingId(day.id);
-                          dayForm.reset({
-                            phase_id: day.phase_id,
-                            day: day.day,
-                            title: day.title,
-                            description: day.description || "",
-                            content: day.content,
-                          });
-                        }}
-                      >
-                        Editar
-                      </Button>
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            Editar
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Editar Dia do Protocolo</DialogTitle>
+                          </DialogHeader>
+                          <Form {...dayForm}>
+                            <form
+                              onSubmit={dayForm.handleSubmit((data) =>
+                                updateDay.mutate({ id: day.id, values: data })
+                              )}
+                              className="space-y-4"
+                            >
+                              <FormField
+                                control={dayForm.control}
+                                name="phase_id"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Fase</FormLabel>
+                                    <FormControl>
+                                      <select
+                                        className="w-full p-2 border rounded"
+                                        {...field}
+                                        onChange={(e) =>
+                                          field.onChange(parseInt(e.target.value))
+                                        }
+                                      >
+                                        <option value="">Selecione uma fase</option>
+                                        {phases?.map((phase) => (
+                                          <option key={phase.id} value={phase.id}>
+                                            {phase.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={dayForm.control}
+                                name="day"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Dia</FormLabel>
+                                    <FormControl>
+                                      <Input type="number" {...field} onChange={(e) => field.onChange(parseInt(e.target.value))} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={dayForm.control}
+                                name="title"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Título</FormLabel>
+                                    <FormControl>
+                                      <Input {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={dayForm.control}
+                                name="description"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Descrição</FormLabel>
+                                    <FormControl>
+                                      <Input {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={dayForm.control}
+                                name="content"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Conteúdo</FormLabel>
+                                    <FormControl>
+                                      <textarea
+                                        className="w-full p-2 border rounded"
+                                        rows={5}
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <Button type="submit">
+                                {editingId ? "Atualizar" : "Salvar"}
+                              </Button>
+                            </form>
+                          </Form>
+                        </DialogContent>
+                      </Dialog>
                       <Button
                         variant="destructive"
                         size="sm"
