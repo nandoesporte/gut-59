@@ -1,4 +1,3 @@
-
 export interface User {
   id: string;
   name: string | null;
@@ -92,4 +91,21 @@ export interface ProtocolFoodFormValues {
   name: string;
   phase_id: number | null;
   food_group_id: number | null;
+}
+
+export interface DayData {
+  id: number;
+  phase_id: number;
+  day: number;
+  title: string;
+  description: string | null;
+  content: string;
+}
+
+export interface DayFormValues {
+  phase_id: number;
+  day: number;
+  title: string;
+  description?: string;
+  content: string;
 }

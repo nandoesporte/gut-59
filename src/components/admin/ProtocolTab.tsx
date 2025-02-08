@@ -1,3 +1,4 @@
+<lov-code>
 import { useState } from "react";
 import {
   Table,
@@ -40,6 +41,8 @@ import {
   FoodGroupFormValues,
   MealTypeFormValues,
   ProtocolFoodFormValues,
+  DayData,
+  DayFormValues,
 } from "./types";
 
 const phaseFormSchema = z.object({
@@ -64,6 +67,14 @@ const protocolFoodFormSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório"),
   phase_id: z.coerce.number().nullable(),
   food_group_id: z.coerce.number().nullable(),
+});
+
+const dayFormSchema = z.object({
+  phase_id: z.coerce.number().min(1, "Fase é obrigatória"),
+  day: z.coerce.number().min(1, "Dia é obrigatório"),
+  title: z.string().min(1, "Título é obrigatório"),
+  description: z.string().optional(),
+  content: z.string().min(1, "Conteúdo é obrigatório"),
 });
 
 export const ProtocolTab = () => {
@@ -116,6 +127,18 @@ export const ProtocolTab = () => {
         .order("name");
       if (error) throw error;
       return data as ProtocolFood[];
+    },
+  });
+
+  const { data: days, isLoading: daysLoading } = useQuery({
+    queryKey: ["protocol-days"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("protocol_days")
+        .select("*")
+        .order("day");
+      if (error) throw error;
+      return data as DayData[];
     },
   });
 
@@ -172,6 +195,20 @@ export const ProtocolTab = () => {
     },
     onError: () => {
       toast.error("Erro ao criar alimento");
+    },
+  });
+
+  const createDay = useMutation({
+    mutationFn: async (values: DayFormValues) => {
+      const { error } = await supabase.from("protocol_days").insert(values);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["protocol-days"] });
+      toast.success("Dia criado com sucesso!");
+    },
+    onError: () => {
+      toast.error("Erro ao criar dia");
     },
   });
 
@@ -237,6 +274,23 @@ export const ProtocolTab = () => {
     },
     onError: () => {
       toast.error("Erro ao excluir alimento");
+    },
+  });
+
+  const deleteDay = useMutation({
+    mutationFn: async (id: number) => {
+      const { error } = await supabase
+        .from("protocol_days")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["protocol-days"] });
+      toast.success("Dia excluído com sucesso!");
+    },
+    onError: () => {
+      toast.error("Erro ao excluir dia");
     },
   });
 
@@ -336,6 +390,30 @@ export const ProtocolTab = () => {
     },
   });
 
+  const updateDay = useMutation({
+    mutationFn: async ({
+      id,
+      values,
+    }: {
+      id: number;
+      values: DayFormValues;
+    }) => {
+      const { error } = await supabase
+        .from("protocol_days")
+        .update(values)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["protocol-days"] });
+      toast.success("Dia atualizado com sucesso!");
+      setEditingId(null);
+    },
+    onError: () => {
+      toast.error("Erro ao atualizar dia");
+    },
+  });
+
   const phaseForm = useForm<PhaseFormValues>({
     resolver: zodResolver(phaseFormSchema),
     defaultValues: {
@@ -372,13 +450,26 @@ export const ProtocolTab = () => {
     },
   });
 
+  const dayForm = useForm<DayFormValues>({
+    resolver: zodResolver(dayFormSchema),
+    defaultValues: {
+      phase_id: 1,
+      day: 1,
+      title: "",
+      description: "",
+      content: "",
+    },
+  });
+
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab}>
-      <TabsList className="grid w-full grid-cols-4">
+      <TabsList className="grid w-full grid-cols-6">
         <TabsTrigger value="phases">Fases</TabsTrigger>
         <TabsTrigger value="food-groups">Grupos Alimentares</TabsTrigger>
         <TabsTrigger value="meal-types">Tipos de Refeição</TabsTrigger>
         <TabsTrigger value="foods">Alimentos</TabsTrigger>
+        <TabsTrigger value="diary">Dados do Diário</TabsTrigger>
+        <TabsTrigger value="modulation">Protocolo de Modulação</TabsTrigger>
       </TabsList>
 
       <TabsContent value="phases" className="space-y-4">
@@ -871,6 +962,120 @@ export const ProtocolTab = () => {
           </Table>
         </div>
       </TabsContent>
-    </Tabs>
-  );
-};
+
+      <TabsContent value="diary">
+        Dados do diário
+      </TabsContent>
+
+      <TabsContent value="modulation" className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h3 className="text-lg font-medium">Protocolo de Modulação</h3>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button>Adicionar Dia</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Novo Dia do Protocolo</DialogTitle>
+              </DialogHeader>
+              <Form {...dayForm}>
+                <form
+                  onSubmit={dayForm.handleSubmit((data) =>
+                    editingId
+                      ? updateDay.mutate({ id: editingId, values: data })
+                      : createDay.mutate(data)
+                  )}
+                  className="space-y-4"
+                >
+                  <FormField
+                    control={dayForm.control}
+                    name="phase_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Fase</FormLabel>
+                        <FormControl>
+                          <select
+                            className="w-full p-2 border rounded"
+                            {...field}
+                            onChange={(e) =>
+                              field.onChange(parseInt(e.target.value))
+                            }
+                          >
+                            <option value="">Selecione uma fase</option>
+                            {phases?.map((phase) => (
+                              <option key={phase.id} value={phase.id}>
+                                {phase.name}
+                              </option>
+                            ))}
+                          </select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={dayForm.control}
+                    name="day"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Dia</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} onChange={(e) => field.onChange(parseInt(e.target.value))} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={dayForm.control}
+                    name="title"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Título</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={dayForm.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Descrição</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={dayForm.control}
+                    name="content"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Conteúdo</FormLabel>
+                        <FormControl>
+                          <textarea
+                            className="w-full p-2 border rounded"
+                            rows={5}
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button type="submit">
+                    {editingId ? "Atualizar" : "Salvar"}
+                  </Button>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        <div className="rounded-md border">
