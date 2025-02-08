@@ -16,7 +16,7 @@ interface Message {
   profiles: {
     name: string | null;
     photo_url: string | null;
-  };
+  } | null;
 }
 
 const Messages = () => {
@@ -84,13 +84,12 @@ const Messages = () => {
           receiver_id,
           content,
           created_at,
-          profiles:sender_id (
+          profiles!messages_sender_id_fkey (
             name,
             photo_url
           )
         `)
-        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-        .or(`sender_id.eq.${receiverId},receiver_id.eq.${receiverId}`)
+        .or(`and(sender_id.eq.${user.id},receiver_id.eq.${receiverId}),and(sender_id.eq.${receiverId},receiver_id.eq.${user.id})`)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
