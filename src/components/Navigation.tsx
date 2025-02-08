@@ -48,12 +48,15 @@ const Navigation = () => {
             text="Início"
             active={isActive("/")}
           />
-          <NavLink
-            to="/store"
-            icon={<ShoppingBag className="w-6 h-6" />}
-            text="Loja"
-            active={isActive("/store")}
-          />
+          <a
+            href="https://loja.katiasantin.com.br"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex flex-col items-center space-y-1 px-4 py-2 rounded-lg transition-colors text-gray-400 hover:text-primary-500"
+          >
+            <ShoppingBag className="w-6 h-6" />
+            <span className="text-xs font-medium">Produtos</span>
+          </a>
           <NavLink
             to="/trainer"
             icon={<ScrollText className="w-6 h-6" />}
