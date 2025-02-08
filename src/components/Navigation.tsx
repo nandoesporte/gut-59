@@ -1,9 +1,33 @@
+
 import { Link, useLocation } from "react-router-dom";
 import { Activity, Book, Home, UtensilsCrossed, LineChart } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
+import { toast } from "@/components/ui/use-toast";
 
 const Navigation = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const isActive = (path: string) => location.pathname === path;
+
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      navigate("/auth");
+      toast({
+        title: "Logout realizado",
+        description: "Você foi desconectado com sucesso.",
+      });
+    } catch (error) {
+      console.error("Error logging out:", error);
+      toast({
+        title: "Erro ao desconectar",
+        description: "Ocorreu um erro ao tentar desconectar.",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <nav className="bg-white shadow-sm fixed bottom-0 left-0 right-0 z-50">
@@ -56,9 +80,7 @@ const NavLink = ({ to, icon, text, active }: NavLinkProps) => (
   <Link
     to={to}
     className={`flex flex-col items-center space-y-1 px-4 py-2 rounded-lg transition-colors ${
-      active
-        ? "text-primary-500"
-        : "text-gray-400 hover:text-primary-500"
+      active ? "text-primary-500" : "text-gray-400 hover:text-primary-500"
     }`}
   >
     {icon}
