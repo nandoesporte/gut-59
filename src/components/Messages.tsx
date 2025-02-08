@@ -79,7 +79,11 @@ const Messages = () => {
       const { data, error } = await supabase
         .from('messages')
         .select(`
-          *,
+          id,
+          sender_id,
+          receiver_id,
+          content,
+          created_at,
           profiles:sender_id (
             name,
             photo_url
