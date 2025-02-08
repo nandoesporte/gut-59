@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,31 @@ const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  useEffect(() => {
+    // Check if user is already logged in
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        navigate("/");
+      }
+    };
+    
+    checkUser();
+
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === "SIGNED_IN" && session) {
+          navigate("/");
+        }
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [navigate]);
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -26,7 +51,8 @@ const Auth = () => {
           password,
         });
         if (error) throw error;
-        navigate("/");
+        
+        // The navigation will be handled by the auth state change listener
         toast({
           title: "Login realizado",
           description: "Bem-vindo de volta!",
@@ -35,8 +61,12 @@ const Auth = () => {
         const { error } = await supabase.auth.signUp({
           email,
           password,
+          options: {
+            emailRedirectTo: window.location.origin,
+          },
         });
         if (error) throw error;
+        
         toast({
           title: "Cadastro realizado",
           description: "Verifique seu email para confirmar o cadastro.",
@@ -44,9 +74,19 @@ const Auth = () => {
       }
     } catch (error: any) {
       console.error("Authentication error:", error);
+      let errorMessage = "Ocorreu um erro durante a autenticação.";
+      
+      if (error.message.includes("Email not confirmed")) {
+        errorMessage = "Por favor, confirme seu email antes de fazer login.";
+      } else if (error.message.includes("Invalid login credentials")) {
+        errorMessage = "Email ou senha incorretos.";
+      } else if (error.message.includes("User already registered")) {
+        errorMessage = "Este email já está cadastrado.";
+      }
+      
       toast({
         title: "Erro na autenticação",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
