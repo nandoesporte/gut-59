@@ -38,3 +38,34 @@ export interface WaterIntake {
   created_at: string;
   amount_ml: number;
 }
+
+export interface ProtocolPhase {
+  id: number;
+  name: string;
+  description: string | null;
+  day_start: number;
+  day_end: number;
+}
+
+export interface FoodGroup {
+  id: number;
+  name: string;
+  display_name: string;
+}
+
+export interface MealType {
+  id: number;
+  name: string;
+  display_name: string;
+  phase: number | null;
+}
+
+export interface ProtocolFood {
+  id: string;
+  name: string;
+  phase: number | null;
+  food_group: string | null;
+  phase_id: number | null;
+  food_group_id: number | null;
+  created_at: string | null;
+}
