@@ -52,7 +52,9 @@ export type Database = {
           created_at: string | null
           description: string | null
           id: string
+          meal_date: string | null
           meal_type: string | null
+          protocol_food_id: string | null
           protocol_phase: number | null
           updated_at: string | null
           user_id: string
@@ -61,7 +63,9 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id?: string
+          meal_date?: string | null
           meal_type?: string | null
+          protocol_food_id?: string | null
           protocol_phase?: number | null
           updated_at?: string | null
           user_id: string
@@ -70,12 +74,21 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id?: string
+          meal_date?: string | null
           meal_type?: string | null
+          protocol_food_id?: string | null
           protocol_phase?: number | null
           updated_at?: string | null
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "meals_protocol_food_id_fkey"
+            columns: ["protocol_food_id"]
+            isOneToOne: false
+            referencedRelation: "protocol_foods"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "meals_user_id_fkey"
             columns: ["user_id"]
@@ -103,6 +116,30 @@ export type Database = {
           health_conditions?: string | null
           id?: string
           name?: string | null
+        }
+        Relationships: []
+      }
+      protocol_foods: {
+        Row: {
+          created_at: string | null
+          food_group: string
+          id: string
+          name: string
+          phase: number
+        }
+        Insert: {
+          created_at?: string | null
+          food_group: string
+          id?: string
+          name: string
+          phase: number
+        }
+        Update: {
+          created_at?: string | null
+          food_group?: string
+          id?: string
+          name?: string
+          phase?: number
         }
         Relationships: []
       }
