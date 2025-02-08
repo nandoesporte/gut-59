@@ -36,6 +36,7 @@ const WaterIntakeSection = ({ date }: WaterIntakeSectionProps) => {
         throw new Error("User not authenticated");
       }
 
+      // Set the time range for the current day (midnight to midnight)
       const startOfDay = new Date(date);
       startOfDay.setHours(0, 0, 0, 0);
       const endOfDay = new Date(date);
