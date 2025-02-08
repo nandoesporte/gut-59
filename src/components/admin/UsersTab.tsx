@@ -133,17 +133,10 @@ export const UsersTab = () => {
       if (error) throw error;
 
       setNewMessage("");
-      toast({
-        title: "Mensagem enviada",
-        description: "Sua mensagem foi enviada com sucesso.",
-      });
+      toast.success('Mensagem enviada com sucesso');
     } catch (error) {
       console.error('Error sending message:', error);
-      toast({
-        title: "Erro ao enviar mensagem",
-        description: "Não foi possível enviar sua mensagem.",
-        variant: "destructive",
-      });
+      toast.error('Erro ao enviar mensagem');
     } finally {
       setLoading(false);
     }
@@ -195,7 +188,6 @@ export const UsersTab = () => {
             <Tabs defaultValue="profile" className="w-full">
               <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="profile">Perfil</TabsTrigger>
-                <TabsTrigger value="meals">Refeições</TabsTrigger>
                 <TabsTrigger value="protocol">Protocolo</TabsTrigger>
                 <TabsTrigger value="messages">Mensagens</TabsTrigger>
               </TabsList>
@@ -223,33 +215,6 @@ export const UsersTab = () => {
                 >
                   Editar Informações
                 </Button>
-              </TabsContent>
-
-              <TabsContent value="meals">
-                <div className="space-y-4">
-                  {selectedUser.meals.map((meal) => (
-                    <Card key={meal.id} className="p-4">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className="font-medium">{meal.meal_type}</h4>
-                          <p className="text-sm text-gray-500">
-                            {format(new Date(meal.meal_date), 'dd/MM/yyyy')}
-                          </p>
-                          {meal.description && (
-                            <p className="mt-2">{meal.description}</p>
-                          )}
-                        </div>
-                        {meal.photo_url && (
-                          <img 
-                            src={meal.photo_url} 
-                            alt="Foto da refeição" 
-                            className="w-24 h-24 object-cover rounded-lg"
-                          />
-                        )}
-                      </div>
-                    </Card>
-                  ))}
-                </div>
               </TabsContent>
 
               <TabsContent value="protocol">
@@ -343,3 +308,4 @@ export const UsersTab = () => {
     </div>
   );
 };
+
