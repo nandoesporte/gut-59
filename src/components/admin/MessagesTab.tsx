@@ -4,8 +4,7 @@ import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { UserList } from "./messages/UserList";
-import { MessageList } from "./messages/MessageList";
-import { MessageInput } from "./messages/MessageInput";
+import { UserConversation } from "./messages/UserConversation";
 
 interface User {
   id: string;
@@ -30,22 +29,20 @@ export const MessagesTab = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [newMessage, setNewMessage] = useState("");
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchUsers();
     
     const channel = supabase
-      .channel('messages_channel')
+      .channel('messages_admin')
       .on('postgres_changes', { 
         event: 'INSERT', 
         schema: 'public', 
-        table: 'messages',
-        filter: selectedUser ? `receiver_id=eq.${selectedUser}` : undefined
-      }, payload => {
-        console.log('New message received:', payload);
-        fetchMessages();
+        table: 'messages'
+      }, () => {
+        if (selectedUser) {
+          fetchMessages(selectedUser);
+        }
       })
       .subscribe();
 
@@ -64,12 +61,8 @@ export const MessagesTab = () => {
         .select('id, name, photo_url')
         .neq('id', user.id);
 
-      if (error) {
-        console.error('Error fetching users:', error);
-        throw error;
-      }
+      if (error) throw error;
       
-      console.log('Fetched users:', data);
       setUsers(data || []);
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -81,9 +74,7 @@ export const MessagesTab = () => {
     }
   };
 
-  const fetchMessages = async () => {
-    if (!selectedUser) return;
-
+  const fetchMessages = async (userId: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -101,15 +92,10 @@ export const MessagesTab = () => {
             photo_url
           )
         `)
-        .or(`and(sender_id.eq.${user.id},receiver_id.eq.${selectedUser}),and(sender_id.eq.${selectedUser},receiver_id.eq.${user.id})`)
+        .or(`and(sender_id.eq.${user.id},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${user.id})`)
         .order('created_at', { ascending: true });
 
-      if (error) {
-        console.error('Error fetching messages:', error);
-        throw error;
-      }
-      
-      console.log('Fetched messages:', data);
+      if (error) throw error;
       setMessages(data || []);
     } catch (error) {
       console.error('Error fetching messages:', error);
@@ -121,83 +107,25 @@ export const MessagesTab = () => {
     }
   };
 
-  const sendMessage = async () => {
-    if (!newMessage.trim() || !selectedUser) return;
-
-    try {
-      setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuário não encontrado");
-
-      const messageData = {
-        content: newMessage.trim(),
-        sender_id: user.id,
-        receiver_id: selectedUser,
-      };
-
-      console.log('Sending message:', messageData);
-
-      const { error } = await supabase
-        .from('messages')
-        .insert(messageData);
-
-      if (error) {
-        console.error('Error sending message:', error);
-        throw error;
-      }
-
-      setNewMessage("");
-      await fetchMessages();
-      toast({
-        title: "Mensagem enviada",
-        description: "Sua mensagem foi enviada com sucesso.",
-      });
-    } catch (error) {
-      console.error('Error sending message:', error);
-      toast({
-        title: "Erro ao enviar mensagem",
-        description: "Não foi possível enviar sua mensagem.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
+  const handleUserSelect = async (userId: string) => {
+    setSelectedUser(userId);
+    await fetchMessages(userId);
   };
-
-  useEffect(() => {
-    if (selectedUser) {
-      fetchMessages();
-    }
-  }, [selectedUser]);
 
   return (
     <Card className="p-6">
-      <div className="flex gap-4">
+      <div className="flex gap-4 h-[600px]">
         <UserList
           users={users}
           selectedUser={selectedUser}
-          onUserSelect={setSelectedUser}
+          onUserSelect={handleUserSelect}
         />
-
         <div className="flex-1">
-          {selectedUser ? (
-            <>
-              <MessageList
-                messages={messages}
-                selectedUserId={selectedUser}
-              />
-              <MessageInput
-                newMessage={newMessage}
-                onMessageChange={setNewMessage}
-                onSendMessage={sendMessage}
-                loading={loading}
-              />
-            </>
-          ) : (
-            <div className="h-full flex items-center justify-center text-gray-500">
-              Selecione um usuário para iniciar uma conversa
-            </div>
-          )}
+          <UserConversation
+            messages={messages}
+            selectedUserId={selectedUser}
+            onMessageSent={() => selectedUser && fetchMessages(selectedUser)}
+          />
         </div>
       </div>
     </Card>

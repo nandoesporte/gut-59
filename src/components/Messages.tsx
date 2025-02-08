@@ -32,10 +32,13 @@ const Messages = () => {
   const [adminId, setAdminId] = useState<string | null>(null);
   const [hasNewMessage, setHasNewMessage] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
+    checkAdminRole();
     fetchAdmin();
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      checkAdminRole();
       fetchAdmin();
     });
 
@@ -55,7 +58,7 @@ const Messages = () => {
           table: 'messages' 
         }, async (payload) => {
           const { data: { user } } = await supabase.auth.getUser();
-          if (payload.new.receiver_id === user?.id) {
+          if (user && (payload.new.receiver_id === user.id || isAdmin)) {
             setHasNewMessage(true);
             fetchMessages();
           }
@@ -66,7 +69,12 @@ const Messages = () => {
         supabase.removeChannel(channel);
       };
     }
-  }, [adminId]);
+  }, [adminId, isAdmin]);
+
+  const checkAdminRole = async () => {
+    const { data } = await supabase.rpc('has_role', { role: 'admin' });
+    setIsAdmin(!!data);
+  };
 
   const fetchAdmin = async () => {
     try {
@@ -167,6 +175,11 @@ const Messages = () => {
       setLoading(false);
     }
   };
+
+  // If user is admin, redirect to admin page
+  if (isAdmin) {
+    return null;
+  }
 
   return (
     <Card className="w-full max-w-2xl mx-auto mt-8">
