@@ -18,6 +18,7 @@ interface Message {
   receiver_id: string;
   content: string;
   created_at: string;
+  read: boolean;
   profiles: {
     name: string | null;
     photo_url: string | null;
@@ -87,6 +88,7 @@ export const MessagesTab = () => {
           receiver_id,
           content,
           created_at,
+          read,
           profiles!messages_sender_id_fkey (
             name,
             photo_url
