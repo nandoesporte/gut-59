@@ -1,10 +1,9 @@
 
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
-import { History, List } from "lucide-react";
+import { History } from "lucide-react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import MealHistory from "./food-diary/MealHistory";
 import WaterTracker from "./food-diary/WaterTracker";
 import ProgressChart from "./food-diary/ProgressChart";
@@ -110,29 +109,15 @@ const FoodDiary = () => {
         </p>
       </div>
 
-      <Tabs defaultValue="history" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="history" className="flex items-center gap-2">
-            <History className="w-4 h-4" />
-            Histórico
-          </TabsTrigger>
-          <TabsTrigger value="progress" className="flex items-center gap-2">
-            <List className="w-4 h-4" />
-            Progresso
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="history">
-          <div className="grid gap-6 md:grid-cols-2">
-            <MealHistory savedMeals={savedMeals} />
-            <WaterTracker />
-          </div>
-        </TabsContent>
-
-        <TabsContent value="progress">
+      <div className="grid gap-6 md:grid-cols-2">
+        <div className="space-y-6">
+          <MealHistory savedMeals={savedMeals} />
+          <WaterTracker />
+        </div>
+        <div>
           <ProgressChart symptomData={symptomData} stats={stats} />
-        </TabsContent>
-      </Tabs>
+        </div>
+      </div>
     </div>
   );
 };
