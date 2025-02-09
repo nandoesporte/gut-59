@@ -1,15 +1,30 @@
 
 import * as React from 'react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from "@/components/ui/card";
 import { ScrollText, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { TrainingModule, TrainingVideo } from '@/components/admin/types';
+import { useNavigate } from 'react-router-dom';
+import { toast } from "sonner";
 
 const Trainer: React.FC = () => {
   const [selectedVideo, setSelectedVideo] = useState<TrainingVideo | null>(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Você precisa estar logado para acessar esta página");
+        navigate('/auth');
+      }
+    };
+
+    checkAuth();
+  }, [navigate]);
 
   const { data: modules, isLoading: isLoadingModules } = useQuery({
     queryKey: ['training-modules'],
