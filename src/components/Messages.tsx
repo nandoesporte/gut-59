@@ -68,7 +68,7 @@ const Messages = () => {
     }
   };
 
-  // If user is admin, redirect to admin page
+  // If user is admin, don't show this component
   if (isAdmin) {
     return null;
   }
