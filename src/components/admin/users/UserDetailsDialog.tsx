@@ -14,6 +14,7 @@ import { MessageInput } from "../messages/MessageInput";
 import { UserDetails } from "../types";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 interface UserDetailsDialogProps {
   user: UserDetails | null;
@@ -37,6 +38,7 @@ export const UserDetailsDialog = ({
   loading,
 }: UserDetailsDialogProps) => {
   const [messages, setMessages] = useState<any[]>([]);
+  const [expandedDays, setExpandedDays] = useState<string[]>([]);
 
   useEffect(() => {
     if (user && open) {
@@ -72,6 +74,14 @@ export const UserDetailsDialog = ({
     }
   };
 
+  const toggleDay = (day: string) => {
+    setExpandedDays(prev =>
+      prev.includes(day)
+        ? prev.filter(d => d !== day)
+        : [...prev, day]
+    );
+  };
+
   if (!user) return null;
 
   const getMealTypeDisplay = (mealType: string) => {
@@ -88,6 +98,30 @@ export const UserDetailsDialog = ({
         return mealType;
     }
   };
+
+  // Group meals by date
+  const mealsByDate = user.meals.reduce((acc, meal) => {
+    const date = meal.meal_date ? format(new Date(meal.meal_date), 'yyyy-MM-dd') : 'Sem data';
+    if (!acc[date]) {
+      acc[date] = [];
+    }
+    acc[date].push(meal);
+    return acc;
+  }, {} as Record<string, typeof user.meals>);
+
+  // Group water intake by date and calculate totals
+  const waterByDate = user.water_intake.reduce((acc, intake) => {
+    const date = format(new Date(intake.created_at), 'yyyy-MM-dd');
+    if (!acc[date]) {
+      acc[date] = {
+        intakes: [],
+        total: 0
+      };
+    }
+    acc[date].intakes.push(intake);
+    acc[date].total += intake.amount_ml;
+    return acc;
+  }, {} as Record<string, { intakes: typeof user.water_intake, total: number }>);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -161,7 +195,7 @@ export const UserDetailsDialog = ({
                   onMessageChange={onMessageChange}
                   onSendMessage={() => {
                     onSendMessage();
-                    setTimeout(fetchMessages, 500); // Refetch messages after sending
+                    setTimeout(fetchMessages, 500);
                   }}
                   loading={loading}
                 />
@@ -169,56 +203,90 @@ export const UserDetailsDialog = ({
             </div>
           </TabsContent>
 
-          <TabsContent value="meals">
-            <div className="space-y-4">
-              {user.meals.map((meal) => (
-                <Card key={meal.id} className="p-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <div>
-                        <h3 className="font-medium">{getMealTypeDisplay(meal.meal_type || '')}</h3>
-                        <p className="text-sm text-gray-500">
-                          {meal.meal_date && format(new Date(meal.meal_date), 'dd/MM/yyyy')}
-                        </p>
+          <TabsContent value="meals" className="space-y-4">
+            {Object.entries(mealsByDate).map(([date, meals]) => (
+              <Card key={date} className="overflow-hidden">
+                <div
+                  className="p-4 bg-gray-50 flex justify-between items-center cursor-pointer"
+                  onClick={() => toggleDay(date)}
+                >
+                  <h3 className="font-medium">
+                    {format(new Date(date), 'dd/MM/yyyy')}
+                  </h3>
+                  <Button variant="ghost" size="icon">
+                    {expandedDays.includes(date) ? <ChevronUp /> : <ChevronDown />}
+                  </Button>
+                </div>
+                {expandedDays.includes(date) && (
+                  <div className="p-4 space-y-4">
+                    {meals.map((meal) => (
+                      <div key={meal.id} className="border-b pb-4 last:border-b-0 last:pb-0">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium">{getMealTypeDisplay(meal.meal_type || '')}</p>
+                            {meal.protocol_phase && (
+                              <p className="text-sm text-gray-500">
+                                Fase {meal.protocol_phase}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        {meal.custom_food && (
+                          <p className="text-sm mt-2">{meal.custom_food}</p>
+                        )}
+                        {meal.description && (
+                          <p className="text-sm text-gray-600 mt-1">{meal.description}</p>
+                        )}
+                        {meal.photo_url && (
+                          <img
+                            src={meal.photo_url}
+                            alt="Foto da refeição"
+                            className="mt-2 w-full h-48 object-cover rounded-lg"
+                          />
+                        )}
                       </div>
-                      {meal.protocol_phase && (
-                        <span className="text-sm text-gray-500">
-                          Fase {meal.protocol_phase}
-                        </span>
-                      )}
-                    </div>
-                    {meal.custom_food && (
-                      <p className="text-sm">{meal.custom_food}</p>
-                    )}
-                    {meal.description && (
-                      <p className="text-sm text-gray-600">{meal.description}</p>
-                    )}
-                    {meal.photo_url && (
-                      <img
-                        src={meal.photo_url}
-                        alt="Foto da refeição"
-                        className="w-full h-48 object-cover rounded-lg"
-                      />
-                    )}
+                    ))}
                   </div>
-                </Card>
-              ))}
-            </div>
+                )}
+              </Card>
+            ))}
           </TabsContent>
 
-          <TabsContent value="water">
-            <div className="space-y-4">
-              {user.water_intake.map((intake) => (
-                <Card key={intake.id} className="p-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-500">
-                      {format(new Date(intake.created_at), 'dd/MM/yyyy HH:mm')}
-                    </span>
-                    <span className="font-medium">{intake.amount_ml}ml</span>
+          <TabsContent value="water" className="space-y-4">
+            {Object.entries(waterByDate).map(([date, { intakes, total }]) => (
+              <Card key={date} className="overflow-hidden">
+                <div
+                  className="p-4 bg-gray-50 flex justify-between items-center cursor-pointer"
+                  onClick={() => toggleDay(date)}
+                >
+                  <div>
+                    <h3 className="font-medium">
+                      {format(new Date(date), 'dd/MM/yyyy')}
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      Total: {total}ml
+                    </p>
                   </div>
-                </Card>
-              ))}
-            </div>
+                  <Button variant="ghost" size="icon">
+                    {expandedDays.includes(date) ? <ChevronUp /> : <ChevronDown />}
+                  </Button>
+                </div>
+                {expandedDays.includes(date) && (
+                  <div className="p-4">
+                    <div className="space-y-2">
+                      {intakes.map((intake) => (
+                        <div key={intake.id} className="flex justify-between items-center text-sm">
+                          <span className="text-gray-500">
+                            {format(new Date(intake.created_at), 'HH:mm')}
+                          </span>
+                          <span className="font-medium">{intake.amount_ml}ml</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </Card>
+            ))}
           </TabsContent>
         </Tabs>
       </DialogContent>
