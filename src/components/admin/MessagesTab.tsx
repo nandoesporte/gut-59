@@ -16,6 +16,7 @@ interface User {
   id: string;
   name: string | null;
   photo_url: string | null;
+  unread_messages?: number;
 }
 
 interface Message {
@@ -53,6 +54,7 @@ export const MessagesTab = () => {
         if (selectedUser) {
           fetchMessages(selectedUser);
         }
+        fetchUsers(); // Atualiza a lista de usuários para mostrar novas mensagens não lidas
       })
       .subscribe();
 
@@ -66,14 +68,26 @@ export const MessagesTab = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Busca todos os usuários e conta suas mensagens não lidas
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, name, photo_url')
-        .neq('id', user.id);
+        .select(`
+          id,
+          name,
+          photo_url,
+          unread_messages:messages!messages_receiver_id_fkey(count)
+        `)
+        .neq('id', user.id)
+        .eq('messages.read', false);
 
       if (error) throw error;
       
-      setUsers(data || []);
+      const usersWithUnreadCount = data?.map(user => ({
+        ...user,
+        unread_messages: user.unread_messages?.[0]?.count || 0
+      })) || [];
+      
+      setUsers(usersWithUnreadCount);
     } catch (error) {
       console.error('Error fetching users:', error);
       toast({
