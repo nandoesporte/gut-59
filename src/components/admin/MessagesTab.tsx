@@ -5,6 +5,12 @@ import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { UserList } from "./messages/UserList";
 import { UserConversation } from "./messages/UserConversation";
+import { MessageSquare, ChevronDown } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 interface User {
   id: string;
@@ -30,6 +36,8 @@ export const MessagesTab = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [isOpen, setIsOpen] = useState(false);
+  const [hasNewMessage, setHasNewMessage] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -41,6 +49,7 @@ export const MessagesTab = () => {
         schema: 'public', 
         table: 'messages'
       }, () => {
+        setHasNewMessage(true);
         if (selectedUser) {
           fetchMessages(selectedUser);
         }
@@ -99,6 +108,7 @@ export const MessagesTab = () => {
 
       if (error) throw error;
       setMessages(data || []);
+      setHasNewMessage(false);
     } catch (error) {
       console.error('Error fetching messages:', error);
       toast({
@@ -115,21 +125,42 @@ export const MessagesTab = () => {
   };
 
   return (
-    <Card className="p-6">
-      <div className="flex gap-4 h-[600px]">
-        <UserList
-          users={users}
-          selectedUser={selectedUser}
-          onUserSelect={handleUserSelect}
-        />
-        <div className="flex-1">
-          <UserConversation
-            messages={messages}
-            selectedUserId={selectedUser}
-            onMessageSent={() => selectedUser && fetchMessages(selectedUser)}
-          />
-        </div>
-      </div>
+    <Card className="w-full max-w-2xl mx-auto">
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CollapsibleTrigger className="w-full">
+          <div className="flex items-center justify-between p-6 border-b">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-primary-500" />
+              <h2 className="text-2xl font-semibold text-primary-500">Mensagens dos Usuários</h2>
+            </div>
+            <div className="flex items-center gap-2">
+              {hasNewMessage && (
+                <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+              )}
+              <ChevronDown className={`w-5 h-5 transition-transform duration-200 ${isOpen ? 'transform rotate-180' : ''}`} />
+            </div>
+          </div>
+        </CollapsibleTrigger>
+
+        <CollapsibleContent>
+          <div className="p-6">
+            <div className="flex gap-4 h-[600px]">
+              <UserList
+                users={users}
+                selectedUser={selectedUser}
+                onUserSelect={handleUserSelect}
+              />
+              <div className="flex-1">
+                <UserConversation
+                  messages={messages}
+                  selectedUserId={selectedUser}
+                  onMessageSent={() => selectedUser && fetchMessages(selectedUser)}
+                />
+              </div>
+            </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
     </Card>
   );
 };
