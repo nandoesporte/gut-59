@@ -13,17 +13,32 @@ import { toast } from "sonner";
 const Trainer: React.FC = () => {
   const [selectedVideo, setSelectedVideo] = useState<TrainingVideo | null>(null);
   const navigate = useNavigate();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || !session) {
+        setIsAuthenticated(false);
+        toast.error("Você precisa estar logado para acessar esta página");
+        navigate('/auth');
+      } else {
+        setIsAuthenticated(true);
+      }
+    });
+
+    // Initial session check
+    supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
         toast.error("Você precisa estar logado para acessar esta página");
         navigate('/auth');
+      } else {
+        setIsAuthenticated(true);
       }
-    };
+    });
 
-    checkAuth();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [navigate]);
 
   const { data: modules, isLoading: isLoadingModules } = useQuery({
@@ -36,7 +51,8 @@ const Trainer: React.FC = () => {
         .order('display_order');
       if (error) throw error;
       return data as TrainingModule[];
-    }
+    },
+    enabled: isAuthenticated // Only fetch when authenticated
   });
 
   const { data: videos, isLoading: isLoadingVideos } = useQuery({
@@ -49,10 +65,11 @@ const Trainer: React.FC = () => {
         .order('created_at');
       if (error) throw error;
       return data as TrainingVideo[];
-    }
+    },
+    enabled: isAuthenticated // Only fetch when authenticated
   });
 
-  if (isLoadingModules || isLoadingVideos) {
+  if (!isAuthenticated || isLoadingModules || isLoadingVideos) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <p>Carregando...</p>
