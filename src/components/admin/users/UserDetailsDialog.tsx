@@ -12,6 +12,8 @@ import {
 import { MessageList } from "../messages/MessageList";
 import { MessageInput } from "../messages/MessageInput";
 import { UserDetails } from "../types";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface UserDetailsDialogProps {
   user: UserDetails | null;
@@ -34,6 +36,42 @@ export const UserDetailsDialog = ({
   onMessageChange,
   loading,
 }: UserDetailsDialogProps) => {
+  const [messages, setMessages] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (user && open) {
+      fetchMessages();
+    }
+  }, [user, open]);
+
+  const fetchMessages = async () => {
+    if (!user) return;
+
+    const { data: { user: adminUser } } = await supabase.auth.getUser();
+    if (!adminUser) return;
+
+    const { data, error } = await supabase
+      .from('messages')
+      .select(`
+        id,
+        sender_id,
+        receiver_id,
+        content,
+        created_at,
+        read,
+        profiles!messages_sender_id_fkey (
+          name,
+          photo_url
+        )
+      `)
+      .or(`and(sender_id.eq.${adminUser.id},receiver_id.eq.${user.id}),and(sender_id.eq.${user.id},receiver_id.eq.${adminUser.id})`)
+      .order('created_at', { ascending: true });
+
+    if (!error && data) {
+      setMessages(data);
+    }
+  };
+
   if (!user) return null;
 
   const getMealTypeDisplay = (mealType: string) => {
@@ -113,14 +151,21 @@ export const UserDetailsDialog = ({
           </TabsContent>
 
           <TabsContent value="messages">
-            <div className="flex flex-col h-[500px]">
-              <MessageList messages={[]} selectedUserId={user.id} />
-              <MessageInput
-                newMessage={newMessage}
-                onMessageChange={onMessageChange}
-                onSendMessage={onSendMessage}
-                loading={loading}
-              />
+            <div className="flex flex-col h-[500px] bg-gray-50 rounded-lg p-4">
+              <div className="flex-1 overflow-y-auto mb-4">
+                <MessageList messages={messages} selectedUserId={user.id} />
+              </div>
+              <div className="bg-white p-4 rounded-lg shadow-sm">
+                <MessageInput
+                  newMessage={newMessage}
+                  onMessageChange={onMessageChange}
+                  onSendMessage={() => {
+                    onSendMessage();
+                    setTimeout(fetchMessages, 500); // Refetch messages after sending
+                  }}
+                  loading={loading}
+                />
+              </div>
             </div>
           </TabsContent>
 
