@@ -13,29 +13,46 @@ import { toast } from "sonner";
 const Trainer: React.FC = () => {
   const [selectedVideo, setSelectedVideo] = useState<TrainingVideo | null>(null);
   const navigate = useNavigate();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT' || !session) {
+    // Initial session check
+    const checkSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        
+        if (!session) {
+          toast.error("Você precisa estar logado para acessar esta página");
+          navigate('/auth');
+          return;
+        }
+        
+        setIsAuthenticated(true);
+      } catch (error) {
+        console.error('Session check error:', error);
+        toast.error("Erro ao verificar sessão");
+        navigate('/auth');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkSession();
+
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        setIsAuthenticated(true);
+      } else if (event === 'SIGNED_OUT' || !session) {
         setIsAuthenticated(false);
         toast.error("Você precisa estar logado para acessar esta página");
         navigate('/auth');
-      } else {
-        setIsAuthenticated(true);
       }
     });
 
-    // Initial session check
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        toast.error("Você precisa estar logado para acessar esta página");
-        navigate('/auth');
-      } else {
-        setIsAuthenticated(true);
-      }
-    });
-
+    // Cleanup subscription on unmount
     return () => {
       subscription.unsubscribe();
     };
@@ -52,7 +69,8 @@ const Trainer: React.FC = () => {
       if (error) throw error;
       return data as TrainingModule[];
     },
-    enabled: isAuthenticated // Only fetch when authenticated
+    enabled: isAuthenticated,
+    retry: false
   });
 
   const { data: videos, isLoading: isLoadingVideos } = useQuery({
@@ -66,10 +84,11 @@ const Trainer: React.FC = () => {
       if (error) throw error;
       return data as TrainingVideo[];
     },
-    enabled: isAuthenticated // Only fetch when authenticated
+    enabled: isAuthenticated,
+    retry: false
   });
 
-  if (!isAuthenticated || isLoadingModules || isLoadingVideos) {
+  if (isLoading || !isAuthenticated || isLoadingModules || isLoadingVideos) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <p>Carregando...</p>
@@ -139,3 +158,4 @@ const Trainer: React.FC = () => {
 };
 
 export default Trainer;
+
