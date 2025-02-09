@@ -49,7 +49,7 @@ const Navigation = () => {
             active={isActive("/")}
           />
           <a
-            href="https://loja.katiasantin.com.br"
+            href="https://katiasantin.com.br/loja"
             target="_blank"
             rel="noopener noreferrer"
             className="flex flex-col items-center space-y-1 px-4 py-2 rounded-lg transition-colors text-gray-400 hover:text-primary-500"
