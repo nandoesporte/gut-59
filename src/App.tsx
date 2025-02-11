@@ -13,8 +13,8 @@ import Progress from "./pages/Progress";
 import Store from "./pages/Store";
 import Admin from "./pages/Admin";
 import Trainer from "./pages/Trainer";
+import Menu from "./pages/Menu";
 
-// Create a client outside the component to prevent recreation on each render
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -94,6 +94,16 @@ function App() {
                 <ProtectedRoute>
                   <Layout>
                     <Progress />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/menu"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Menu />
                   </Layout>
                 </ProtectedRoute>
               }
