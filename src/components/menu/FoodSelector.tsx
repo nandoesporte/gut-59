@@ -12,6 +12,7 @@ interface ProtocolFood {
   protein: number;
   carbs: number;
   fats: number;
+  food_group_id: number; // Added this property
 }
 
 interface FoodSelectorProps {
