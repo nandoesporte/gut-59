@@ -12,7 +12,7 @@ interface ProtocolFood {
   protein: number;
   carbs: number;
   fats: number;
-  food_group_id: number; // Added this property
+  food_group_id: number;
 }
 
 interface FoodSelectorProps {
@@ -35,9 +35,11 @@ export const FoodSelector = ({
   return (
     <div className="space-y-6">
       <Tabs defaultValue="breakfast" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="breakfast">Café da Manhã</TabsTrigger>
           <TabsTrigger value="lunch">Almoço</TabsTrigger>
+          <TabsTrigger value="snack">Lanche</TabsTrigger>
+          <TabsTrigger value="dinner">Jantar</TabsTrigger>
         </TabsList>
         
         <TabsContent value="breakfast" className="space-y-6">
@@ -86,6 +88,80 @@ export const FoodSelector = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {protocolFoods
               .filter(food => food.food_group_id === 2)
+              .map((food) => (
+                <div
+                  key={food.id}
+                  className={`p-4 border rounded-lg flex items-center justify-between ${
+                    selectedFoods.includes(food.id) ? 'bg-primary-50 border-primary-200' : 'bg-white'
+                  }`}
+                >
+                  <div className="flex items-center space-x-3">
+                    <Checkbox
+                      id={food.id}
+                      checked={selectedFoods.includes(food.id)}
+                      onCheckedChange={() => onFoodSelection(food.id)}
+                      disabled={selectedFoods.length >= 5 && !selectedFoods.includes(food.id)}
+                    />
+                    <div>
+                      <Label htmlFor={food.id} className="text-sm font-medium">
+                        {food.name}
+                      </Label>
+                      <p className="text-xs text-gray-500">
+                        {food.calories} kcal | P: {food.protein}g | C: {food.carbs}g | G: {food.fats}g
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="snack" className="space-y-6">
+          <div className="text-center">
+            <h2 className="text-2xl font-semibold text-gray-900">Lanche da Tarde</h2>
+            <p className="text-gray-600 mt-2">Escolha até 5 opções para seu lanche</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {protocolFoods
+              .filter(food => food.food_group_id === 3)
+              .map((food) => (
+                <div
+                  key={food.id}
+                  className={`p-4 border rounded-lg flex items-center justify-between ${
+                    selectedFoods.includes(food.id) ? 'bg-primary-50 border-primary-200' : 'bg-white'
+                  }`}
+                >
+                  <div className="flex items-center space-x-3">
+                    <Checkbox
+                      id={food.id}
+                      checked={selectedFoods.includes(food.id)}
+                      onCheckedChange={() => onFoodSelection(food.id)}
+                      disabled={selectedFoods.length >= 5 && !selectedFoods.includes(food.id)}
+                    />
+                    <div>
+                      <Label htmlFor={food.id} className="text-sm font-medium">
+                        {food.name}
+                      </Label>
+                      <p className="text-xs text-gray-500">
+                        {food.calories} kcal | P: {food.protein}g | C: {food.carbs}g | G: {food.fats}g
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="dinner" className="space-y-6">
+          <div className="text-center">
+            <h2 className="text-2xl font-semibold text-gray-900">Jantar</h2>
+            <p className="text-gray-600 mt-2">Escolha até 5 opções para seu jantar</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {protocolFoods
+              .filter(food => food.food_group_id === 4)
               .map((food) => (
                 <div
                   key={food.id}

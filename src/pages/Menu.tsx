@@ -36,7 +36,7 @@ const Menu = () => {
       const { data, error } = await supabase
         .from('protocol_foods')
         .select('*')
-        .in('food_group_id', [1, 2]); // Fetch both breakfast and lunch foods
+        .in('food_group_id', [1, 2, 3, 4]); // Fetch foods for all meal types
 
       if (error) {
         console.error('Error fetching foods:', error);
@@ -110,7 +110,7 @@ const Menu = () => {
   };
 
   const handleConfirmSelection = () => {
-    toast.success("Café da manhã salvo com sucesso!");
+    toast.success("Refeições salvas com sucesso!");
   };
 
   return (
