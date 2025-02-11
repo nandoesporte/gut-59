@@ -13,6 +13,7 @@ interface ProtocolFood {
   protein: number;
   carbs: number;
   fats: number;
+  food_group_id: number;
 }
 
 const Menu = () => {
@@ -35,7 +36,7 @@ const Menu = () => {
       const { data, error } = await supabase
         .from('protocol_foods')
         .select('*')
-        .eq('food_group_id', 1);
+        .in('food_group_id', [1, 2]); // Fetch both breakfast and lunch foods
 
       if (error) {
         console.error('Error fetching foods:', error);
