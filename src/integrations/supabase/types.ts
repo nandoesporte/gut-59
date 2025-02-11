@@ -104,6 +104,21 @@ export type Database = {
           },
         ]
       }
+      food_groups: {
+        Row: {
+          id: number
+          name: string
+        }
+        Insert: {
+          id?: number
+          name: string
+        }
+        Update: {
+          id?: number
+          name?: string
+        }
+        Relationships: []
+      }
       meals: {
         Row: {
           created_at: string | null
@@ -398,6 +413,50 @@ export type Database = {
             columns: ["phase_id"]
             isOneToOne: false
             referencedRelation: "protocol_phases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      protocol_foods: {
+        Row: {
+          calories: number
+          carbs: number | null
+          created_at: string
+          fats: number | null
+          food_group_id: number | null
+          id: string
+          name: string
+          phase: number | null
+          protein: number | null
+        }
+        Insert: {
+          calories: number
+          carbs?: number | null
+          created_at?: string
+          fats?: number | null
+          food_group_id?: number | null
+          id?: string
+          name: string
+          phase?: number | null
+          protein?: number | null
+        }
+        Update: {
+          calories?: number
+          carbs?: number | null
+          created_at?: string
+          fats?: number | null
+          food_group_id?: number | null
+          id?: string
+          name?: string
+          phase?: number | null
+          protein?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "protocol_foods_food_group_id_fkey"
+            columns: ["food_group_id"]
+            isOneToOne: false
+            referencedRelation: "food_groups"
             referencedColumns: ["id"]
           },
         ]
