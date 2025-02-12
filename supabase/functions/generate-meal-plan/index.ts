@@ -74,7 +74,7 @@ serve(async (req) => {
     console.log('Making request to DeepSeek');
 
     // Make request to DeepSeek
-    const deepseekResponse = await fetch('https://api.deepinfra.com/v1/inference/deepseek-ai/deepseek-coder-33b-instruct', {
+    const deepseekResponse = await fetch('https://api.deepinfra.com/v1/inference/meta-llama/Llama-2-70b-chat-hf', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${deepseekApiKey}`,
@@ -88,6 +88,7 @@ serve(async (req) => {
           ]
         },
         temperature: 0.7,
+        max_tokens: 2000
       }),
     });
 
