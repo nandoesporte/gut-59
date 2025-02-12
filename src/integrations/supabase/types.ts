@@ -66,6 +66,39 @@ export type Database = {
         }
         Relationships: []
       }
+      dietary_preferences: {
+        Row: {
+          allergies: string[] | null
+          created_at: string | null
+          dietary_restrictions: string[] | null
+          has_allergies: boolean | null
+          id: string
+          training_time: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          allergies?: string[] | null
+          created_at?: string | null
+          dietary_restrictions?: string[] | null
+          has_allergies?: boolean | null
+          id?: string
+          training_time?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          allergies?: string[] | null
+          created_at?: string | null
+          dietary_restrictions?: string[] | null
+          has_allergies?: boolean | null
+          id?: string
+          training_time?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       education_progress: {
         Row: {
           completed: boolean | null
@@ -116,6 +149,42 @@ export type Database = {
         Update: {
           id?: number
           name?: string
+        }
+        Relationships: []
+      }
+      meal_plans: {
+        Row: {
+          carbs_target: number | null
+          created_at: string | null
+          daily_calories: number
+          fats_target: number | null
+          id: string
+          meal_recommendations: Json | null
+          protein_target: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          carbs_target?: number | null
+          created_at?: string | null
+          daily_calories: number
+          fats_target?: number | null
+          id?: string
+          meal_recommendations?: Json | null
+          protein_target?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          carbs_target?: number | null
+          created_at?: string | null
+          daily_calories?: number
+          fats_target?: number | null
+          id?: string
+          meal_recommendations?: Json | null
+          protein_target?: number | null
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }
