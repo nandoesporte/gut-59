@@ -32,10 +32,10 @@ serve(async (req) => {
 
     console.log('Input data:', { userData, selectedFoods, dietaryPreferences });
 
-    // Check if OpenAI API key is configured
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openAIApiKey) {
-      throw new Error('OpenAI API key is not configured');
+    // Check if DeepSeek API key is configured
+    const deepseekApiKey = Deno.env.get('DEEPSEEK_API_KEY');
+    if (!deepseekApiKey) {
+      throw new Error('DeepSeek API key is not configured');
     }
 
     // Prepare system message with nutritionist expertise
@@ -71,17 +71,17 @@ serve(async (req) => {
       }
     }`;
 
-    console.log('Making request to OpenAI');
+    console.log('Making request to DeepSeek');
 
-    // Make request to OpenAI
-    const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Make request to DeepSeek
+    const deepseekResponse = await fetch('https://api.deepseek.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
+        'Authorization': `Bearer ${deepseekApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'deepseek-chat',
         messages: [
           { role: 'system', content: systemMessage },
           { role: 'user', content: 'Generate a personalized meal plan based on the provided data.' }
@@ -90,17 +90,17 @@ serve(async (req) => {
       }),
     });
 
-    if (!openAIResponse.ok) {
-      const errorText = await openAIResponse.text();
-      console.error('OpenAI API error:', errorText);
-      throw new Error(`OpenAI API error: ${errorText}`);
+    if (!deepseekResponse.ok) {
+      const errorText = await deepseekResponse.text();
+      console.error('DeepSeek API error:', errorText);
+      throw new Error(`DeepSeek API error: ${errorText}`);
     }
 
-    const aiData = await openAIResponse.json();
-    console.log('OpenAI response:', aiData);
+    const aiData = await deepseekResponse.json();
+    console.log('DeepSeek response:', aiData);
 
     if (!aiData.choices || !aiData.choices[0] || !aiData.choices[0].message) {
-      throw new Error('Invalid response format from OpenAI');
+      throw new Error('Invalid response format from DeepSeek');
     }
 
     const mealPlan = JSON.parse(aiData.choices[0].message.content);
