@@ -32,10 +32,10 @@ serve(async (req) => {
 
     console.log('Input data:', { userData, selectedFoods, dietaryPreferences });
 
-    // Check if DeepSeek API key is configured
-    const deepseekApiKey = Deno.env.get('DEEPSEEK_API_KEY');
-    if (!deepseekApiKey) {
-      throw new Error('DeepSeek API key is not configured');
+    // Check if OpenAI API key is configured
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openAIApiKey) {
+      throw new Error('OpenAI API key is not configured');
     }
 
     // Prepare system message with nutritionist expertise
@@ -71,41 +71,40 @@ serve(async (req) => {
       }
     }`;
 
-    console.log('Making request to DeepSeek');
+    console.log('Making request to OpenAI');
 
-    // Make request to DeepSeek
-    const deepseekResponse = await fetch('https://api.deepinfra.com/v1/inference/meta-llama/Llama-2-70b-chat-hf', {
+    // Make request to OpenAI
+    const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${deepseekApiKey}`,
+        'Authorization': `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        input: {
-          messages: [
-            { role: 'system', content: systemMessage },
-            { role: 'user', content: 'Generate a personalized meal plan based on the provided data.' }
-          ]
-        },
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemMessage },
+          { role: 'user', content: 'Generate a personalized meal plan based on the provided data.' }
+        ],
         temperature: 0.7,
         max_tokens: 2000
       }),
     });
 
-    if (!deepseekResponse.ok) {
-      const errorText = await deepseekResponse.text();
-      console.error('DeepSeek API error:', errorText);
-      throw new Error(`DeepSeek API error: ${errorText}`);
+    if (!openAIResponse.ok) {
+      const errorText = await openAIResponse.text();
+      console.error('OpenAI API error:', errorText);
+      throw new Error(`OpenAI API error: ${errorText}`);
     }
 
-    const aiData = await deepseekResponse.json();
-    console.log('DeepSeek response:', aiData);
+    const aiData = await openAIResponse.json();
+    console.log('OpenAI response:', aiData);
 
-    if (!aiData.results || !aiData.results[0]) {
-      throw new Error('Invalid response format from DeepSeek');
+    if (!aiData.choices || !aiData.choices[0]?.message?.content) {
+      throw new Error('Invalid response format from OpenAI');
     }
 
-    const mealPlan = JSON.parse(aiData.results[0].text);
+    const mealPlan = JSON.parse(aiData.choices[0].message.content);
 
     // Validate meal plan structure
     if (!mealPlan.dailyPlan || !mealPlan.totalNutrition || !mealPlan.recommendations) {
