@@ -25,6 +25,19 @@ serve(async (req) => {
       dietaryPreferences
     } = await req.json();
 
+    // Validate input data
+    if (!userData || !selectedFoods || !dietaryPreferences) {
+      throw new Error('Missing required input data');
+    }
+
+    console.log('Input data:', { userData, selectedFoods, dietaryPreferences });
+
+    // Check if OpenAI API key is configured
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openAIApiKey) {
+      throw new Error('OpenAI API key is not configured');
+    }
+
     // Prepare system message with nutritionist expertise
     const systemMessage = `You are an expert nutritionist specialized in personalized meal planning. Create a meal plan based on the following criteria:
     - User's data: ${JSON.stringify(userData)}
@@ -58,11 +71,13 @@ serve(async (req) => {
       }
     }`;
 
+    console.log('Making request to OpenAI');
+
     // Make request to OpenAI
     const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+        'Authorization': `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -75,8 +90,25 @@ serve(async (req) => {
       }),
     });
 
+    if (!openAIResponse.ok) {
+      const errorText = await openAIResponse.text();
+      console.error('OpenAI API error:', errorText);
+      throw new Error(`OpenAI API error: ${errorText}`);
+    }
+
     const aiData = await openAIResponse.json();
+    console.log('OpenAI response:', aiData);
+
+    if (!aiData.choices || !aiData.choices[0] || !aiData.choices[0].message) {
+      throw new Error('Invalid response format from OpenAI');
+    }
+
     const mealPlan = JSON.parse(aiData.choices[0].message.content);
+
+    // Validate meal plan structure
+    if (!mealPlan.dailyPlan || !mealPlan.totalNutrition || !mealPlan.recommendations) {
+      throw new Error('Invalid meal plan structure generated');
+    }
 
     // Save meal plan to database
     const { error: saveError } = await supabase
@@ -91,6 +123,7 @@ serve(async (req) => {
       });
 
     if (saveError) {
+      console.error('Database save error:', saveError);
       throw saveError;
     }
 
@@ -99,10 +132,16 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error in generate-meal-plan function:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ 
+        error: error.message,
+        details: error.toString()
+      }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
   }
 });
