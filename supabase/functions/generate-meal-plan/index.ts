@@ -74,18 +74,19 @@ serve(async (req) => {
     console.log('Making request to DeepSeek');
 
     // Make request to DeepSeek
-    const deepseekResponse = await fetch('https://api.deepseek.com/v1/chat/completions', {
+    const deepseekResponse = await fetch('https://api.deepinfra.com/v1/inference/deepseek-ai/deepseek-coder-33b-instruct', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${deepseekApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'deepseek-chat',
-        messages: [
-          { role: 'system', content: systemMessage },
-          { role: 'user', content: 'Generate a personalized meal plan based on the provided data.' }
-        ],
+        input: {
+          messages: [
+            { role: 'system', content: systemMessage },
+            { role: 'user', content: 'Generate a personalized meal plan based on the provided data.' }
+          ]
+        },
         temperature: 0.7,
       }),
     });
@@ -99,11 +100,11 @@ serve(async (req) => {
     const aiData = await deepseekResponse.json();
     console.log('DeepSeek response:', aiData);
 
-    if (!aiData.choices || !aiData.choices[0] || !aiData.choices[0].message) {
+    if (!aiData.results || !aiData.results[0]) {
       throw new Error('Invalid response format from DeepSeek');
     }
 
-    const mealPlan = JSON.parse(aiData.choices[0].message.content);
+    const mealPlan = JSON.parse(aiData.results[0].text);
 
     // Validate meal plan structure
     if (!mealPlan.dailyPlan || !mealPlan.totalNutrition || !mealPlan.recommendations) {
