@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { CalorieCalculator } from "@/components/menu/CalorieCalculator";
@@ -50,6 +51,15 @@ interface MealPlan {
   };
 }
 
+interface CalorieCalculatorForm {
+  weight: number;
+  height: number;
+  age: number;
+  gender: "male" | "female";
+  activityLevel: string;
+  goal: string;
+}
+
 const Menu = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [calorieNeeds, setCalorieNeeds] = useState<number | null>(null);
@@ -57,7 +67,7 @@ const Menu = () => {
   const [protocolFoods, setProtocolFoods] = useState<ProtocolFood[]>([]);
   const [totalCalories, setTotalCalories] = useState(0);
   const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<CalorieCalculatorForm>({
     weight: 0,
     height: 0,
     age: 0,
@@ -199,8 +209,6 @@ const Menu = () => {
                       toast.error("Nenhum alimento selecionado");
                       return;
                     }
-
-                    setDietaryPreferences(preferences);
 
                     const requestData = {
                       userData: {
