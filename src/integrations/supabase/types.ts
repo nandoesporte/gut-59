@@ -522,13 +522,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "fk_food_group"
-            columns: ["food_group_id"]
-            isOneToOne: false
-            referencedRelation: "food_groups"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "protocol_foods_food_group_id_fkey"
             columns: ["food_group_id"]
             isOneToOne: false
