@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
@@ -156,28 +155,41 @@ const Menu = () => {
         return;
       }
 
-      const response = await supabase.functions.invoke('generate-meal-plan', {
-        body: {
-          userData: {
-            ...formData,
-            userId: userData.user.id,
-            dailyCalories: calorieNeeds
-          },
-          selectedFoods: selectedFoods,
-          dietaryPreferences: preferences
+      const requestData = {
+        userData: {
+          ...formData,
+          userId: userData.user.id,
+          dailyCalories: calorieNeeds
         },
+        selectedFoods,
+        dietaryPreferences: preferences
+      };
+
+      console.log('Sending request with data:', requestData);
+
+      const { data, error } = await supabase.functions.invoke('generate-meal-plan', {
+        body: requestData,
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
 
-      if (response.error) {
-        throw response.error;
+      if (error) {
+        console.error('Error from edge function:', error);
+        throw error;
       }
 
-      setMealPlan(response.data);
+      if (!data) {
+        throw new Error('No data received from the meal plan generator');
+      }
+
+      console.log('Received meal plan:', data);
+      setMealPlan(data);
       setCurrentStep(4);
       toast.success("Cardápio personalizado gerado com sucesso!");
     } catch (error) {
       console.error('Error generating meal plan:', error);
-      toast.error("Erro ao gerar cardápio personalizado");
+      toast.error("Erro ao gerar cardápio personalizado. Por favor, tente novamente.");
     }
   };
 
