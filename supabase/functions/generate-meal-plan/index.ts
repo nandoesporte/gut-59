@@ -173,7 +173,7 @@ serve(async (req) => {
   }
 }
 
-Use ONLY the foods from the provided list. All numbers should be integers. The response MUST be a valid JSON object.`
+Use ONLY the foods from the provided list. All numbers should be integers. The response MUST be a valid JSON object and DO NOT include markdown formatting, code blocks, or any other text besides the JSON object.`
             },
             { 
               role: 'user', 
@@ -192,8 +192,10 @@ Use ONLY the foods from the provided list. All numbers should be integers. The r
               })
             }
           ],
-          temperature: 0.3,
-          max_tokens: 2000
+          temperature: 0.1, // Reduzido ainda mais para respostas mais consistentes
+          max_tokens: 2000,
+          presence_penalty: 0,
+          frequency_penalty: 0
         })
       });
 
@@ -211,23 +213,31 @@ Use ONLY the foods from the provided list. All numbers should be integers. The r
       }
 
       const content = aiData.choices[0].message.content;
-      console.log('OpenAI content:', content);
+      console.log('Raw OpenAI content:', content);
 
       let mealPlan;
       try {
-        // Remove possíveis caracteres de formatação
-        const cleanContent = content.trim().replace(/^```json\n|\n```$/g, '');
+        // Remove qualquer formatação e espaços extras
+        const cleanContent = content
+          .trim()
+          .replace(/^```json\n|\n```$/g, '')
+          .replace(/^```\n|\n```$/g, '')
+          .replace(/^\{|\}$/g, (match) => match); // Preserva as chaves do JSON
+
+        console.log('Cleaned content:', cleanContent);
+        
         mealPlan = JSON.parse(cleanContent);
+        console.log('Parsed meal plan:', mealPlan);
       } catch (parseError) {
         console.error('Error parsing OpenAI response:', parseError);
-        console.error('Raw content:', content);
-        throw new Error('Failed to parse meal plan JSON');
+        console.error('Clean content that failed to parse:', cleanContent);
+        throw new Error(`Failed to parse meal plan JSON: ${parseError.message}`);
       }
 
       // Validate meal plan structure
       if (!mealPlan.dailyPlan || !mealPlan.totalNutrition || !mealPlan.recommendations) {
         console.error('Invalid meal plan structure:', mealPlan);
-        throw new Error('Invalid meal plan structure');
+        throw new Error('Invalid meal plan structure: missing required sections');
       }
 
       // Validate each required section
