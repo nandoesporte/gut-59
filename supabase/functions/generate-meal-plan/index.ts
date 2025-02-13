@@ -132,11 +132,48 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-3.5-turbo', // Corrigido o modelo
+          model: 'gpt-3.5-turbo',
           messages: [
             { 
               role: 'system', 
-              content: `You are a professional nutritionist AI that creates structured meal plans. Create a meal plan using ONLY the foods from the provided list, following the user's preferences and restrictions.` 
+              content: `You are a professional nutritionist AI. You must create a meal plan following this EXACT JSON structure:
+{
+  "dailyPlan": {
+    "breakfast": {
+      "foods": [{"id": "string", "name": "string", "calories": number, "protein": number, "carbs": number, "fats": number}],
+      "calories": number,
+      "macros": {"protein": number, "carbs": number, "fats": number}
+    },
+    "lunch": {
+      "foods": [{"id": "string", "name": "string", "calories": number, "protein": number, "carbs": number, "fats": number}],
+      "calories": number,
+      "macros": {"protein": number, "carbs": number, "fats": number}
+    },
+    "snacks": {
+      "foods": [{"id": "string", "name": "string", "calories": number, "protein": number, "carbs": number, "fats": number}],
+      "calories": number,
+      "macros": {"protein": number, "carbs": number, "fats": number}
+    },
+    "dinner": {
+      "foods": [{"id": "string", "name": "string", "calories": number, "protein": number, "carbs": number, "fats": number}],
+      "calories": number,
+      "macros": {"protein": number, "carbs": number, "fats": number}
+    }
+  },
+  "totalNutrition": {
+    "calories": number,
+    "protein": number,
+    "carbs": number,
+    "fats": number
+  },
+  "recommendations": {
+    "preworkout": "string",
+    "postworkout": "string",
+    "general": "string"
+  }
+}
+
+Use ONLY the foods from the provided list. All numbers should be integers. The response MUST be a valid JSON object.`
             },
             { 
               role: 'user', 
@@ -155,8 +192,8 @@ serve(async (req) => {
               })
             }
           ],
-          temperature: 0.7,
-          max_tokens: 1500
+          temperature: 0.3,
+          max_tokens: 2000
         })
       });
 
@@ -178,16 +215,27 @@ serve(async (req) => {
 
       let mealPlan;
       try {
-        mealPlan = JSON.parse(content);
+        // Remove possíveis caracteres de formatação
+        const cleanContent = content.trim().replace(/^```json\n|\n```$/g, '');
+        mealPlan = JSON.parse(cleanContent);
       } catch (parseError) {
         console.error('Error parsing OpenAI response:', parseError);
+        console.error('Raw content:', content);
         throw new Error('Failed to parse meal plan JSON');
       }
 
       // Validate meal plan structure
       if (!mealPlan.dailyPlan || !mealPlan.totalNutrition || !mealPlan.recommendations) {
+        console.error('Invalid meal plan structure:', mealPlan);
         throw new Error('Invalid meal plan structure');
       }
+
+      // Validate each required section
+      ['breakfast', 'lunch', 'snacks', 'dinner'].forEach(meal => {
+        if (!mealPlan.dailyPlan[meal]?.foods?.length) {
+          throw new Error(`Missing or invalid ${meal} foods`);
+        }
+      });
 
       return new Response(
         JSON.stringify(mealPlan),
