@@ -6,11 +6,16 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.0';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 serve(async (req) => {
+  // Improved CORS handling
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { 
+      status: 204, // No content for OPTIONS
+      headers: corsHeaders 
+    });
   }
 
   try {
@@ -48,11 +53,17 @@ serve(async (req) => {
       throw new Error('Error fetching foods data: ' + foodsError.message);
     }
 
+    if (!foodsData || foodsData.length === 0) {
+      throw new Error('No foods found for the selected IDs');
+    }
+
     // Prepare system message with nutritionist expertise
     const systemMessage = `You are a professional nutritionist AI that creates structured meal plans. 
 Your task is to create a meal plan using ONLY the foods from the provided list, following the user's preferences and restrictions.
 
-IMPORTANT: You MUST respond with a valid JSON object following this EXACT structure:
+CRITICAL: You must respond ONLY with a valid JSON object. Do not include any additional text, explanations, or formatting.
+
+Required JSON structure:
 {
   "dailyPlan": {
     "breakfast": {
@@ -134,11 +145,12 @@ Rules:
 2. Distribute meals to meet the daily calorie target
 3. Balance macronutrients based on the user's goal
 4. Respect dietary restrictions and allergies
-5. STRICTLY follow the JSON response format`;
+5. ONLY return a valid JSON object, no additional text
+6. Each meal's foods array should contain complete food objects from the available foods list`;
 
     console.log('Making request to OpenAI');
 
-    // Make request to OpenAI
+    // Make request to OpenAI with updated parameters
     const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -146,15 +158,15 @@ Rules:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4',
+        model: 'gpt-4o-mini', // Using the recommended model
         messages: [
           { role: 'system', content: systemMessage },
           { 
             role: 'user', 
-            content: 'Generate a meal plan following the exact JSON structure provided. Respond ONLY with the JSON object, no additional text.' 
+            content: 'Create a meal plan. Return ONLY a JSON object matching the specified structure.'
           }
         ],
-        temperature: 0.5, // Reduced for more consistent output
+        temperature: 0.3, // Lower temperature for more consistent outputs
         max_tokens: 2000
       }),
     });
@@ -174,7 +186,8 @@ Rules:
 
     let mealPlan;
     try {
-      mealPlan = JSON.parse(aiData.choices[0].message.content);
+      const content = aiData.choices[0].message.content.trim();
+      mealPlan = JSON.parse(content);
     } catch (parseError) {
       console.error('JSON parse error:', parseError);
       console.error('Raw content:', aiData.choices[0].message.content);
@@ -205,7 +218,13 @@ Rules:
 
     return new Response(
       JSON.stringify(mealPlan),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        status: 200,
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json'
+        } 
+      }
     );
   } catch (error) {
     console.error('Error in generate-meal-plan function:', error);
@@ -216,7 +235,10 @@ Rules:
       }),
       { 
         status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json'
+        } 
       }
     );
   }
