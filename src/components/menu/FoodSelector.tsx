@@ -3,7 +3,24 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { 
+  Egg, 
+  Coffee, 
+  Salad, 
+  Apple, 
+  Sandwich, 
+  Pizza, 
+  Fish,
+  Carrot,
+  Cherry,
+  Grape,
+  Banana,
+  EggFried,
+  IceCreamCone,
+  Soup,
+  Ham
+} from "lucide-react";
 
 interface ProtocolFood {
   id: string;
@@ -24,6 +41,26 @@ interface FoodSelectorProps {
   onConfirm: () => void;
 }
 
+const getFoodIcon = (name: string, size = 24) => {
+  const lowerName = name.toLowerCase();
+  if (lowerName.includes('ovo')) return <Egg size={size} />;
+  if (lowerName.includes('café')) return <Coffee size={size} />;
+  if (lowerName.includes('salad')) return <Salad size={size} />;
+  if (lowerName.includes('fruta')) return <Apple size={size} />;
+  if (lowerName.includes('sandwich')) return <Sandwich size={size} />;
+  if (lowerName.includes('pizza')) return <Pizza size={size} />;
+  if (lowerName.includes('peixe')) return <Fish size={size} />;
+  if (lowerName.includes('cenoura')) return <Carrot size={size} />;
+  if (lowerName.includes('cereais')) return <Cherry size={size} />;
+  if (lowerName.includes('uva')) return <Grape size={size} />;
+  if (lowerName.includes('banana')) return <Banana size={size} />;
+  if (lowerName.includes('frito')) return <EggFried size={size} />;
+  if (lowerName.includes('sorvete')) return <IceCreamCone size={size} />;
+  if (lowerName.includes('sopa')) return <Soup size={size} />;
+  if (lowerName.includes('presunto')) return <Ham size={size} />;
+  return <Apple size={size} />; // default icon
+};
+
 export const FoodSelector = ({
   protocolFoods,
   selectedFoods,
@@ -34,169 +71,65 @@ export const FoodSelector = ({
 }: FoodSelectorProps) => {
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="breakfast" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="breakfast">Café da Manhã</TabsTrigger>
-          <TabsTrigger value="lunch">Almoço</TabsTrigger>
-          <TabsTrigger value="snack">Lanche</TabsTrigger>
-          <TabsTrigger value="dinner">Jantar</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="breakfast" className="space-y-6">
-          <div className="text-center">
-            <h2 className="text-2xl font-semibold text-gray-900">Café da Manhã</h2>
-            <p className="text-gray-600 mt-2">Escolha até 5 opções para seu café da manhã</p>
-          </div>
+      <div className="text-center mb-6">
+        <h2 className="text-2xl font-semibold text-gray-900">Selecione seus Alimentos</h2>
+        <p className="text-gray-600 mt-2">Escolha todos os alimentos que você gostaria de incluir no seu cardápio</p>
+      </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {protocolFoods
-              .filter(food => food.food_group_id === 1)
-              .map((food) => (
-                <div
-                  key={food.id}
-                  className={`p-4 border rounded-lg flex items-center justify-between ${
-                    selectedFoods.includes(food.id) ? 'bg-primary-50 border-primary-200' : 'bg-white'
-                  }`}
-                >
-                  <div className="flex items-center space-x-3">
-                    <Checkbox
-                      id={food.id}
-                      checked={selectedFoods.includes(food.id)}
-                      onCheckedChange={() => onFoodSelection(food.id)}
-                      disabled={selectedFoods.length >= 5 && !selectedFoods.includes(food.id)}
-                    />
-                    <div>
-                      <Label htmlFor={food.id} className="text-sm font-medium">
-                        {food.name}
-                      </Label>
-                      <p className="text-xs text-gray-500">
-                        {food.calories} kcal | P: {food.protein}g | C: {food.carbs}g | G: {food.fats}g
-                      </p>
-                    </div>
-                  </div>
+      <ScrollArea className="h-[500px] w-full rounded-md border">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+          {protocolFoods.map((food) => (
+            <Button
+              key={food.id}
+              variant="outline"
+              className={`
+                h-auto w-full p-4 flex flex-col items-center gap-3 transition-all duration-200
+                ${selectedFoods.includes(food.id) 
+                  ? 'bg-primary/10 border-primary ring-2 ring-primary/20' 
+                  : 'hover:bg-gray-50'
+                }
+              `}
+              onClick={() => onFoodSelection(food.id)}
+            >
+              <div className={`
+                p-3 rounded-full 
+                ${selectedFoods.includes(food.id) 
+                  ? 'bg-primary/20' 
+                  : 'bg-gray-100'
+                }
+              `}>
+                {getFoodIcon(food.name)}
+              </div>
+              
+              <div className="text-center space-y-2">
+                <h3 className="font-medium text-sm">{food.name}</h3>
+                
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Badge variant="outline" className="text-xs">
+                    {food.calories} kcal
+                  </Badge>
+                  <Badge variant="outline" className="text-xs">
+                    P: {food.protein}g
+                  </Badge>
+                  <Badge variant="outline" className="text-xs">
+                    C: {food.carbs}g
+                  </Badge>
+                  <Badge variant="outline" className="text-xs">
+                    G: {food.fats}g
+                  </Badge>
                 </div>
-              ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="lunch" className="space-y-6">
-          <div className="text-center">
-            <h2 className="text-2xl font-semibold text-gray-900">Almoço</h2>
-            <p className="text-gray-600 mt-2">Escolha até 5 opções para seu almoço</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {protocolFoods
-              .filter(food => food.food_group_id === 2)
-              .map((food) => (
-                <div
-                  key={food.id}
-                  className={`p-4 border rounded-lg flex items-center justify-between ${
-                    selectedFoods.includes(food.id) ? 'bg-primary-50 border-primary-200' : 'bg-white'
-                  }`}
-                >
-                  <div className="flex items-center space-x-3">
-                    <Checkbox
-                      id={food.id}
-                      checked={selectedFoods.includes(food.id)}
-                      onCheckedChange={() => onFoodSelection(food.id)}
-                      disabled={selectedFoods.length >= 5 && !selectedFoods.includes(food.id)}
-                    />
-                    <div>
-                      <Label htmlFor={food.id} className="text-sm font-medium">
-                        {food.name}
-                      </Label>
-                      <p className="text-xs text-gray-500">
-                        {food.calories} kcal | P: {food.protein}g | C: {food.carbs}g | G: {food.fats}g
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="snack" className="space-y-6">
-          <div className="text-center">
-            <h2 className="text-2xl font-semibold text-gray-900">Lanche da Tarde</h2>
-            <p className="text-gray-600 mt-2">Escolha até 5 opções para seu lanche</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {protocolFoods
-              .filter(food => food.food_group_id === 3)
-              .map((food) => (
-                <div
-                  key={food.id}
-                  className={`p-4 border rounded-lg flex items-center justify-between ${
-                    selectedFoods.includes(food.id) ? 'bg-primary-50 border-primary-200' : 'bg-white'
-                  }`}
-                >
-                  <div className="flex items-center space-x-3">
-                    <Checkbox
-                      id={food.id}
-                      checked={selectedFoods.includes(food.id)}
-                      onCheckedChange={() => onFoodSelection(food.id)}
-                      disabled={selectedFoods.length >= 5 && !selectedFoods.includes(food.id)}
-                    />
-                    <div>
-                      <Label htmlFor={food.id} className="text-sm font-medium">
-                        {food.name}
-                      </Label>
-                      <p className="text-xs text-gray-500">
-                        {food.calories} kcal | P: {food.protein}g | C: {food.carbs}g | G: {food.fats}g
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="dinner" className="space-y-6">
-          <div className="text-center">
-            <h2 className="text-2xl font-semibold text-gray-900">Jantar</h2>
-            <p className="text-gray-600 mt-2">Escolha até 5 opções para seu jantar</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {protocolFoods
-              .filter(food => food.food_group_id === 4)
-              .map((food) => (
-                <div
-                  key={food.id}
-                  className={`p-4 border rounded-lg flex items-center justify-between ${
-                    selectedFoods.includes(food.id) ? 'bg-primary-50 border-primary-200' : 'bg-white'
-                  }`}
-                >
-                  <div className="flex items-center space-x-3">
-                    <Checkbox
-                      id={food.id}
-                      checked={selectedFoods.includes(food.id)}
-                      onCheckedChange={() => onFoodSelection(food.id)}
-                      disabled={selectedFoods.length >= 5 && !selectedFoods.includes(food.id)}
-                    />
-                    <div>
-                      <Label htmlFor={food.id} className="text-sm font-medium">
-                        {food.name}
-                      </Label>
-                      <p className="text-xs text-gray-500">
-                        {food.calories} kcal | P: {food.protein}g | C: {food.carbs}g | G: {food.fats}g
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-          </div>
-        </TabsContent>
-      </Tabs>
+              </div>
+            </Button>
+          ))}
+        </div>
+      </ScrollArea>
 
       <div className="bg-primary-50 p-4 rounded-lg">
         <div className="flex justify-between items-center">
           <div>
             <h3 className="font-semibold text-primary-900">Total de Calorias Selecionadas</h3>
             <p className="text-sm text-primary-700">
-              {selectedFoods.length}/5 itens selecionados
+              {selectedFoods.length} itens selecionados
             </p>
           </div>
           <Badge variant="outline" className="text-lg px-4 py-2">
@@ -209,7 +142,11 @@ export const FoodSelector = ({
         <Button variant="outline" onClick={onBack}>
           Voltar
         </Button>
-        <Button disabled={selectedFoods.length === 0} onClick={onConfirm}>
+        <Button 
+          disabled={selectedFoods.length === 0} 
+          onClick={onConfirm}
+          className="bg-primary hover:bg-primary-600"
+        >
           Confirmar Seleção
         </Button>
       </div>
