@@ -7,6 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Expose-Headers': 'content-length, content-type',
   'Content-Type': 'application/json'
 };
 
@@ -20,6 +21,21 @@ serve(async (req) => {
   }
 
   try {
+    // Validate Content-Type
+    const contentType = req.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid content type',
+          details: 'Content-Type must be application/json'
+        }),
+        { 
+          status: 400,
+          headers: corsHeaders
+        }
+      );
+    }
+
     let requestData;
     try {
       requestData = await req.json();
@@ -106,96 +122,6 @@ serve(async (req) => {
       );
     }
 
-    const systemMessage = `You are a professional nutritionist AI that creates structured meal plans. 
-Your task is to create a meal plan using ONLY the foods from the provided list, following the user's preferences and restrictions.
-
-CRITICAL: You must respond ONLY with a valid JSON object. Do not include any additional text, explanations, or formatting.
-
-Required JSON structure:
-{
-  "dailyPlan": {
-    "breakfast": {
-      "foods": [],
-      "calories": 0,
-      "macros": {
-        "protein": 0,
-        "carbs": 0,
-        "fats": 0
-      }
-    },
-    "morningSnack": {
-      "foods": [],
-      "calories": 0,
-      "macros": {
-        "protein": 0,
-        "carbs": 0,
-        "fats": 0
-      }
-    },
-    "lunch": {
-      "foods": [],
-      "calories": 0,
-      "macros": {
-        "protein": 0,
-        "carbs": 0,
-        "fats": 0
-      }
-    },
-    "afternoonSnack": {
-      "foods": [],
-      "calories": 0,
-      "macros": {
-        "protein": 0,
-        "carbs": 0,
-        "fats": 0
-      }
-    },
-    "dinner": {
-      "foods": [],
-      "calories": 0,
-      "macros": {
-        "protein": 0,
-        "carbs": 0,
-        "fats": 0
-      }
-    }
-  },
-  "totalNutrition": {
-    "calories": 0,
-    "protein": 0,
-    "carbs": 0,
-    "fats": 0
-  },
-  "recommendations": {
-    "preworkout": "",
-    "postworkout": "",
-    "general": ""
-  }
-}
-
-Available Foods:
-${JSON.stringify(foodsData)}
-
-User Data:
-Weight: ${userData.weight}kg
-Height: ${userData.height}cm
-Age: ${userData.age}
-Gender: ${userData.gender}
-Activity Level: ${userData.activityLevel}
-Goal: ${userData.goal}
-Daily Calorie Target: ${userData.dailyCalories}
-
-Dietary Preferences:
-${JSON.stringify(dietaryPreferences)}
-
-Rules:
-1. ONLY use foods from the provided list
-2. Distribute meals to meet the daily calorie target
-3. Balance macronutrients based on the user's goal
-4. Respect dietary restrictions and allergies
-5. ONLY return a valid JSON object, no additional text
-6. Each meal's foods array should contain complete food objects from the available foods list`;
-
     console.log('Making request to OpenAI');
 
     try {
@@ -206,27 +132,48 @@ Rules:
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
+          model: 'gpt-3.5-turbo', // Corrigido o modelo
           messages: [
-            { role: 'system', content: systemMessage },
+            { 
+              role: 'system', 
+              content: `You are a professional nutritionist AI that creates structured meal plans. Create a meal plan using ONLY the foods from the provided list, following the user's preferences and restrictions.` 
+            },
             { 
               role: 'user', 
-              content: 'Create a meal plan following the exact JSON structure provided. Return ONLY the JSON object.' 
+              content: JSON.stringify({
+                availableFoods: foodsData,
+                userData: {
+                  weight: userData.weight,
+                  height: userData.height,
+                  age: userData.age,
+                  gender: userData.gender,
+                  activityLevel: userData.activityLevel,
+                  goal: userData.goal,
+                  dailyCalories: userData.dailyCalories
+                },
+                dietaryPreferences
+              })
             }
           ],
-          temperature: 0.3,
-          max_tokens: 2000
+          temperature: 0.7,
+          max_tokens: 1500
         })
       });
 
+      if (!openAIResponse.ok) {
+        const errorData = await openAIResponse.text();
+        console.error('OpenAI error response:', errorData);
+        throw new Error(`OpenAI API error: ${openAIResponse.status} ${errorData}`);
+      }
+
       const aiData = await openAIResponse.json();
-      console.log('OpenAI raw response:', aiData);
+      console.log('OpenAI response:', aiData);
 
       if (!aiData.choices?.[0]?.message?.content) {
         throw new Error('Invalid response from OpenAI');
       }
 
-      const content = aiData.choices[0].message.content.trim();
+      const content = aiData.choices[0].message.content;
       console.log('OpenAI content:', content);
 
       let mealPlan;
@@ -234,30 +181,12 @@ Rules:
         mealPlan = JSON.parse(content);
       } catch (parseError) {
         console.error('Error parsing OpenAI response:', parseError);
-        console.error('Raw content:', content);
         throw new Error('Failed to parse meal plan JSON');
       }
 
       // Validate meal plan structure
       if (!mealPlan.dailyPlan || !mealPlan.totalNutrition || !mealPlan.recommendations) {
         throw new Error('Invalid meal plan structure');
-      }
-
-      // Save to database
-      const { error: saveError } = await supabase
-        .from('meal_plans')
-        .insert({
-          user_id: userData.userId,
-          daily_calories: mealPlan.totalNutrition.calories,
-          protein_target: mealPlan.totalNutrition.protein,
-          carbs_target: mealPlan.totalNutrition.carbs,
-          fats_target: mealPlan.totalNutrition.fats,
-          meal_recommendations: mealPlan
-        });
-
-      if (saveError) {
-        console.error('Error saving to database:', saveError);
-        throw saveError;
       }
 
       return new Response(
