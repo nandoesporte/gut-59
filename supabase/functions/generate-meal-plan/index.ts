@@ -38,38 +38,103 @@ serve(async (req) => {
       throw new Error('OpenAI API key is not configured');
     }
 
+    // Get selected foods details from database
+    const { data: foodsData, error: foodsError } = await supabase
+      .from('protocol_foods')
+      .select('*')
+      .in('id', selectedFoods);
+
+    if (foodsError) {
+      throw new Error('Error fetching foods data: ' + foodsError.message);
+    }
+
     // Prepare system message with nutritionist expertise
-    const systemMessage = `You are an expert nutritionist specialized in personalized meal planning. Create a meal plan based on the following criteria:
-    - User's data: ${JSON.stringify(userData)}
-    - Selected foods: ${JSON.stringify(selectedFoods)}
-    - Dietary preferences: ${JSON.stringify(dietaryPreferences)}
-    
-    Follow these rules:
-    1. Only use foods from the selected foods list
-    2. Distribute meals according to daily caloric needs
-    3. Balance macronutrients based on the user's goal
-    4. Consider dietary restrictions and allergies
-    5. Format the response as JSON with the following structure:
-    {
-      "dailyPlan": {
-        "breakfast": { "foods": [], "calories": 0, "macros": {} },
-        "morningSnack": { "foods": [], "calories": 0, "macros": {} },
-        "lunch": { "foods": [], "calories": 0, "macros": {} },
-        "afternoonSnack": { "foods": [], "calories": 0, "macros": {} },
-        "dinner": { "foods": [], "calories": 0, "macros": {} }
-      },
-      "totalNutrition": {
-        "calories": 0,
+    const systemMessage = `You are a professional nutritionist AI that creates structured meal plans. 
+Your task is to create a meal plan using ONLY the foods from the provided list, following the user's preferences and restrictions.
+
+IMPORTANT: You MUST respond with a valid JSON object following this EXACT structure:
+{
+  "dailyPlan": {
+    "breakfast": {
+      "foods": [],
+      "calories": 0,
+      "macros": {
         "protein": 0,
         "carbs": 0,
         "fats": 0
-      },
-      "recommendations": {
-        "preworkout": "",
-        "postworkout": "",
-        "general": ""
       }
-    }`;
+    },
+    "morningSnack": {
+      "foods": [],
+      "calories": 0,
+      "macros": {
+        "protein": 0,
+        "carbs": 0,
+        "fats": 0
+      }
+    },
+    "lunch": {
+      "foods": [],
+      "calories": 0,
+      "macros": {
+        "protein": 0,
+        "carbs": 0,
+        "fats": 0
+      }
+    },
+    "afternoonSnack": {
+      "foods": [],
+      "calories": 0,
+      "macros": {
+        "protein": 0,
+        "carbs": 0,
+        "fats": 0
+      }
+    },
+    "dinner": {
+      "foods": [],
+      "calories": 0,
+      "macros": {
+        "protein": 0,
+        "carbs": 0,
+        "fats": 0
+      }
+    }
+  },
+  "totalNutrition": {
+    "calories": 0,
+    "protein": 0,
+    "carbs": 0,
+    "fats": 0
+  },
+  "recommendations": {
+    "preworkout": "",
+    "postworkout": "",
+    "general": ""
+  }
+}
+
+Available Foods:
+${JSON.stringify(foodsData, null, 2)}
+
+User Data:
+- Weight: ${userData.weight}kg
+- Height: ${userData.height}cm
+- Age: ${userData.age}
+- Gender: ${userData.gender}
+- Activity Level: ${userData.activityLevel}
+- Goal: ${userData.goal}
+- Daily Calorie Target: ${userData.dailyCalories}
+
+Dietary Preferences:
+${JSON.stringify(dietaryPreferences, null, 2)}
+
+Rules:
+1. ONLY use foods from the provided list
+2. Distribute meals to meet the daily calorie target
+3. Balance macronutrients based on the user's goal
+4. Respect dietary restrictions and allergies
+5. STRICTLY follow the JSON response format`;
 
     console.log('Making request to OpenAI');
 
@@ -84,9 +149,13 @@ serve(async (req) => {
         model: 'gpt-4',
         messages: [
           { role: 'system', content: systemMessage },
-          { role: 'user', content: 'Generate a personalized meal plan based on the provided data.' }
+          { 
+            role: 'user', 
+            content: 'Generate a meal plan following the exact JSON structure provided. Respond ONLY with the JSON object, no additional text.' 
+          }
         ],
-        temperature: 0.7,
+        temperature: 0.5, // Reduced for more consistent output
+        response_format: { type: "json_object" }, // Force JSON response
         max_tokens: 2000
       }),
     });
@@ -104,7 +173,14 @@ serve(async (req) => {
       throw new Error('Invalid response format from OpenAI');
     }
 
-    const mealPlan = JSON.parse(aiData.choices[0].message.content);
+    let mealPlan;
+    try {
+      mealPlan = JSON.parse(aiData.choices[0].message.content);
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      console.error('Raw content:', aiData.choices[0].message.content);
+      throw new Error('Failed to parse meal plan JSON');
+    }
 
     // Validate meal plan structure
     if (!mealPlan.dailyPlan || !mealPlan.totalNutrition || !mealPlan.recommendations) {
