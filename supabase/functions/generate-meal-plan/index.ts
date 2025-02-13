@@ -155,7 +155,6 @@ Rules:
           }
         ],
         temperature: 0.5, // Reduced for more consistent output
-        response_format: { type: "json_object" }, // Force JSON response
         max_tokens: 2000
       }),
     });
