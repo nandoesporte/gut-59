@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
@@ -81,6 +82,7 @@ const Menu = () => {
 
       if (error) {
         console.error('Error fetching foods:', error);
+        toast.error("Erro ao carregar lista de alimentos");
         return;
       }
 
@@ -146,14 +148,24 @@ const Menu = () => {
   };
 
   const handleDietaryPreferences = async (preferences: DietaryPreferences) => {
-    setDietaryPreferences(preferences);
-    
     try {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) {
         toast.error("Usuário não autenticado");
         return;
       }
+
+      if (!calorieNeeds) {
+        toast.error("Necessidade calórica não calculada");
+        return;
+      }
+
+      if (selectedFoods.length === 0) {
+        toast.error("Nenhum alimento selecionado");
+        return;
+      }
+
+      setDietaryPreferences(preferences);
 
       const requestData = {
         userData: {
@@ -165,30 +177,27 @@ const Menu = () => {
         dietaryPreferences: preferences
       };
 
-      console.log('Sending request with data:', requestData);
+      console.log('Enviando requisição com dados:', JSON.stringify(requestData, null, 2));
 
-      const { data, error } = await supabase.functions.invoke('generate-meal-plan', {
-        body: requestData,
-        headers: {
-          'Content-Type': 'application/json'
-        }
+      const { data: responseData, error } = await supabase.functions.invoke('generate-meal-plan', {
+        body: requestData
       });
 
       if (error) {
-        console.error('Error from edge function:', error);
+        console.error('Erro da função edge:', error);
         throw error;
       }
 
-      if (!data) {
-        throw new Error('No data received from the meal plan generator');
+      if (!responseData) {
+        throw new Error('Nenhum dado recebido do gerador de cardápio');
       }
 
-      console.log('Received meal plan:', data);
-      setMealPlan(data);
+      console.log('Cardápio recebido:', responseData);
+      setMealPlan(responseData);
       setCurrentStep(4);
       toast.success("Cardápio personalizado gerado com sucesso!");
     } catch (error) {
-      console.error('Error generating meal plan:', error);
+      console.error('Erro ao gerar cardápio:', error);
       toast.error("Erro ao gerar cardápio personalizado. Por favor, tente novamente.");
     }
   };
