@@ -7,41 +7,57 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Content-Type': 'application/json'
 };
 
 serve(async (req) => {
-  // Improved CORS handling
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { 
-      status: 204, // No content for OPTIONS
+      status: 204,
       headers: corsHeaders 
     });
   }
 
   try {
+    let requestData;
+    try {
+      requestData = await req.json();
+      console.log('Received request data:', requestData);
+    } catch (parseError) {
+      console.error('Error parsing request JSON:', parseError);
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid JSON in request body',
+          details: parseError.message
+        }), 
+        { 
+          status: 400,
+          headers: corsHeaders
+        }
+      );
+    }
+
+    const { userData, selectedFoods, dietaryPreferences } = requestData;
+
+    // Validate required fields
+    if (!userData || !selectedFoods || !dietaryPreferences) {
+      return new Response(
+        JSON.stringify({
+          error: 'Missing required fields',
+          details: 'userData, selectedFoods, and dietaryPreferences are required'
+        }),
+        { 
+          status: 400,
+          headers: corsHeaders
+        }
+      );
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
-
-    const {
-      userData,
-      selectedFoods,
-      dietaryPreferences
-    } = await req.json();
-
-    // Validate input data
-    if (!userData || !selectedFoods || !dietaryPreferences) {
-      throw new Error('Missing required input data');
-    }
-
-    console.log('Input data:', { userData, selectedFoods, dietaryPreferences });
-
-    // Check if OpenAI API key is configured
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openAIApiKey) {
-      throw new Error('OpenAI API key is not configured');
-    }
 
     // Get selected foods details from database
     const { data: foodsData, error: foodsError } = await supabase
@@ -50,14 +66,46 @@ serve(async (req) => {
       .in('id', selectedFoods);
 
     if (foodsError) {
-      throw new Error('Error fetching foods data: ' + foodsError.message);
+      console.error('Error fetching foods:', foodsError);
+      return new Response(
+        JSON.stringify({
+          error: 'Database error',
+          details: foodsError.message
+        }),
+        { 
+          status: 500,
+          headers: corsHeaders
+        }
+      );
     }
 
     if (!foodsData || foodsData.length === 0) {
-      throw new Error('No foods found for the selected IDs');
+      return new Response(
+        JSON.stringify({
+          error: 'No foods found',
+          details: 'No foods found for the selected IDs'
+        }),
+        { 
+          status: 404,
+          headers: corsHeaders
+        }
+      );
     }
 
-    // Prepare system message with nutritionist expertise
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openAIApiKey) {
+      return new Response(
+        JSON.stringify({
+          error: 'Configuration error',
+          details: 'OpenAI API key is not configured'
+        }),
+        { 
+          status: 500,
+          headers: corsHeaders
+        }
+      );
+    }
+
     const systemMessage = `You are a professional nutritionist AI that creates structured meal plans. 
 Your task is to create a meal plan using ONLY the foods from the provided list, following the user's preferences and restrictions.
 
@@ -126,19 +174,19 @@ Required JSON structure:
 }
 
 Available Foods:
-${JSON.stringify(foodsData, null, 2)}
+${JSON.stringify(foodsData)}
 
 User Data:
-- Weight: ${userData.weight}kg
-- Height: ${userData.height}cm
-- Age: ${userData.age}
-- Gender: ${userData.gender}
-- Activity Level: ${userData.activityLevel}
-- Goal: ${userData.goal}
-- Daily Calorie Target: ${userData.dailyCalories}
+Weight: ${userData.weight}kg
+Height: ${userData.height}cm
+Age: ${userData.age}
+Gender: ${userData.gender}
+Activity Level: ${userData.activityLevel}
+Goal: ${userData.goal}
+Daily Calorie Target: ${userData.dailyCalories}
 
 Dietary Preferences:
-${JSON.stringify(dietaryPreferences, null, 2)}
+${JSON.stringify(dietaryPreferences)}
 
 Rules:
 1. ONLY use foods from the provided list
@@ -150,95 +198,97 @@ Rules:
 
     console.log('Making request to OpenAI');
 
-    // Make request to OpenAI with updated parameters
-    const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini', // Using the recommended model
-        messages: [
-          { role: 'system', content: systemMessage },
-          { 
-            role: 'user', 
-            content: 'Create a meal plan. Return ONLY a JSON object matching the specified structure.'
-          }
-        ],
-        temperature: 0.3, // Lower temperature for more consistent outputs
-        max_tokens: 2000
-      }),
-    });
-
-    if (!openAIResponse.ok) {
-      const errorText = await openAIResponse.text();
-      console.error('OpenAI API error:', errorText);
-      throw new Error(`OpenAI API error: ${errorText}`);
-    }
-
-    const aiData = await openAIResponse.json();
-    console.log('OpenAI response:', aiData);
-
-    if (!aiData.choices || !aiData.choices[0]?.message?.content) {
-      throw new Error('Invalid response format from OpenAI');
-    }
-
-    let mealPlan;
     try {
-      const content = aiData.choices[0].message.content.trim();
-      mealPlan = JSON.parse(content);
-    } catch (parseError) {
-      console.error('JSON parse error:', parseError);
-      console.error('Raw content:', aiData.choices[0].message.content);
-      throw new Error('Failed to parse meal plan JSON');
-    }
-
-    // Validate meal plan structure
-    if (!mealPlan.dailyPlan || !mealPlan.totalNutrition || !mealPlan.recommendations) {
-      throw new Error('Invalid meal plan structure generated');
-    }
-
-    // Save meal plan to database
-    const { error: saveError } = await supabase
-      .from('meal_plans')
-      .insert({
-        user_id: userData.userId,
-        daily_calories: mealPlan.totalNutrition.calories,
-        protein_target: mealPlan.totalNutrition.protein,
-        carbs_target: mealPlan.totalNutrition.carbs,
-        fats_target: mealPlan.totalNutrition.fats,
-        meal_recommendations: mealPlan
+      const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAIApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: systemMessage },
+            { 
+              role: 'user', 
+              content: 'Create a meal plan following the exact JSON structure provided. Return ONLY the JSON object.' 
+            }
+          ],
+          temperature: 0.3,
+          max_tokens: 2000
+        })
       });
 
-    if (saveError) {
-      console.error('Database save error:', saveError);
-      throw saveError;
+      const aiData = await openAIResponse.json();
+      console.log('OpenAI raw response:', aiData);
+
+      if (!aiData.choices?.[0]?.message?.content) {
+        throw new Error('Invalid response from OpenAI');
+      }
+
+      const content = aiData.choices[0].message.content.trim();
+      console.log('OpenAI content:', content);
+
+      let mealPlan;
+      try {
+        mealPlan = JSON.parse(content);
+      } catch (parseError) {
+        console.error('Error parsing OpenAI response:', parseError);
+        console.error('Raw content:', content);
+        throw new Error('Failed to parse meal plan JSON');
+      }
+
+      // Validate meal plan structure
+      if (!mealPlan.dailyPlan || !mealPlan.totalNutrition || !mealPlan.recommendations) {
+        throw new Error('Invalid meal plan structure');
+      }
+
+      // Save to database
+      const { error: saveError } = await supabase
+        .from('meal_plans')
+        .insert({
+          user_id: userData.userId,
+          daily_calories: mealPlan.totalNutrition.calories,
+          protein_target: mealPlan.totalNutrition.protein,
+          carbs_target: mealPlan.totalNutrition.carbs,
+          fats_target: mealPlan.totalNutrition.fats,
+          meal_recommendations: mealPlan
+        });
+
+      if (saveError) {
+        console.error('Error saving to database:', saveError);
+        throw saveError;
+      }
+
+      return new Response(
+        JSON.stringify(mealPlan),
+        { headers: corsHeaders }
+      );
+
+    } catch (openAIError) {
+      console.error('OpenAI or parsing error:', openAIError);
+      return new Response(
+        JSON.stringify({
+          error: 'AI Processing Error',
+          details: openAIError.message
+        }),
+        { 
+          status: 500,
+          headers: corsHeaders
+        }
+      );
     }
 
-    return new Response(
-      JSON.stringify(mealPlan),
-      { 
-        status: 200,
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json'
-        } 
-      }
-    );
   } catch (error) {
-    console.error('Error in generate-meal-plan function:', error);
+    console.error('General error:', error);
     return new Response(
-      JSON.stringify({ 
-        error: error.message,
-        details: error.toString()
+      JSON.stringify({
+        error: 'Internal Server Error',
+        details: error.message
       }),
       { 
-        status: 500, 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json'
-        } 
+        status: 500,
+        headers: corsHeaders
       }
     );
   }
