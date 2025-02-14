@@ -1,8 +1,6 @@
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   Egg, 
@@ -145,7 +143,7 @@ export const FoodSelector = ({
         <Button 
           disabled={selectedFoods.length === 0} 
           onClick={onConfirm}
-          className="bg-primary hover:bg-primary-600"
+          className="bg-green-500 hover:bg-green-600 text-white"
         >
           Confirmar Seleção
         </Button>
