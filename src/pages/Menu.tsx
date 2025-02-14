@@ -122,7 +122,7 @@ const Menu = () => {
     toast.success("Cálculo realizado com sucesso!");
   };
 
-  const handleInputChange = (field: keyof CalorieCalculatorForm, value: string | number) => {
+    const handleInputChange = (field: keyof CalorieCalculatorForm, value: string | number) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -244,7 +244,9 @@ const Menu = () => {
                 </Accordion>
 
                 <Button 
-                  onClick={() => setCurrentStep(2)}
+                  onClick={() => {
+                    setCurrentStep(1.5); // Novo step intermediário para o CalorieCalculator
+                  }}
                   className="w-full mt-6 bg-green-500 hover:bg-green-600"
                 >
                   MONTAR MINHA DIETA
@@ -253,6 +255,23 @@ const Menu = () => {
             </Card>
           </div>
         );
+      case 1.5: // Novo step para o CalorieCalculator
+        return (
+          <Card className="p-6">
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-semibold text-gray-900">Calcule suas Calorias</h2>
+              <p className="text-gray-600 mt-2">
+                Preencha seus dados para calcularmos suas necessidades calóricas
+              </p>
+            </div>
+            <CalorieCalculator
+              formData={formData}
+              onInputChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
+              onCalculate={handleCalculateCalories}
+              calorieNeeds={calorieNeeds}
+            />
+          </Card>
+        );
       case 2:
         return (
           <FoodSelector
@@ -260,7 +279,7 @@ const Menu = () => {
             selectedFoods={selectedFoods}
             onFoodSelection={handleFoodSelection}
             totalCalories={totalCalories}
-            onBack={() => setCurrentStep(1)}
+            onBack={() => setCurrentStep(1.5)}
             onConfirm={() => setCurrentStep(3)}
           />
         );
