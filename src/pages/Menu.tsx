@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { CalorieCalculator, CalorieCalculatorForm, activityLevels, goals } from "@/components/menu/CalorieCalculator";
@@ -52,7 +53,7 @@ interface MealPlan {
 }
 
 const Menu = () => {
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState<number>(1);
   const [calorieNeeds, setCalorieNeeds] = useState<number | null>(null);
   const [selectedFoods, setSelectedFoods] = useState<string[]>([]);
   const [protocolFoods, setProtocolFoods] = useState<ProtocolFood[]>([]);
@@ -122,26 +123,6 @@ const Menu = () => {
     toast.success("Cálculo realizado com sucesso!");
   };
 
-    const handleInputChange = (field: keyof CalorieCalculatorForm, value: string | number) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const handleFoodSelection = (foodId: string) => {
-    setSelectedFoods(prev => {
-      if (prev.includes(foodId)) {
-        return prev.filter(id => id !== foodId);
-      }
-      if (prev.length >= 20) {
-        toast.error("Você já selecionou o máximo de 20 alimentos!");
-        return prev;
-      }
-      return [...prev, foodId];
-    });
-  };
-
   const handleDietaryPreferences = async (preferences: DietaryPreferences) => {
     try {
       const { data: userData } = await supabase.auth.getUser();
@@ -197,6 +178,19 @@ const Menu = () => {
     }
   };
 
+  const handleFoodSelection = (foodId: string) => {
+    setSelectedFoods(prev => {
+      if (prev.includes(foodId)) {
+        return prev.filter(id => id !== foodId);
+      }
+      if (prev.length >= 20) {
+        toast.error("Você já selecionou o máximo de 20 alimentos!");
+        return prev;
+      }
+      return [...prev, foodId];
+    });
+  };
+
   const renderStep = () => {
     switch (currentStep) {
       case 1:
@@ -244,10 +238,8 @@ const Menu = () => {
                 </Accordion>
 
                 <Button 
-                  onClick={() => {
-                    setCurrentStep(1.5); // Novo step intermediário para o CalorieCalculator
-                  }}
-                  className="w-full mt-6 bg-green-500 hover:bg-green-600"
+                  onClick={() => setCurrentStep(1.5)}
+                  className="w-full mt-6 bg-green-500 hover:bg-green-600 text-white"
                 >
                   MONTAR MINHA DIETA
                 </Button>
@@ -255,7 +247,7 @@ const Menu = () => {
             </Card>
           </div>
         );
-      case 1.5: // Novo step para o CalorieCalculator
+      case 1.5:
         return (
           <Card className="p-6">
             <div className="text-center mb-6">
@@ -270,6 +262,13 @@ const Menu = () => {
               onCalculate={handleCalculateCalories}
               calorieNeeds={calorieNeeds}
             />
+            <Button 
+              variant="outline" 
+              onClick={() => setCurrentStep(1)}
+              className="mt-4"
+            >
+              Voltar
+            </Button>
           </Card>
         );
       case 2:
@@ -285,12 +284,18 @@ const Menu = () => {
         );
       case 3:
         return (
-          <DietaryPreferencesForm
-            onSubmit={handleDietaryPreferences}
-          />
+          <div className="space-y-6">
+            <Card className="p-6">
+              <DietaryPreferencesForm
+                onSubmit={handleDietaryPreferences}
+                onBack={() => setCurrentStep(2)}
+              />
+            </Card>
+          </div>
         );
       case 4:
-        return mealPlan ? (
+        if (!mealPlan) return null;
+        return (
           <div className="space-y-6">
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -398,20 +403,23 @@ const Menu = () => {
                     {mealPlan.totalNutrition.calories} kcal totais
                   </p>
                 </div>
-                <Button className="w-full bg-green-500 hover:bg-green-600">
-                  MONTAR MINHA DIETA
+                <Button 
+                  onClick={() => setCurrentStep(1)}
+                  className="w-full bg-green-500 hover:bg-green-600 text-white"
+                >
+                  COMEÇAR NOVA DIETA
                 </Button>
               </div>
             </div>
           </div>
-        ) : null;
+        );
       default:
         return null;
     }
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-3xl">
+    <div className="container mx-auto px-4 py-8 max-w-3xl min-h-screen pb-24">
       {renderStep()}
     </div>
   );
