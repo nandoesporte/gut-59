@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 
 interface DietaryPreferencesFormProps {
   onSubmit: (preferences: DietaryPreferences) => void;
+  onBack: () => void; // Adicionada a prop onBack
 }
 
 interface DietaryPreferences {
@@ -16,7 +17,7 @@ interface DietaryPreferences {
   trainingTime: string | null;
 }
 
-export const DietaryPreferencesForm = ({ onSubmit }: DietaryPreferencesFormProps) => {
+export const DietaryPreferencesForm = ({ onSubmit, onBack }: DietaryPreferencesFormProps) => {
   const [preferences, setPreferences] = useState<DietaryPreferences>({
     hasAllergies: false,
     allergies: [],
@@ -105,9 +106,14 @@ export const DietaryPreferencesForm = ({ onSubmit }: DietaryPreferencesFormProps
         </div>
       </div>
 
-      <Button type="submit">
-        Continuar
-      </Button>
+      <div className="flex justify-between gap-4">
+        <Button type="button" variant="outline" onClick={onBack}>
+          Voltar
+        </Button>
+        <Button type="submit" className="flex-1">
+          Continuar
+        </Button>
+      </div>
     </form>
   );
 };
