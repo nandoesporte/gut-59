@@ -154,36 +154,36 @@ export type Database = {
       }
       meal_plans: {
         Row: {
-          carbs_target: number | null
+          active: boolean | null
+          calories: number | null
           created_at: string | null
-          daily_calories: number
-          fats_target: number | null
+          dietary_preferences: Json | null
           id: string
-          meal_recommendations: Json | null
-          protein_target: number | null
-          updated_at: string | null
+          macros: Json | null
+          plan_data: Json
+          training_time: string | null
           user_id: string
         }
         Insert: {
-          carbs_target?: number | null
+          active?: boolean | null
+          calories?: number | null
           created_at?: string | null
-          daily_calories: number
-          fats_target?: number | null
+          dietary_preferences?: Json | null
           id?: string
-          meal_recommendations?: Json | null
-          protein_target?: number | null
-          updated_at?: string | null
+          macros?: Json | null
+          plan_data: Json
+          training_time?: string | null
           user_id: string
         }
         Update: {
-          carbs_target?: number | null
+          active?: boolean | null
+          calories?: number | null
           created_at?: string | null
-          daily_calories?: number
-          fats_target?: number | null
+          dietary_preferences?: Json | null
           id?: string
-          meal_recommendations?: Json | null
-          protein_target?: number | null
-          updated_at?: string | null
+          macros?: Json | null
+          plan_data?: Json
+          training_time?: string | null
           user_id?: string
         }
         Relationships: []
@@ -490,35 +490,74 @@ export type Database = {
         Row: {
           calories: number
           carbs: number | null
+          common_allergens: string[] | null
           created_at: string
+          dietary_flags: string[] | null
           fats: number | null
+          fiber: number | null
           food_group_id: number | null
+          glycemic_index: number | null
           id: string
+          is_quick_meal: boolean | null
+          meal_type: string[] | null
+          minerals: Json | null
           name: string
           phase: number | null
+          post_workout_compatible: boolean | null
+          pre_workout_compatible: boolean | null
+          preparation_time_minutes: number | null
           protein: number | null
+          serving_size: number | null
+          serving_unit: string | null
+          vitamins: Json | null
         }
         Insert: {
           calories: number
           carbs?: number | null
+          common_allergens?: string[] | null
           created_at?: string
+          dietary_flags?: string[] | null
           fats?: number | null
+          fiber?: number | null
           food_group_id?: number | null
+          glycemic_index?: number | null
           id?: string
+          is_quick_meal?: boolean | null
+          meal_type?: string[] | null
+          minerals?: Json | null
           name: string
           phase?: number | null
+          post_workout_compatible?: boolean | null
+          pre_workout_compatible?: boolean | null
+          preparation_time_minutes?: number | null
           protein?: number | null
+          serving_size?: number | null
+          serving_unit?: string | null
+          vitamins?: Json | null
         }
         Update: {
           calories?: number
           carbs?: number | null
+          common_allergens?: string[] | null
           created_at?: string
+          dietary_flags?: string[] | null
           fats?: number | null
+          fiber?: number | null
           food_group_id?: number | null
+          glycemic_index?: number | null
           id?: string
+          is_quick_meal?: boolean | null
+          meal_type?: string[] | null
+          minerals?: Json | null
           name?: string
           phase?: number | null
+          post_workout_compatible?: boolean | null
+          pre_workout_compatible?: boolean | null
+          preparation_time_minutes?: number | null
           protein?: number | null
+          serving_size?: number | null
+          serving_unit?: string | null
+          vitamins?: Json | null
         }
         Relationships: [
           {
@@ -678,6 +717,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_progress: {
+        Row: {
+          body_fat: number | null
+          created_at: string | null
+          date: string | null
+          digestive_issues: string[] | null
+          energy_level: number | null
+          feedback: string | null
+          id: string
+          muscle_mass: number | null
+          user_id: string
+          waist_circumference: number | null
+          weight: number | null
+        }
+        Insert: {
+          body_fat?: number | null
+          created_at?: string | null
+          date?: string | null
+          digestive_issues?: string[] | null
+          energy_level?: number | null
+          feedback?: string | null
+          id?: string
+          muscle_mass?: number | null
+          user_id: string
+          waist_circumference?: number | null
+          weight?: number | null
+        }
+        Update: {
+          body_fat?: number | null
+          created_at?: string | null
+          date?: string | null
+          digestive_issues?: string[] | null
+          energy_level?: number | null
+          feedback?: string | null
+          id?: string
+          muscle_mass?: number | null
+          user_id?: string
+          waist_circumference?: number | null
+          weight?: number | null
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {

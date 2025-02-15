@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.0';
@@ -101,6 +100,83 @@ function generateTimingRecommendations(trainingTime: string | null, goal: string
   return recommendations;
 }
 
+// Função para analisar compatibilidade com horário de treino
+function analyzeWorkoutCompatibility(
+  foods: any[],
+  trainingTime: string | null,
+  isPreWorkout: boolean
+): any[] {
+  if (!trainingTime) return foods;
+
+  return foods.filter(food => {
+    if (isPreWorkout) {
+      return food.pre_workout_compatible && 
+             (food.preparation_time_minutes <= 30) && 
+             (food.glycemic_index ? food.glycemic_index > 55 : true);
+    } else {
+      return food.post_workout_compatible;
+    }
+  });
+}
+
+// Função para calcular score nutricional
+function calculateNutritionalScore(food: any, goal: string): number {
+  let score = 0;
+  
+  // Base nutricional
+  if (food.protein) score += (goal === 'gain' ? 3 : 2);
+  if (food.fiber) score += 1;
+  if (food.vitamins) score += Object.keys(food.vitamins).length * 0.5;
+  if (food.minerals) score += Object.keys(food.minerals).length * 0.5;
+  
+  // Adequação ao objetivo
+  switch (goal) {
+    case 'lose':
+      if (food.fiber > 3) score += 2;
+      if (food.glycemic_index && food.glycemic_index < 55) score += 2;
+      break;
+    case 'gain':
+      if (food.calories > 200) score += 1;
+      if (food.protein > 20) score += 2;
+      break;
+    default: // maintain
+      if (food.fiber > 2) score += 1;
+      score += 1; // Balanceado para manutenção
+  }
+
+  return score;
+}
+
+// Função para otimizar combinações de alimentos
+function optimizeMealCombinations(
+  foods: any[],
+  targetCalories: number,
+  macroTargets: { protein: number; carbs: number; fats: number },
+  goal: string
+): any[] {
+  const combinations: any[] = [];
+  const maxFoods = 4;
+
+  // Ordenar alimentos por score nutricional
+  const scoredFoods = foods.map(food => ({
+    ...food,
+    nutritionalScore: calculateNutritionalScore(food, goal)
+  })).sort((a, b) => b.nutritionalScore - a.nutritionalScore);
+
+  // Selecionar melhores combinações
+  for (let i = 0; i < Math.min(maxFoods, scoredFoods.length); i++) {
+    const mainFood = scoredFoods[i];
+    const complementaryFoods = scoredFoods
+      .filter(f => f.id !== mainFood.id)
+      .slice(0, maxFoods - 1);
+
+    combinations.push([mainFood, ...complementaryFoods]);
+  }
+
+  // Ajustar porções para atingir targets
+  return combinations[0] || []; // Retorna a melhor combinação
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { 
@@ -178,7 +254,22 @@ serve(async (req) => {
     // Buscar alimentos selecionados
     const { data: foodsData, error: foodsError } = await supabase
       .from('protocol_foods')
-      .select('*')
+      .select(`
+        *,
+        vitamins,
+        minerals,
+        preparation_time_minutes,
+        is_quick_meal,
+        glycemic_index,
+        fiber,
+        meal_type,
+        serving_size,
+        serving_unit,
+        pre_workout_compatible,
+        post_workout_compatible,
+        common_allergens,
+        dietary_flags
+      `)
       .in('id', selectedFoods);
 
     if (foodsError) {
@@ -222,7 +313,7 @@ serve(async (req) => {
       return true;
     });
 
-    // Organizar alimentos por grupo
+    // Organizar alimentos por grupo e otimizar para horário de treino
     const foodsByGroup = filteredFoods.reduce((acc, food) => {
       const group = food.food_group_id;
       if (!acc[group]) acc[group] = [];
@@ -230,59 +321,79 @@ serve(async (req) => {
       return acc;
     }, {} as Record<number, typeof filteredFoods>);
 
-    // Distribuir calorias por refeição
-    const mealDistribution = {
-      breakfast: 0.25,    // 25% das calorias
-      lunch: 0.35,        // 35% das calorias
-      snacks: 0.15,       // 15% das calorias
-      dinner: 0.25        // 25% das calorias
-    };
-
-    // Criar plano de refeições
+    // Gerar plano de refeições otimizado
     const mealPlan = {
       dailyPlan: {
         breakfast: {
-          foods: (foodsByGroup[1] || [])
-            .sort(() => Math.random() - 0.5)
-            .slice(0, 3),
-          calories: Math.round(adjustedCalories * mealDistribution.breakfast),
-          macros: { 
-            protein: Math.round(macroTargets.protein * mealDistribution.breakfast),
-            carbs: Math.round(macroTargets.carbs * mealDistribution.breakfast),
-            fats: Math.round(macroTargets.fats * mealDistribution.breakfast)
+          foods: optimizeMealCombinations(
+            analyzeWorkoutCompatibility(foodsByGroup[1] || [], dietaryPreferences.trainingTime, true),
+            Math.round(adjustedCalories * 0.25),
+            {
+              protein: Math.round(macroTargets.protein * 0.25),
+              carbs: Math.round(macroTargets.carbs * 0.25),
+              fats: Math.round(macroTargets.fats * 0.25)
+            },
+            userData.goal
+          ),
+          calories: Math.round(adjustedCalories * 0.25),
+          macros: {
+            protein: Math.round(macroTargets.protein * 0.25),
+            carbs: Math.round(macroTargets.carbs * 0.25),
+            fats: Math.round(macroTargets.fats * 0.25)
           }
         },
         lunch: {
-          foods: (foodsByGroup[2] || [])
-            .sort(() => Math.random() - 0.5)
-            .slice(0, 4),
-          calories: Math.round(adjustedCalories * mealDistribution.lunch),
+          foods: optimizeMealCombinations(
+            foodsByGroup[2] || [],
+            Math.round(adjustedCalories * 0.35),
+            {
+              protein: Math.round(macroTargets.protein * 0.35),
+              carbs: Math.round(macroTargets.carbs * 0.35),
+              fats: Math.round(macroTargets.fats * 0.35)
+            },
+            userData.goal
+          ),
+          calories: Math.round(adjustedCalories * 0.35),
           macros: {
-            protein: Math.round(macroTargets.protein * mealDistribution.lunch),
-            carbs: Math.round(macroTargets.carbs * mealDistribution.lunch),
-            fats: Math.round(macroTargets.fats * mealDistribution.lunch)
+            protein: Math.round(macroTargets.protein * 0.35),
+            carbs: Math.round(macroTargets.carbs * 0.35),
+            fats: Math.round(macroTargets.fats * 0.35)
           }
         },
         snacks: {
-          foods: (foodsByGroup[3] || [])
-            .sort(() => Math.random() - 0.5)
-            .slice(0, 3),
-          calories: Math.round(adjustedCalories * mealDistribution.snacks),
+          foods: optimizeMealCombinations(
+            foodsByGroup[3] || [],
+            Math.round(adjustedCalories * 0.15),
+            {
+              protein: Math.round(macroTargets.protein * 0.15),
+              carbs: Math.round(macroTargets.carbs * 0.15),
+              fats: Math.round(macroTargets.fats * 0.15)
+            },
+            userData.goal
+          ),
+          calories: Math.round(adjustedCalories * 0.15),
           macros: {
-            protein: Math.round(macroTargets.protein * mealDistribution.snacks),
-            carbs: Math.round(macroTargets.carbs * mealDistribution.snacks),
-            fats: Math.round(macroTargets.fats * mealDistribution.snacks)
+            protein: Math.round(macroTargets.protein * 0.15),
+            carbs: Math.round(macroTargets.carbs * 0.15),
+            fats: Math.round(macroTargets.fats * 0.15)
           }
         },
         dinner: {
-          foods: (foodsByGroup[4] || [])
-            .sort(() => Math.random() - 0.5)
-            .slice(0, 4),
-          calories: Math.round(adjustedCalories * mealDistribution.dinner),
+          foods: optimizeMealCombinations(
+            analyzeWorkoutCompatibility(foodsByGroup[4] || [], dietaryPreferences.trainingTime, false),
+            Math.round(adjustedCalories * 0.25),
+            {
+              protein: Math.round(macroTargets.protein * 0.25),
+              carbs: Math.round(macroTargets.carbs * 0.25),
+              fats: Math.round(macroTargets.fats * 0.25)
+            },
+            userData.goal
+          ),
+          calories: Math.round(adjustedCalories * 0.25),
           macros: {
-            protein: Math.round(macroTargets.protein * mealDistribution.dinner),
-            carbs: Math.round(macroTargets.carbs * mealDistribution.dinner),
-            fats: Math.round(macroTargets.fats * mealDistribution.dinner)
+            protein: Math.round(macroTargets.protein * 0.25),
+            carbs: Math.round(macroTargets.carbs * 0.25),
+            fats: Math.round(macroTargets.fats * 0.25)
           }
         }
       },
@@ -295,42 +406,21 @@ serve(async (req) => {
       recommendations: generateTimingRecommendations(dietaryPreferences.trainingTime, userData.goal)
     };
 
-    // Adicionar informações extras para cada refeição
-    Object.values(mealPlan.dailyPlan).forEach(meal => {
-      const mealTotalProtein = meal.foods.reduce((sum, food) => sum + (food.protein || 0), 0);
-      const mealTotalCarbs = meal.foods.reduce((sum, food) => sum + (food.carbs || 0), 0);
-      const mealTotalFats = meal.foods.reduce((sum, food) => sum + (food.fats || 0), 0);
-
-      // Ajustar porções para atingir os macros alvo
-      if (mealTotalProtein > 0) {
-        const proteinAdjustment = meal.macros.protein / mealTotalProtein;
-        meal.foods.forEach(food => {
-          if (food.protein) food.protein *= proteinAdjustment;
-        });
-      }
-
-      if (mealTotalCarbs > 0) {
-        const carbsAdjustment = meal.macros.carbs / mealTotalCarbs;
-        meal.foods.forEach(food => {
-          if (food.carbs) food.carbs *= carbsAdjustment;
-        });
-      }
-
-      if (mealTotalFats > 0) {
-        const fatsAdjustment = meal.macros.fats / mealTotalFats;
-        meal.foods.forEach(food => {
-          if (food.fats) food.fats *= fatsAdjustment;
-        });
-      }
-
-      // Arredondar valores
-      meal.foods.forEach(food => {
-        if (food.protein) food.protein = Math.round(food.protein);
-        if (food.carbs) food.carbs = Math.round(food.carbs);
-        if (food.fats) food.fats = Math.round(food.fats);
-        if (food.calories) food.calories = Math.round(food.calories);
+    // Salvar o plano gerado
+    const { error: saveError } = await supabase
+      .from('meal_plans')
+      .insert({
+        user_id: userData.userId,
+        plan_data: mealPlan,
+        dietary_preferences: dietaryPreferences,
+        calories: adjustedCalories,
+        macros: macroTargets,
+        training_time: dietaryPreferences.trainingTime
       });
-    });
+
+    if (saveError) {
+      console.error('Error saving meal plan:', saveError);
+    }
 
     return new Response(
       JSON.stringify(mealPlan),
