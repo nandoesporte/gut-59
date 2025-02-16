@@ -160,17 +160,17 @@ const Menu = () => {
   const renderAdditionalSections = () => (
     <div className="space-y-8 mt-8">
       <div className="bg-[#F2FCE2] rounded-lg shadow-sm p-6 border border-green-100">
-        <h2 className="text-2xl font-semibold text-green-800 mb-6">Diário Alimentar</h2>
+        <h2 className="text-2xl font-semibold text-green-500 mb-6">Diário Alimentar</h2>
         <FoodDiary />
       </div>
 
       <div className="bg-[#F2FCE2] rounded-lg shadow-sm p-6 border border-green-100">
-        <h2 className="text-2xl font-semibold text-green-800 mb-6">Registro de Sintomas</h2>
+        <h2 className="text-2xl font-semibold text-green-500 mb-6">Registro de Sintomas</h2>
         <SymptomTracker />
       </div>
 
       <div className="bg-[#F2FCE2] rounded-lg shadow-sm p-6 border border-green-100">
-        <h2 className="text-2xl font-semibold text-green-800 mb-6">Protocolo de Modulação Intestinal</h2>
+        <h2 className="text-2xl font-semibold text-green-500 mb-6">Protocolo de Modulação Intestinal</h2>
         <Education />
       </div>
 
@@ -179,7 +179,7 @@ const Menu = () => {
           <Button
             variant="ghost"
             onClick={() => setShowShopping(!showShopping)}
-            className="w-full flex justify-between items-center text-green-800 hover:text-green-700 hover:bg-green-50"
+            className="w-full flex justify-between items-center text-green-500 hover:text-green-600 hover:bg-green-50"
           >
             <span className="font-semibold">Lista de Compras</span>
             <ChevronDown className={`transform transition-transform ${showShopping ? 'rotate-180' : ''}`} />
@@ -209,8 +209,8 @@ const Menu = () => {
         return (
           <Card className="p-6 bg-[#F2FCE2] border border-green-100">
             <div className="text-center mb-6">
-              <h2 className="text-2xl font-semibold text-green-800">Calcule suas Calorias</h2>
-              <p className="text-green-700 mt-2">
+              <h2 className="text-2xl font-semibold text-green-500">Calcule suas Calorias</h2>
+              <p className="text-green-600 mt-2">
                 Preencha seus dados para calcularmos suas necessidades calóricas
               </p>
             </div>
