@@ -132,50 +132,117 @@ export const MealPlanDisplay = ({ mealPlan, onReset }: MealPlanDisplayProps) => 
       meal === "lunch" ? "Almoço" :
       meal === "afternoonSnack" ? "Lanche da Tarde" :
       "Jantar"
-    } (${calories} kcal):\n`;
+    } (${calories} kcal):\n\n`;
 
-    // Adiciona cada alimento com suas porções e calorias
+    // Primeiro, lista os alimentos com suas porções e calorias
     foods.forEach(food => {
       const foodCalories = Math.round((food.calories / 100) * food.portion!);
       description += `- ${food.portion}${food.portionUnit} de ${food.name} (${foodCalories} kcal)\n`;
     });
 
-    // Adiciona recomendações específicas baseadas no período e timing
+    // Adiciona explicação nutricional específica para cada refeição
+    description += "\nBenefícios nutricionais:\n";
+    
     switch (meal) {
       case "breakfast":
-        description += "\nRecomendações:\n";
-        description += "• Tome esta refeição 30 minutos após acordar\n";
-        description += "• Beba um copo de água morna com limão antes do café da manhã\n";
+        description += "Esta combinação de alimentos foi escolhida para:\n";
+        description += "• Fornecer energia sustentada durante a manhã\n";
+        description += "• Equilibrar os níveis de glicose no sangue\n";
+        description += "• Garantir proteínas de alta qualidade para saciedade\n";
+        description += "• Oferecer fibras para saúde digestiva\n\n";
+        
+        description += "Modo de preparo e consumo:\n";
+        description += "• Prepare os alimentos frescos na hora\n";
+        description += "• Mastigue bem cada porção\n";
+        description += "• Evite distrações durante a refeição\n";
+        
         if (timing?.includes("manhã")) {
-          description += "• Como você treina pela manhã, consuma esta refeição 1-2 horas antes do treino\n";
+          description += "\nOrientação para treino:\n";
+          description += "• Consuma 1-2 horas antes do treino\n";
+          description += "• Priorize a hidratação com água\n";
         }
         break;
+
       case "morningSnack":
-        description += "\nRecomendações:\n";
-        description += "• Consuma este lanche 2-3 horas após o café da manhã\n";
-        description += "• Mantenha-se hidratado entre as refeições\n";
+        description += "Este lanche foi planejado para:\n";
+        description += "• Manter níveis estáveis de energia\n";
+        description += "• Fornecer nutrientes essenciais\n";
+        description += "• Evitar picos de fome antes do almoço\n\n";
+        
+        description += "Dicas de consumo:\n";
+        description += "• Combine os alimentos sugeridos\n";
+        description += "• Mantenha o horário regular\n";
+        description += "• Hidrate-se entre as refeições\n";
         break;
+
       case "lunch":
-        description += "\nRecomendações:\n";
-        description += "• Comece pela porção de vegetais\n";
-        description += "• Mastigue bem os alimentos\n";
+        description += "Refeição principal desenvolvida para:\n";
+        description += "• Fornecer proteínas completas\n";
+        description += "• Garantir carboidratos complexos\n";
+        description += "• Incluir gorduras boas\n";
+        description += "• Oferecer vitaminas e minerais essenciais\n\n";
+        
+        description += "Recomendações de consumo:\n";
+        description += "• Inicie pelos vegetais\n";
+        description += "• Faça uma pausa entre as porções\n";
+        description += "• Reserve 20-30 minutos para a refeição\n";
+        
         if (timing?.includes("tarde")) {
-          description += "• Como você treina à tarde, faça esta refeição 2-3 horas antes do treino\n";
+          description += "\nAdaptação para treino:\n";
+          description += "• Faça esta refeição 2-3 horas antes do treino\n";
+          description += "• Garanta boa digestão antes da atividade\n";
         }
         break;
+
       case "afternoonSnack":
-        description += "\nRecomendações:\n";
-        description += "• Consuma este lanche 2-3 horas após o almoço\n";
-        description += "• Evite pular este lanche para não chegar com muita fome no jantar\n";
+        description += "Lanche estratégico para:\n";
+        description += "• Manter o metabolismo ativo\n";
+        description += "• Controlar a fome antes do jantar\n";
+        description += "• Fornecer energia equilibrada\n\n";
+        
+        description += "Como consumir:\n";
+        description += "• Respeite as porções indicadas\n";
+        description += "• Mantenha o intervalo entre refeições\n";
+        description += "• Combine com hidratação adequada\n";
         break;
+
       case "dinner":
-        description += "\nRecomendações:\n";
-        description += "• Faça esta refeição pelo menos 2 horas antes de dormir\n";
-        description += "• Evite bebidas estimulantes neste horário\n";
+        description += "Última refeição formulada para:\n";
+        description += "• Promover boa recuperação noturna\n";
+        description += "• Manter saciedade adequada\n";
+        description += "• Fornecer nutrientes para recuperação\n\n";
+        
+        description += "Orientações importantes:\n";
+        description += "• Consuma 2-3 horas antes de dormir\n";
+        description += "• Opte por preparações leves\n";
+        description += "• Evite excesso de gorduras\n";
+        
         if (timing?.includes("noite")) {
-          description += "• Como você treina à noite, esta refeição é importante para sua recuperação muscular\n";
+          description += "\nPós-treino:\n";
+          description += "• Priorize a reposição de nutrientes\n";
+          description += "• Aumente a hidratação\n";
+          description += "• Inclua proteínas de rápida absorção\n";
         }
         break;
+    }
+
+    // Adiciona considerações específicas de saúde se houver condições especiais
+    if (mealPlan.recommendations?.healthCondition) {
+      description += "\nConsiderações especiais de saúde:\n";
+      switch (mealPlan.recommendations.healthCondition) {
+        case "hipertensao":
+          description += "• Preparações com baixo teor de sódio\n";
+          description += "• Alimentos ricos em potássio e magnésio\n";
+          break;
+        case "diabetes":
+          description += "• Combinação adequada para controle glicêmico\n";
+          description += "• Fibras para liberação gradual de açúcar\n";
+          break;
+        case "depressao_ansiedade":
+          description += "• Alimentos ricos em triptofano e ômega-3\n";
+          description += "• Combinações que favorecem a produção de serotonina\n";
+          break;
+      }
     }
 
     return description;
