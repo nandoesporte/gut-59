@@ -1,5 +1,6 @@
 
-import React, { useState, useEffect } from "react";
+import * as React from "react";
+import { useState, useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -25,9 +26,9 @@ const queryClient = new QueryClient({
 });
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const [session, setSession] = useState<boolean | null>(null);
+  const [session, setSession] = React.useState<boolean | null>(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(!!session);
     });
@@ -54,87 +55,89 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <TooltipProvider>
-          <Routes>
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Index />
-                  </Layout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/store"
-              element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Store />
-                  </Layout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/trainer"
-              element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Trainer />
-                  </Layout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/instructions"
-              element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Trainer />
-                  </Layout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/progress"
-              element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Progress />
-                  </Layout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/menu"
-              element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Menu />
-                  </Layout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin"
-              element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Admin />
-                  </Layout>
-                </ProtectedRoute>
-              }
-            />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-          <Toaster />
-        </TooltipProvider>
-      </BrowserRouter>
-    </QueryClientProvider>
+    <React.StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <TooltipProvider>
+            <Routes>
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <Index />
+                    </Layout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/store"
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <Store />
+                    </Layout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/trainer"
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <Trainer />
+                    </Layout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/instructions"
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <Trainer />
+                    </Layout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/progress"
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <Progress />
+                    </Layout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/menu"
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <Menu />
+                    </Layout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <Admin />
+                    </Layout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+            <Toaster />
+          </TooltipProvider>
+        </BrowserRouter>
+      </QueryClientProvider>
+    </React.StrictMode>
   );
 }
 
