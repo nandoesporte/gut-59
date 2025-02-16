@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 
 interface Message {
   id: string;
@@ -21,9 +22,16 @@ export const useMessages = (adminId: string | null, isAdmin: boolean, type: 'nut
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
   const [hasNewMessage, setHasNewMessage] = useState(false);
+  const navigate = useNavigate();
 
   const fetchMessages = useCallback(async () => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate('/auth');
+        return;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !adminId) return;
 
@@ -63,16 +71,26 @@ export const useMessages = (adminId: string | null, isAdmin: boolean, type: 'nut
       setMessages(data || []);
     } catch (error) {
       console.error('Error fetching messages:', error);
-      toast({
-        title: "Erro ao carregar mensagens",
-        description: "Não foi possível carregar as mensagens.",
-        variant: "destructive",
-      });
+      if ((error as any)?.status === 403) {
+        navigate('/auth');
+      } else {
+        toast({
+          title: "Erro ao carregar mensagens",
+          description: "Não foi possível carregar as mensagens.",
+          variant: "destructive",
+        });
+      }
     }
-  }, [adminId, isAdmin, type]);
+  }, [adminId, isAdmin, type, navigate]);
 
   const markMessagesAsRead = useCallback(async () => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate('/auth');
+        return;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !adminId) return;
 
@@ -94,8 +112,11 @@ export const useMessages = (adminId: string | null, isAdmin: boolean, type: 'nut
       }
     } catch (error) {
       console.error('Error marking messages as read:', error);
+      if ((error as any)?.status === 403) {
+        navigate('/auth');
+      }
     }
-  }, [messages, adminId, type]);
+  }, [messages, adminId, type, navigate]);
 
   useEffect(() => {
     if (adminId) {
@@ -110,6 +131,12 @@ export const useMessages = (adminId: string | null, isAdmin: boolean, type: 'nut
           table: 'messages',
           filter: `type=eq.${type}`
         }, async (payload) => {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) {
+            navigate('/auth');
+            return;
+          }
+
           const { data: { user } } = await supabase.auth.getUser();
           if (!user) return;
 
@@ -135,7 +162,7 @@ export const useMessages = (adminId: string | null, isAdmin: boolean, type: 'nut
         supabase.removeChannel(channel);
       };
     }
-  }, [adminId, isAdmin, type, fetchMessages]);
+  }, [adminId, isAdmin, type, fetchMessages, navigate]);
 
   return { messages, hasNewMessage, fetchMessages, markMessagesAsRead };
 };
