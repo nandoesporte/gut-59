@@ -115,6 +115,7 @@ export const useMenuController = () => {
 
       setDietaryPreferences(preferences);
 
+      // Garantir que todos os campos necessários estão presentes
       const requestData = {
         userData: {
           ...formData,
@@ -126,16 +127,20 @@ export const useMenuController = () => {
           }
         },
         selectedFoods,
-        dietaryPreferences: preferences
+        dietaryPreferences: {
+          ...preferences,
+          hasAllergies: preferences.hasAllergies || false,
+          allergies: preferences.allergies || [],
+          dietaryRestrictions: preferences.dietaryRestrictions || [],
+          trainingTime: preferences.trainingTime || null
+        }
       };
 
-      console.log('Enviando requisição com dados:', JSON.stringify(requestData, null, 2));
+      // Log da requisição para debug
+      console.log('Enviando requisição:', JSON.stringify(requestData, null, 2));
 
       const { data: responseData, error } = await supabase.functions.invoke('generate-meal-plan', {
-        body: requestData,
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        body: requestData
       });
 
       if (error) {
