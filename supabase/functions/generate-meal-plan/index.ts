@@ -43,11 +43,11 @@ serve(async (req) => {
       );
     }
 
-    // Fetch foods data from Supabase
+    // Initialize Supabase client with direct values
     console.log('Creating Supabase client');
     const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+      'https://sxjafhzikftdenqnkcri.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4amFmaHppa2Z0ZGVucW5rY3JpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzg5ODQ0NTMsImV4cCI6MjA1NDU2MDQ1M30.qc8SAzrY0FJSz34BMeelH9CPWFZar5_1P-tAFMr4zp4'
     );
 
     console.log('Fetching selected foods');
@@ -61,7 +61,7 @@ serve(async (req) => {
       throw new Error('Failed to fetch foods data');
     }
 
-    // For now, return a mock response to test data flow
+    // Create response with mock data but real foods
     const mockResponse = {
       dailyPlan: {
         breakfast: {
@@ -108,7 +108,7 @@ serve(async (req) => {
       }
     };
 
-    console.log('Returning response');
+    console.log('Response data:', JSON.stringify(mockResponse, null, 2));
     return new Response(
       JSON.stringify(mockResponse),
       { 
