@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Coffee, Utensils, Apple, Moon, Dumbbell, Plus, FileDown } from "lucide-react";
 import { MealPlan, ProtocolFood } from "./types";
@@ -19,41 +18,51 @@ interface MealSectionProps {
   calories?: number;
 }
 
-const MealSection = ({ title, icon, foods, description, macros, calories }: MealSectionProps) => (
-  <div className="bg-white rounded-lg shadow-sm p-6">
-    <h2 className="text-lg font-semibold flex items-center gap-2">
-      {icon}
-      {title}
-    </h2>
-    <div className="mt-4 grid grid-cols-3 gap-3">
-      {Array.isArray(foods) && foods.map((food) => (
-        <Button
-          key={food.id}
-          variant="outline"
-          className="flex items-center justify-center p-2 h-auto text-sm"
-        >
-          {food.name} ({food.portion}{food.portionUnit})
-        </Button>
-      ))}
-    </div>
-    {description && (
-      <div className="mt-4 text-gray-600 border-t border-gray-100 pt-4">
-        <p className="text-sm">{description}</p>
+const MealSection = ({ title, icon, foods, description, macros, calories }: MealSectionProps) => {
+  const formatDescription = (description: string) => {
+    return description.split('\n').map((line, index) => (
+      <p key={index} className="text-sm text-gray-600 mb-1">
+        {line}
+      </p>
+    ));
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm p-6">
+      <h2 className="text-lg font-semibold flex items-center gap-2">
+        {icon}
+        {title}
+      </h2>
+      <div className="mt-4 grid grid-cols-3 gap-3">
+        {Array.isArray(foods) && foods.map((food) => (
+          <Button
+            key={food.id}
+            variant="outline"
+            className="flex items-center justify-center p-2 h-auto text-sm"
+          >
+            {food.name} ({food.portion}{food.portionUnit})
+          </Button>
+        ))}
       </div>
-    )}
-    {macros && calories && (
-      <div className="mt-4 text-sm text-gray-600 border-t pt-4">
-        <p className="font-medium">{calories} kcal</p>
-        <div className="grid grid-cols-4 gap-2 mt-2">
-          <div>P: {macros.protein}g</div>
-          <div>C: {macros.carbs}g</div>
-          <div>G: {macros.fats}g</div>
-          <div>F: {macros.fiber}g</div>
+      {description && (
+        <div className="mt-4 text-gray-600 border-t border-gray-100 pt-4">
+          {formatDescription(description)}
         </div>
-      </div>
-    )}
-  </div>
-);
+      )}
+      {macros && calories && (
+        <div className="mt-4 text-sm text-gray-600 border-t pt-4">
+          <p className="font-medium">{calories} kcal</p>
+          <div className="grid grid-cols-4 gap-2 mt-2">
+            <div>P: {macros.protein}g</div>
+            <div>C: {macros.carbs}g</div>
+            <div>G: {macros.fats}g</div>
+            <div>F: {macros.fiber}g</div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 interface MealPlanDisplayProps {
   mealPlan: MealPlan;
@@ -116,35 +125,59 @@ export const MealPlanDisplay = ({ mealPlan, onReset }: MealPlanDisplayProps) => 
     );
   }
 
-  const getMealDescription = (meal: string, timing?: string) => {
-    let description = "";
-    
+  const getMealDescription = (meal: string, foods: ProtocolFood[], calories: number, timing?: string) => {
+    let description = `${
+      meal === "breakfast" ? "Café da Manhã" :
+      meal === "morningSnack" ? "Lanche da Manhã" :
+      meal === "lunch" ? "Almoço" :
+      meal === "afternoonSnack" ? "Lanche da Tarde" :
+      "Jantar"
+    } (${calories} kcal):\n`;
+
+    // Adiciona cada alimento com suas porções e calorias
+    foods.forEach(food => {
+      const foodCalories = Math.round((food.calories / 100) * food.portion!);
+      description += `- ${food.portion}${food.portionUnit} de ${food.name} (${foodCalories} kcal)\n`;
+    });
+
+    // Adiciona recomendações específicas baseadas no período e timing
     switch (meal) {
       case "breakfast":
-        description = "Comece o dia com uma refeição balanceada que inclui proteínas para saciedade, carboidratos complexos para energia sustentada e fibras para saúde digestiva.";
-        if (timing && timing.includes("manhã")) {
-          description += " Esta refeição é importante para seu treino matinal.";
+        description += "\nRecomendações:\n";
+        description += "• Tome esta refeição 30 minutos após acordar\n";
+        description += "• Beba um copo de água morna com limão antes do café da manhã\n";
+        if (timing?.includes("manhã")) {
+          description += "• Como você treina pela manhã, consuma esta refeição 1-2 horas antes do treino\n";
         }
         break;
       case "morningSnack":
-        description = "Lanche estratégico para manter os níveis de energia e evitar que fique muito tempo sem se alimentar.";
+        description += "\nRecomendações:\n";
+        description += "• Consuma este lanche 2-3 horas após o café da manhã\n";
+        description += "• Mantenha-se hidratado entre as refeições\n";
         break;
       case "lunch":
-        description = "Refeição principal do dia, com foco em proteínas magras, vegetais coloridos e carboidratos complexos.";
-        if (timing && timing.includes("tarde")) {
-          description += " Importante para fornecer energia para seu treino da tarde.";
+        description += "\nRecomendações:\n";
+        description += "• Comece pela porção de vegetais\n";
+        description += "• Mastigue bem os alimentos\n";
+        if (timing?.includes("tarde")) {
+          description += "• Como você treina à tarde, faça esta refeição 2-3 horas antes do treino\n";
         }
         break;
       case "afternoonSnack":
-        description = "Lanche equilibrado para manter o metabolismo ativo e prevenir a fome excessiva antes do jantar.";
+        description += "\nRecomendações:\n";
+        description += "• Consuma este lanche 2-3 horas após o almoço\n";
+        description += "• Evite pular este lanche para não chegar com muita fome no jantar\n";
         break;
       case "dinner":
-        description = "Última refeição do dia, mais leve mas ainda nutritiva, focando em proteínas e vegetais.";
-        if (timing && timing.includes("noite")) {
-          description += " Adaptada para seu treino noturno, priorizando recuperação muscular.";
+        description += "\nRecomendações:\n";
+        description += "• Faça esta refeição pelo menos 2 horas antes de dormir\n";
+        description += "• Evite bebidas estimulantes neste horário\n";
+        if (timing?.includes("noite")) {
+          description += "• Como você treina à noite, esta refeição é importante para sua recuperação muscular\n";
         }
         break;
     }
+
     return description;
   };
 
@@ -167,7 +200,12 @@ export const MealPlanDisplay = ({ mealPlan, onReset }: MealPlanDisplayProps) => 
           title="Café da manhã"
           icon={<Coffee className="h-5 w-5" />}
           foods={mealPlan.dailyPlan.breakfast.foods}
-          description={getMealDescription("breakfast", mealPlan.recommendations?.timing?.join(" "))}
+          description={getMealDescription(
+            "breakfast",
+            mealPlan.dailyPlan.breakfast.foods,
+            mealPlan.dailyPlan.breakfast.calories,
+            mealPlan.recommendations?.timing?.join(" ")
+          )}
           macros={mealPlan.dailyPlan.breakfast.macros}
           calories={mealPlan.dailyPlan.breakfast.calories}
         />
@@ -176,7 +214,12 @@ export const MealPlanDisplay = ({ mealPlan, onReset }: MealPlanDisplayProps) => 
           title="Lanche da Manhã"
           icon={<Apple className="h-5 w-5" />}
           foods={mealPlan.dailyPlan.morningSnack.foods}
-          description={getMealDescription("morningSnack")}
+          description={getMealDescription(
+            "morningSnack",
+            mealPlan.dailyPlan.morningSnack.foods,
+            mealPlan.dailyPlan.morningSnack.calories,
+            mealPlan.recommendations?.timing?.join(" ")
+          )}
           macros={mealPlan.dailyPlan.morningSnack.macros}
           calories={mealPlan.dailyPlan.morningSnack.calories}
         />
@@ -185,7 +228,12 @@ export const MealPlanDisplay = ({ mealPlan, onReset }: MealPlanDisplayProps) => 
           title="Almoço"
           icon={<Utensils className="h-5 w-5" />}
           foods={mealPlan.dailyPlan.lunch.foods}
-          description={getMealDescription("lunch", mealPlan.recommendations?.timing?.join(" "))}
+          description={getMealDescription(
+            "lunch",
+            mealPlan.dailyPlan.lunch.foods,
+            mealPlan.dailyPlan.lunch.calories,
+            mealPlan.recommendations?.timing?.join(" ")
+          )}
           macros={mealPlan.dailyPlan.lunch.macros}
           calories={mealPlan.dailyPlan.lunch.calories}
         />
@@ -194,7 +242,12 @@ export const MealPlanDisplay = ({ mealPlan, onReset }: MealPlanDisplayProps) => 
           title="Lanche da Tarde"
           icon={<Apple className="h-5 w-5" />}
           foods={mealPlan.dailyPlan.afternoonSnack.foods}
-          description={getMealDescription("afternoonSnack")}
+          description={getMealDescription(
+            "afternoonSnack",
+            mealPlan.dailyPlan.afternoonSnack.foods,
+            mealPlan.dailyPlan.afternoonSnack.calories,
+            mealPlan.recommendations?.timing?.join(" ")
+          )}
           macros={mealPlan.dailyPlan.afternoonSnack.macros}
           calories={mealPlan.dailyPlan.afternoonSnack.calories}
         />
@@ -203,7 +256,12 @@ export const MealPlanDisplay = ({ mealPlan, onReset }: MealPlanDisplayProps) => 
           title="Jantar"
           icon={<Moon className="h-5 w-5" />}
           foods={mealPlan.dailyPlan.dinner.foods}
-          description={getMealDescription("dinner", mealPlan.recommendations?.timing?.join(" "))}
+          description={getMealDescription(
+            "dinner",
+            mealPlan.dailyPlan.dinner.foods,
+            mealPlan.dailyPlan.dinner.calories,
+            mealPlan.recommendations?.timing?.join(" ")
+          )}
           macros={mealPlan.dailyPlan.dinner.macros}
           calories={mealPlan.dailyPlan.dinner.calories}
         />
