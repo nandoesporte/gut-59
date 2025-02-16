@@ -24,17 +24,30 @@ export const useMessages = (adminId: string | null, isAdmin: boolean, type: 'nut
   useEffect(() => {
     if (adminId) {
       fetchMessages();
+      
+      // Inscreva-se para atualizações em tempo real
       const channel = supabase
-        .channel('messages')
+        .channel('messages_channel')
         .on('postgres_changes', { 
           event: 'INSERT', 
           schema: 'public', 
-          table: 'messages' 
+          table: 'messages',
+          filter: `type=eq.${type}`
         }, async (payload) => {
           const { data: { user } } = await supabase.auth.getUser();
-          if (user && (payload.new.receiver_id === user.id || isAdmin)) {
-            setHasNewMessage(true);
-            fetchMessages();
+          if (!user) return;
+
+          // Verifique se a mensagem é relevante para este usuário
+          if (isAdmin) {
+            if (payload.new.receiver_id === user.id || payload.new.type === type) {
+              setHasNewMessage(true);
+              fetchMessages();
+            }
+          } else {
+            if (payload.new.sender_id === user.id || payload.new.receiver_id === user.id) {
+              setHasNewMessage(true);
+              fetchMessages();
+            }
           }
         })
         .subscribe();
@@ -50,7 +63,7 @@ export const useMessages = (adminId: string | null, isAdmin: boolean, type: 'nut
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !adminId) return;
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('messages')
         .select(`
           id,
@@ -64,11 +77,19 @@ export const useMessages = (adminId: string | null, isAdmin: boolean, type: 'nut
             photo_url
           )
         `)
-        .eq('type', type)
-        .or(`and(sender_id.eq.${user.id},receiver_id.eq.${adminId}),and(sender_id.eq.${adminId},receiver_id.eq.${user.id})`)
-        .order('created_at', { ascending: true });
+        .eq('type', type);
+
+      // Se for admin, veja todas as mensagens do tipo específico
+      // Se for usuário regular, veja apenas suas mensagens com o admin
+      if (!isAdmin) {
+        query = query.or(`and(sender_id.eq.${user.id},receiver_id.eq.${adminId}),and(sender_id.eq.${adminId},receiver_id.eq.${user.id})`);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: true });
 
       if (error) throw error;
+      
+      console.log('Fetched messages:', data);
       setMessages(data || []);
       setHasNewMessage(false);
     } catch (error) {

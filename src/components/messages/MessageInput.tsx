@@ -24,6 +24,13 @@ export const MessageInput = ({ adminId, onMessageSent, type = 'nutricionista' }:
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não encontrado");
 
+      console.log('Sending message:', {
+        sender_id: user.id,
+        receiver_id: adminId,
+        content: newMessage.trim(),
+        type
+      });
+
       const { error } = await supabase
         .from('messages')
         .insert({
