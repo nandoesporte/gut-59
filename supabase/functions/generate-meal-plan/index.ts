@@ -2,10 +2,10 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.0';
-import { calculateHarrisBenedict, calculateMifflinStJeor, calculateMacroDistribution } from './calculators.ts';
-import { analyzeWorkoutCompatibility, optimizeMealCombinations } from './meal-optimizer.ts';
+import { calculateHarrisBenedict, calculateMifflinStJeor, adjustCaloriesForGoal, calculateMacroDistribution } from './calculators.ts';
+import { analyzeWorkoutCompatibility, optimizeMealCombinations, generateWeeklyPlan } from './meal-optimizer.ts';
 import { generateTimingRecommendations } from './recommendations.ts';
-import type { UserData, DietaryPreferences, Food } from './types.ts';
+import type { UserData, DietaryPreferences, Food, FoodWithPortion } from './types.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -57,6 +57,7 @@ serve(async (req) => {
 
     const activityFactor = activityFactors[userData.activityLevel] || 1.2;
     
+    // Calcular média entre Harris-Benedict e Mifflin-St Jeor
     const harrisBenedictCalories = calculateHarrisBenedict(
       userData.weight,
       userData.height,
@@ -74,15 +75,8 @@ serve(async (req) => {
     );
 
     const baseCalories = Math.round((harrisBenedictCalories + mifflinStJeorCalories) / 2);
-
-    const goalFactors: { [key: string]: number } = {
-      lose: 0.8,
-      maintain: 1,
-      gain: 1.2
-    };
-
-    const adjustedCalories = Math.round(baseCalories * (goalFactors[userData.goal] || 1));
-    const macroTargets = calculateMacroDistribution(adjustedCalories, userData.goal);
+    const adjustedCalories = adjustCaloriesForGoal(baseCalories, userData.goal);
+    const macroTargets = calculateMacroDistribution(adjustedCalories, userData.goal, userData.weight);
 
     const { data: foodsData, error: foodsError } = await supabase
       .from('protocol_foods')
@@ -140,90 +134,138 @@ serve(async (req) => {
       return acc;
     }, {} as Record<number, Food[]>);
 
-    const mealPlan = {
-      dailyPlan: {
-        breakfast: {
-          foods: optimizeMealCombinations(
-            analyzeWorkoutCompatibility(foodsByGroup[1] || [], dietaryPreferences.trainingTime, true),
-            Math.round(adjustedCalories * 0.25),
-            {
-              protein: Math.round(macroTargets.protein * 0.25),
-              carbs: Math.round(macroTargets.carbs * 0.25),
-              fats: Math.round(macroTargets.fats * 0.25)
-            },
-            userData.goal
-          ),
-          calories: Math.round(adjustedCalories * 0.25),
-          macros: {
+    // Gerar plano diário com todas as refeições
+    const dailyPlan = {
+      breakfast: {
+        foods: optimizeMealCombinations(
+          analyzeWorkoutCompatibility(foodsByGroup[1] || [], dietaryPreferences.trainingTime, true),
+          Math.round(adjustedCalories * 0.25),
+          {
             protein: Math.round(macroTargets.protein * 0.25),
             carbs: Math.round(macroTargets.carbs * 0.25),
-            fats: Math.round(macroTargets.fats * 0.25)
-          }
-        },
-        lunch: {
-          foods: optimizeMealCombinations(
-            foodsByGroup[2] || [],
-            Math.round(adjustedCalories * 0.35),
-            {
-              protein: Math.round(macroTargets.protein * 0.35),
-              carbs: Math.round(macroTargets.carbs * 0.35),
-              fats: Math.round(macroTargets.fats * 0.35)
-            },
-            userData.goal
-          ),
-          calories: Math.round(adjustedCalories * 0.35),
-          macros: {
-            protein: Math.round(macroTargets.protein * 0.35),
-            carbs: Math.round(macroTargets.carbs * 0.35),
-            fats: Math.round(macroTargets.fats * 0.35)
-          }
-        },
-        snacks: {
-          foods: optimizeMealCombinations(
-            foodsByGroup[3] || [],
-            Math.round(adjustedCalories * 0.15),
-            {
-              protein: Math.round(macroTargets.protein * 0.15),
-              carbs: Math.round(macroTargets.carbs * 0.15),
-              fats: Math.round(macroTargets.fats * 0.15)
-            },
-            userData.goal
-          ),
-          calories: Math.round(adjustedCalories * 0.15),
-          macros: {
-            protein: Math.round(macroTargets.protein * 0.15),
-            carbs: Math.round(macroTargets.carbs * 0.15),
-            fats: Math.round(macroTargets.fats * 0.15)
-          }
-        },
-        dinner: {
-          foods: optimizeMealCombinations(
-            analyzeWorkoutCompatibility(foodsByGroup[4] || [], dietaryPreferences.trainingTime, false),
-            Math.round(adjustedCalories * 0.25),
-            {
-              protein: Math.round(macroTargets.protein * 0.25),
-              carbs: Math.round(macroTargets.carbs * 0.25),
-              fats: Math.round(macroTargets.fats * 0.25)
-            },
-            userData.goal
-          ),
-          calories: Math.round(adjustedCalories * 0.25),
-          macros: {
-            protein: Math.round(macroTargets.protein * 0.25),
-            carbs: Math.round(macroTargets.carbs * 0.25),
-            fats: Math.round(macroTargets.fats * 0.25)
-          }
+            fats: Math.round(macroTargets.fats * 0.25),
+            fiber: Math.round(macroTargets.fiber * 0.25)
+          },
+          userData.goal,
+          { likedFoods: userData.lastFeedback?.likedFoods }
+        ),
+        calories: Math.round(adjustedCalories * 0.25),
+        macros: {
+          protein: Math.round(macroTargets.protein * 0.25),
+          carbs: Math.round(macroTargets.carbs * 0.25),
+          fats: Math.round(macroTargets.fats * 0.25),
+          fiber: Math.round(macroTargets.fiber * 0.25)
         }
       },
+      morningSnack: {
+        foods: optimizeMealCombinations(
+          foodsByGroup[3] || [],
+          Math.round(adjustedCalories * 0.15),
+          {
+            protein: Math.round(macroTargets.protein * 0.15),
+            carbs: Math.round(macroTargets.carbs * 0.15),
+            fats: Math.round(macroTargets.fats * 0.15),
+            fiber: Math.round(macroTargets.fiber * 0.15)
+          },
+          userData.goal,
+          { likedFoods: userData.lastFeedback?.likedFoods }
+        ),
+        calories: Math.round(adjustedCalories * 0.15),
+        macros: {
+          protein: Math.round(macroTargets.protein * 0.15),
+          carbs: Math.round(macroTargets.carbs * 0.15),
+          fats: Math.round(macroTargets.fats * 0.15),
+          fiber: Math.round(macroTargets.fiber * 0.15)
+        }
+      },
+      lunch: {
+        foods: optimizeMealCombinations(
+          foodsByGroup[2] || [],
+          Math.round(adjustedCalories * 0.30),
+          {
+            protein: Math.round(macroTargets.protein * 0.30),
+            carbs: Math.round(macroTargets.carbs * 0.30),
+            fats: Math.round(macroTargets.fats * 0.30),
+            fiber: Math.round(macroTargets.fiber * 0.30)
+          },
+          userData.goal,
+          { likedFoods: userData.lastFeedback?.likedFoods }
+        ),
+        calories: Math.round(adjustedCalories * 0.30),
+        macros: {
+          protein: Math.round(macroTargets.protein * 0.30),
+          carbs: Math.round(macroTargets.carbs * 0.30),
+          fats: Math.round(macroTargets.fats * 0.30),
+          fiber: Math.round(macroTargets.fiber * 0.30)
+        }
+      },
+      afternoonSnack: {
+        foods: optimizeMealCombinations(
+          foodsByGroup[3] || [],
+          Math.round(adjustedCalories * 0.10),
+          {
+            protein: Math.round(macroTargets.protein * 0.10),
+            carbs: Math.round(macroTargets.carbs * 0.10),
+            fats: Math.round(macroTargets.fats * 0.10),
+            fiber: Math.round(macroTargets.fiber * 0.10)
+          },
+          userData.goal,
+          { likedFoods: userData.lastFeedback?.likedFoods }
+        ),
+        calories: Math.round(adjustedCalories * 0.10),
+        macros: {
+          protein: Math.round(macroTargets.protein * 0.10),
+          carbs: Math.round(macroTargets.carbs * 0.10),
+          fats: Math.round(macroTargets.fats * 0.10),
+          fiber: Math.round(macroTargets.fiber * 0.10)
+        }
+      },
+      dinner: {
+        foods: optimizeMealCombinations(
+          analyzeWorkoutCompatibility(foodsByGroup[4] || [], dietaryPreferences.trainingTime, false),
+          Math.round(adjustedCalories * 0.20),
+          {
+            protein: Math.round(macroTargets.protein * 0.20),
+            carbs: Math.round(macroTargets.carbs * 0.20),
+            fats: Math.round(macroTargets.fats * 0.20),
+            fiber: Math.round(macroTargets.fiber * 0.20)
+          },
+          userData.goal,
+          { likedFoods: userData.lastFeedback?.likedFoods }
+        ),
+        calories: Math.round(adjustedCalories * 0.20),
+        macros: {
+          protein: Math.round(macroTargets.protein * 0.20),
+          carbs: Math.round(macroTargets.carbs * 0.20),
+          fats: Math.round(macroTargets.fats * 0.20),
+          fiber: Math.round(macroTargets.fiber * 0.20)
+        }
+      }
+    };
+
+    // Gerar plano semanal se solicitado
+    const weeklyPlan = generateWeeklyPlan(
+      filteredFoods,
+      adjustedCalories,
+      macroTargets,
+      userData.goal,
+      { likedFoods: userData.lastFeedback?.likedFoods }
+    );
+
+    const mealPlan = {
+      dailyPlan,
+      weeklyPlan,
       totalNutrition: {
         calories: adjustedCalories,
         protein: macroTargets.protein,
         carbs: macroTargets.carbs,
-        fats: macroTargets.fats
+        fats: macroTargets.fats,
+        fiber: macroTargets.fiber
       },
       recommendations: generateTimingRecommendations(dietaryPreferences.trainingTime, userData.goal)
     };
 
+    // Salvar o plano e feedback
     const { error: saveError } = await supabase
       .from('meal_plans')
       .insert({

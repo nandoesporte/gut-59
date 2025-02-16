@@ -31,70 +31,112 @@ export function calculateMifflinStJeor(
   return Math.round(bmr * activityFactor);
 }
 
-export function calculateMacroDistribution(calories: number, goal: string, activityLevel: string) {
-  let protein, carbs, fats;
-
-  // Base protein em g/kg de peso corporal
-  const proteinPerKg = {
-    lose: 2.2, // Maior proteína para preservar massa magra
-    maintain: 1.8,
-    gain: 2.0 // Alto para suportar ganho muscular
-  };
-
-  // Ajuste baseado no nível de atividade
-  const activityMultiplier = {
-    sedentary: 0.8,
-    lightlyActive: 0.9,
-    moderatelyActive: 1.0,
-    veryActive: 1.1,
-    extremelyActive: 1.2
-  };
-
+export function adjustCaloriesForGoal(baseCalories: number, goal: string): number {
   switch (goal) {
     case 'lose':
-      protein = Math.round((calories * 0.35) / 4); // 35% proteína
-      carbs = Math.round((calories * 0.40) / 4);   // 40% carboidratos
-      fats = Math.round((calories * 0.25) / 9);    // 25% gorduras
+      return baseCalories - 500; // Déficit calórico para perda
+    case 'gain':
+      return baseCalories + 500; // Superávit calórico para ganho
+    default:
+      return baseCalories; // Manutenção
+  }
+}
+
+export function calculateMacroDistribution(calories: number, goal: string, weight: number) {
+  // Proteína baseada no peso corporal
+  const proteinPerKg = {
+    lose: 2.2,    // Maior proteína para preservar massa
+    maintain: 1.8,
+    gain: 2.0     // Alto para suporte ao ganho muscular
+  };
+
+  const baseProtein = Math.round(weight * (proteinPerKg[goal as keyof typeof proteinPerKg] || 1.8));
+  const proteinCalories = baseProtein * 4;
+  
+  let carbsPercentage, fatsPercentage;
+  
+  switch (goal) {
+    case 'lose':
+      carbsPercentage = 0.40; // 40% carbs
+      fatsPercentage = 0.25;  // 25% gorduras
       break;
     case 'gain':
-      protein = Math.round((calories * 0.30) / 4); // 30% proteína
-      carbs = Math.round((calories * 0.50) / 4);   // 50% carboidratos
-      fats = Math.round((calories * 0.20) / 9);    // 20% gorduras
+      carbsPercentage = 0.50; // 50% carbs
+      fatsPercentage = 0.20;  // 20% gorduras
       break;
-    default: // maintain
-      protein = Math.round((calories * 0.30) / 4); // 30% proteína
-      carbs = Math.round((calories * 0.45) / 4);   // 45% carboidratos
-      fats = Math.round((calories * 0.25) / 9);    // 25% gorduras
+    default:
+      carbsPercentage = 0.45; // 45% carbs
+      fatsPercentage = 0.25;  // 25% gorduras
   }
 
-  // Ajuste final baseado no nível de atividade
-  const multiplier = activityMultiplier[activityLevel as keyof typeof activityMultiplier] || 1;
-  
+  const remainingCalories = calories - proteinCalories;
+  const carbCalories = Math.round(calories * carbsPercentage);
+  const fatCalories = Math.round(calories * fatsPercentage);
+
   return {
-    protein: Math.round(protein * multiplier),
-    carbs: Math.round(carbs * multiplier),
-    fats
+    protein: baseProtein,
+    carbs: Math.round(carbCalories / 4),
+    fats: Math.round(fatCalories / 9),
+    fiber: Math.round(calories / 1000 * 14) // 14g de fibra por 1000kcal
   };
 }
 
-// Função para calcular as porções com base nas necessidades calóricas
-export function calculatePortions(
-  food: any,
+export function calculatePortion(
+  food: Food,
   targetCalories: number,
-  macroTargets: { protein: number; carbs: number; fats: number }
-) {
-  const baseServing = food.serving_size || 100; // gramas
-  const caloriesPerServing = food.calories;
+  macroTargets: MacroTargets
+): FoodWithPortion {
+  const caloriesPerGram = food.calories / food.serving_size;
+  let portion = (targetCalories / caloriesPerGram);
+
+  // Ajustar porção baseado nos macros
+  if (food.protein) {
+    const proteinPortion = (macroTargets.protein / food.protein) * food.serving_size;
+    portion = Math.min(portion, proteinPortion);
+  }
   
-  // Calcular a porção ideal baseada nas calorias alvo
-  let recommendedServing = (targetCalories / caloriesPerServing) * baseServing;
-  
-  // Ajustar porção com base nos macronutrientes
-  const proteinAdjustment = (macroTargets.protein / food.protein) * baseServing;
-  const carbsAdjustment = (macroTargets.carbs / food.carbs) * baseServing;
-  
-  // Usar a menor porção para não exceder nenhum macro
-  recommendedServing = Math.min(recommendedServing, proteinAdjustment, carbsAdjustment);
-  
-  return Math.round(recommendedServing);
+  if (food.carbs) {
+    const carbsPortion = (macroTargets.carbs / food.carbs) * food.serving_size;
+    portion = Math.min(portion, carbsPortion);
+  }
+
+  portion = Math.round(portion);
+
+  return {
+    ...food,
+    portion,
+    portionUnit: food.serving_unit,
+    calculatedNutrients: {
+      calories: Math.round((food.calories / food.serving_size) * portion),
+      protein: Math.round((food.protein / food.serving_size) * portion),
+      carbs: Math.round((food.carbs / food.serving_size) * portion),
+      fats: Math.round((food.fats / food.serving_size) * portion),
+      fiber: Math.round((food.fiber / food.serving_size) * portion)
+    }
+  };
+}
+
+export function validateNutrition(
+  foods: FoodWithPortion[],
+  macroTargets: MacroTargets
+): boolean {
+  const totals = foods.reduce(
+    (acc, food) => ({
+      calories: acc.calories + food.calculatedNutrients.calories,
+      protein: acc.protein + food.calculatedNutrients.protein,
+      carbs: acc.carbs + food.calculatedNutrients.carbs,
+      fats: acc.fats + food.calculatedNutrients.fats,
+      fiber: acc.fiber + food.calculatedNutrients.fiber
+    }),
+    { calories: 0, protein: 0, carbs: 0, fats: 0, fiber: 0 }
+  );
+
+  const tolerancePercentage = 0.1; // 10% de tolerância
+
+  return (
+    Math.abs(totals.protein - macroTargets.protein) / macroTargets.protein <= tolerancePercentage &&
+    Math.abs(totals.carbs - macroTargets.carbs) / macroTargets.carbs <= tolerancePercentage &&
+    Math.abs(totals.fats - macroTargets.fats) / macroTargets.fats <= tolerancePercentage &&
+    totals.fiber >= macroTargets.fiber
+  );
 }
