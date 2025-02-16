@@ -1,6 +1,6 @@
 
 import { Link, useLocation } from "react-router-dom";
-import { Book, Home, LineChart, ShoppingBag, Settings, ScrollText, UtensilsCrossed, Dumbbell, MessageSquare } from "lucide-react";
+import { Book, Home, LineChart, ShoppingBag, Settings, ScrollText, UtensilsCrossed, Dumbbell } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -11,7 +11,6 @@ const Navigation = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
-  const [hasNewMessage, setHasNewMessage] = useState(false);
   const isMobile = useIsMobile();
   const isActive = (path: string) => location.pathname === path;
 
@@ -21,32 +20,7 @@ const Navigation = () => {
       setIsAdmin(!!data);
     };
 
-    const setupMessageSubscription = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const channel = supabase
-          .channel('messages')
-          .on('postgres_changes', { 
-            event: 'INSERT', 
-            schema: 'public', 
-            table: 'messages',
-            filter: `receiver_id=eq.${user.id}`
-          }, () => {
-            setHasNewMessage(true);
-            toast("Nova mensagem recebida!", {
-              description: "Você tem uma nova mensagem.",
-            });
-          })
-          .subscribe();
-
-        return () => {
-          supabase.removeChannel(channel);
-        };
-      }
-    };
-
     checkAdminRole();
-    setupMessageSubscription();
   }, []);
 
   const handleLogout = async () => {
@@ -107,18 +81,6 @@ const Navigation = () => {
             active={isActive("/progress")}
             showText={!isMobile}
           />
-          <div className="relative">
-            <NavLink
-              to="/messages"
-              icon={<MessageSquare className="w-5 h-5 md:w-6 md:h-6" />}
-              text="Mensagens"
-              active={isActive("/messages")}
-              showText={!isMobile}
-            />
-            {hasNewMessage && (
-              <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full" />
-            )}
-          </div>
           {isAdmin && (
             <NavLink
               to="/admin"
