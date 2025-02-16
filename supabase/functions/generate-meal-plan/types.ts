@@ -11,8 +11,8 @@ export interface DietaryPreferences {
   allergies: string[];
   dietaryRestrictions: string[];
   trainingTime: string | null;
-  preferAutomatic: boolean; // Nova flag para cardápio automático
-  excludedFoods: string[]; // Alimentos que o usuário não gosta
+  preferAutomatic: boolean;
+  excludedFoods: string[];
 }
 
 export interface UserData {
@@ -28,6 +28,7 @@ export interface UserData {
     dislikedFoods: string[];
     date: string;
   };
+  healthCondition?: string;
 }
 
 export interface Food {
@@ -51,35 +52,8 @@ export interface Food {
   post_workout_compatible?: boolean;
   common_allergens?: string[];
   dietary_flags?: string[];
-  substitutes?: string[]; // IDs de alimentos que podem substituir
-}
-
-export interface MealPlanResponse {
-  dailyPlan: {
-    [key: string]: {
-      foods: FoodWithPortion[];
-      calories: number;
-      macros: MacroTargets;
-    };
-  };
-  weeklyPlan?: WeeklyPlan;
-  totalNutrition: {
-    calories: number;
-    protein: number;
-    carbs: number;
-    fats: number;
-    fiber: number;
-  };
-  recommendations: {
-    preworkout: string;
-    postworkout: string;
-    general: string;
-    timing: string[];
-    substitutions: Array<{
-      foodId: string;
-      alternatives: Food[];
-    }>;
-  };
+  substitutes?: string[];
+  nutritional_category?: string[];
 }
 
 export interface FoodWithPortion extends Food {
