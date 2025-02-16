@@ -5,6 +5,7 @@ import { CalorieCalculatorStep } from "@/components/menu/CalorieCalculatorStep";
 import { FoodSelector } from "@/components/menu/FoodSelector";
 import { DietaryPreferencesForm } from "@/components/menu/DietaryPreferencesForm";
 import { MealPlanDisplay } from "@/components/menu/MealPlanDisplay";
+import { MenuHeader } from "@/components/menu/MenuHeader";
 import { useMenuController } from "@/components/menu/MenuController";
 
 const Menu = () => {
@@ -26,7 +27,15 @@ const Menu = () => {
   const renderStep = () => {
     switch (currentStep) {
       case 1:
-        return <InitialMenuContent onStartDiet={() => setCurrentStep(1.5)} />;
+        return (
+          <>
+            <MenuHeader onStart={() => setCurrentStep(1.5)} />
+            <div className="space-y-8 mt-8">
+              {/* Resto do conteúdo inicial */}
+              <InitialMenuContent onStartDiet={() => setCurrentStep(1.5)} />
+            </div>
+          </>
+        );
       case 1.5:
         return (
           <CalorieCalculatorStep
