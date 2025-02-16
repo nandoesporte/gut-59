@@ -8,9 +8,10 @@ import { supabase } from "@/integrations/supabase/client";
 interface MessageInputProps {
   adminId: string;
   onMessageSent: () => void;
+  type?: 'nutricionista' | 'personal';
 }
 
-export const MessageInput = ({ adminId, onMessageSent }: MessageInputProps) => {
+export const MessageInput = ({ adminId, onMessageSent, type = 'nutricionista' }: MessageInputProps) => {
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -29,6 +30,7 @@ export const MessageInput = ({ adminId, onMessageSent }: MessageInputProps) => {
           content: newMessage.trim(),
           sender_id: user.id,
           receiver_id: adminId,
+          type: type
         });
 
       if (error) throw error;

@@ -18,7 +18,7 @@ const Messages = () => {
   const [adminId, setAdminId] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-  const { messages, hasNewMessage, fetchMessages } = useMessages(adminId, isAdmin);
+  const { messages, hasNewMessage, fetchMessages } = useMessages(adminId, isAdmin, 'nutricionista');
 
   useEffect(() => {
     checkAdminRole();
@@ -98,7 +98,7 @@ const Messages = () => {
             {adminId && (
               <>
                 <MessageList messages={messages} adminId={adminId} />
-                <MessageInput adminId={adminId} onMessageSent={fetchMessages} />
+                <MessageInput adminId={adminId} onMessageSent={fetchMessages} type="nutricionista" />
               </>
             )}
           </CardContent>

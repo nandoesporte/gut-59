@@ -9,13 +9,14 @@ interface Message {
   receiver_id: string;
   content: string;
   created_at: string;
+  type: 'nutricionista' | 'personal';
   profiles: {
     name: string | null;
     photo_url: string | null;
   } | null;
 }
 
-export const useMessages = (adminId: string | null, isAdmin: boolean) => {
+export const useMessages = (adminId: string | null, isAdmin: boolean, type: 'nutricionista' | 'personal' = 'nutricionista') => {
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
   const [hasNewMessage, setHasNewMessage] = useState(false);
@@ -42,7 +43,7 @@ export const useMessages = (adminId: string | null, isAdmin: boolean) => {
         supabase.removeChannel(channel);
       };
     }
-  }, [adminId, isAdmin]);
+  }, [adminId, isAdmin, type]);
 
   const fetchMessages = async () => {
     try {
@@ -57,11 +58,13 @@ export const useMessages = (adminId: string | null, isAdmin: boolean) => {
           receiver_id,
           content,
           created_at,
+          type,
           profiles!messages_sender_id_fkey (
             name,
             photo_url
           )
         `)
+        .eq('type', type)
         .or(`and(sender_id.eq.${user.id},receiver_id.eq.${adminId}),and(sender_id.eq.${adminId},receiver_id.eq.${user.id})`)
         .order('created_at', { ascending: true });
 

@@ -249,6 +249,7 @@ export type Database = {
           read: boolean | null
           receiver_id: string
           sender_id: string
+          type: Database["public"]["Enums"]["message_type"]
         }
         Insert: {
           content: string
@@ -257,6 +258,7 @@ export type Database = {
           read?: boolean | null
           receiver_id: string
           sender_id: string
+          type?: Database["public"]["Enums"]["message_type"]
         }
         Update: {
           content?: string
@@ -265,6 +267,7 @@ export type Database = {
           read?: boolean | null
           receiver_id?: string
           sender_id?: string
+          type?: Database["public"]["Enums"]["message_type"]
         }
         Relationships: [
           {

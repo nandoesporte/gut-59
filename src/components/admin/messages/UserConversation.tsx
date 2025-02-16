@@ -14,6 +14,7 @@ interface Message {
   content: string;
   created_at: string;
   read: boolean;
+  type: 'nutricionista' | 'personal';
   profiles: {
     name: string | null;
     photo_url: string | null;
@@ -78,6 +79,7 @@ export const UserConversation = ({
           content: newMessage.trim(),
           sender_id: user.id,
           receiver_id: selectedUserId,
+          type: role === 'nutritionist' ? 'nutricionista' : 'personal'
         });
 
       if (error) throw error;

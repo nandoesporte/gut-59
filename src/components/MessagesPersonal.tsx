@@ -18,7 +18,7 @@ const MessagesPersonal = () => {
   const [personalId, setPersonalId] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isPersonal, setIsPersonal] = useState(false);
-  const { messages, hasNewMessage, fetchMessages } = useMessages(personalId, isPersonal);
+  const { messages, hasNewMessage, fetchMessages } = useMessages(personalId, isPersonal, 'personal');
 
   useEffect(() => {
     checkPersonalRole();
@@ -98,7 +98,7 @@ const MessagesPersonal = () => {
             {personalId && (
               <>
                 <MessageList messages={messages} adminId={personalId} isPersonal />
-                <MessageInput adminId={personalId} onMessageSent={fetchMessages} />
+                <MessageInput adminId={personalId} onMessageSent={fetchMessages} type="personal" />
               </>
             )}
           </CardContent>

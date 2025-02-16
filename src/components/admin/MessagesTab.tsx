@@ -26,6 +26,7 @@ interface Message {
   receiver_id: string;
   content: string;
   created_at: string;
+  type: 'nutricionista' | 'personal';
   read: boolean;
   profiles: {
     name: string | null;
@@ -147,6 +148,8 @@ export const MessagesTab = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      const messageType = type === 'nutritionist' ? 'nutricionista' : 'personal';
+
       const { data, error } = await supabase
         .from('messages')
         .select(`
@@ -156,11 +159,13 @@ export const MessagesTab = () => {
           content,
           created_at,
           read,
+          type,
           profiles!messages_sender_id_fkey (
             name,
             photo_url
           )
         `)
+        .eq('type', messageType)
         .or(`and(sender_id.eq.${user.id},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${user.id})`)
         .order('created_at', { ascending: true });
 
@@ -261,3 +266,5 @@ export const MessagesTab = () => {
     </Card>
   );
 };
+
+export default MessagesTab;
