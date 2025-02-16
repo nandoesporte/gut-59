@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
@@ -36,10 +37,13 @@ export const MessagesTab = () => {
   const { toast } = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [personalUsers, setPersonalUsers] = useState<User[]>([]);
-  const [selectedUser, setSelectedUser] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [selectedNutriUser, setSelectedNutriUser] = useState<string | null>(null);
+  const [selectedPersonalUser, setSelectedPersonalUser] = useState<string | null>(null);
+  const [nutriMessages, setNutriMessages] = useState<Message[]>([]);
+  const [personalMessages, setPersonalMessages] = useState<Message[]>([]);
   const [isOpen, setIsOpen] = useState(true);
   const [hasNewMessage, setHasNewMessage] = useState(false);
+  const [currentTab, setCurrentTab] = useState<'nutritionist' | 'personal'>('nutritionist');
 
   useEffect(() => {
     fetchUsers();
@@ -52,8 +56,10 @@ export const MessagesTab = () => {
         table: 'messages'
       }, () => {
         setHasNewMessage(true);
-        if (selectedUser) {
-          fetchMessages(selectedUser);
+        if (currentTab === 'nutritionist' && selectedNutriUser) {
+          fetchMessages(selectedNutriUser, 'nutritionist');
+        } else if (currentTab === 'personal' && selectedPersonalUser) {
+          fetchMessages(selectedPersonalUser, 'personal');
         }
         fetchUsers();
       })
@@ -62,7 +68,7 @@ export const MessagesTab = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [selectedUser]);
+  }, [selectedNutriUser, selectedPersonalUser, currentTab]);
 
   const fetchUsers = async () => {
     try {
@@ -86,7 +92,7 @@ export const MessagesTab = () => {
       const excludeIds = [
         adminData?.user_id,
         personalData?.user_id
-      ].filter(Boolean); // Filter out undefined values
+      ].filter(Boolean);
 
       // Fetch users who have messages with the nutritionist
       const { data: nutritionistUsers, error: nutritionistError } = await supabase
@@ -136,7 +142,7 @@ export const MessagesTab = () => {
     }
   };
 
-  const fetchMessages = async (userId: string) => {
+  const fetchMessages = async (userId: string, type: 'nutritionist' | 'personal') => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -159,7 +165,13 @@ export const MessagesTab = () => {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setMessages(data || []);
+      
+      if (type === 'nutritionist') {
+        setNutriMessages(data || []);
+      } else {
+        setPersonalMessages(data || []);
+      }
+      
       setHasNewMessage(false);
     } catch (error) {
       console.error('Error fetching messages:', error);
@@ -191,7 +203,11 @@ export const MessagesTab = () => {
 
         <CollapsibleContent>
           <CardContent className="p-6">
-            <Tabs defaultValue="nutritionist" className="w-full">
+            <Tabs 
+              defaultValue="nutritionist" 
+              className="w-full"
+              onValueChange={(value) => setCurrentTab(value as 'nutritionist' | 'personal')}
+            >
               <TabsList className="mb-4">
                 <TabsTrigger value="nutritionist">Mensagens da Nutricionista</TabsTrigger>
                 <TabsTrigger value="personal">Mensagens do Personal</TabsTrigger>
@@ -201,17 +217,18 @@ export const MessagesTab = () => {
                 <div className="flex gap-4 h-[600px]">
                   <UserList
                     users={users}
-                    selectedUser={selectedUser}
+                    selectedUser={selectedNutriUser}
                     onUserSelect={(userId) => {
-                      setSelectedUser(userId);
-                      fetchMessages(userId);
+                      setSelectedNutriUser(userId);
+                      fetchMessages(userId, 'nutritionist');
                     }}
                   />
                   <div className="flex-1">
                     <UserConversation
-                      messages={messages}
-                      selectedUserId={selectedUser}
-                      onMessageSent={() => selectedUser && fetchMessages(selectedUser)}
+                      messages={nutriMessages}
+                      selectedUserId={selectedNutriUser}
+                      onMessageSent={() => selectedNutriUser && fetchMessages(selectedNutriUser, 'nutritionist')}
+                      role="nutritionist"
                     />
                   </div>
                 </div>
@@ -221,17 +238,18 @@ export const MessagesTab = () => {
                 <div className="flex gap-4 h-[600px]">
                   <UserList
                     users={personalUsers}
-                    selectedUser={selectedUser}
+                    selectedUser={selectedPersonalUser}
                     onUserSelect={(userId) => {
-                      setSelectedUser(userId);
-                      fetchMessages(userId);
+                      setSelectedPersonalUser(userId);
+                      fetchMessages(userId, 'personal');
                     }}
                   />
                   <div className="flex-1">
                     <UserConversation
-                      messages={messages}
-                      selectedUserId={selectedUser}
-                      onMessageSent={() => selectedUser && fetchMessages(selectedUser)}
+                      messages={personalMessages}
+                      selectedUserId={selectedPersonalUser}
+                      onMessageSent={() => selectedPersonalUser && fetchMessages(selectedPersonalUser, 'personal')}
+                      role="personal"
                     />
                   </div>
                 </div>

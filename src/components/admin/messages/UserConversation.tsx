@@ -24,12 +24,14 @@ interface UserConversationProps {
   messages: Message[];
   selectedUserId: string | null;
   onMessageSent: () => void;
+  role?: 'nutritionist' | 'personal';
 }
 
 export const UserConversation = ({ 
   messages, 
   selectedUserId,
-  onMessageSent 
+  onMessageSent,
+  role = 'nutritionist'
 }: UserConversationProps) => {
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -108,6 +110,9 @@ export const UserConversation = ({
 
   return (
     <Card className="p-4 h-[600px] flex flex-col">
+      <div className="text-sm text-gray-500 mb-2">
+        {role === 'nutritionist' ? 'Conversando como Nutricionista' : 'Conversando como Personal'}
+      </div>
       <MessageList messages={messages} selectedUserId={selectedUserId} />
       <div className="flex gap-2 mt-4">
         <input
