@@ -4,12 +4,12 @@ import { Card } from "@/components/ui/card";
 interface RecommendationsProps {
   recommendations: {
     general?: string;
-    timing?: string[];
+    timing?: string | string[];
   };
 }
 
 export const Recommendations = ({ recommendations }: RecommendationsProps) => {
-  if (!recommendations.general && !recommendations.timing?.length) return null;
+  if (!recommendations.general && !recommendations.timing) return null;
 
   return (
     <Card className="p-6 mt-6">
@@ -20,9 +20,13 @@ export const Recommendations = ({ recommendations }: RecommendationsProps) => {
         )}
         {recommendations.timing && (
           <ul className="list-disc pl-5 space-y-2">
-            {recommendations.timing.map((tip, index) => (
-              <li key={index}>{tip}</li>
-            ))}
+            {Array.isArray(recommendations.timing) ? (
+              recommendations.timing.map((tip, index) => (
+                <li key={index}>{tip}</li>
+              ))
+            ) : (
+              <li>{recommendations.timing}</li>
+            )}
           </ul>
         )}
       </div>
