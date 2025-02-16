@@ -21,27 +21,32 @@ const Navigation = () => {
       setIsAdmin(!!data);
     };
 
+    const setupMessageSubscription = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const channel = supabase
+          .channel('messages')
+          .on('postgres_changes', { 
+            event: 'INSERT', 
+            schema: 'public', 
+            table: 'messages',
+            filter: `receiver_id=eq.${user.id}`
+          }, () => {
+            setHasNewMessage(true);
+            toast("Nova mensagem recebida!", {
+              description: "Você tem uma nova mensagem.",
+            });
+          })
+          .subscribe();
+
+        return () => {
+          supabase.removeChannel(channel);
+        };
+      }
+    };
+
     checkAdminRole();
-
-    // Subscribe to new messages
-    const { data: { user } } = supabase.auth.getUser();
-    if (user) {
-      const channel = supabase
-        .channel('messages')
-        .on('postgres_changes', { 
-          event: 'INSERT', 
-          schema: 'public', 
-          table: 'messages',
-          filter: `receiver_id=eq.${user.id}`
-        }, () => {
-          setHasNewMessage(true);
-        })
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
+    setupMessageSubscription();
   }, []);
 
   const handleLogout = async () => {
