@@ -1,16 +1,17 @@
 
 import { useState, useEffect } from "react";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { UserList } from "./messages/UserList";
-import { UserConversation } from "./messages/UserConversation";
 import { MessageSquare, ChevronDown } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { UserList } from "./messages/UserList";
+import { UserConversation } from "./messages/UserConversation";
 
 interface User {
   id: string;
@@ -35,9 +36,10 @@ interface Message {
 export const MessagesTab = () => {
   const { toast } = useToast();
   const [users, setUsers] = useState<User[]>([]);
+  const [personalUsers, setPersonalUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   const [hasNewMessage, setHasNewMessage] = useState(false);
 
   useEffect(() => {
@@ -54,7 +56,7 @@ export const MessagesTab = () => {
         if (selectedUser) {
           fetchMessages(selectedUser);
         }
-        fetchUsers(); // Atualiza a lista de usuários para mostrar novas mensagens não lidas
+        fetchUsers();
       })
       .subscribe();
 
@@ -68,8 +70,26 @@ export const MessagesTab = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Busca todos os usuários e conta suas mensagens não lidas
-      const { data, error } = await supabase
+      // Buscar usuários que têm mensagens com a nutricionista
+      const { data: adminData } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'admin')
+        .single();
+
+      if (!adminData) return;
+
+      // Buscar usuários que têm mensagens com o personal
+      const { data: personalData } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'personal')
+        .single();
+
+      if (!personalData) return;
+
+      // Buscar usuários que têm mensagens com a nutricionista
+      const { data: nutritionistUsers, error: nutritionistError } = await supabase
         .from('profiles')
         .select(`
           id,
@@ -77,17 +97,37 @@ export const MessagesTab = () => {
           photo_url,
           unread_messages:messages!messages_receiver_id_fkey(count)
         `)
-        .neq('id', user.id)
-        .eq('messages.read', false);
+        .neq('id', adminData.user_id)
+        .neq('id', personalData.user_id);
 
-      if (error) throw error;
+      if (nutritionistError) throw nutritionistError;
+
+      // Buscar usuários que têm mensagens com o personal
+      const { data: personalUsers, error: personalError } = await supabase
+        .from('profiles')
+        .select(`
+          id,
+          name,
+          photo_url,
+          unread_messages:messages!messages_receiver_id_fkey(count)
+        `)
+        .neq('id', adminData.user_id)
+        .neq('id', personalData.user_id);
+
+      if (personalError) throw personalError;
       
-      const usersWithUnreadCount = data?.map(user => ({
+      const nutritionistUsersWithUnreadCount = nutritionistUsers?.map(user => ({
+        ...user,
+        unread_messages: user.unread_messages?.[0]?.count || 0
+      })) || [];
+
+      const personalUsersWithUnreadCount = personalUsers?.map(user => ({
         ...user,
         unread_messages: user.unread_messages?.[0]?.count || 0
       })) || [];
       
-      setUsers(usersWithUnreadCount);
+      setUsers(nutritionistUsersWithUnreadCount);
+      setPersonalUsers(personalUsersWithUnreadCount);
     } catch (error) {
       console.error('Error fetching users:', error);
       toast({
@@ -133,13 +173,8 @@ export const MessagesTab = () => {
     }
   };
 
-  const handleUserSelect = async (userId: string) => {
-    setSelectedUser(userId);
-    await fetchMessages(userId);
-  };
-
   return (
-    <Card className="w-full max-w-2xl mx-auto">
+    <Card className="w-full max-w-4xl mx-auto">
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <CollapsibleTrigger className="w-full">
           <div className="flex items-center justify-between p-6 border-b">
@@ -157,22 +192,54 @@ export const MessagesTab = () => {
         </CollapsibleTrigger>
 
         <CollapsibleContent>
-          <div className="p-6">
-            <div className="flex gap-4 h-[600px]">
-              <UserList
-                users={users}
-                selectedUser={selectedUser}
-                onUserSelect={handleUserSelect}
-              />
-              <div className="flex-1">
-                <UserConversation
-                  messages={messages}
-                  selectedUserId={selectedUser}
-                  onMessageSent={() => selectedUser && fetchMessages(selectedUser)}
-                />
-              </div>
-            </div>
-          </div>
+          <CardContent className="p-6">
+            <Tabs defaultValue="nutritionist" className="w-full">
+              <TabsList className="mb-4">
+                <TabsTrigger value="nutritionist">Mensagens da Nutricionista</TabsTrigger>
+                <TabsTrigger value="personal">Mensagens do Personal</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="nutritionist">
+                <div className="flex gap-4 h-[600px]">
+                  <UserList
+                    users={users}
+                    selectedUser={selectedUser}
+                    onUserSelect={(userId) => {
+                      setSelectedUser(userId);
+                      fetchMessages(userId);
+                    }}
+                  />
+                  <div className="flex-1">
+                    <UserConversation
+                      messages={messages}
+                      selectedUserId={selectedUser}
+                      onMessageSent={() => selectedUser && fetchMessages(selectedUser)}
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="personal">
+                <div className="flex gap-4 h-[600px]">
+                  <UserList
+                    users={personalUsers}
+                    selectedUser={selectedUser}
+                    onUserSelect={(userId) => {
+                      setSelectedUser(userId);
+                      fetchMessages(userId);
+                    }}
+                  />
+                  <div className="flex-1">
+                    <UserConversation
+                      messages={messages}
+                      selectedUserId={selectedUser}
+                      onMessageSent={() => selectedUser && fetchMessages(selectedUser)}
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
         </CollapsibleContent>
       </Collapsible>
     </Card>
