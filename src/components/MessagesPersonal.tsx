@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { MessageSquare, ChevronDown } from "lucide-react";
+import { Dumbbell, ChevronDown } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -80,7 +80,7 @@ const MessagesPersonal = () => {
           <CollapsibleTrigger className="w-full">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-primary-500" />
+                <Dumbbell className="w-5 h-5 text-primary-500" />
                 <CardTitle className="text-2xl text-primary-500">Mensagens do Personal</CardTitle>
               </div>
               <div className="flex items-center gap-2">
@@ -97,7 +97,7 @@ const MessagesPersonal = () => {
           <CardContent className="space-y-6 pt-4">
             {personalId && (
               <>
-                <MessageList messages={messages} adminId={personalId} isPersonal={true} />
+                <MessageList messages={messages} adminId={personalId} isPersonal />
                 <MessageInput adminId={personalId} onMessageSent={fetchMessages} />
               </>
             )}

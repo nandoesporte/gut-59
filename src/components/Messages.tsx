@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { MessageSquare, ChevronDown } from "lucide-react";
+import { MessageSquareHeart, ChevronDown } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -74,14 +74,14 @@ const Messages = () => {
   }
 
   return (
-    <Card className="w-full max-w-2xl mx-auto mt-8">
+    <Card className="w-full max-w-2xl mx-auto">
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <CardHeader className="border-b">
           <CollapsibleTrigger className="w-full">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-primary-500" />
-                <CardTitle className="text-2xl text-primary-500">Mensagens da Nutricionista</CardTitle>
+                <MessageSquareHeart className="w-5 h-5 text-green-500" />
+                <CardTitle className="text-2xl text-green-500">Mensagens da Nutricionista</CardTitle>
               </div>
               <div className="flex items-center gap-2">
                 {hasNewMessage && (

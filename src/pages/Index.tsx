@@ -37,9 +37,6 @@ const Index = () => {
       <div className="w-full">
         <Profile />
       </div>
-      <div className="w-full">
-        <FoodDiary />
-      </div>
       {isAdmin ? (
         <div className="w-full">
           <MessagesTab />
@@ -58,6 +55,9 @@ const Index = () => {
           </div>
         </>
       )}
+      <div className="w-full">
+        <FoodDiary />
+      </div>
     </div>
   );
 };
