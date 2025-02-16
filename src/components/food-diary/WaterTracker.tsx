@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
 import { CircularProgressbar, buildStyles } from 'react-circular-progressbar';
-import { Droplets, Plus, Settings } from "lucide-react";
+import { Droplets, Plus, Calculator } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { WaterGoalSettings } from "./WaterGoalSettings";
 import 'react-circular-progressbar/dist/styles.css';
@@ -155,11 +155,12 @@ export const WaterTracker = () => {
               <h2 className="text-xl font-semibold text-gray-900">Ingestão de água</h2>
             </div>
             <Button
-              variant="ghost"
-              size="icon"
+              variant="outline"
               onClick={() => setShowSettings(!showSettings)}
+              className="flex items-center gap-2"
             >
-              <Settings className="h-5 w-5" />
+              <Calculator className="h-5 w-5" />
+              Calcular
             </Button>
           </div>
 
@@ -196,7 +197,7 @@ export const WaterTracker = () => {
           ) : (
             <div className="text-center text-gray-500 my-4">
               <p>Configure sua meta diária de água</p>
-              <p>baseada no seu peso e altura.</p>
+              <p>baseada no seu peso.</p>
             </div>
           )}
 
