@@ -9,7 +9,12 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  console.log('Function called');
+  // Log completo da requisição recebida
+  console.log('Request received:', {
+    method: req.method,
+    headers: Object.fromEntries(req.headers.entries()),
+    url: req.url
+  });
   
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -18,33 +23,63 @@ serve(async (req) => {
   }
 
   try {
-    console.log('Parsing request body');
-    const body = await req.json();
-    console.log('Received request data:', JSON.stringify(body, null, 2));
+    // Validar se o corpo da requisição existe
+    const contentLength = req.headers.get('content-length');
+    if (!contentLength || parseInt(contentLength) === 0) {
+      console.error('Empty request body');
+      throw new Error('Request body is empty');
+    }
 
-    const { userData, selectedFoods, dietaryPreferences } = body;
+    // Converter o corpo da requisição para texto primeiro para debug
+    const rawBody = await req.text();
+    console.log('Raw request body:', rawBody);
 
-    // Basic validation
-    if (!userData || !selectedFoods || !dietaryPreferences) {
-      console.log('Missing required data:', { userData, selectedFoods, dietaryPreferences });
+    // Tentar fazer o parse do JSON
+    let body;
+    try {
+      body = JSON.parse(rawBody);
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
       return new Response(
         JSON.stringify({ 
-          error: 'Missing required data',
-          received: { 
-            hasUserData: !!userData, 
-            hasSelectedFoods: !!selectedFoods, 
-            hasDietaryPreferences: !!dietaryPreferences 
-          }
+          error: 'Invalid JSON in request body',
+          details: parseError.message,
+          receivedBody: rawBody
         }),
         { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
 
-    // Initialize Supabase client with direct values
-    console.log('Creating Supabase client');
+    console.log('Parsed request body:', JSON.stringify(body, null, 2));
+
+    const { userData, selectedFoods, dietaryPreferences } = body;
+
+    // Validação detalhada dos dados recebidos
+    if (!userData || typeof userData !== 'object') {
+      throw new Error('Missing or invalid userData object');
+    }
+
+    if (!Array.isArray(selectedFoods)) {
+      throw new Error('selectedFoods must be an array');
+    }
+
+    if (!dietaryPreferences || typeof dietaryPreferences !== 'object') {
+      throw new Error('Missing or invalid dietaryPreferences object');
+    }
+
+    // Validar campos obrigatórios do userData
+    const requiredFields = ['weight', 'height', 'age', 'gender', 'activityLevel', 'goal'];
+    for (const field of requiredFields) {
+      if (!(field in userData)) {
+        throw new Error(`Missing required field in userData: ${field}`);
+      }
+    }
+
+    // Initialize Supabase client
+    console.log('Initializing Supabase client');
     const supabase = createClient(
       'https://sxjafhzikftdenqnkcri.supabase.co',
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4amFmaHppa2Z0ZGVucW5rY3JpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzg5ODQ0NTMsImV4cCI6MjA1NDU2MDQ1M30.qc8SAzrY0FJSz34BMeelH9CPWFZar5_1P-tAFMr4zp4'
@@ -59,6 +94,11 @@ serve(async (req) => {
     if (foodsError) {
       console.error('Error fetching foods:', foodsError);
       throw new Error('Failed to fetch foods data');
+    }
+
+    if (!foods || foods.length === 0) {
+      console.warn('No foods found for the provided IDs');
+      throw new Error('No foods found for the provided IDs');
     }
 
     // Create response with mock data but real foods
@@ -108,13 +148,13 @@ serve(async (req) => {
       }
     };
 
-    console.log('Response data:', JSON.stringify(mockResponse, null, 2));
-    return new Response(
-      JSON.stringify(mockResponse),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    );
+    console.log('Preparing response');
+    const responseJson = JSON.stringify(mockResponse);
+    console.log('Response data:', responseJson);
+
+    return new Response(responseJson, { 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
 
   } catch (error) {
     console.error('Error in function:', error);
@@ -122,10 +162,10 @@ serve(async (req) => {
       JSON.stringify({ 
         error: 'Internal server error', 
         details: error.message,
-        stack: error.stack 
+        type: error.constructor.name
       }),
       { 
-        status: 500,
+        status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
