@@ -119,7 +119,11 @@ export const useMenuController = () => {
         userData: {
           ...formData,
           userId: userData.user.id,
-          dailyCalories: calorieNeeds
+          dailyCalories: calorieNeeds,
+          lastFeedback: {
+            likedFoods: [],
+            dislikedFoods: []
+          }
         },
         selectedFoods,
         dietaryPreferences: preferences
@@ -128,11 +132,15 @@ export const useMenuController = () => {
       console.log('Enviando requisição com dados:', JSON.stringify(requestData, null, 2));
 
       const { data: responseData, error } = await supabase.functions.invoke('generate-meal-plan', {
-        body: requestData
+        body: requestData,
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
 
       if (error) {
         console.error('Erro da função edge:', error);
+        toast.error("Erro ao gerar cardápio. Por favor, tente novamente.");
         throw error;
       }
 
