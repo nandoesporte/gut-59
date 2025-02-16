@@ -88,6 +88,19 @@ const Menu = () => {
     toast.success("Cálculo realizado com sucesso!");
   };
 
+  const handleFoodSelection = (foodId: string) => {
+    setSelectedFoods(prev => {
+      if (prev.includes(foodId)) {
+        return prev.filter(id => id !== foodId);
+      }
+      if (prev.length >= 20) {
+        toast.error("Você já selecionou o máximo de 20 alimentos!");
+        return prev;
+      }
+      return [...prev, foodId];
+    });
+  };
+
   const handleDietaryPreferences = async (preferences: DietaryPreferences) => {
     try {
       const { data: userData } = await supabase.auth.getUser();
