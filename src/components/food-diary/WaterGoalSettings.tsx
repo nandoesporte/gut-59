@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Ruler, Weight } from "lucide-react";
+import { Weight } from "lucide-react";
 
 interface WaterGoalSettingsProps {
   onGoalUpdated: () => void;
@@ -13,7 +13,6 @@ interface WaterGoalSettingsProps {
 
 export const WaterGoalSettings = ({ onGoalUpdated }: WaterGoalSettingsProps) => {
   const [weight, setWeight] = useState<string>("");
-  const [height, setHeight] = useState<string>("");
   const [loading, setLoading] = useState(false);
 
   const handleUpdateGoal = async () => {
@@ -23,17 +22,16 @@ export const WaterGoalSettings = ({ onGoalUpdated }: WaterGoalSettingsProps) => 
       if (!user) throw new Error("User not found");
 
       const weightNum = parseFloat(weight);
-      const heightNum = parseFloat(height);
 
-      if (isNaN(weightNum) || isNaN(heightNum)) {
-        toast.error("Por favor, insira valores válidos");
+      if (isNaN(weightNum)) {
+        toast.error("Por favor, insira um peso válido");
         return;
       }
 
       const { error } = await supabase.rpc('update_user_water_goal', {
         p_user_id: user.id,
         p_weight: weightNum,
-        p_height: heightNum
+        p_height: 0 // Height is no longer used in calculation
       });
 
       if (error) throw error;
@@ -41,7 +39,6 @@ export const WaterGoalSettings = ({ onGoalUpdated }: WaterGoalSettingsProps) => 
       toast.success("Meta de água atualizada com sucesso!");
       onGoalUpdated();
       setWeight("");
-      setHeight("");
     } catch (error) {
       console.error("Error updating water goal:", error);
       toast.error("Erro ao atualizar meta de água");
@@ -65,22 +62,12 @@ export const WaterGoalSettings = ({ onGoalUpdated }: WaterGoalSettingsProps) => 
               className="flex-1"
             />
           </div>
-          <div className="flex items-center space-x-2">
-            <Ruler className="w-5 h-5 text-gray-400" />
-            <Input
-              type="number"
-              placeholder="Altura (cm)"
-              value={height}
-              onChange={(e) => setHeight(e.target.value)}
-              className="flex-1"
-            />
-          </div>
           <Button
             onClick={handleUpdateGoal}
             disabled={loading}
             className="w-full bg-primary-500 hover:bg-primary-600"
           >
-            {loading ? "Atualizando..." : "Atualizar Meta"}
+            {loading ? "Atualizando..." : "Calcular Meta"}
           </Button>
         </div>
       </CardContent>
