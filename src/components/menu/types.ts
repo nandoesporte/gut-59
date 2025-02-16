@@ -1,4 +1,3 @@
-
 export interface ProtocolFood {
   id: string;
   name: string;
@@ -18,6 +17,7 @@ export interface ProtocolFood {
   };
   vitamins_minerals?: Record<string, number>;
   substitution_group?: string;
+  nutritional_category?: string[];
 }
 
 export interface DietaryPreferences {
