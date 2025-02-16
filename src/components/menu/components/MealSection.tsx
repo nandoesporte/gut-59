@@ -7,6 +7,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { MacroDistributionBar } from "./MacroDistributionBar";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 interface MealSectionProps {
   title: string;
@@ -27,6 +29,53 @@ interface MealSectionProps {
   onFoodSubstitute?: (originalFoodId: string, newFoodId: string) => void;
 }
 
+const checkMealRequirements = (foods: ProtocolFood[], mealType: string) => {
+  const categories = foods.reduce((acc, food) => {
+    if (food.nutritional_category) {
+      food.nutritional_category.forEach(cat => acc.add(cat));
+    }
+    return acc;
+  }, new Set<string>());
+
+  const requirements = {
+    'Café da Manhã': {
+      min: 3,
+      required: ['carb', 'protein'],
+      optional: ['fat', 'fruit'],
+      message: 'Deve incluir carboidrato complexo, proteína e gordura boa ou fruta'
+    },
+    'Lanche': {
+      min: 2,
+      required: ['protein', 'carb'],
+      optional: ['fruit'],
+      message: 'Deve incluir proteína e carboidrato ou fruta'
+    },
+    'Almoço': {
+      min: 4,
+      required: ['carb', 'protein', 'vegetable', 'fat'],
+      optional: [],
+      message: 'Deve incluir carboidrato complexo, proteína, vegetais e gordura boa'
+    },
+    'Jantar': {
+      min: 4,
+      required: ['carb', 'protein', 'vegetable', 'fat'],
+      optional: [],
+      message: 'Deve incluir carboidrato complexo, proteína, vegetais e gordura boa'
+    }
+  };
+
+  const mealReqs = requirements[mealType];
+  if (!mealReqs) return { meets: true, message: '' };
+
+  const hasMinItems = foods.length >= mealReqs.min;
+  const hasRequiredCategories = mealReqs.required.every(cat => categories.has(cat));
+
+  return {
+    meets: hasMinItems && hasRequiredCategories,
+    message: !hasMinItems || !hasRequiredCategories ? mealReqs.message : ''
+  };
+};
+
 export const MealSection = ({ 
   title, 
   icon, 
@@ -37,6 +86,8 @@ export const MealSection = ({
   foodSubstitutions,
   onFoodSubstitute 
 }: MealSectionProps) => {
+  const requirements = checkMealRequirements(foods, title);
+
   const formatDescription = (description: string) => {
     return description.split('\n').map((line, index) => (
       <p key={index} className="text-sm text-gray-600 mb-1">
@@ -51,6 +102,16 @@ export const MealSection = ({
         {icon}
         {title} {calories && `(${calories} kcal)`}
       </h2>
+
+      {!requirements.meets && (
+        <Alert variant="destructive" className="mt-2">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            {requirements.message}
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="mt-4 space-y-2">
         {Array.isArray(foods) && foods.map((food) => (
           <div key={food.id} className="flex justify-between items-center text-gray-700">
@@ -93,11 +154,13 @@ export const MealSection = ({
           </div>
         ))}
       </div>
+
       {description && (
         <div className="mt-4 text-gray-600 border-t border-gray-100 pt-4">
           {formatDescription(description)}
         </div>
       )}
+
       {macros && (
         <div className="mt-4 text-sm text-gray-600 border-t pt-4">
           <div className="grid grid-cols-4 gap-2 mt-2">

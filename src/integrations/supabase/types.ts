@@ -550,6 +550,7 @@ export type Database = {
           meal_type: string[] | null
           minerals: Json | null
           name: string
+          nutritional_category: string[] | null
           phase: number | null
           post_workout_compatible: boolean | null
           pre_workout_compatible: boolean | null
@@ -574,6 +575,7 @@ export type Database = {
           meal_type?: string[] | null
           minerals?: Json | null
           name: string
+          nutritional_category?: string[] | null
           phase?: number | null
           post_workout_compatible?: boolean | null
           pre_workout_compatible?: boolean | null
@@ -598,6 +600,7 @@ export type Database = {
           meal_type?: string[] | null
           minerals?: Json | null
           name?: string
+          nutritional_category?: string[] | null
           phase?: number | null
           post_workout_compatible?: boolean | null
           pre_workout_compatible?: boolean | null
