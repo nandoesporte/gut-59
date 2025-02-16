@@ -127,18 +127,18 @@ serve(async (req) => {
       return true;
     });
 
-    const foodsByGroup = filteredFoods.reduce((acc, food) => {
-      const group = food.food_group_id;
-      if (!acc[group]) acc[group] = [];
-      acc[group].push(food);
-      return acc;
-    }, {} as Record<number, Food[]>);
+    // Organizar alimentos por tipo de refeição
+    const breakfastFoods = filteredFoods.filter(food => food.meal_type.includes('breakfast'));
+    const snackFoods = filteredFoods.filter(food => food.meal_type.includes('snack'));
+    const lunchDinnerFoods = filteredFoods.filter(food => 
+      food.meal_type.includes('lunch') || food.meal_type.includes('dinner')
+    );
 
     // Gerar plano diário com todas as refeições
     const dailyPlan = {
       breakfast: {
         foods: optimizeMealCombinations(
-          analyzeWorkoutCompatibility(foodsByGroup[1] || [], dietaryPreferences.trainingTime, true),
+          analyzeWorkoutCompatibility(breakfastFoods, dietaryPreferences.trainingTime, true),
           Math.round(adjustedCalories * 0.25),
           {
             protein: Math.round(macroTargets.protein * 0.25),
@@ -159,7 +159,7 @@ serve(async (req) => {
       },
       morningSnack: {
         foods: optimizeMealCombinations(
-          foodsByGroup[3] || [],
+          snackFoods,
           Math.round(adjustedCalories * 0.15),
           {
             protein: Math.round(macroTargets.protein * 0.15),
@@ -180,7 +180,7 @@ serve(async (req) => {
       },
       lunch: {
         foods: optimizeMealCombinations(
-          foodsByGroup[2] || [],
+          lunchDinnerFoods,
           Math.round(adjustedCalories * 0.30),
           {
             protein: Math.round(macroTargets.protein * 0.30),
@@ -201,7 +201,7 @@ serve(async (req) => {
       },
       afternoonSnack: {
         foods: optimizeMealCombinations(
-          foodsByGroup[3] || [],
+          snackFoods,
           Math.round(adjustedCalories * 0.10),
           {
             protein: Math.round(macroTargets.protein * 0.10),
@@ -222,7 +222,7 @@ serve(async (req) => {
       },
       dinner: {
         foods: optimizeMealCombinations(
-          analyzeWorkoutCompatibility(foodsByGroup[4] || [], dietaryPreferences.trainingTime, false),
+          analyzeWorkoutCompatibility(lunchDinnerFoods, dietaryPreferences.trainingTime, false),
           Math.round(adjustedCalories * 0.20),
           {
             protein: Math.round(macroTargets.protein * 0.20),
@@ -243,18 +243,8 @@ serve(async (req) => {
       }
     };
 
-    // Gerar plano semanal se solicitado
-    const weeklyPlan = generateWeeklyPlan(
-      filteredFoods,
-      adjustedCalories,
-      macroTargets,
-      userData.goal,
-      { likedFoods: userData.lastFeedback?.likedFoods }
-    );
-
     const mealPlan = {
       dailyPlan,
-      weeklyPlan,
       totalNutrition: {
         calories: adjustedCalories,
         protein: macroTargets.protein,
@@ -262,10 +252,10 @@ serve(async (req) => {
         fats: macroTargets.fats,
         fiber: macroTargets.fiber
       },
-      recommendations: generateTimingRecommendations(dietaryPreferences.trainingTime, userData.goal)
+      recommendations: generateTimingRecommendations(dietaryPreferences.trainingTime, userData.goal, userData.healthCondition)
     };
 
-    // Salvar o plano e feedback
+    // Salvar o plano no banco de dados
     const { error: saveError } = await supabase
       .from('meal_plans')
       .insert({
@@ -274,7 +264,8 @@ serve(async (req) => {
         dietary_preferences: dietaryPreferences,
         calories: adjustedCalories,
         macros: macroTargets,
-        training_time: dietaryPreferences.trainingTime
+        training_time: dietaryPreferences.trainingTime,
+        active: true
       });
 
     if (saveError) {
