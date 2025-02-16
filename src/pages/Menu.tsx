@@ -63,7 +63,7 @@ const Menu = () => {
         );
       case 4:
         if (!mealPlan) return null;
-        return <MealPlanDisplay mealPlan={mealPlan} onReset={() => setCurrentStep(1)} />;
+        return <MealPlanDisplay mealPlan={mealPlan} />;
       default:
         return null;
     }
