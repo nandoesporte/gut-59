@@ -52,7 +52,6 @@ export const CalorieCalculator = ({
   return (
     <div className="space-y-8">
       <div className="space-y-4">
-        <Label>Selecione sua Condição de Saúde Principal</Label>
         <HealthConditionCards
           selectedCondition={formData.healthCondition}
           onSelect={(condition) => onInputChange("healthCondition", condition)}
