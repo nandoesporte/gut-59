@@ -78,9 +78,9 @@ export const FoodSelector = ({
   return (
     <div className="space-y-6">
       <div className="text-center mb-6">
-        <h2 className="text-2xl font-semibold text-gray-900">Monte seu Cardápio</h2>
+        <h2 className="text-2xl font-semibold text-gray-900">Opções de Preferência dos Alimentos</h2>
         <p className="text-gray-600 mt-2">
-          Selecione os alimentos para cada refeição do seu dia
+          Selecione suas preferências alimentares para cada refeição do dia
         </p>
       </div>
 
