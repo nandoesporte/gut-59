@@ -21,7 +21,7 @@ export const useMessages = (adminId: string | null, isAdmin: boolean, type: 'nut
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
   const [hasNewMessage, setHasNewMessage] = useState(false);
-  const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutos
+  const REFRESH_INTERVAL = 30 * 1000; // Reduzido para 30 segundos
 
   const fetchMessages = useCallback(async () => {
     try {
@@ -102,7 +102,7 @@ export const useMessages = (adminId: string | null, isAdmin: boolean, type: 'nut
     if (adminId) {
       fetchMessages();
       
-      // Configura a atualização automática
+      // Configura a atualização automática mais frequente
       const intervalId = setInterval(fetchMessages, REFRESH_INTERVAL);
       
       // Configurar o canal para atualizações em tempo real

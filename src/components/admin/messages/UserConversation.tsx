@@ -115,7 +115,9 @@ export const UserConversation = ({
       <div className="text-sm text-gray-500 mb-2">
         {role === 'nutritionist' ? 'Conversando como Nutricionista' : 'Conversando como Personal'}
       </div>
-      <MessageList messages={messages} selectedUserId={selectedUserId} />
+      <div className="flex-1 overflow-hidden">
+        <MessageList messages={messages} selectedUserId={selectedUserId} />
+      </div>
       <div className="flex gap-2 mt-4">
         <input
           type="text"

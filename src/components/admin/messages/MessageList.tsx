@@ -22,7 +22,7 @@ interface MessageListProps {
 
 export const MessageList = ({ messages, selectedUserId }: MessageListProps) => {
   return (
-    <div className="space-y-4">
+    <div className="flex-1 overflow-y-auto space-y-4 max-h-[400px] pr-2">
       {messages.map((message) => {
         const isUserMessage = message.sender_id === selectedUserId;
         return (
