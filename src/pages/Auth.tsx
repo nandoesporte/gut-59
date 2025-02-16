@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Activity } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -52,7 +51,6 @@ const Auth = () => {
         });
         if (error) throw error;
         
-        // The navigation will be handled by the auth state change listener
         toast({
           title: "Login realizado",
           description: "Bem-vindo de volta!",
@@ -95,18 +93,22 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-8">
-        <div className="flex flex-col items-center gap-2">
-          <div className="flex items-center gap-3">
-            <Activity className="w-12 h-12 text-primary-500" />
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary-500 to-primary-600 bg-clip-text text-transparent">
-              VitaGut
+    <div className="min-h-screen bg-gradient-to-b from-primary-50 to-primary-100 flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-md space-y-8 bg-white rounded-2xl shadow-xl p-8">
+        <div className="flex flex-col items-center gap-4">
+          <img 
+            src="/lovable-uploads/9456a3bf-9bc8-45d6-9105-dd939e3362f5.png" 
+            alt="Mais Saúde" 
+            className="h-16 w-auto"
+          />
+          <div className="text-center">
+            <h1 className="text-3xl font-bold text-primary-500">
+              Mais Saúde
             </h1>
+            <p className="text-gray-600 mt-2">
+              Sua jornada para uma vida mais saudável começa aqui
+            </p>
           </div>
-          <p className="text-gray-600 text-center mt-2">
-            Sua jornada para uma vida mais saudável começa aqui
-          </p>
         </div>
 
         <form onSubmit={handleAuth} className="mt-8 space-y-6">
@@ -118,7 +120,7 @@ const Auth = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full"
+                className="w-full bg-gray-50 border-gray-200 focus:border-primary-400 focus:ring-primary-400"
               />
             </div>
             <div>
@@ -128,7 +130,7 @@ const Auth = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full"
+                className="w-full bg-gray-50 border-gray-200 focus:border-primary-400 focus:ring-primary-400"
                 minLength={6}
               />
             </div>
@@ -136,7 +138,7 @@ const Auth = () => {
 
           <Button
             type="submit"
-            className="w-full"
+            className="w-full bg-primary-500 hover:bg-primary-600 text-white font-semibold py-3 rounded-lg transition-colors"
             disabled={isLoading}
           >
             {isLoading
@@ -150,7 +152,7 @@ const Auth = () => {
             <button
               type="button"
               onClick={() => setIsLogin(!isLogin)}
-              className="text-sm text-primary-600 hover:text-primary-500"
+              className="text-sm text-primary-600 hover:text-primary-500 font-medium"
             >
               {isLogin
                 ? "Não tem uma conta? Cadastre-se"
