@@ -1,10 +1,10 @@
-
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { ProtocolFood, DietaryPreferences, MealPlan } from "./types";
 import { CalorieCalculatorForm, activityLevels, goals } from "./CalorieCalculator";
 import type { HealthCondition } from "./HealthConditionCards";
+import type { Goal } from "./GoalCards";
 
 export const useMenuController = () => {
   const [currentStep, setCurrentStep] = useState<number>(1);
@@ -20,7 +20,7 @@ export const useMenuController = () => {
     age: 0,
     gender: "male",
     activityLevel: "",
-    goal: "",
+    goal: null,
     healthCondition: null,
   });
 

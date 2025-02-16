@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { HealthConditionCards, type HealthCondition } from "./HealthConditionCards";
+import { GoalCards, type Goal } from "./GoalCards";
 
 export interface CalorieCalculatorForm {
   weight: number;
@@ -18,7 +19,7 @@ export interface CalorieCalculatorForm {
   age: number;
   gender: "male" | "female";
   activityLevel: string;
-  goal: string;
+  goal: Goal | null;
   healthCondition: HealthCondition | null;
 }
 
@@ -37,12 +38,6 @@ export const activityLevels = {
   extremelyActive: { label: "Extremamente ativo (Treinos diários e/ou trabalho físico pesado)", factor: 1.9 },
 };
 
-export const goals = {
-  lose: { label: "Perder peso", factor: 0.8 },
-  maintain: { label: "Manter peso", factor: 1 },
-  gain: { label: "Ganhar peso (massa muscular)", factor: 1.2 },
-};
-
 export const CalorieCalculator = ({
   formData,
   onInputChange,
@@ -52,6 +47,15 @@ export const CalorieCalculator = ({
   return (
     <div className="space-y-8">
       <div className="space-y-4">
+        <Label>Selecione um Objetivo</Label>
+        <GoalCards
+          selectedGoal={formData.goal}
+          onSelect={(goal) => onInputChange("goal", goal)}
+        />
+      </div>
+
+      <div className="space-y-4">
+        <Label>Selecione uma Condição de Saúde (se aplicável)</Label>
         <HealthConditionCards
           selectedCondition={formData.healthCondition}
           onSelect={(condition) => onInputChange("healthCondition", condition)}
