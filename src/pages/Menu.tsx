@@ -10,7 +10,6 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { ProtocolFood, DietaryPreferences, MealPlan } from "@/components/menu/types";
 import SymptomTracker from "@/components/SymptomTracker";
-import FoodDiary from "@/components/FoodDiary";
 import ShoppingList from "@/components/ShoppingList";
 import Education from "@/components/Education";
 import { ChevronDown } from "lucide-react";
@@ -144,65 +143,43 @@ const Menu = () => {
     }
   };
 
-  const handleFoodSelection = (foodId: string) => {
-    setSelectedFoods(prev => {
-      if (prev.includes(foodId)) {
-        return prev.filter(id => id !== foodId);
-      }
-      if (prev.length >= 20) {
-        toast.error("Você já selecionou o máximo de 20 alimentos!");
-        return prev;
-      }
-      return [...prev, foodId];
-    });
-  };
-
-  const renderAdditionalSections = () => (
-    <div className="space-y-8 mt-8">
-      <div className="bg-[#F2FCE2] rounded-lg shadow-sm p-6 border border-green-100">
-        <h2 className="text-2xl font-semibold text-green-500 mb-6">Diário Alimentar</h2>
-        <FoodDiary />
-      </div>
-
-      <div className="bg-[#F2FCE2] rounded-lg shadow-sm p-6 border border-green-100">
-        <h2 className="text-2xl font-semibold text-green-500 mb-6">Registro de Sintomas</h2>
-        <SymptomTracker />
-      </div>
-
-      <div className="bg-[#F2FCE2] rounded-lg shadow-sm p-6 border border-green-100">
-        <h2 className="text-2xl font-semibold text-green-500 mb-6">Protocolo de Modulação Intestinal</h2>
-        <Education />
-      </div>
-
-      <Card className="bg-[#F2FCE2] shadow-sm border border-green-100">
-        <div className="p-4">
-          <Button
-            variant="ghost"
-            onClick={() => setShowShopping(!showShopping)}
-            className="w-full flex justify-between items-center text-green-500 hover:text-green-600 hover:bg-green-50"
-          >
-            <span className="font-semibold">Lista de Compras</span>
-            <ChevronDown className={`transform transition-transform ${showShopping ? 'rotate-180' : ''}`} />
-          </Button>
-          {showShopping && (
-            <div className="mt-4">
-              <ScrollArea className="h-[500px]">
-                <ShoppingList />
-              </ScrollArea>
-            </div>
-          )}
-        </div>
-      </Card>
-    </div>
-  );
-
   const renderStep = () => {
     switch (currentStep) {
       case 1:
         return (
           <div className="bg-[#F2FCE2]">
             <MenuHeader onStart={() => setCurrentStep(1.5)} />
-            {renderAdditionalSections()}
+            <div className="space-y-8 mt-8">
+              <div className="bg-[#F2FCE2] rounded-lg shadow-sm p-6 border border-green-100">
+                <h2 className="text-2xl font-semibold text-green-500 mb-6">Registro de Sintomas</h2>
+                <SymptomTracker />
+              </div>
+
+              <div className="bg-[#F2FCE2] rounded-lg shadow-sm p-6 border border-green-100">
+                <h2 className="text-2xl font-semibold text-green-500 mb-6">Protocolo de Modulação Intestinal</h2>
+                <Education />
+              </div>
+
+              <Card className="bg-[#F2FCE2] shadow-sm border border-green-100">
+                <div className="p-4">
+                  <Button
+                    variant="ghost"
+                    onClick={() => setShowShopping(!showShopping)}
+                    className="w-full flex justify-between items-center text-green-500 hover:text-green-600 hover:bg-green-50"
+                  >
+                    <span className="font-semibold">Lista de Compras</span>
+                    <ChevronDown className={`transform transition-transform ${showShopping ? 'rotate-180' : ''}`} />
+                  </Button>
+                  {showShopping && (
+                    <div className="mt-4">
+                      <ScrollArea className="h-[500px]">
+                        <ShoppingList />
+                      </ScrollArea>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            </div>
           </div>
         );
       case 1.5:
