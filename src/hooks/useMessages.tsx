@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -10,6 +10,7 @@ interface Message {
   content: string;
   created_at: string;
   type: 'nutricionista' | 'personal';
+  read: boolean;
   profiles: {
     name: string | null;
     photo_url: string | null;
@@ -20,45 +21,9 @@ export const useMessages = (adminId: string | null, isAdmin: boolean, type: 'nut
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
   const [hasNewMessage, setHasNewMessage] = useState(false);
+  const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutos
 
-  useEffect(() => {
-    if (adminId) {
-      fetchMessages();
-      
-      // Inscreva-se para atualizações em tempo real
-      const channel = supabase
-        .channel('messages_channel')
-        .on('postgres_changes', { 
-          event: 'INSERT', 
-          schema: 'public', 
-          table: 'messages',
-          filter: `type=eq.${type}`
-        }, async (payload) => {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) return;
-
-          // Verifique se a mensagem é relevante para este usuário
-          if (isAdmin) {
-            if (payload.new.receiver_id === user.id || payload.new.type === type) {
-              setHasNewMessage(true);
-              fetchMessages();
-            }
-          } else {
-            if (payload.new.sender_id === user.id || payload.new.receiver_id === user.id) {
-              setHasNewMessage(true);
-              fetchMessages();
-            }
-          }
-        })
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
-  }, [adminId, isAdmin, type]);
-
-  const fetchMessages = async () => {
+  const fetchMessages = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !adminId) return;
@@ -72,6 +37,7 @@ export const useMessages = (adminId: string | null, isAdmin: boolean, type: 'nut
           content,
           created_at,
           type,
+          read,
           profiles!messages_sender_id_fkey (
             name,
             photo_url
@@ -79,8 +45,6 @@ export const useMessages = (adminId: string | null, isAdmin: boolean, type: 'nut
         `)
         .eq('type', type);
 
-      // Se for admin, veja todas as mensagens do tipo específico
-      // Se for usuário regular, veja apenas suas mensagens com o admin
       if (!isAdmin) {
         query = query.or(`and(sender_id.eq.${user.id},receiver_id.eq.${adminId}),and(sender_id.eq.${adminId},receiver_id.eq.${user.id})`);
       }
@@ -89,9 +53,15 @@ export const useMessages = (adminId: string | null, isAdmin: boolean, type: 'nut
 
       if (error) throw error;
       
-      console.log('Fetched messages:', data);
+      const lastViewedTimestamp = localStorage.getItem(`last_viewed_${type}`);
+      const hasUnread = data?.some(message => 
+        message.sender_id === adminId && 
+        message.created_at > (lastViewedTimestamp || '0') &&
+        !message.read
+      );
+
+      setHasNewMessage(hasUnread);
       setMessages(data || []);
-      setHasNewMessage(false);
     } catch (error) {
       console.error('Error fetching messages:', error);
       toast({
@@ -100,7 +70,77 @@ export const useMessages = (adminId: string | null, isAdmin: boolean, type: 'nut
         variant: "destructive",
       });
     }
-  };
+  }, [adminId, isAdmin, type]);
 
-  return { messages, hasNewMessage, fetchMessages };
+  const markMessagesAsRead = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !adminId) return;
+
+      const currentTimestamp = new Date().toISOString();
+      localStorage.setItem(`last_viewed_${type}`, currentTimestamp);
+
+      const unreadMessages = messages.filter(message => 
+        message.sender_id === adminId && !message.read
+      );
+
+      if (unreadMessages.length > 0) {
+        const { error } = await supabase
+          .from('messages')
+          .update({ read: true })
+          .in('id', unreadMessages.map(m => m.id));
+
+        if (error) throw error;
+        setHasNewMessage(false);
+      }
+    } catch (error) {
+      console.error('Error marking messages as read:', error);
+    }
+  }, [messages, adminId, type]);
+
+  useEffect(() => {
+    if (adminId) {
+      fetchMessages();
+      
+      // Configura a atualização automática
+      const intervalId = setInterval(fetchMessages, REFRESH_INTERVAL);
+      
+      // Configurar o canal para atualizações em tempo real
+      const channel = supabase
+        .channel('messages_channel')
+        .on('postgres_changes', { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'messages',
+          filter: `type=eq.${type}`
+        }, async (payload) => {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
+
+          if (isAdmin) {
+            if (payload.new.receiver_id === user.id || payload.new.type === type) {
+              setHasNewMessage(true);
+              fetchMessages();
+            }
+          } else {
+            if (payload.new.sender_id === adminId || payload.new.receiver_id === user.id) {
+              setHasNewMessage(true);
+              fetchMessages();
+              
+              // Reproduzir um som de notificação (opcional)
+              const audio = new Audio('/notification.mp3');
+              audio.play().catch(() => {}); // Ignora erro se o usuário não interagiu com a página
+            }
+          }
+        })
+        .subscribe();
+
+      return () => {
+        clearInterval(intervalId);
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [adminId, isAdmin, type, fetchMessages]);
+
+  return { messages, hasNewMessage, fetchMessages, markMessagesAsRead };
 };

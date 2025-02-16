@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Dumbbell, ChevronDown } from "lucide-react";
+import { Dumbbell, ChevronDown, MessageSquareDot } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -18,7 +18,7 @@ const MessagesPersonal = () => {
   const [personalId, setPersonalId] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isPersonal, setIsPersonal] = useState(false);
-  const { messages, hasNewMessage, fetchMessages } = useMessages(personalId, isPersonal, 'personal');
+  const { messages, hasNewMessage, fetchMessages, markMessagesAsRead } = useMessages(personalId, isPersonal, 'personal');
 
   useEffect(() => {
     checkPersonalRole();
@@ -32,6 +32,13 @@ const MessagesPersonal = () => {
       subscription?.unsubscribe();
     };
   }, []);
+
+  // Quando o usuário abre o componente, marca as mensagens como lidas
+  useEffect(() => {
+    if (isOpen && hasNewMessage) {
+      markMessagesAsRead();
+    }
+  }, [isOpen, hasNewMessage, markMessagesAsRead]);
 
   const checkPersonalRole = async () => {
     const { data } = await supabase.rpc('has_role', { role: 'personal' });
@@ -68,7 +75,6 @@ const MessagesPersonal = () => {
     }
   };
 
-  // If user is personal, don't show this component
   if (isPersonal) {
     return null;
   }
@@ -80,15 +86,14 @@ const MessagesPersonal = () => {
           <CollapsibleTrigger className="w-full">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Dumbbell className="w-5 h-5 text-primary-500" />
+                {hasNewMessage ? (
+                  <MessageSquareDot className="w-5 h-5 text-primary-500 animate-pulse" />
+                ) : (
+                  <Dumbbell className="w-5 h-5 text-primary-500" />
+                )}
                 <CardTitle className="text-2xl text-primary-500">Mensagens do Personal</CardTitle>
               </div>
-              <div className="flex items-center gap-2">
-                {hasNewMessage && (
-                  <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-                )}
-                <ChevronDown className={`w-5 h-5 transition-transform duration-200 ${isOpen ? 'transform rotate-180' : ''}`} />
-              </div>
+              <ChevronDown className={`w-5 h-5 transition-transform duration-200 ${isOpen ? 'transform rotate-180' : ''}`} />
             </div>
           </CollapsibleTrigger>
         </CardHeader>
