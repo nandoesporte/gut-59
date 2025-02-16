@@ -28,13 +28,12 @@ export const ProfessionalsSection = () => {
   return (
     <div className="mt-12">
       <div className="relative mb-12">
-        <div className="absolute inset-0 bg-gradient-to-r from-primary-100 to-primary-50 opacity-50 rounded-lg" />
+        <div className="absolute inset-0 bg-gradient-to-r from-primary-100 to-primary-50 rounded-lg" />
         <div className="relative py-8 px-4">
-          <h2 className="text-2xl font-bold text-center text-primary-700 bg-clip-text">
+          <h2 className="text-2xl font-bold text-center text-primary-700">
             Nossa Equipe
           </h2>
         </div>
-        <div className="absolute inset-0 bg-white/10 backdrop-blur-sm rounded-lg" />
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {professionals?.map((professional) => (
