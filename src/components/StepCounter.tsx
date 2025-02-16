@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Motion } from '@capacitor/motion';
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Walking, Activity, LineChart } from "lucide-react";
+import { Activity, LineChart, User } from "lucide-react";
 
 interface StepData {
   steps: number;
@@ -66,7 +66,7 @@ const StepCounter = () => {
         <div className="flex flex-col space-y-6">
           <div className="flex justify-between items-center">
             <h2 className="text-2xl font-bold text-gray-800">Atividade Diária</h2>
-            <Walking className="w-8 h-8 text-primary-500" />
+            <User className="w-8 h-8 text-primary-500" />
           </div>
           
           <div className="space-y-4">
