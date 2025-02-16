@@ -13,33 +13,137 @@ import { Recommendations } from "./components/Recommendations";
 export const MealPlanDisplay = ({ mealPlan }: { mealPlan: MealPlan }) => {
   const handleDownloadPDF = async () => {
     try {
+      toast.info("Gerando PDF do cardápio...");
+      
       const element = document.getElementById('meal-plan-content');
       if (!element) return;
 
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        logging: false,
-        useCORS: true
-      });
-
-      const imgWidth = 190;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      
+      // Configurações do PDF
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgData = canvas.toDataURL('image/png');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 10;
+      let currentY = margin;
 
+      // Adicionar cabeçalho na primeira página
+      const logoImg = document.querySelector('img[alt="Mais Saúde"]') as HTMLImageElement;
+      if (logoImg) {
+        pdf.addImage(logoImg.src, 'PNG', margin, currentY, 20, 20);
+      }
+
+      // Título e data
       pdf.setFontSize(20);
       pdf.setTextColor(40, 167, 69);
-      pdf.text('Seu Plano Alimentar Personalizado', 105, 15, { align: 'center' });
+      pdf.text('Mais Saúde', margin + 25, currentY + 12);
+      pdf.setFontSize(16);
+      pdf.text('Plano Alimentar Personalizado', margin + 25, currentY + 18);
       
       pdf.setFontSize(12);
       pdf.setTextColor(100);
-      pdf.text(new Date().toLocaleDateString('pt-BR'), 105, 22, { align: 'center' });
+      pdf.text(new Date().toLocaleDateString('pt-BR'), pageWidth - margin, currentY + 10, { align: 'right' });
+      
+      currentY += 35;
 
-      pdf.addImage(imgData, 'PNG', 10, 30, imgWidth, imgHeight);
+      // Função auxiliar para adicionar uma nova página
+      const addNewPage = () => {
+        pdf.addPage();
+        currentY = margin;
+        // Adicionar cabeçalho reduzido nas páginas subsequentes
+        pdf.setFontSize(10);
+        pdf.setTextColor(100);
+        pdf.text('Mais Saúde - Plano Alimentar', margin, margin);
+        pdf.text(new Date().toLocaleDateString('pt-BR'), pageWidth - margin, margin, { align: 'right' });
+        currentY += 15;
+      };
 
-      pdf.setFontSize(10);
-      pdf.text('Gerado automaticamente pelo sistema', 105, 287, { align: 'center' });
+      // Gerar imagem para cada seção do cardápio
+      const sections = ['breakfast', 'morningSnack', 'lunch', 'afternoonSnack', 'dinner'];
+      const titles = {
+        breakfast: 'Café da Manhã',
+        morningSnack: 'Lanche da Manhã',
+        lunch: 'Almoço',
+        afternoonSnack: 'Lanche da Tarde',
+        dinner: 'Jantar'
+      };
+
+      // Adicionar cada seção do cardápio
+      for (const section of sections) {
+        const sectionElement = document.getElementById(`meal-section-${section}`);
+        if (!sectionElement) continue;
+
+        const canvas = await html2canvas(sectionElement, {
+          scale: 2,
+          logging: false,
+          useCORS: true
+        });
+
+        const imgWidth = pageWidth - (2 * margin);
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+        // Verificar se precisa de uma nova página
+        if (currentY + imgHeight > pageHeight - margin) {
+          addNewPage();
+        }
+
+        const imgData = canvas.toDataURL('image/png');
+        pdf.addImage(imgData, 'PNG', margin, currentY, imgWidth, imgHeight);
+        currentY += imgHeight + 10;
+      }
+
+      // Adicionar totais diários
+      const totalsElement = document.getElementById('daily-totals');
+      if (totalsElement) {
+        if (currentY + 40 > pageHeight - margin) {
+          addNewPage();
+        }
+
+        const canvas = await html2canvas(totalsElement, {
+          scale: 2,
+          logging: false,
+          useCORS: true
+        });
+
+        const imgWidth = pageWidth - (2 * margin);
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        const imgData = canvas.toDataURL('image/png');
+        
+        pdf.addImage(imgData, 'PNG', margin, currentY, imgWidth, imgHeight);
+        currentY += imgHeight + 10;
+      }
+
+      // Adicionar recomendações
+      const recommendationsElement = document.getElementById('recommendations');
+      if (recommendationsElement) {
+        if (currentY + 60 > pageHeight - margin) {
+          addNewPage();
+        }
+
+        const canvas = await html2canvas(recommendationsElement, {
+          scale: 2,
+          logging: false,
+          useCORS: true
+        });
+
+        const imgWidth = pageWidth - (2 * margin);
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        const imgData = canvas.toDataURL('image/png');
+        
+        pdf.addImage(imgData, 'PNG', margin, currentY, imgWidth, imgHeight);
+      }
+
+      // Adicionar rodapé em todas as páginas
+      const totalPages = pdf.internal.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i);
+        pdf.setFontSize(8);
+        pdf.setTextColor(128);
+        pdf.text(
+          `Página ${i} de ${totalPages}`,
+          pageWidth / 2,
+          pageHeight - 10,
+          { align: 'center' }
+        );
+      }
 
       pdf.save('plano-alimentar.pdf');
       toast.success("PDF do cardápio baixado com sucesso!");
@@ -104,71 +208,85 @@ export const MealPlanDisplay = ({ mealPlan }: { mealPlan: MealPlan }) => {
       )}
 
       <div id="meal-plan-content" className="space-y-6">
-        <MealSection
-          title="Café da Manhã"
-          icon={<Coffee className="h-5 w-5" />}
-          foods={mealPlan.dailyPlan.breakfast.foods}
-          macros={mealPlan.dailyPlan.breakfast.macros}
-          calories={mealPlan.dailyPlan.breakfast.calories}
-          foodSubstitutions={mealPlan.recommendations.substitutions?.map(sub => ({
-            originalFoodId: sub.originalFood.id,
-            alternatives: sub.alternatives
-          }))}
-        />
+        <div id="meal-section-breakfast">
+          <MealSection
+            title="Café da Manhã"
+            icon={<Coffee className="h-5 w-5" />}
+            foods={mealPlan.dailyPlan.breakfast.foods}
+            macros={mealPlan.dailyPlan.breakfast.macros}
+            calories={mealPlan.dailyPlan.breakfast.calories}
+            foodSubstitutions={mealPlan.recommendations.substitutions?.map(sub => ({
+              originalFoodId: sub.originalFood.id,
+              alternatives: sub.alternatives
+            }))}
+          />
+        </div>
 
-        <MealSection
-          title="Lanche da Manhã"
-          icon={<Apple className="h-5 w-5" />}
-          foods={mealPlan.dailyPlan.morningSnack.foods}
-          macros={mealPlan.dailyPlan.morningSnack.macros}
-          calories={mealPlan.dailyPlan.morningSnack.calories}
-          foodSubstitutions={mealPlan.recommendations.substitutions?.map(sub => ({
-            originalFoodId: sub.originalFood.id,
-            alternatives: sub.alternatives
-          }))}
-        />
+        <div id="meal-section-morningSnack">
+          <MealSection
+            title="Lanche da Manhã"
+            icon={<Apple className="h-5 w-5" />}
+            foods={mealPlan.dailyPlan.morningSnack.foods}
+            macros={mealPlan.dailyPlan.morningSnack.macros}
+            calories={mealPlan.dailyPlan.morningSnack.calories}
+            foodSubstitutions={mealPlan.recommendations.substitutions?.map(sub => ({
+              originalFoodId: sub.originalFood.id,
+              alternatives: sub.alternatives
+            }))}
+          />
+        </div>
 
-        <MealSection
-          title="Almoço"
-          icon={<Utensils className="h-5 w-5" />}
-          foods={mealPlan.dailyPlan.lunch.foods}
-          macros={mealPlan.dailyPlan.lunch.macros}
-          calories={mealPlan.dailyPlan.lunch.calories}
-          foodSubstitutions={mealPlan.recommendations.substitutions?.map(sub => ({
-            originalFoodId: sub.originalFood.id,
-            alternatives: sub.alternatives
-          }))}
-        />
+        <div id="meal-section-lunch">
+          <MealSection
+            title="Almoço"
+            icon={<Utensils className="h-5 w-5" />}
+            foods={mealPlan.dailyPlan.lunch.foods}
+            macros={mealPlan.dailyPlan.lunch.macros}
+            calories={mealPlan.dailyPlan.lunch.calories}
+            foodSubstitutions={mealPlan.recommendations.substitutions?.map(sub => ({
+              originalFoodId: sub.originalFood.id,
+              alternatives: sub.alternatives
+            }))}
+          />
+        </div>
 
-        <MealSection
-          title="Lanche da Tarde"
-          icon={<Apple className="h-5 w-5" />}
-          foods={mealPlan.dailyPlan.afternoonSnack.foods}
-          macros={mealPlan.dailyPlan.afternoonSnack.macros}
-          calories={mealPlan.dailyPlan.afternoonSnack.calories}
-          foodSubstitutions={mealPlan.recommendations.substitutions?.map(sub => ({
-            originalFoodId: sub.originalFood.id,
-            alternatives: sub.alternatives
-          }))}
-        />
+        <div id="meal-section-afternoonSnack">
+          <MealSection
+            title="Lanche da Tarde"
+            icon={<Apple className="h-5 w-5" />}
+            foods={mealPlan.dailyPlan.afternoonSnack.foods}
+            macros={mealPlan.dailyPlan.afternoonSnack.macros}
+            calories={mealPlan.dailyPlan.afternoonSnack.calories}
+            foodSubstitutions={mealPlan.recommendations.substitutions?.map(sub => ({
+              originalFoodId: sub.originalFood.id,
+              alternatives: sub.alternatives
+            }))}
+          />
+        </div>
 
-        <MealSection
-          title="Jantar"
-          icon={<Moon className="h-5 w-5" />}
-          foods={mealPlan.dailyPlan.dinner.foods}
-          macros={mealPlan.dailyPlan.dinner.macros}
-          calories={mealPlan.dailyPlan.dinner.calories}
-          foodSubstitutions={mealPlan.recommendations.substitutions?.map(sub => ({
-            originalFoodId: sub.originalFood.id,
-            alternatives: sub.alternatives
-          }))}
-        />
+        <div id="meal-section-dinner">
+          <MealSection
+            title="Jantar"
+            icon={<Moon className="h-5 w-5" />}
+            foods={mealPlan.dailyPlan.dinner.foods}
+            macros={mealPlan.dailyPlan.dinner.macros}
+            calories={mealPlan.dailyPlan.dinner.calories}
+            foodSubstitutions={mealPlan.recommendations.substitutions?.map(sub => ({
+              originalFoodId: sub.originalFood.id,
+              alternatives: sub.alternatives
+            }))}
+          />
+        </div>
 
-        <DailyTotals totalNutrition={mealPlan.totalNutrition} />
+        <div id="daily-totals">
+          <DailyTotals totalNutrition={mealPlan.totalNutrition} />
+        </div>
       </div>
 
       {mealPlan.recommendations && (
-        <Recommendations recommendations={mealPlan.recommendations} />
+        <div id="recommendations">
+          <Recommendations recommendations={mealPlan.recommendations} />
+        </div>
       )}
     </div>
   );
