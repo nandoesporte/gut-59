@@ -6,6 +6,7 @@ import { MessagesTab } from "@/components/admin/MessagesTab";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import FoodDiary from "@/components/FoodDiary";
+import StepCounter from "@/components/StepCounter";
 
 const Index = () => {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -36,6 +37,9 @@ const Index = () => {
     <div className="space-y-8 flex flex-col items-center">
       <div className="w-full">
         <Profile />
+      </div>
+      <div className="w-full">
+        <StepCounter />
       </div>
       {isAdmin ? (
         <div className="w-full">
