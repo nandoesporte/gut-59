@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { toast } from "sonner";
+import { HealthConditionCards, type HealthCondition } from "./HealthConditionCards";
 
 export interface CalorieCalculatorForm {
   weight: number;
@@ -19,11 +19,12 @@ export interface CalorieCalculatorForm {
   gender: "male" | "female";
   activityLevel: string;
   goal: string;
+  healthCondition: HealthCondition | null;
 }
 
 interface CalorieCalculatorProps {
   formData: CalorieCalculatorForm;
-  onInputChange: (field: keyof CalorieCalculatorForm, value: string | number) => void;
+  onInputChange: (field: keyof CalorieCalculatorForm, value: string | number | null) => void;
   onCalculate: () => void;
   calorieNeeds: number | null;
 }
@@ -49,7 +50,15 @@ export const CalorieCalculator = ({
   calorieNeeds,
 }: CalorieCalculatorProps) => {
   return (
-    <>
+    <div className="space-y-8">
+      <div className="space-y-4">
+        <Label>Selecione sua Condição de Saúde Principal</Label>
+        <HealthConditionCards
+          selectedCondition={formData.healthCondition}
+          onSelect={(condition) => onInputChange("healthCondition", condition)}
+        />
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-4">
           <Label htmlFor="weight">Peso (kg)</Label>
@@ -145,7 +154,7 @@ export const CalorieCalculator = ({
         </div>
       </div>
 
-      <div className="flex justify-center pt-4">
+      <div className="flex justify-center">
         <Button onClick={onCalculate} className="w-full md:w-auto">
           Calcular Calorias
         </Button>
@@ -165,6 +174,6 @@ export const CalorieCalculator = ({
           </p>
         </div>
       )}
-    </>
+    </div>
   );
 };
