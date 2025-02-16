@@ -427,24 +427,33 @@ export type Database = {
       profiles: {
         Row: {
           age: number | null
+          daily_water_goal_ml: number | null
           health_conditions: string | null
+          height: number | null
           id: string
           name: string | null
           photo_url: string | null
+          weight: number | null
         }
         Insert: {
           age?: number | null
+          daily_water_goal_ml?: number | null
           health_conditions?: string | null
+          height?: number | null
           id: string
           name?: string | null
           photo_url?: string | null
+          weight?: number | null
         }
         Update: {
           age?: number | null
+          daily_water_goal_ml?: number | null
           health_conditions?: string | null
+          height?: number | null
           id?: string
           name?: string | null
           photo_url?: string | null
+          weight?: number | null
         }
         Relationships: []
       }
@@ -821,11 +830,26 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_daily_water_goal: {
+        Args: {
+          user_weight: number
+          user_height: number
+        }
+        Returns: number
+      }
       has_role: {
         Args: {
           role: Database["public"]["Enums"]["app_role"]
         }
         Returns: boolean
+      }
+      update_user_water_goal: {
+        Args: {
+          p_user_id: string
+          p_weight: number
+          p_height: number
+        }
+        Returns: undefined
       }
     }
     Enums: {
