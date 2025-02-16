@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.0';
@@ -15,6 +14,9 @@ const corsHeaders = {
   'Content-Type': 'application/json'
 };
 
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -25,6 +27,7 @@ serve(async (req) => {
   }
 
   try {
+    console.log('Function started');
     const requestData = await req.json();
     console.log('Received request data:', JSON.stringify(requestData, null, 2));
 
@@ -43,10 +46,7 @@ serve(async (req) => {
       );
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const activityFactors = {
       sedentary: 1.2,
@@ -110,7 +110,6 @@ serve(async (req) => {
       return true;
     });
 
-    // Distribuição das calorias por refeição
     const mealCalories = {
       breakfast: Math.round(adjustedCalories * 0.25),
       morningSnack: Math.round(adjustedCalories * 0.15),
@@ -119,14 +118,12 @@ serve(async (req) => {
       dinner: Math.round(adjustedCalories * 0.20)
     };
 
-    // Organizar alimentos por tipo de refeição
     const breakfastFoods = filteredFoods.filter(food => food.meal_type?.includes('breakfast'));
     const snackFoods = filteredFoods.filter(food => food.meal_type?.includes('snack'));
     const lunchDinnerFoods = filteredFoods.filter(food => 
       food.meal_type?.includes('lunch') || food.meal_type?.includes('dinner')
     );
 
-    // Gerar plano diário
     const dailyPlan = {
       breakfast: {
         foods: optimizeMealCombinations(
@@ -258,7 +255,6 @@ serve(async (req) => {
 
     console.log('Generated meal plan:', JSON.stringify(mealPlan, null, 2));
 
-    // Save the plan to the database
     const { error: saveError } = await supabase
       .from('meal_plans')
       .insert({
