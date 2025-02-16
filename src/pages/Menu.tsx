@@ -28,13 +28,7 @@ const Menu = () => {
     switch (currentStep) {
       case 1:
         return (
-          <>
-            <MenuHeader onStart={() => setCurrentStep(1.5)} />
-            <div className="space-y-8 mt-8">
-              {/* Resto do conteúdo inicial */}
-              <InitialMenuContent onStartDiet={() => setCurrentStep(1.5)} />
-            </div>
-          </>
+          <InitialMenuContent onStartDiet={() => setCurrentStep(1.5)} />
         );
       case 1.5:
         return (
