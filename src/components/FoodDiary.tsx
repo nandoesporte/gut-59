@@ -17,7 +17,6 @@ const FoodDiary = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [mealType, setMealType] = useState<string>("");
-  const [phase, setPhase] = useState<string>("");
   const [date, setDate] = useState<Date>(new Date());
   const [mealTypes] = useState<MealType[]>([
     { id: 1, name: 'breakfast', display_name: 'Café da Manhã', phase: null },
@@ -77,7 +76,6 @@ const FoodDiary = () => {
         .insert({
           user_id: user.id,
           meal_type: mealType,
-          protocol_phase: phase ? parseInt(phase) : null,
           meal_date: format(date, 'yyyy-MM-dd'),
           photo_url: publicUrl,
         });
@@ -90,7 +88,6 @@ const FoodDiary = () => {
       });
 
       setMealType("");
-      setPhase("");
       setPhotoUrl(null);
       setCurrentPhotoFile(null);
     } catch (error) {
@@ -114,21 +111,19 @@ const FoodDiary = () => {
         </p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-1">
+        <WaterTracker />
         <MealForm
           loading={loading}
           mealTypes={mealTypes}
           onSubmit={handleFoodLog}
           mealType={mealType}
           setMealType={setMealType}
-          phase={phase}
-          setPhase={setPhase}
           date={date}
           setDate={setDate}
           photoUrl={photoUrl}
           onPhotoCapture={handlePhotoCapture}
         />
-        <WaterTracker />
       </div>
     </div>
   );

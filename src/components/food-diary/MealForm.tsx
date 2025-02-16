@@ -1,18 +1,25 @@
 
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CalendarIcon, Camera } from "lucide-react";
-import { format } from "date-fns";
-import { Calendar } from "@/components/ui/calendar";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { CalendarIcon, Camera } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { useState, useRef } from "react";
 
 interface MealType {
   id: number;
   name: string;
   display_name: string;
-  phase: number | null;
 }
 
 interface MealFormProps {
@@ -21,10 +28,8 @@ interface MealFormProps {
   onSubmit: () => void;
   mealType: string;
   setMealType: (value: string) => void;
-  phase: string;
-  setPhase: (value: string) => void;
   date: Date;
-  setDate: (value: Date) => void;
+  setDate: (date: Date) => void;
   photoUrl: string | null;
   onPhotoCapture: (file: File) => void;
 }
@@ -35,122 +40,110 @@ export const MealForm = ({
   onSubmit,
   mealType,
   setMealType,
-  phase,
-  setPhase,
   date,
   setDate,
   photoUrl,
   onPhotoCapture,
 }: MealFormProps) => {
-  const fileInputRef = useState<HTMLInputElement | null>(null);
+  const [showCamera, setShowCamera] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handlePhotoCapture = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       onPhotoCapture(file);
     }
   };
 
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
+  };
+
   return (
-    <Card className="bg-white shadow-sm border-none">
+    <Card>
       <CardContent className="p-6">
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CalendarIcon className="w-5 h-5 text-primary-500" />
-              <h2 className="text-lg font-semibold text-gray-900">Nova Refeição</h2>
-            </div>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="justify-start text-left font-normal"
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {format(date, "dd/MM/yyyy")}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
-                <Calendar
-                  mode="single"
-                  selected={date}
-                  onSelect={(date) => date && setDate(date)}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          <Select value={mealType} onValueChange={setMealType}>
-            <SelectTrigger className="w-full bg-gray-50 border-gray-200">
-              <SelectValue placeholder="Selecione a refeição" />
-            </SelectTrigger>
-            <SelectContent>
-              {mealTypes.map((type) => (
-                <SelectItem key={type.id} value={type.name}>
-                  {type.display_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Fase do Protocolo
-              </label>
-              <Select value={phase} onValueChange={setPhase}>
-                <SelectTrigger className="w-full bg-gray-50 border-gray-200">
-                  <SelectValue placeholder="Selecione a fase" />
+        <form onSubmit={(e) => { e.preventDefault(); onSubmit(); }} className="space-y-4">
+          <div className="grid gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="meal-type">Tipo de Refeição</Label>
+              <Select value={mealType} onValueChange={setMealType}>
+                <SelectTrigger id="meal-type">
+                  <SelectValue placeholder="Selecione o tipo de refeição" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1">Fase 1 - Remoção e Desintoxicação</SelectItem>
-                  <SelectItem value="2">Fase 2 - Reequilíbrio da Microbiota</SelectItem>
-                  <SelectItem value="3">Fase 3 - Reparo e Manutenção</SelectItem>
+                  {mealTypes.map((type) => (
+                    <SelectItem key={type.id} value={type.name}>
+                      {type.display_name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="space-y-4">
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handlePhotoCapture}
-                className="hidden"
-                ref={(el) => fileInputRef[1](el)}
-              />
-              
-              <Button
-                type="button"
-                onClick={() => fileInputRef[0]?.click()}
-                className="w-full flex items-center justify-center gap-2"
-                variant="outline"
-              >
-                <Camera className="w-5 h-5" />
-                Tirar Foto
-              </Button>
-
-              {photoUrl && (
-                <div className="mt-4">
-                  <img 
-                    src={photoUrl} 
-                    alt="Foto da refeição" 
-                    className="w-full h-48 object-cover rounded-lg"
+            <div className="space-y-2">
+              <Label>Data</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {date ? format(date, "dd/MM/yyyy") : "Selecione uma data"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={(newDate) => newDate && setDate(newDate)}
+                    initialFocus
                   />
-                </div>
-              )}
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Foto da Refeição</Label>
+              <div className="flex flex-col items-center gap-4">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={triggerFileInput}
+                >
+                  <Camera className="mr-2 h-4 w-4" />
+                  Tirar Foto
+                </Button>
+                {photoUrl && (
+                  <div className="relative w-full aspect-video">
+                    <img
+                      src={photoUrl}
+                      alt="Preview"
+                      className="w-full h-full object-cover rounded-lg"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
           <Button
-            onClick={onSubmit}
-            disabled={loading || !mealType || !photoUrl}
-            className="w-full bg-primary-500 hover:bg-primary-600 text-white"
+            type="submit"
+            className="w-full"
+            disabled={!mealType || !photoUrl || loading}
           >
-            {loading ? "Registrando..." : "Registrar Refeição"}
+            {loading ? "Salvando..." : "Salvar Refeição"}
           </Button>
-        </div>
+        </form>
       </CardContent>
     </Card>
   );
