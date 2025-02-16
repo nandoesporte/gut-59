@@ -49,21 +49,18 @@ const Navigation = () => {
             icon={<Home className="w-5 h-5 md:w-6 md:h-6" />}
             text="Início"
             active={isActive("/")}
-            showText={!isMobile}
           />
           <NavLink
             to="/menu"
             icon={<UtensilsCrossed className="w-5 h-5 md:w-6 md:h-6" />}
             text="Cardápio"
             active={isActive("/menu")}
-            showText={!isMobile}
           />
           <NavLink
             to="/trainer"
             icon={<Dumbbell className="w-5 h-5 md:w-6 md:h-6" />}
             text="Treino"
             active={isActive("/trainer")}
-            showText={!isMobile}
           />
           <a
             href="https://katiasantin.com.br/loja"
@@ -72,14 +69,13 @@ const Navigation = () => {
             className="flex flex-col items-center space-y-1 px-2 py-1 rounded-lg transition-colors text-gray-400 hover:text-primary-500"
           >
             <ShoppingBag className="w-5 h-5 md:w-6 md:h-6" />
-            {!isMobile && <span className="text-xs font-medium">Produtos</span>}
+            <span className="text-xs font-medium">Produtos</span>
           </a>
           <NavLink
             to="/progress"
             icon={<LineChart className="w-5 h-5 md:w-6 md:h-6" />}
             text="Diário"
             active={isActive("/progress")}
-            showText={!isMobile}
           />
           {isAdmin && (
             <NavLink
@@ -87,7 +83,6 @@ const Navigation = () => {
               icon={<Settings className="w-5 h-5 md:w-6 md:h-6" />}
               text="Admin"
               active={isActive("/admin")}
-              showText={!isMobile}
             />
           )}
         </div>
@@ -112,7 +107,7 @@ const NavLink = ({ to, icon, text, active, showText = true }: NavLinkProps) => (
     }`}
   >
     {icon}
-    {showText && <span className="text-xs font-medium">{text}</span>}
+    <span className="text-xs font-medium">{text}</span>
   </Link>
 );
 
