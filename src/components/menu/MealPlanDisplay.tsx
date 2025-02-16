@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Coffee, Utensils, Apple, Moon, Download, Calendar } from "lucide-react";
