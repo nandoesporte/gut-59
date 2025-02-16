@@ -1,14 +1,12 @@
 
 import { Card } from "@/components/ui/card";
-import { Heart, Droplets, Brain, Scale, Dumbbell } from "lucide-react";
+import { Heart, Droplets, Brain } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type HealthCondition = 
   | "hipertensao" 
   | "diabetes" 
-  | "depressao_ansiedade" 
-  | "perda_peso" 
-  | "ganho_massa";
+  | "depressao_ansiedade";
 
 interface HealthConditionCardsProps {
   selectedCondition: HealthCondition | null;
@@ -42,24 +40,6 @@ const conditions = [
     hoverColor: "hover:bg-[#D7CDFF]",
     borderColor: "border-purple-200",
     iconColor: "text-purple-500"
-  },
-  {
-    id: "perda_peso",
-    label: "Perda de Peso",
-    icon: Scale,
-    color: "bg-[#F2FCE2]",
-    hoverColor: "hover:bg-[#E5F7CC]",
-    borderColor: "border-green-200",
-    iconColor: "text-green-500"
-  },
-  {
-    id: "ganho_massa",
-    label: "Ganho de Massa",
-    icon: Dumbbell,
-    color: "bg-[#FEF7CD]",
-    hoverColor: "hover:bg-[#FDF2B3]",
-    borderColor: "border-yellow-200",
-    iconColor: "text-yellow-600"
   }
 ];
 
