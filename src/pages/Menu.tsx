@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { CalorieCalculator, CalorieCalculatorForm, activityLevels, goals } from "@/components/menu/CalorieCalculator";
@@ -18,6 +17,15 @@ interface ProtocolFood {
   carbs: number;
   fats: number;
   food_group_id: number;
+  portion?: number;
+  portionUnit?: string;
+  calculatedNutrients?: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fats: number;
+    fiber: number;
+  };
 }
 
 interface DietaryPreferences {
@@ -29,13 +37,54 @@ interface DietaryPreferences {
 
 interface MealPlan {
   dailyPlan: {
-    [key: string]: {
+    breakfast: {
       foods: ProtocolFood[];
       calories: number;
       macros: {
         protein: number;
         carbs: number;
         fats: number;
+        fiber: number;
+      };
+    };
+    morningSnack: {
+      foods: ProtocolFood[];
+      calories: number;
+      macros: {
+        protein: number;
+        carbs: number;
+        fats: number;
+        fiber: number;
+      };
+    };
+    lunch: {
+      foods: ProtocolFood[];
+      calories: number;
+      macros: {
+        protein: number;
+        carbs: number;
+        fats: number;
+        fiber: number;
+      };
+    };
+    afternoonSnack: {
+      foods: ProtocolFood[];
+      calories: number;
+      macros: {
+        protein: number;
+        carbs: number;
+        fats: number;
+        fiber: number;
+      };
+    };
+    dinner: {
+      foods: ProtocolFood[];
+      calories: number;
+      macros: {
+        protein: number;
+        carbs: number;
+        fats: number;
+        fiber: number;
       };
     };
   };
@@ -44,11 +93,13 @@ interface MealPlan {
     protein: number;
     carbs: number;
     fats: number;
+    fiber: number;
   };
   recommendations: {
     preworkout: string;
     postworkout: string;
     general: string;
+    timing: string[];
   };
 }
 
@@ -303,13 +354,31 @@ const Menu = () => {
                 Café da manhã
               </h2>
               <div className="mt-4 grid grid-cols-3 gap-3">
-                {mealPlan.dailyPlan.breakfast.foods.map((food) => (
+                {mealPlan.dailyPlan.breakfast?.foods.map((food) => (
                   <Button
                     key={food.id}
                     variant="outline"
                     className="flex items-center justify-center p-2 h-auto text-sm"
                   >
-                    {food.name}
+                    {food.name} ({food.portion}{food.portionUnit})
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Apple className="h-5 w-5" />
+                Lanche da Manhã
+              </h2>
+              <div className="mt-4 grid grid-cols-3 gap-3">
+                {mealPlan.dailyPlan.morningSnack?.foods.map((food) => (
+                  <Button
+                    key={food.id}
+                    variant="outline"
+                    className="flex items-center justify-center p-2 h-auto text-sm"
+                  >
+                    {food.name} ({food.portion}{food.portionUnit})
                   </Button>
                 ))}
               </div>
@@ -321,13 +390,13 @@ const Menu = () => {
                 Almoço
               </h2>
               <div className="mt-4 grid grid-cols-3 gap-3">
-                {mealPlan.dailyPlan.lunch.foods.map((food) => (
+                {mealPlan.dailyPlan.lunch?.foods.map((food) => (
                   <Button
                     key={food.id}
                     variant="outline"
                     className="flex items-center justify-center p-2 h-auto text-sm"
                   >
-                    {food.name}
+                    {food.name} ({food.portion}{food.portionUnit})
                   </Button>
                 ))}
               </div>
@@ -336,16 +405,16 @@ const Menu = () => {
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold flex items-center gap-2">
                 <Apple className="h-5 w-5" />
-                Lanche da Manhã e Tarde
+                Lanche da Tarde
               </h2>
               <div className="mt-4 grid grid-cols-3 gap-3">
-                {mealPlan.dailyPlan.snacks.foods.map((food) => (
+                {mealPlan.dailyPlan.afternoonSnack?.foods.map((food) => (
                   <Button
                     key={food.id}
                     variant="outline"
                     className="flex items-center justify-center p-2 h-auto text-sm"
                   >
-                    {food.name}
+                    {food.name} ({food.portion}{food.portionUnit})
                   </Button>
                 ))}
               </div>
@@ -357,13 +426,13 @@ const Menu = () => {
                 Jantar
               </h2>
               <div className="mt-4 grid grid-cols-3 gap-3">
-                {mealPlan.dailyPlan.dinner.foods.map((food) => (
+                {mealPlan.dailyPlan.dinner?.foods.map((food) => (
                   <Button
                     key={food.id}
                     variant="outline"
                     className="flex items-center justify-center p-2 h-auto text-sm"
                   >
-                    {food.name}
+                    {food.name} ({food.portion}{food.portionUnit})
                   </Button>
                 ))}
               </div>
@@ -393,6 +462,11 @@ const Menu = () => {
               </h2>
               <div className="mt-4">
                 <p className="text-gray-600">{mealPlan.recommendations.general}</p>
+                <div className="mt-4 space-y-2">
+                  {mealPlan.recommendations.timing.map((tip, index) => (
+                    <p key={index} className="text-gray-600">• {tip}</p>
+                  ))}
+                </div>
               </div>
             </div>
 
