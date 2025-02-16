@@ -827,6 +827,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user" | "personal"
+      message_type: "nutricionista" | "personal"
       module_status: "active" | "inactive"
     }
     CompositeTypes: {
