@@ -16,9 +16,10 @@ interface Message {
 interface MessageListProps {
   messages: Message[];
   adminId: string;
+  isPersonal?: boolean;
 }
 
-export const MessageList = ({ messages, adminId }: MessageListProps) => {
+export const MessageList = ({ messages, adminId, isPersonal = false }: MessageListProps) => {
   return (
     <div className="space-y-4 h-[400px] overflow-y-auto p-4 border rounded-lg">
       {messages.map((message) => (
@@ -41,7 +42,9 @@ export const MessageList = ({ messages, adminId }: MessageListProps) => {
             className={`max-w-[70%] p-3 rounded-lg ${
               message.sender_id === adminId
                 ? 'bg-gray-100'
-                : 'bg-primary-500 text-white'
+                : isPersonal 
+                  ? 'bg-primary-500 text-white'
+                  : 'bg-green-500 text-white'
             }`}
           >
             <p className="text-sm">{message.content}</p>

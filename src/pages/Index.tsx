@@ -1,6 +1,7 @@
 
 import Profile from "@/components/Profile";
 import Messages from "@/components/Messages";
+import MessagesPersonal from "@/components/MessagesPersonal";
 import { MessagesTab } from "@/components/admin/MessagesTab";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,9 +35,14 @@ const Index = () => {
           <MessagesTab />
         </div>
       ) : (
-        <div className="w-full">
-          <Messages />
-        </div>
+        <>
+          <div className="w-full">
+            <Messages />
+          </div>
+          <div className="w-full">
+            <MessagesPersonal />
+          </div>
+        </>
       )}
     </div>
   );
