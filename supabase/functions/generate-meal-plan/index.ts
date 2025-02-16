@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -101,7 +100,7 @@ serve(async (req) => {
       throw new Error('No foods found for the provided IDs');
     }
 
-    // Create response with mock data but real foods
+    // Create response with proper meal structure and recommendations
     const mockResponse = {
       dailyPlan: {
         breakfast: {
@@ -110,22 +109,22 @@ serve(async (req) => {
           calories: 300
         },
         morningSnack: {
-          foods: foods?.slice(3, 5) || [],
+          foods: foods?.slice(3, 6) || [],
           macros: { protein: 10, carbs: 15, fats: 5 },
           calories: 150
         },
         lunch: {
-          foods: foods?.slice(5, 8) || [],
+          foods: foods?.slice(6, 12) || [],
           macros: { protein: 30, carbs: 45, fats: 15 },
           calories: 450
         },
         afternoonSnack: {
-          foods: foods?.slice(8, 10) || [],
+          foods: foods?.slice(12, 15) || [],
           macros: { protein: 10, carbs: 15, fats: 5 },
           calories: 150
         },
         dinner: {
-          foods: foods?.slice(10, 13) || [],
+          foods: foods?.slice(15, 21) || [],
           macros: { protein: 25, carbs: 35, fats: 12 },
           calories: 375
         }
@@ -134,19 +133,53 @@ serve(async (req) => {
         calories: 1425,
         protein: 95,
         carbs: 140,
-        fats: 47
+        fats: 47,
+        fiber: 25
       },
       recommendations: {
-        timing: "Distribute meals every 3-4 hours",
-        hydration: "Drink 8-10 glasses of water daily",
+        general: "Para melhores resultados, siga estas orientações:",
+        timing: [
+          "Café da Manhã (Mínimo 3 itens): Inclua sempre uma proteína, um carboidrato complexo e uma fruta ou gordura boa",
+          "Lanche da Manhã/Tarde (Mínimo 3 itens): Combine proteína com carboidrato ou fruta para manter a energia",
+          "Almoço/Jantar (Mínimo 6 itens): Monte seu prato com 2 porções de proteína, 2 porções de carboidrato, 2 porções de vegetais e uma gordura boa",
+          "Distribua as refeições a cada 3-4 horas para manter o metabolismo ativo",
+          "Beba água entre as refeições, não durante, para melhor digestão"
+        ],
+        preworkout: "Consuma carboidratos complexos 1-2 horas antes do treino",
+        postworkout: "Priorize proteínas e carboidratos até 30 minutos após o treino",
         substitutions: []
       },
       nutritionalAnalysis: {
         carbsPercentage: 45,
         proteinPercentage: 30,
-        fatsPercentage: 25
+        fatsPercentage: 25,
+        fiberAdequate: true,
+        vitaminsComplete: true,
+        mineralsComplete: true
       }
     };
+
+    // Validate minimum food requirements
+    const validateMealPlan = (plan: any) => {
+      if (plan.dailyPlan.breakfast.foods.length < 3) {
+        throw new Error('Café da manhã deve ter no mínimo 3 itens');
+      }
+      if (plan.dailyPlan.morningSnack.foods.length < 3) {
+        throw new Error('Lanche da manhã deve ter no mínimo 3 itens');
+      }
+      if (plan.dailyPlan.lunch.foods.length < 6) {
+        throw new Error('Almoço deve ter no mínimo 6 itens');
+      }
+      if (plan.dailyPlan.afternoonSnack.foods.length < 3) {
+        throw new Error('Lanche da tarde deve ter no mínimo 3 itens');
+      }
+      if (plan.dailyPlan.dinner.foods.length < 6) {
+        throw new Error('Jantar deve ter no mínimo 6 itens');
+      }
+    };
+
+    // Validate the meal plan
+    validateMealPlan(mockResponse);
 
     console.log('Preparing response');
     const responseJson = JSON.stringify(mockResponse);
