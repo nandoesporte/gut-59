@@ -90,5 +90,6 @@ export interface MealPlan {
     postworkout: string;
     general: string;
     timing: string[];
+    healthCondition?: "hipertensao" | "diabetes" | "depressao_ansiedade" | null;
   };
 }

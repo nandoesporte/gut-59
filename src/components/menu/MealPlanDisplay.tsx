@@ -227,9 +227,10 @@ export const MealPlanDisplay = ({ mealPlan, onReset }: MealPlanDisplayProps) => 
     }
 
     // Adiciona considerações específicas de saúde se houver condições especiais
-    if (mealPlan.recommendations?.healthCondition) {
+    const healthCondition = mealPlan.recommendations?.healthCondition;
+    if (healthCondition) {
       description += "\nConsiderações especiais de saúde:\n";
-      switch (mealPlan.recommendations.healthCondition) {
+      switch (healthCondition) {
         case "hipertensao":
           description += "• Preparações com baixo teor de sódio\n";
           description += "• Alimentos ricos em potássio e magnésio\n";
