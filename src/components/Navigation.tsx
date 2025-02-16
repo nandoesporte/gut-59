@@ -57,6 +57,12 @@ const Navigation = () => {
             active={isActive("/menu")}
           />
           <NavLink
+            to="/instructions"
+            icon={<Book className="w-5 h-5 md:w-6 md:h-6" />}
+            text="Instruções"
+            active={isActive("/instructions")}
+          />
+          <NavLink
             to="/trainer"
             icon={<Dumbbell className="w-5 h-5 md:w-6 md:h-6" />}
             text="Treino"

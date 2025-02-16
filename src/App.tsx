@@ -90,6 +90,16 @@ function App() {
                 }
               />
               <Route
+                path="/instructions"
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <Trainer />
+                    </Layout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/progress"
                 element={
                   <ProtectedRoute>
