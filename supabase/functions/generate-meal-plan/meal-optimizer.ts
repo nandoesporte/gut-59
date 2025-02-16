@@ -1,6 +1,4 @@
-
 import type { Food, MacroTargets, FoodWithPortion } from './types.ts';
-import { calculatePortion, validateNutrition } from './calculators.ts';
 
 export function analyzeWorkoutCompatibility(
   foods: Food[],
@@ -20,7 +18,109 @@ export function analyzeWorkoutCompatibility(
   });
 }
 
-export function calculateNutritionalScore(
+function calculatePortionSize(
+  food: Food,
+  targetCalories: number,
+  macroTargets: MacroTargets
+): FoodWithPortion {
+  // Calcula a porção ideal baseada nas calorias alvo
+  const caloriesPerGram = food.calories / food.serving_size;
+  let targetPortion = Math.round((targetCalories / caloriesPerGram) * 100) / 100;
+
+  // Ajusta a porção para uma medida mais amigável
+  let portionUnit = food.serving_unit;
+  let friendlyPortion = targetPortion;
+
+  // Converte para medidas caseiras quando possível
+  if (food.serving_unit === 'g' || food.serving_unit === 'ml') {
+    if (food.name.includes('pão')) {
+      portionUnit = 'fatia';
+      friendlyPortion = Math.round(targetPortion / 30);
+    } else if (food.name.includes('arroz') || food.name.includes('quinoa')) {
+      portionUnit = 'xícara';
+      friendlyPortion = Math.round((targetPortion / 100) * 10) / 10;
+    } else if (food.name.includes('azeite') || food.name.includes('manteiga')) {
+      portionUnit = 'colher de sopa';
+      friendlyPortion = Math.round((targetPortion / 15) * 10) / 10;
+    } else if (food.name.includes('granola')) {
+      portionUnit = 'colher de sopa';
+      friendlyPortion = Math.round(targetPortion / 15);
+    }
+  }
+
+  const calculatedCalories = Math.round((food.calories / food.serving_size) * targetPortion);
+  const calculatedProtein = Math.round((food.protein / food.serving_size) * targetPortion * 10) / 10;
+  const calculatedCarbs = Math.round((food.carbs / food.serving_size) * targetPortion * 10) / 10;
+  const calculatedFats = Math.round((food.fats / food.serving_size) * targetPortion * 10) / 10;
+  const calculatedFiber = Math.round((food.fiber / food.serving_size) * targetPortion * 10) / 10;
+
+  return {
+    ...food,
+    portion: friendlyPortion,
+    portionUnit,
+    calculatedNutrients: {
+      calories: calculatedCalories,
+      protein: calculatedProtein,
+      carbs: calculatedCarbs,
+      fats: calculatedFats,
+      fiber: calculatedFiber
+    }
+  };
+}
+
+export function optimizeMealCombinations(
+  foods: Food[],
+  targetCalories: number,
+  macroTargets: MacroTargets,
+  goal: string,
+  userPreferences: {
+    likedFoods?: string[];
+    dislikedFoods?: string[];
+  }
+): FoodWithPortion[] {
+  const mealFoods: FoodWithPortion[] = [];
+  let remainingCalories = targetCalories;
+  const minCaloriesPerFood = 30; // Mínimo de calorias por alimento para evitar porções muito pequenas
+
+  // Ordena os alimentos por score nutricional
+  const scoredFoods = foods
+    .map(food => ({
+      ...food,
+      score: calculateNutritionalScore(food, goal, userPreferences)
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  // Distribui as calorias entre os alimentos
+  for (const food of scoredFoods) {
+    if (remainingCalories < minCaloriesPerFood || mealFoods.length >= 5) break;
+
+    // Calcula quantas calorias alocar para este alimento
+    let foodCalories = Math.min(
+      remainingCalories,
+      food.calories * 2 // Limita a porção a 2x o tamanho padrão
+    );
+
+    if (food.meal_type.includes('protein')) {
+      foodCalories = Math.max(foodCalories, targetCalories * 0.3);
+    }
+
+    const portionedFood = calculatePortionSize(food, foodCalories, {
+      protein: macroTargets.protein * (foodCalories / targetCalories),
+      carbs: macroTargets.carbs * (foodCalories / targetCalories),
+      fats: macroTargets.fats * (foodCalories / targetCalories),
+      fiber: macroTargets.fiber * (foodCalories / targetCalories)
+    });
+
+    if (portionedFood.calculatedNutrients.calories > 0) {
+      mealFoods.push(portionedFood);
+      remainingCalories -= portionedFood.calculatedNutrients.calories;
+    }
+  }
+
+  return mealFoods;
+}
+
+function calculateNutritionalScore(
   food: Food,
   goal: string,
   userPreferences: {
@@ -41,7 +141,7 @@ export function calculateNutritionalScore(
     case 'lose':
       if (food.fiber > 3) score += 2;
       if (food.glycemic_index && food.glycemic_index < 55) score += 2;
-      if (food.protein / food.calories > 0.1) score += 2; // Densidade proteica
+      if (food.protein / food.calories > 0.1) score += 2;
       break;
     case 'gain':
       if (food.calories > 200) score += 1;
@@ -63,59 +163,6 @@ export function calculateNutritionalScore(
   }
 
   return score;
-}
-
-export function optimizeMealCombinations(
-  foods: Food[],
-  targetCalories: number,
-  macroTargets: MacroTargets,
-  goal: string,
-  userPreferences: {
-    likedFoods?: string[];
-    dislikedFoods?: string[];
-  }
-): FoodWithPortion[] {
-  const combinations: FoodWithPortion[][] = [];
-  const maxFoods = 4;
-  const maxAttempts = 10;
-  let attempts = 0;
-
-  while (attempts < maxAttempts && combinations.length < 3) {
-    const scoredFoods = foods
-      .map(food => ({
-        ...food,
-        nutritionalScore: calculateNutritionalScore(food, goal, userPreferences)
-      }))
-      .sort((a, b) => b.nutritionalScore - a.nutritionalScore);
-
-    const selectedFoods: FoodWithPortion[] = [];
-    let remainingCalories = targetCalories;
-    let remainingTargets = { ...macroTargets };
-
-    for (let i = 0; i < Math.min(maxFoods, scoredFoods.length) && remainingCalories > 0; i++) {
-      const food = scoredFoods[i];
-      const portionedFood = calculatePortion(food, remainingCalories, remainingTargets);
-      
-      if (portionedFood.calculatedNutrients.calories > 0) {
-        selectedFoods.push(portionedFood);
-        remainingCalories -= portionedFood.calculatedNutrients.calories;
-        remainingTargets = {
-          protein: remainingTargets.protein - portionedFood.calculatedNutrients.protein,
-          carbs: remainingTargets.carbs - portionedFood.calculatedNutrients.carbs,
-          fats: remainingTargets.fats - portionedFood.calculatedNutrients.fats,
-          fiber: remainingTargets.fiber - portionedFood.calculatedNutrients.fiber
-        };
-      }
-    }
-
-    if (validateNutrition(selectedFoods, macroTargets)) {
-      combinations.push(selectedFoods);
-    }
-
-    attempts++;
-  }
-
-  return combinations[0] || [];
 }
 
 export function generateWeeklyPlan(
