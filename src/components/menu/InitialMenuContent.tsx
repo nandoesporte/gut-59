@@ -21,13 +21,17 @@ export const InitialMenuContent = ({ onStartDiet }: InitialMenuContentProps) => 
       <MenuHeader onStart={onStartDiet} />
       <div className="space-y-8 mt-8">
         <div className="bg-[#F2FCE2] rounded-lg shadow-sm p-6 border border-green-100">
-          <h2 className="text-2xl font-semibold text-green-500 mb-6">Registro de Sintomas</h2>
-          <SymptomTracker />
+          <p className="text-lg text-gray-700 leading-relaxed">
+            Descubra o Protocolo de Modulação Intestinal, desenvolvido pelas nossas nutricionistas especialistas, para ajudar você a alcançar um equilíbrio digestivo e melhorar sua saúde intestinal.
+          </p>
         </div>
 
         <div className="bg-[#F2FCE2] rounded-lg shadow-sm p-6 border border-green-100">
-          <h2 className="text-2xl font-semibold text-green-500 mb-6">Protocolo de Modulação Intestinal</h2>
           <Education />
+        </div>
+
+        <div className="bg-[#F2FCE2] rounded-lg shadow-sm p-6 border border-green-100">
+          <SymptomTracker />
         </div>
 
         <Card className="bg-[#F2FCE2] shadow-sm border border-green-100">
