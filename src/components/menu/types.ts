@@ -16,6 +16,8 @@ export interface ProtocolFood {
     fats: number;
     fiber: number;
   };
+  vitamins_minerals?: Record<string, number>;
+  substitution_group?: string;
 }
 
 export interface DietaryPreferences {
@@ -23,6 +25,12 @@ export interface DietaryPreferences {
   allergies: string[];
   dietaryRestrictions: string[];
   trainingTime: string | null;
+}
+
+export interface FoodSubstitution {
+  originalFood: ProtocolFood;
+  alternatives: ProtocolFood[];
+  similarityScore: number;
 }
 
 export interface MealPlan {
@@ -91,5 +99,29 @@ export interface MealPlan {
     general: string;
     timing: string[];
     healthCondition?: "hipertensao" | "diabetes" | "depressao_ansiedade" | null;
+    substitutions?: FoodSubstitution[];
+  };
+  nutritionalAnalysis?: {
+    carbsPercentage: number;
+    proteinPercentage: number;
+    fatsPercentage: number;
+    fiberAdequate: boolean;
+    vitaminsComplete: boolean;
+    mineralsComplete: boolean;
+  };
+}
+
+export interface WeeklyMealPlan {
+  weekStartDate: string;
+  dailyPlans: {
+    [key: string]: MealPlan;
+  };
+  nutritionalAnalysis: {
+    averageMacroDistribution: {
+      carbs: number;
+      protein: number;
+      fats: number;
+    };
+    varietyScore: number;
   };
 }

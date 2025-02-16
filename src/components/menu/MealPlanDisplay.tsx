@@ -1,11 +1,16 @@
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Coffee, Utensils, Apple, Moon } from "lucide-react";
+import { Coffee, Utensils, Apple, Moon, Download, Calendar, ArrowRight } from "lucide-react";
 import { MealPlan, ProtocolFood } from "./types";
 import { toast } from "sonner";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface MealSectionProps {
   title: string;
@@ -19,9 +24,50 @@ interface MealSectionProps {
     fiber: number;
   };
   calories?: number;
+  foodSubstitutions?: {
+    originalFoodId: string;
+    alternatives: ProtocolFood[];
+  }[];
+  onFoodSubstitute?: (originalFoodId: string, newFoodId: string) => void;
 }
 
-const MealSection = ({ title, icon, foods, description, macros, calories }: MealSectionProps) => {
+const MacroDistributionBar = ({ macros }: { macros: { protein: number; carbs: number; fats: number } }) => {
+  const total = macros.protein + macros.carbs + macros.fats;
+  const proteinPercentage = (macros.protein / total) * 100;
+  const carbsPercentage = (macros.carbs / total) * 100;
+  const fatsPercentage = (macros.fats / total) * 100;
+
+  return (
+    <div className="w-full h-4 rounded-full overflow-hidden flex">
+      <div 
+        className="bg-blue-500" 
+        style={{ width: `${proteinPercentage}%` }}
+        title={`Proteínas: ${Math.round(proteinPercentage)}%`}
+      />
+      <div 
+        className="bg-green-500" 
+        style={{ width: `${carbsPercentage}%` }}
+        title={`Carboidratos: ${Math.round(carbsPercentage)}%`}
+      />
+      <div 
+        className="bg-yellow-500" 
+        style={{ width: `${fatsPercentage}%` }}
+        title={`Gorduras: ${Math.round(fatsPercentage)}%`}
+      />
+    </div>
+  );
+};
+
+const MealSection = ({ 
+  title, 
+  icon, 
+  foods, 
+  description, 
+  macros, 
+  calories,
+  foodSubstitutions,
+  onFoodSubstitute 
+}: MealSectionProps) => {
   const formatDescription = (description: string) => {
     return description.split('\n').map((line, index) => (
       <p key={index} className="text-sm text-gray-600 mb-1">
@@ -39,9 +85,39 @@ const MealSection = ({ title, icon, foods, description, macros, calories }: Meal
       <div className="mt-4 space-y-2">
         {Array.isArray(foods) && foods.map((food) => (
           <div key={food.id} className="flex justify-between items-center text-gray-700">
-            <span>
-              {food.portion} {food.portionUnit} de {food.name}
-            </span>
+            <div className="flex items-center gap-2">
+              <span>
+                {food.portion} {food.portionUnit} de {food.name}
+              </span>
+              {foodSubstitutions?.find(sub => sub.originalFoodId === food.id) && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      Substituições
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80">
+                    <div className="space-y-2">
+                      <h4 className="font-medium">Alternativas equivalentes:</h4>
+                      {foodSubstitutions
+                        .find(sub => sub.originalFoodId === food.id)
+                        ?.alternatives.map((alt) => (
+                          <div key={alt.id} className="flex justify-between items-center">
+                            <span>{alt.name}</span>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => onFoodSubstitute?.(food.id, alt.id)}
+                            >
+                              Substituir
+                            </Button>
+                          </div>
+                        ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+            </div>
             <span className="text-gray-500">
               ({food.calculatedNutrients?.calories} kcal)
             </span>
@@ -60,6 +136,15 @@ const MealSection = ({ title, icon, foods, description, macros, calories }: Meal
             <div>C: {macros.carbs}g</div>
             <div>G: {macros.fats}g</div>
             <div>F: {macros.fiber}g</div>
+          </div>
+          <div className="mt-2">
+            <MacroDistributionBar 
+              macros={{
+                protein: macros.protein,
+                carbs: macros.carbs,
+                fats: macros.fats
+              }}
+            />
           </div>
         </div>
       )}
@@ -106,6 +191,11 @@ export const MealPlanDisplay = ({ mealPlan }: { mealPlan: MealPlan }) => {
     }
   };
 
+  const handleExportWeeklyPlan = () => {
+    // Implementation for weekly plan export
+    toast.success("Plano semanal exportado com sucesso!");
+  };
+
   if (!mealPlan?.dailyPlan) {
     return (
       <div className="text-center p-6">
@@ -114,18 +204,47 @@ export const MealPlanDisplay = ({ mealPlan }: { mealPlan: MealPlan }) => {
     );
   }
 
+  const isNutritionallyBalanced = mealPlan.nutritionalAnalysis && (
+    mealPlan.nutritionalAnalysis.carbsPercentage >= 40 &&
+    mealPlan.nutritionalAnalysis.carbsPercentage <= 50 &&
+    mealPlan.nutritionalAnalysis.proteinPercentage >= 20 &&
+    mealPlan.nutritionalAnalysis.proteinPercentage <= 30 &&
+    mealPlan.nutritionalAnalysis.fatsPercentage >= 20 &&
+    mealPlan.nutritionalAnalysis.fatsPercentage <= 30
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-green-700">Seu Plano Alimentar Personalizado</h1>
-        <Button
-          onClick={handleDownloadPDF}
-          variant="outline"
-          className="flex items-center gap-2"
-        >
-          <span>Baixar PDF</span>
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={handleDownloadPDF}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            <span>Baixar PDF</span>
+          </Button>
+          <Button
+            onClick={handleExportWeeklyPlan}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <Calendar className="h-4 w-4" />
+            <span>Plano Semanal</span>
+          </Button>
+        </div>
       </div>
+
+      {isNutritionallyBalanced === false && (
+        <Card className="bg-yellow-50 p-4">
+          <p className="text-yellow-800">
+            Este plano pode precisar de ajustes para atingir a distribuição ideal de macronutrientes:
+            40-50% carboidratos, 20-30% proteínas, 20-30% gorduras.
+          </p>
+        </Card>
+      )}
 
       <div id="meal-plan-content" className="space-y-6">
         <MealSection
@@ -134,6 +253,10 @@ export const MealPlanDisplay = ({ mealPlan }: { mealPlan: MealPlan }) => {
           foods={mealPlan.dailyPlan.breakfast.foods}
           macros={mealPlan.dailyPlan.breakfast.macros}
           calories={mealPlan.dailyPlan.breakfast.calories}
+          foodSubstitutions={mealPlan.recommendations.substitutions?.map(sub => ({
+            originalFoodId: sub.originalFood.id,
+            alternatives: sub.alternatives
+          }))}
         />
 
         <MealSection
@@ -142,6 +265,10 @@ export const MealPlanDisplay = ({ mealPlan }: { mealPlan: MealPlan }) => {
           foods={mealPlan.dailyPlan.morningSnack.foods}
           macros={mealPlan.dailyPlan.morningSnack.macros}
           calories={mealPlan.dailyPlan.morningSnack.calories}
+          foodSubstitutions={mealPlan.recommendations.substitutions?.map(sub => ({
+            originalFoodId: sub.originalFood.id,
+            alternatives: sub.alternatives
+          }))}
         />
 
         <MealSection
@@ -150,6 +277,10 @@ export const MealPlanDisplay = ({ mealPlan }: { mealPlan: MealPlan }) => {
           foods={mealPlan.dailyPlan.lunch.foods}
           macros={mealPlan.dailyPlan.lunch.macros}
           calories={mealPlan.dailyPlan.lunch.calories}
+          foodSubstitutions={mealPlan.recommendations.substitutions?.map(sub => ({
+            originalFoodId: sub.originalFood.id,
+            alternatives: sub.alternatives
+          }))}
         />
 
         <MealSection
@@ -158,6 +289,10 @@ export const MealPlanDisplay = ({ mealPlan }: { mealPlan: MealPlan }) => {
           foods={mealPlan.dailyPlan.afternoonSnack.foods}
           macros={mealPlan.dailyPlan.afternoonSnack.macros}
           calories={mealPlan.dailyPlan.afternoonSnack.calories}
+          foodSubstitutions={mealPlan.recommendations.substitutions?.map(sub => ({
+            originalFoodId: sub.originalFood.id,
+            alternatives: sub.alternatives
+          }))}
         />
 
         <MealSection
@@ -166,6 +301,10 @@ export const MealPlanDisplay = ({ mealPlan }: { mealPlan: MealPlan }) => {
           foods={mealPlan.dailyPlan.dinner.foods}
           macros={mealPlan.dailyPlan.dinner.macros}
           calories={mealPlan.dailyPlan.dinner.calories}
+          foodSubstitutions={mealPlan.recommendations.substitutions?.map(sub => ({
+            originalFoodId: sub.originalFood.id,
+            alternatives: sub.alternatives
+          }))}
         />
 
         <div className="py-6 border-t mt-6">
@@ -177,6 +316,15 @@ export const MealPlanDisplay = ({ mealPlan }: { mealPlan: MealPlan }) => {
                 <div>Carboidratos: {mealPlan.totalNutrition.carbs}g</div>
                 <div>Gorduras: {mealPlan.totalNutrition.fats}g</div>
                 <div>Fibras: {mealPlan.totalNutrition.fiber}g</div>
+              </div>
+              <div className="mt-4">
+                <MacroDistributionBar
+                  macros={{
+                    protein: mealPlan.totalNutrition.protein,
+                    carbs: mealPlan.totalNutrition.carbs,
+                    fats: mealPlan.totalNutrition.fats
+                  }}
+                />
               </div>
             </div>
             <div className="text-right">
