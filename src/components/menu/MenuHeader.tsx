@@ -10,7 +10,7 @@ export const MenuHeader = ({ onStart }: { onStart: () => void }) => {
         <div className="text-center space-y-6">
           <h1 className="text-2xl font-bold text-gray-900">Como Montar sua Dieta?</h1>
           <p className="text-gray-600">
-            Vamos te ajudar a criar um plano alimentar personalizado baseado em suas necessidades
+            Nosso sistema utiliza inteligência artificial elaborada por profissionais especializados, mestres e doutores na área de nutrição e saúde, para criar um plano alimentar personalizado com base nos seus dados e preferências. Combinamos tecnologia avançada com conhecimento científico para oferecer a você um cardápio equilibrado, adaptado ao seu estilo de vida e objetivos nutricionais
           </p>
         </div>
 
