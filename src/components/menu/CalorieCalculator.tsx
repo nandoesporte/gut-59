@@ -130,27 +130,6 @@ export const CalorieCalculator = ({
             </SelectContent>
           </Select>
         </div>
-
-        <div className="space-y-4">
-          <Label htmlFor="goal">Objetivo</Label>
-          <Select
-            value={formData.goal}
-            onValueChange={(value) => onInputChange("goal", value)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione seu objetivo" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {Object.entries(goals).map(([key, { label }]) => (
-                  <SelectItem key={key} value={key}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
       </div>
 
       <div className="flex justify-center">
