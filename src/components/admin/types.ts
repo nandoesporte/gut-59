@@ -163,3 +163,24 @@ export interface TrainingVideoFormValues {
   url: string;
   status: 'active' | 'inactive';
 }
+
+export interface Professional {
+  id: string;
+  name: string;
+  title: string;
+  description: string | null;
+  photo_url: string | null;
+  display_order: number;
+  status: 'active' | 'inactive';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProfessionalFormValues {
+  name: string;
+  title: string;
+  description?: string;
+  photo_url?: string;
+  display_order: number;
+  status: 'active' | 'inactive';
+}

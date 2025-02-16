@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { TrainingModule, TrainingVideo } from '@/components/admin/types';
 import { useNavigate } from 'react-router-dom';
 import { toast } from "sonner";
+import { ProfessionalsSection } from '@/components/professionals/ProfessionalsSection';
 
 const Trainer: React.FC = () => {
   const [selectedVideo, setSelectedVideo] = useState<TrainingVideo | null>(null);
@@ -153,9 +154,10 @@ const Trainer: React.FC = () => {
           })
         )}
       </div>
+
+      <ProfessionalsSection />
     </div>
   );
 };
 
 export default Trainer;
-
