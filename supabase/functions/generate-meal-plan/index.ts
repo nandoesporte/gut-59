@@ -16,6 +16,7 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { 
       status: 204,
@@ -25,7 +26,7 @@ serve(async (req) => {
 
   try {
     const requestData = await req.json();
-    console.log('Received request data:', requestData);
+    console.log('Received request data:', JSON.stringify(requestData, null, 2));
 
     const { userData, selectedFoods, dietaryPreferences } = requestData;
 
@@ -138,7 +139,8 @@ serve(async (req) => {
             fiber: Math.round(macroTargets.fiber * 0.25)
           },
           userData.goal,
-          { likedFoods: userData.lastFeedback?.likedFoods }
+          { likedFoods: userData.lastFeedback?.likedFoods },
+          'breakfast'
         ),
         calories: mealCalories.breakfast,
         macros: {
@@ -159,7 +161,8 @@ serve(async (req) => {
             fiber: Math.round(macroTargets.fiber * 0.15)
           },
           userData.goal,
-          { likedFoods: userData.lastFeedback?.likedFoods }
+          { likedFoods: userData.lastFeedback?.likedFoods },
+          'snack'
         ),
         calories: mealCalories.morningSnack,
         macros: {
@@ -180,7 +183,8 @@ serve(async (req) => {
             fiber: Math.round(macroTargets.fiber * 0.30)
           },
           userData.goal,
-          { likedFoods: userData.lastFeedback?.likedFoods }
+          { likedFoods: userData.lastFeedback?.likedFoods },
+          'main'
         ),
         calories: mealCalories.lunch,
         macros: {
@@ -201,7 +205,8 @@ serve(async (req) => {
             fiber: Math.round(macroTargets.fiber * 0.10)
           },
           userData.goal,
-          { likedFoods: userData.lastFeedback?.likedFoods }
+          { likedFoods: userData.lastFeedback?.likedFoods },
+          'snack'
         ),
         calories: mealCalories.afternoonSnack,
         macros: {
@@ -222,7 +227,8 @@ serve(async (req) => {
             fiber: Math.round(macroTargets.fiber * 0.20)
           },
           userData.goal,
-          { likedFoods: userData.lastFeedback?.likedFoods }
+          { likedFoods: userData.lastFeedback?.likedFoods },
+          'main'
         ),
         calories: mealCalories.dinner,
         macros: {
@@ -252,7 +258,7 @@ serve(async (req) => {
 
     console.log('Generated meal plan:', JSON.stringify(mealPlan, null, 2));
 
-    // Salvar o plano no banco de dados
+    // Save the plan to the database
     const { error: saveError } = await supabase
       .from('meal_plans')
       .insert({
