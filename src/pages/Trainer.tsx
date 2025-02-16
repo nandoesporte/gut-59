@@ -99,6 +99,8 @@ const Trainer: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <ProfessionalsSection />
+
       <div className="flex items-center gap-3 mb-8">
         <ScrollText className="w-8 h-8 text-primary-500" />
         <h1 className="text-2xl font-bold bg-gradient-to-r from-primary-500 to-primary-600 bg-clip-text text-transparent">
@@ -154,8 +156,6 @@ const Trainer: React.FC = () => {
           })
         )}
       </div>
-
-      <ProfessionalsSection />
     </div>
   );
 };
