@@ -3,7 +3,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.0';
 import { calculateHarrisBenedict, calculateMifflinStJeor, adjustCaloriesForGoal, calculateMacroDistribution } from './calculators.ts';
-import { analyzeWorkoutCompatibility, optimizeMealCombinations } from './meal-optimizer.ts';
+import { analyzeWorkoutCompatibility, optimizeMealCombinations, generateWeeklyPlan } from './meal-optimizer.ts';
 import { generateTimingRecommendations } from './recommendations.ts';
 import type { UserData, DietaryPreferences, Food, FoodWithPortion } from './types.ts';
 
@@ -266,3 +266,35 @@ serve(async (req) => {
       });
 
     if (saveError) {
+      console.error('Error saving meal plan:', saveError);
+      return new Response(
+        JSON.stringify({
+          error: 'Failed to save meal plan',
+          details: saveError.message
+        }),
+        { 
+          status: 500,
+          headers: corsHeaders
+        }
+      );
+    }
+
+    return new Response(
+      JSON.stringify(mealPlan),
+      { headers: corsHeaders }
+    );
+
+  } catch (error) {
+    console.error('General error:', error);
+    return new Response(
+      JSON.stringify({
+        error: 'Internal Server Error',
+        details: error.message
+      }),
+      { 
+        status: 500,
+        headers: corsHeaders
+      }
+    );
+  }
+});
