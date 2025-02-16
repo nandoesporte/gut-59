@@ -1,8 +1,9 @@
+
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { ProtocolFood, DietaryPreferences, MealPlan } from "./types";
-import { CalorieCalculatorForm, activityLevels, goals } from "./CalorieCalculator";
+import { CalorieCalculatorForm, activityLevels } from "./CalorieCalculator";
 import type { HealthCondition } from "./HealthConditionCards";
 import type { Goal } from "./GoalCards";
 
@@ -70,7 +71,12 @@ export const useMenuController = () => {
 
     const bmr = calculateBMR(formData);
     const activityFactor = activityLevels[formData.activityLevel as keyof typeof activityLevels].factor;
-    const goalFactor = goals[formData.goal as keyof typeof goals].factor;
+    const goalFactors = {
+      lose: 0.8,
+      maintain: 1,
+      gain: 1.2
+    };
+    const goalFactor = goalFactors[formData.goal];
     const dailyCalories = Math.round(bmr * activityFactor * goalFactor);
 
     setCalorieNeeds(dailyCalories);
