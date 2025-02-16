@@ -1,107 +1,14 @@
+
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { CalorieCalculator, CalorieCalculatorForm, activityLevels, goals } from "@/components/menu/CalorieCalculator";
 import { FoodSelector } from "@/components/menu/FoodSelector";
 import { DietaryPreferencesForm } from "@/components/menu/DietaryPreferencesForm";
-import { Button } from "@/components/ui/button";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { MenuHeader } from "@/components/menu/MenuHeader";
+import { MealPlanDisplay } from "@/components/menu/MealPlanDisplay";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Coffee, Utensils, Apple, Moon, Dumbbell, Plus } from "lucide-react";
-
-interface ProtocolFood {
-  id: string;
-  name: string;
-  calories: number;
-  protein: number;
-  carbs: number;
-  fats: number;
-  food_group_id: number;
-  portion?: number;
-  portionUnit?: string;
-  calculatedNutrients?: {
-    calories: number;
-    protein: number;
-    carbs: number;
-    fats: number;
-    fiber: number;
-  };
-}
-
-interface DietaryPreferences {
-  hasAllergies: boolean;
-  allergies: string[];
-  dietaryRestrictions: string[];
-  trainingTime: string | null;
-}
-
-interface MealPlan {
-  dailyPlan: {
-    breakfast: {
-      foods: ProtocolFood[];
-      calories: number;
-      macros: {
-        protein: number;
-        carbs: number;
-        fats: number;
-        fiber: number;
-      };
-    };
-    morningSnack: {
-      foods: ProtocolFood[];
-      calories: number;
-      macros: {
-        protein: number;
-        carbs: number;
-        fats: number;
-        fiber: number;
-      };
-    };
-    lunch: {
-      foods: ProtocolFood[];
-      calories: number;
-      macros: {
-        protein: number;
-        carbs: number;
-        fats: number;
-        fiber: number;
-      };
-    };
-    afternoonSnack: {
-      foods: ProtocolFood[];
-      calories: number;
-      macros: {
-        protein: number;
-        carbs: number;
-        fats: number;
-        fiber: number;
-      };
-    };
-    dinner: {
-      foods: ProtocolFood[];
-      calories: number;
-      macros: {
-        protein: number;
-        carbs: number;
-        fats: number;
-        fiber: number;
-      };
-    };
-  };
-  totalNutrition: {
-    calories: number;
-    protein: number;
-    carbs: number;
-    fats: number;
-    fiber: number;
-  };
-  recommendations: {
-    preworkout: string;
-    postworkout: string;
-    general: string;
-    timing: string[];
-  };
-}
+import type { ProtocolFood, DietaryPreferences, MealPlan } from "@/components/menu/types";
 
 const Menu = () => {
   const [currentStep, setCurrentStep] = useState<number>(1);
@@ -245,59 +152,7 @@ const Menu = () => {
   const renderStep = () => {
     switch (currentStep) {
       case 1:
-        return (
-          <div className="space-y-8">
-            <div className="flex items-center justify-between mb-6">
-              <img src="/logo.png" alt="Logo" className="h-8" />
-              <Button variant="outline" size="sm">
-                Suporte
-              </Button>
-            </div>
-
-            <Card className="p-6">
-              <div className="text-center space-y-6">
-                <h1 className="text-2xl font-bold text-gray-900">Como Montar sua Dieta?</h1>
-                <p className="text-gray-600">
-                  Vamos te ajudar a criar um plano alimentar personalizado baseado em suas necessidades
-                </p>
-              </div>
-
-              <div className="mt-8">
-                <Accordion type="single" collapsible className="w-full">
-                  <AccordionItem value="how">
-                    <AccordionTrigger>Como funciona?</AccordionTrigger>
-                    <AccordionContent>
-                      O nosso sistema utiliza inteligência artificial para criar um plano alimentar personalizado 
-                      baseado nos seus dados e preferências.
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="receive">
-                    <AccordionTrigger>Como receber a Dieta?</AccordionTrigger>
-                    <AccordionContent>
-                      Após preencher seus dados, você receberá um plano detalhado com todas as refeições 
-                      e recomendações personalizadas.
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="start">
-                    <AccordionTrigger>Como começar?</AccordionTrigger>
-                    <AccordionContent>
-                      Clique no botão abaixo para começar a montar sua dieta personalizada.
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-
-                <Button 
-                  onClick={() => setCurrentStep(1.5)}
-                  className="w-full mt-6 bg-green-500 hover:bg-green-600 text-white"
-                >
-                  MONTAR MINHA DIETA
-                </Button>
-              </div>
-            </Card>
-          </div>
-        );
+        return <MenuHeader onStart={() => setCurrentStep(1.5)} />;
       case 1.5:
         return (
           <Card className="p-6">
@@ -313,13 +168,6 @@ const Menu = () => {
               onCalculate={handleCalculateCalories}
               calorieNeeds={calorieNeeds}
             />
-            <Button 
-              variant="outline" 
-              onClick={() => setCurrentStep(1)}
-              className="mt-4"
-            >
-              Voltar
-            </Button>
           </Card>
         );
       case 2:
@@ -346,147 +194,7 @@ const Menu = () => {
         );
       case 4:
         if (!mealPlan) return null;
-        return (
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                <Coffee className="h-5 w-5" />
-                Café da manhã
-              </h2>
-              <div className="mt-4 grid grid-cols-3 gap-3">
-                {mealPlan.dailyPlan.breakfast?.foods.map((food) => (
-                  <Button
-                    key={food.id}
-                    variant="outline"
-                    className="flex items-center justify-center p-2 h-auto text-sm"
-                  >
-                    {food.name} ({food.portion}{food.portionUnit})
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                <Apple className="h-5 w-5" />
-                Lanche da Manhã
-              </h2>
-              <div className="mt-4 grid grid-cols-3 gap-3">
-                {mealPlan.dailyPlan.morningSnack?.foods.map((food) => (
-                  <Button
-                    key={food.id}
-                    variant="outline"
-                    className="flex items-center justify-center p-2 h-auto text-sm"
-                  >
-                    {food.name} ({food.portion}{food.portionUnit})
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                <Utensils className="h-5 w-5" />
-                Almoço
-              </h2>
-              <div className="mt-4 grid grid-cols-3 gap-3">
-                {mealPlan.dailyPlan.lunch?.foods.map((food) => (
-                  <Button
-                    key={food.id}
-                    variant="outline"
-                    className="flex items-center justify-center p-2 h-auto text-sm"
-                  >
-                    {food.name} ({food.portion}{food.portionUnit})
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                <Apple className="h-5 w-5" />
-                Lanche da Tarde
-              </h2>
-              <div className="mt-4 grid grid-cols-3 gap-3">
-                {mealPlan.dailyPlan.afternoonSnack?.foods.map((food) => (
-                  <Button
-                    key={food.id}
-                    variant="outline"
-                    className="flex items-center justify-center p-2 h-auto text-sm"
-                  >
-                    {food.name} ({food.portion}{food.portionUnit})
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                <Moon className="h-5 w-5" />
-                Jantar
-              </h2>
-              <div className="mt-4 grid grid-cols-3 gap-3">
-                {mealPlan.dailyPlan.dinner?.foods.map((food) => (
-                  <Button
-                    key={food.id}
-                    variant="outline"
-                    className="flex items-center justify-center p-2 h-auto text-sm"
-                  >
-                    {food.name} ({food.portion}{food.portionUnit})
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                <Dumbbell className="h-5 w-5" />
-                Treinos e Atividades
-              </h2>
-              <div className="mt-4 space-y-4">
-                <div>
-                  <h4 className="font-medium mb-2">Pré-treino:</h4>
-                  <p className="text-gray-600">{mealPlan.recommendations.preworkout}</p>
-                </div>
-                <div>
-                  <h4 className="font-medium mb-2">Pós-treino:</h4>
-                  <p className="text-gray-600">{mealPlan.recommendations.postworkout}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                <Plus className="h-5 w-5" />
-                Adicionais na Dieta
-              </h2>
-              <div className="mt-4">
-                <p className="text-gray-600">{mealPlan.recommendations.general}</p>
-                <div className="mt-4 space-y-2">
-                  {mealPlan.recommendations.timing.map((tip, index) => (
-                    <p key={index} className="text-gray-600">• {tip}</p>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4">
-              <div className="container mx-auto max-w-3xl">
-                <div className="text-center mb-2">
-                  <p className="text-sm text-gray-600">
-                    {mealPlan.totalNutrition.calories} kcal totais
-                  </p>
-                </div>
-                <Button 
-                  onClick={() => setCurrentStep(1)}
-                  className="w-full bg-green-500 hover:bg-green-600 text-white"
-                >
-                  COMEÇAR NOVA DIETA
-                </Button>
-              </div>
-            </div>
-          </div>
-        );
+        return <MealPlanDisplay mealPlan={mealPlan} onReset={() => setCurrentStep(1)} />;
       default:
         return null;
     }
