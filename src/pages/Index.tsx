@@ -1,10 +1,6 @@
 
 import Profile from "@/components/Profile";
-import SymptomTracker from "@/components/SymptomTracker";
-import FoodDiary from "@/components/FoodDiary";
-import Education from "@/components/Education";
 import Messages from "@/components/Messages";
-import ShoppingList from "@/components/ShoppingList";
 import { MessagesTab } from "@/components/admin/MessagesTab";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -42,18 +38,6 @@ const Index = () => {
           <Messages />
         </div>
       )}
-      <div className="w-full">
-        <SymptomTracker />
-      </div>
-      <div className="w-full">
-        <FoodDiary />
-      </div>
-      <div className="w-full">
-        <ShoppingList />
-      </div>
-      <div className="w-full">
-        <Education />
-      </div>
     </div>
   );
 };
