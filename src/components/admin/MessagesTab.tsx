@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
@@ -70,25 +69,26 @@ export const MessagesTab = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Buscar usuários que têm mensagens com a nutricionista
+      // Get admin user ID
       const { data: adminData } = await supabase
         .from('user_roles')
         .select('user_id')
         .eq('role', 'admin')
-        .single();
+        .maybeSingle();
 
-      if (!adminData) return;
-
-      // Buscar usuários que têm mensagens com o personal
+      // Get personal trainer user ID
       const { data: personalData } = await supabase
         .from('user_roles')
         .select('user_id')
         .eq('role', 'personal')
-        .single();
+        .maybeSingle();
 
-      if (!personalData) return;
+      const excludeIds = [
+        adminData?.user_id,
+        personalData?.user_id
+      ].filter(Boolean); // Filter out undefined values
 
-      // Buscar usuários que têm mensagens com a nutricionista
+      // Fetch users who have messages with the nutritionist
       const { data: nutritionistUsers, error: nutritionistError } = await supabase
         .from('profiles')
         .select(`
@@ -97,12 +97,11 @@ export const MessagesTab = () => {
           photo_url,
           unread_messages:messages!messages_receiver_id_fkey(count)
         `)
-        .neq('id', adminData.user_id)
-        .neq('id', personalData.user_id);
+        .not('id', 'in', `(${excludeIds.join(',')})`);
 
       if (nutritionistError) throw nutritionistError;
 
-      // Buscar usuários que têm mensagens com o personal
+      // Fetch users who have messages with the personal trainer
       const { data: personalUsers, error: personalError } = await supabase
         .from('profiles')
         .select(`
@@ -111,8 +110,7 @@ export const MessagesTab = () => {
           photo_url,
           unread_messages:messages!messages_receiver_id_fkey(count)
         `)
-        .neq('id', adminData.user_id)
-        .neq('id', personalData.user_id);
+        .not('id', 'in', `(${excludeIds.join(',')})`);
 
       if (personalError) throw personalError;
       
