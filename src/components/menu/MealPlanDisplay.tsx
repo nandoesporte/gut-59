@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Coffee, Utensils, Apple, Moon, Download, Calendar } from "lucide-react";
@@ -131,7 +132,7 @@ export const MealPlanDisplay = ({ mealPlan }: { mealPlan: MealPlan }) => {
       }
 
       // Adicionar rodapé em todas as páginas
-      const totalPages = pdf.internal.getNumberOfPages();
+      const totalPages = pdf.getNumberOfPages();
       for (let i = 1; i <= totalPages; i++) {
         pdf.setPage(i);
         pdf.setFontSize(8);
