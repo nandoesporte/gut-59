@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { CalorieCalculator, CalorieCalculatorForm, activityLevels, goals } from "@/components/menu/CalorieCalculator";
@@ -158,27 +159,27 @@ const Menu = () => {
 
   const renderAdditionalSections = () => (
     <div className="space-y-8 mt-8">
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        <h2 className="text-2xl font-semibold text-primary-700 mb-6">Diário Alimentar</h2>
+      <div className="bg-[#F2FCE2] rounded-lg shadow-sm p-6 border border-green-100">
+        <h2 className="text-2xl font-semibold text-green-800 mb-6">Diário Alimentar</h2>
         <FoodDiary />
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        <h2 className="text-2xl font-semibold text-primary-700 mb-6">Registro de Sintomas</h2>
+      <div className="bg-[#F2FCE2] rounded-lg shadow-sm p-6 border border-green-100">
+        <h2 className="text-2xl font-semibold text-green-800 mb-6">Registro de Sintomas</h2>
         <SymptomTracker />
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        <h2 className="text-2xl font-semibold text-primary-700 mb-6">Protocolo de Modulação Intestinal</h2>
+      <div className="bg-[#F2FCE2] rounded-lg shadow-sm p-6 border border-green-100">
+        <h2 className="text-2xl font-semibold text-green-800 mb-6">Protocolo de Modulação Intestinal</h2>
         <Education />
       </div>
 
-      <Card className="bg-white shadow-sm border-none">
+      <Card className="bg-[#F2FCE2] shadow-sm border border-green-100">
         <div className="p-4">
           <Button
             variant="ghost"
             onClick={() => setShowShopping(!showShopping)}
-            className="w-full flex justify-between items-center text-primary-500"
+            className="w-full flex justify-between items-center text-green-800 hover:text-green-700 hover:bg-green-50"
           >
             <span className="font-semibold">Lista de Compras</span>
             <ChevronDown className={`transform transition-transform ${showShopping ? 'rotate-180' : ''}`} />
@@ -199,17 +200,17 @@ const Menu = () => {
     switch (currentStep) {
       case 1:
         return (
-          <>
+          <div className="bg-[#F2FCE2]">
             <MenuHeader onStart={() => setCurrentStep(1.5)} />
             {renderAdditionalSections()}
-          </>
+          </div>
         );
       case 1.5:
         return (
-          <Card className="p-6">
+          <Card className="p-6 bg-[#F2FCE2] border border-green-100">
             <div className="text-center mb-6">
-              <h2 className="text-2xl font-semibold text-gray-900">Calcule suas Calorias</h2>
-              <p className="text-gray-600 mt-2">
+              <h2 className="text-2xl font-semibold text-green-800">Calcule suas Calorias</h2>
+              <p className="text-green-700 mt-2">
                 Preencha seus dados para calcularmos suas necessidades calóricas
               </p>
             </div>
@@ -252,7 +253,7 @@ const Menu = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-3xl min-h-screen pb-24">
+    <div className="container mx-auto px-4 py-8 max-w-3xl min-h-screen pb-24 bg-green-50">
       {renderStep()}
     </div>
   );
