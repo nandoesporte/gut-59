@@ -1,3 +1,4 @@
+
 import type { Food, MacroTargets, FoodWithPortion } from './types.ts';
 import { analyzeWorkoutCompatibility } from './workout-analyzer.ts';
 import { calculatePortionSize } from './portion-calculator.ts';

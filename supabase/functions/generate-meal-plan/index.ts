@@ -266,25 +266,3 @@ serve(async (req) => {
       });
 
     if (saveError) {
-      console.error('Error saving meal plan:', saveError);
-    }
-
-    return new Response(
-      JSON.stringify(mealPlan),
-      { headers: corsHeaders }
-    );
-
-  } catch (error) {
-    console.error('General error:', error);
-    return new Response(
-      JSON.stringify({
-        error: 'Internal Server Error',
-        details: error.message
-      }),
-      { 
-        status: 500,
-        headers: corsHeaders
-      }
-    );
-  }
-});
