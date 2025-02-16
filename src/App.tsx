@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -54,89 +54,87 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 function App() {
   return (
-    <React.StrictMode>
+    <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <QueryClientProvider client={queryClient}>
-          <TooltipProvider>
-            <Routes>
-              <Route
-                path="/"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <Index />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/store"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <Store />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/trainer"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <Trainer />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/instructions"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <Trainer />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/progress"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <Progress />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/menu"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <Menu />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <Admin />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-            <Toaster />
-          </TooltipProvider>
-        </QueryClientProvider>
+        <TooltipProvider>
+          <Routes>
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Index />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/store"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Store />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/trainer"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Trainer />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/instructions"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Trainer />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/progress"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Progress />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/menu"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Menu />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Admin />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+          <Toaster />
+        </TooltipProvider>
       </BrowserRouter>
-    </React.StrictMode>
+    </QueryClientProvider>
   );
 }
 
