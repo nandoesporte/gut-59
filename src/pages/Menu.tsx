@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { CalorieCalculator, CalorieCalculatorForm, activityLevels, goals } from "@/components/menu/CalorieCalculator";
@@ -9,6 +8,13 @@ import { MealPlanDisplay } from "@/components/menu/MealPlanDisplay";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { ProtocolFood, DietaryPreferences, MealPlan } from "@/components/menu/types";
+import SymptomTracker from "@/components/SymptomTracker";
+import FoodDiary from "@/components/FoodDiary";
+import ShoppingList from "@/components/ShoppingList";
+import Education from "@/components/Education";
+import { ChevronDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const Menu = () => {
   const [currentStep, setCurrentStep] = useState<number>(1);
@@ -18,6 +24,10 @@ const Menu = () => {
   const [totalCalories, setTotalCalories] = useState(0);
   const [dietaryPreferences, setDietaryPreferences] = useState<DietaryPreferences | null>(null);
   const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
+  const [showDiary, setShowDiary] = useState(false);
+  const [showSymptoms, setShowSymptoms] = useState(false);
+  const [showShopping, setShowShopping] = useState(false);
+  const [showProtocol, setShowProtocol] = useState(false);
   const [formData, setFormData] = useState<CalorieCalculatorForm>({
     weight: 0,
     height: 0,
@@ -149,10 +159,99 @@ const Menu = () => {
     });
   };
 
+  const renderAdditionalSections = () => (
+    <div className="space-y-6 mt-6">
+      <Card className="bg-white shadow-sm border-none">
+        <div className="p-4">
+          <Button
+            variant="ghost"
+            onClick={() => setShowDiary(!showDiary)}
+            className="w-full flex justify-between items-center text-primary-500"
+          >
+            <span className="font-semibold">Diário Alimentar</span>
+            <ChevronDown className={`transform transition-transform ${showDiary ? 'rotate-180' : ''}`} />
+          </Button>
+          {showDiary && (
+            <div className="mt-4">
+              <ScrollArea className="h-[500px]">
+                <FoodDiary />
+              </ScrollArea>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      <Card className="bg-white shadow-sm border-none">
+        <div className="p-4">
+          <Button
+            variant="ghost"
+            onClick={() => setShowSymptoms(!showSymptoms)}
+            className="w-full flex justify-between items-center text-primary-500"
+          >
+            <span className="font-semibold">Registro de Sintomas</span>
+            <ChevronDown className={`transform transition-transform ${showSymptoms ? 'rotate-180' : ''}`} />
+          </Button>
+          {showSymptoms && (
+            <div className="mt-4">
+              <ScrollArea className="h-[500px]">
+                <SymptomTracker />
+              </ScrollArea>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      <Card className="bg-white shadow-sm border-none">
+        <div className="p-4">
+          <Button
+            variant="ghost"
+            onClick={() => setShowShopping(!showShopping)}
+            className="w-full flex justify-between items-center text-primary-500"
+          >
+            <span className="font-semibold">Lista de Compras</span>
+            <ChevronDown className={`transform transition-transform ${showShopping ? 'rotate-180' : ''}`} />
+          </Button>
+          {showShopping && (
+            <div className="mt-4">
+              <ScrollArea className="h-[500px]">
+                <ShoppingList />
+              </ScrollArea>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      <Card className="bg-white shadow-sm border-none">
+        <div className="p-4">
+          <Button
+            variant="ghost"
+            onClick={() => setShowProtocol(!showProtocol)}
+            className="w-full flex justify-between items-center text-primary-500"
+          >
+            <span className="font-semibold">Protocolo de Modulação Intestinal</span>
+            <ChevronDown className={`transform transition-transform ${showProtocol ? 'rotate-180' : ''}`} />
+          </Button>
+          {showProtocol && (
+            <div className="mt-4">
+              <ScrollArea className="h-[500px]">
+                <Education />
+              </ScrollArea>
+            </div>
+          )}
+        </div>
+      </Card>
+    </div>
+  );
+
   const renderStep = () => {
     switch (currentStep) {
       case 1:
-        return <MenuHeader onStart={() => setCurrentStep(1.5)} />;
+        return (
+          <>
+            <MenuHeader onStart={() => setCurrentStep(1.5)} />
+            {renderAdditionalSections()}
+          </>
+        );
       case 1.5:
         return (
           <Card className="p-6">
