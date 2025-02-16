@@ -160,7 +160,7 @@ const Menu = () => {
     switch (currentStep) {
       case 1:
         return (
-          <div className="bg-[#F2FCE2]">
+          <>
             <MenuHeader onStart={() => setCurrentStep(1.5)} />
             <div className="space-y-8 mt-8">
               <div className="bg-[#F2FCE2] rounded-lg shadow-sm p-6 border border-green-100">
@@ -193,7 +193,7 @@ const Menu = () => {
                 </div>
               </Card>
             </div>
-          </div>
+          </>
         );
       case 1.5:
         return (
