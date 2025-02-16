@@ -48,9 +48,9 @@ const Layout = ({ children }: LayoutProps) => {
             <img 
               src="/lovable-uploads/9456a3bf-9bc8-45d6-9105-dd939e3362f5.png" 
               alt="Mais Saúde" 
-              className="h-10 w-auto"
+              className="h-8 w-auto sm:h-10"
             />
-            <h1 className="text-2xl font-bold text-primary-500">
+            <h1 className="text-xl sm:text-2xl font-bold text-primary-500">
               Mais Saúde
             </h1>
           </div>
@@ -59,7 +59,7 @@ const Layout = ({ children }: LayoutProps) => {
           )}
         </div>
       </header>
-      <main className="w-full px-4 sm:px-6 lg:px-8 py-4 pb-28 animate-fadeIn mt-16">
+      <main className="w-full px-2 sm:px-6 lg:px-8 py-4 pb-24 animate-fadeIn mt-16">
         {children}
       </main>
       <Navigation />
