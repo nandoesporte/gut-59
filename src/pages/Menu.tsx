@@ -24,10 +24,7 @@ const Menu = () => {
   const [totalCalories, setTotalCalories] = useState(0);
   const [dietaryPreferences, setDietaryPreferences] = useState<DietaryPreferences | null>(null);
   const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
-  const [showDiary, setShowDiary] = useState(false);
-  const [showSymptoms, setShowSymptoms] = useState(false);
   const [showShopping, setShowShopping] = useState(false);
-  const [showProtocol, setShowProtocol] = useState(false);
   const [formData, setFormData] = useState<CalorieCalculatorForm>({
     weight: 0,
     height: 0,
@@ -160,46 +157,21 @@ const Menu = () => {
   };
 
   const renderAdditionalSections = () => (
-    <div className="space-y-6 mt-6">
-      <Card className="bg-white shadow-sm border-none">
-        <div className="p-4">
-          <Button
-            variant="ghost"
-            onClick={() => setShowDiary(!showDiary)}
-            className="w-full flex justify-between items-center text-primary-500"
-          >
-            <span className="font-semibold">Diário Alimentar</span>
-            <ChevronDown className={`transform transition-transform ${showDiary ? 'rotate-180' : ''}`} />
-          </Button>
-          {showDiary && (
-            <div className="mt-4">
-              <ScrollArea className="h-[500px]">
-                <FoodDiary />
-              </ScrollArea>
-            </div>
-          )}
-        </div>
-      </Card>
+    <div className="space-y-8 mt-8">
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <h2 className="text-2xl font-semibold text-primary-700 mb-6">Diário Alimentar</h2>
+        <FoodDiary />
+      </div>
 
-      <Card className="bg-white shadow-sm border-none">
-        <div className="p-4">
-          <Button
-            variant="ghost"
-            onClick={() => setShowSymptoms(!showSymptoms)}
-            className="w-full flex justify-between items-center text-primary-500"
-          >
-            <span className="font-semibold">Registro de Sintomas</span>
-            <ChevronDown className={`transform transition-transform ${showSymptoms ? 'rotate-180' : ''}`} />
-          </Button>
-          {showSymptoms && (
-            <div className="mt-4">
-              <ScrollArea className="h-[500px]">
-                <SymptomTracker />
-              </ScrollArea>
-            </div>
-          )}
-        </div>
-      </Card>
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <h2 className="text-2xl font-semibold text-primary-700 mb-6">Registro de Sintomas</h2>
+        <SymptomTracker />
+      </div>
+
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <h2 className="text-2xl font-semibold text-primary-700 mb-6">Protocolo de Modulação Intestinal</h2>
+        <Education />
+      </div>
 
       <Card className="bg-white shadow-sm border-none">
         <div className="p-4">
@@ -215,26 +187,6 @@ const Menu = () => {
             <div className="mt-4">
               <ScrollArea className="h-[500px]">
                 <ShoppingList />
-              </ScrollArea>
-            </div>
-          )}
-        </div>
-      </Card>
-
-      <Card className="bg-white shadow-sm border-none">
-        <div className="p-4">
-          <Button
-            variant="ghost"
-            onClick={() => setShowProtocol(!showProtocol)}
-            className="w-full flex justify-between items-center text-primary-500"
-          >
-            <span className="font-semibold">Protocolo de Modulação Intestinal</span>
-            <ChevronDown className={`transform transition-transform ${showProtocol ? 'rotate-180' : ''}`} />
-          </Button>
-          {showProtocol && (
-            <div className="mt-4">
-              <ScrollArea className="h-[500px]">
-                <Education />
               </ScrollArea>
             </div>
           )}
