@@ -42,17 +42,18 @@ const MealSection = ({
       {icon}
       <h3 className="font-medium text-gray-900">{title}</h3>
     </div>
-    <div className="grid grid-cols-3 gap-2">
+    <div className="flex flex-wrap gap-2">
       {foods.map((food) => (
         <Button
           key={food.id}
           variant={selectedFoods.includes(food.id) ? "default" : "outline"}
           onClick={() => onFoodSelection(food.id)}
-          className={`h-auto py-2 px-3 text-sm justify-start ${
-            selectedFoods.includes(food.id) 
-              ? 'bg-primary/10 border-primary text-primary' 
-              : ''
-          }`}
+          className={`
+            inline-flex items-center justify-center whitespace-nowrap h-auto py-1.5 px-3 text-sm
+            ${selectedFoods.includes(food.id)
+              ? 'bg-green-100 border-green-500 text-green-700 hover:bg-green-200 hover:text-green-800'
+              : 'hover:bg-green-50 hover:border-green-200'}
+          `}
         >
           {food.name}
         </Button>
@@ -88,7 +89,7 @@ export const FoodSelector = ({
         <div className="space-y-6">
           <MealSection
             title="Café da manhã"
-            icon={<Coffee className="h-5 w-5 text-primary" />}
+            icon={<Coffee className="h-5 w-5 text-green-600" />}
             foods={breakfastFoods}
             selectedFoods={selectedFoods}
             onFoodSelection={onFoodSelection}
@@ -96,7 +97,7 @@ export const FoodSelector = ({
 
           <MealSection
             title="Almoço"
-            icon={<Utensils className="h-5 w-5 text-primary" />}
+            icon={<Utensils className="h-5 w-5 text-green-600" />}
             foods={lunchFoods}
             selectedFoods={selectedFoods}
             onFoodSelection={onFoodSelection}
@@ -104,7 +105,7 @@ export const FoodSelector = ({
 
           <MealSection
             title="Lanche da Manhã e Tarde"
-            icon={<Apple className="h-5 w-5 text-primary" />}
+            icon={<Apple className="h-5 w-5 text-green-600" />}
             foods={snackFoods}
             selectedFoods={selectedFoods}
             onFoodSelection={onFoodSelection}
@@ -112,7 +113,7 @@ export const FoodSelector = ({
 
           <MealSection
             title="Jantar"
-            icon={<Moon className="h-5 w-5 text-primary" />}
+            icon={<Moon className="h-5 w-5 text-green-600" />}
             foods={dinnerFoods}
             selectedFoods={selectedFoods}
             onFoodSelection={onFoodSelection}
