@@ -4,16 +4,7 @@ import { Coffee, Utensils, Apple, Moon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-
-interface ProtocolFood {
-  id: string;
-  name: string;
-  calories: number;
-  protein: number;
-  carbs: number;
-  fats: number;
-  food_group_id: number;
-}
+import type { ProtocolFood } from "./types";
 
 interface FoodSelectorProps {
   protocolFoods: ProtocolFood[];
@@ -43,21 +34,25 @@ const MealSection = ({
       <h3 className="font-medium text-gray-900">{title}</h3>
     </div>
     <div className="flex flex-wrap gap-2">
-      {foods.map((food) => (
-        <Button
-          key={food.id}
-          variant={selectedFoods.includes(food.id) ? "default" : "outline"}
-          onClick={() => onFoodSelection(food.id)}
-          className={`
-            inline-flex items-center justify-center whitespace-nowrap h-auto py-1.5 px-3 text-sm
-            ${selectedFoods.includes(food.id)
-              ? 'bg-green-100 border-green-500 text-green-700 hover:bg-green-200 hover:text-green-800'
-              : 'hover:bg-green-50 hover:border-green-200'}
-          `}
-        >
-          {food.name}
-        </Button>
-      ))}
+      {foods.length > 0 ? (
+        foods.map((food) => (
+          <Button
+            key={food.id}
+            variant={selectedFoods.includes(food.id) ? "default" : "outline"}
+            onClick={() => onFoodSelection(food.id)}
+            className={`
+              inline-flex items-center justify-center whitespace-nowrap h-auto py-1.5 px-3 text-sm
+              ${selectedFoods.includes(food.id)
+                ? 'bg-green-100 border-green-500 text-green-700 hover:bg-green-200 hover:text-green-800'
+                : 'hover:bg-green-50 hover:border-green-200'}
+            `}
+          >
+            {food.name} ({food.calories} kcal)
+          </Button>
+        ))
+      ) : (
+        <p className="text-gray-500 text-sm">Nenhum alimento disponível para esta refeição</p>
+      )}
     </div>
   </Card>
 );
@@ -94,11 +89,20 @@ export const FoodSelector = ({
     }
   };
 
+  console.log('Protocol Foods:', protocolFoods); // Debug log
+
   // Organizar alimentos por grupo
   const breakfastFoods = protocolFoods.filter(food => food.food_group_id === 1);
   const lunchFoods = protocolFoods.filter(food => food.food_group_id === 2);
   const snackFoods = protocolFoods.filter(food => food.food_group_id === 3);
   const dinnerFoods = protocolFoods.filter(food => food.food_group_id === 4);
+
+  console.log('Filtered Foods:', { // Debug log
+    breakfast: breakfastFoods.length,
+    lunch: lunchFoods.length,
+    snack: snackFoods.length,
+    dinner: dinnerFoods.length
+  });
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
@@ -106,6 +110,9 @@ export const FoodSelector = ({
         <h2 className="text-2xl font-semibold text-gray-900">Opções de Preferência dos Alimentos</h2>
         <p className="text-gray-600 mt-2">
           Selecione todas as suas preferências alimentares para cada refeição do dia
+        </p>
+        <p className="text-sm text-gray-500 mt-1">
+          Alimentos selecionados: {selectedFoods.length}/20
         </p>
       </div>
 
@@ -143,7 +150,7 @@ export const FoodSelector = ({
         />
       </div>
 
-      <div className="sticky bottom-0 bg-white border-t pt-4 mt-6">
+      <div className="sticky bottom-0 bg-white border-t pt-4 mt-6 pb-4">
         <div className="flex justify-between gap-4">
           <Button variant="outline" onClick={onBack}>
             Voltar
