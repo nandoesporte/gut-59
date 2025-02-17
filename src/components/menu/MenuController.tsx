@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -63,7 +64,6 @@ export const useMenuController = () => {
 
   const handleCalculateCalories = () => {
     setLoading(true);
-    toast.loading("Calculando suas necessidades calóricas...");
     
     // Simulate calculation delay
     setTimeout(() => {
@@ -79,7 +79,6 @@ export const useMenuController = () => {
 
       setCalorieNeeds(dailyCalories);
       setLoading(false);
-      toast.success("Cálculo concluído!");
       setCurrentStep(2);
     }, 1500);
   };

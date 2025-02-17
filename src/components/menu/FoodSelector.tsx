@@ -77,6 +77,7 @@ export const FoodSelector = ({
     }
 
     try {
+      toast.loading("Aguarde...");
       const { data, error } = await supabase.functions.invoke('generate-meal-suggestions', {
         body: {
           selectedFoods,
