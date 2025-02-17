@@ -1,10 +1,11 @@
+
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Scale, Walking, Run, Dumbbell } from "lucide-react";
+import { Scale, Activity, Running, Dumbbell } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface CalorieCalculatorForm {
@@ -17,12 +18,12 @@ export interface CalorieCalculatorForm {
 
 interface CalorieCalculatorProps {
   formData: CalorieCalculatorForm;
-  onInputChange: (field: keyof CalorieCalculatorForm, value: string | number) => void;
+  onInputChange: (field: keyof CalorieCalculatorForm, value: string) => void;
   onCalculate: () => void;
   calorieNeeds: number | null;
 }
 
-const activityLevels = [
+export const activityLevels = [
   {
     value: "sedentary",
     label: "Sedentário",
@@ -34,14 +35,14 @@ const activityLevels = [
     value: "lightlyActive",
     label: "Levemente Ativo",
     description: "Exercício leve ou caminhada (1-3 dias/semana)",
-    icon: Walking,
+    icon: Activity,
     multiplier: 1.375
   },
   {
     value: "moderatelyActive",
     label: "Moderadamente Ativo",
     description: "Exercício moderado (3-5 dias/semana)",
-    icon: Run,
+    icon: Running,
     multiplier: 1.55
   },
   {
