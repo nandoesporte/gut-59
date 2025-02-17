@@ -29,10 +29,10 @@ const Menu = () => {
   const renderStep = () => {
     if (loading && currentStep !== 1.5) {
       return (
-        <Card className="p-6">
+        <Card className="p-6 bg-white shadow-md border border-green-100">
           <div className="flex flex-col items-center justify-center py-8 space-y-4">
-            <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
-            <p className="text-lg font-medium text-primary-700">
+            <Loader2 className="w-8 h-8 animate-spin text-green-500" />
+            <p className="text-lg font-medium text-green-700">
               {currentStep === 2 ? "Processando sua seleção..." :
                currentStep === 3 ? "Gerando seu plano alimentar..." :
                "Aguarde um momento..."}
@@ -70,7 +70,7 @@ const Menu = () => {
       case 3:
         return (
           <div className="space-y-6">
-            <Card className="p-6">
+            <Card className="p-6 bg-white shadow-md border border-green-100">
               <DietaryPreferencesForm
                 onSubmit={handleDietaryPreferences}
                 onBack={() => setCurrentStep(2)}
@@ -87,8 +87,10 @@ const Menu = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-3xl min-h-screen pb-24 bg-green-50">
-      {renderStep()}
+    <div className="container mx-auto px-4 py-8 max-w-3xl min-h-screen pb-24">
+      <div className="space-y-6 bg-gradient-to-b from-green-50/50 to-white rounded-lg p-6">
+        {renderStep()}
+      </div>
     </div>
   );
 };
