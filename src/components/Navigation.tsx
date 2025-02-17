@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import {
-  UtensilsCrossed,
   LineChart,
   ShoppingBag,
   GraduationCap,
@@ -29,11 +28,6 @@ export const Navigation = () => {
       href: '/',
       label: 'Progresso',
       icon: LineChart
-    },
-    {
-      href: '/menu',
-      label: 'Cardápio',
-      icon: UtensilsCrossed
     },
     {
       href: '/nutri',

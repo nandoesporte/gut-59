@@ -1,7 +1,6 @@
 
 import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
 import Layout from "./components/Layout";
-import Menu from "./pages/Menu";
 import Progress from "./pages/Progress";
 import Store from "./pages/Store";
 import Trainer from "./pages/Trainer";
@@ -17,7 +16,6 @@ function App() {
       <Routes>
         <Route path="/" element={<Layout><Outlet /></Layout>}>
           <Route index element={<Progress />} />
-          <Route path="menu" element={<Menu />} />
           <Route path="nutri" element={<Nutri />} />
           <Route path="workout" element={<WorkoutPage />} />
           <Route path="store" element={<Store />} />
