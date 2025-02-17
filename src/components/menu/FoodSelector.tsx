@@ -51,7 +51,7 @@ const MealSection = ({
             <span className="flex flex-col items-start text-left">
               <span>{food.name}</span>
               <span className="text-xs opacity-75">
-                {food.calories} kcal / {food.portion_size}{food.serving_unit}
+                {food.calories} kcal / {food.portion_size}{food.portion_unit || food.serving_unit}
               </span>
             </span>
           </Button>
