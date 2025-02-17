@@ -35,6 +35,12 @@ serve(async (req) => {
       .in('exercise_type', preferences.preferredExerciseTypes)
 
     if (exercisesError) throw exercisesError
+    if (!exercises || exercises.length === 0) {
+      throw new Error('No exercises found matching the criteria')
+    }
+
+    // Create a map of available exercises for validation
+    const availableExercises = new Map(exercises.map(e => [e.id, e]))
 
     // Generate prompt for OpenAI
     const prompt = `
@@ -49,17 +55,14 @@ serve(async (req) => {
       - Available Equipment: ${preferences.availableEquipment.join(', ')}
       - Training Location: ${preferences.trainingLocation}
 
-      Available exercises: ${JSON.stringify(exercises.map(e => ({ 
-        id: e.id,
-        name: e.name,
-        type: e.exercise_type,
-        muscleGroup: e.muscle_group,
-        equipment: e.equipment_needed
-      })))}
+      IMPORTANT: You MUST use ONLY the exercise IDs from the following list when creating the workout plan. DO NOT use exercise names or create new exercises.
+
+      Available exercises:
+      ${exercises.map(e => `- ID: "${e.id}" - ${e.name} (${e.exercise_type}, ${e.muscle_group})`).join('\n')}
 
       Create a 4-week workout plan with 3-4 sessions per week. For each session, include:
       1. Warmup description
-      2. Main exercises (using only the available exercises provided)
+      2. Main exercises (ONLY use exerciseId from the list above)
       3. Sets, reps, and rest times for each exercise
       4. Cooldown description
       
@@ -82,6 +85,8 @@ serve(async (req) => {
           }]
         }
       }
+
+      VERY IMPORTANT: The exerciseId MUST be one of the exact IDs provided in the list above.
     `
 
     // Call OpenAI API
@@ -95,7 +100,7 @@ serve(async (req) => {
         model: 'gpt-4',
         messages: [{
           role: 'system',
-          content: 'You are a professional fitness trainer specialized in creating personalized workout plans.'
+          content: 'You are a professional fitness trainer specialized in creating personalized workout plans. You must only use the exact exercise IDs provided.'
         }, {
           role: 'user',
           content: prompt
@@ -110,6 +115,15 @@ serve(async (req) => {
 
     const aiResponse = await response.json()
     const workoutPlan = JSON.parse(aiResponse.choices[0].message.content)
+
+    // Validate that all exercise IDs are valid
+    for (const session of workoutPlan.plan.sessions) {
+      for (const exercise of session.exercises) {
+        if (!availableExercises.has(exercise.exerciseId)) {
+          throw new Error(`Invalid exercise ID: ${exercise.exerciseId}`)
+        }
+      }
+    }
 
     // Save the workout plan to the database
     const { data: plan, error: planError } = await supabase
@@ -159,12 +173,7 @@ serve(async (req) => {
     // Return the plan with exercises mapped to their names
     const transformedSessions = await Promise.all(workoutPlan.plan.sessions.map(async (session) => {
       const exerciseDetails = await Promise.all(session.exercises.map(async (exercise) => {
-        const { data: exerciseData } = await supabase
-          .from('exercises')
-          .select('name')
-          .eq('id', exercise.exerciseId)
-          .single()
-
+        const exerciseData = availableExercises.get(exercise.exerciseId)
         return {
           name: exerciseData?.name || 'Unknown Exercise',
           sets: exercise.sets,
