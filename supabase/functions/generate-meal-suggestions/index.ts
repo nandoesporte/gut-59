@@ -29,7 +29,7 @@ serve(async (req) => {
     Use apenas os alimentos listados acima.
     Inclua porções aproximadas para cada alimento.
     Distribua as calorias de forma equilibrada entre as refeições.
-    Formate o resultado em JSON seguindo exatamente esta estrutura:
+    Retorne apenas um objeto JSON seguindo exatamente esta estrutura, sem texto adicional ou formatação markdown:
     {
       "dailyPlan": {
         "breakfast": { "foods": [], "calories": 0 },
@@ -44,6 +44,8 @@ serve(async (req) => {
       }
     }`;
 
+    console.log('Sending prompt to OpenAI:', prompt);
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -55,7 +57,7 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: 'Você é um nutricionista especializado que responde apenas em JSON válido.'
+            content: 'Você é um nutricionista especializado que responde apenas em JSON válido, sem formatação markdown ou texto adicional.'
           },
           {
             role: 'user',
@@ -66,8 +68,17 @@ serve(async (req) => {
       }),
     });
 
-    const data = await response.json();
-    const mealPlan = JSON.parse(data.choices[0].message.content);
+    const openAIResponse = await response.json();
+    console.log('OpenAI response:', openAIResponse);
+
+    let mealPlan;
+    try {
+      mealPlan = JSON.parse(openAIResponse.choices[0].message.content.trim());
+    } catch (parseError) {
+      console.error('Error parsing OpenAI response:', parseError);
+      console.log('Raw content:', openAIResponse.choices[0].message.content);
+      throw new Error('Invalid JSON response from AI');
+    }
 
     return new Response(JSON.stringify(mealPlan), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
