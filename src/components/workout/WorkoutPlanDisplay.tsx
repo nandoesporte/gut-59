@@ -1,8 +1,8 @@
 
 import * as React from "react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { WorkoutPlan } from "./types";
+import { Card, CardHeader, CardContent } from "@/components/ui/card";
+import { WorkoutPreferences } from "./types";
 import { Loader2, RefreshCw } from "lucide-react";
 
 interface WorkoutPlanDisplayProps {
