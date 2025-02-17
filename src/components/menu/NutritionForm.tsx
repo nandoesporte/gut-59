@@ -12,9 +12,9 @@ import {
 } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import type { NutritionPreferences, Goal, HealthCondition } from "./types";
-import { GoalCards } from "./GoalCards";
-import { HealthConditionCards } from "./HealthConditionCards";
+import type { NutritionPreferences } from "./types";
+import { GoalCards, type Goal } from "./GoalCards";
+import { HealthConditionCards, type HealthCondition } from "./HealthConditionCards";
 
 interface NutritionFormProps {
   onSubmit: (data: NutritionPreferences) => void;
@@ -49,6 +49,21 @@ export const NutritionForm = ({ onSubmit, initialData }: NutritionFormProps) => 
       return;
     }
 
+    if (formData.weight < 30 || formData.weight > 300) {
+      toast.error("Por favor, insira um peso válido entre 30 e 300 kg");
+      return;
+    }
+
+    if (formData.height < 100 || formData.height > 250) {
+      toast.error("Por favor, insira uma altura válida entre 100 e 250 cm");
+      return;
+    }
+
+    if (formData.age < 18 || formData.age > 120) {
+      toast.error("Por favor, insira uma idade válida entre 18 e 120 anos");
+      return;
+    }
+
     onSubmit(formData);
   };
 
@@ -67,6 +82,8 @@ export const NutritionForm = ({ onSubmit, initialData }: NutritionFormProps) => 
                 value={formData.weight || ''}
                 onChange={(e) => handleInputChange('weight', Number(e.target.value))}
                 placeholder="Ex: 70"
+                min="30"
+                max="300"
               />
             </div>
 
@@ -78,6 +95,8 @@ export const NutritionForm = ({ onSubmit, initialData }: NutritionFormProps) => 
                 value={formData.height || ''}
                 onChange={(e) => handleInputChange('height', Number(e.target.value))}
                 placeholder="Ex: 170"
+                min="100"
+                max="250"
               />
             </div>
 
@@ -89,6 +108,8 @@ export const NutritionForm = ({ onSubmit, initialData }: NutritionFormProps) => 
                 value={formData.age || ''}
                 onChange={(e) => handleInputChange('age', Number(e.target.value))}
                 placeholder="Ex: 30"
+                min="18"
+                max="120"
               />
             </div>
 
@@ -133,8 +154,8 @@ export const NutritionForm = ({ onSubmit, initialData }: NutritionFormProps) => 
         <div className="space-y-4">
           <h2 className="text-xl font-semibold">Objetivo</h2>
           <GoalCards
-            selectedGoal={formData.goal as Goal}
-            onSelect={(goal) => handleInputChange('goal', goal)}
+            selectedGoal={formData.goal}
+            onSelect={(goal: Goal) => handleInputChange('goal', goal)}
           />
         </div>
       </Card>
@@ -143,14 +164,14 @@ export const NutritionForm = ({ onSubmit, initialData }: NutritionFormProps) => 
         <div className="space-y-4">
           <h2 className="text-xl font-semibold">Condição de Saúde (se aplicável)</h2>
           <HealthConditionCards
-            selectedCondition={formData.healthCondition as HealthCondition}
-            onSelect={(condition) => handleInputChange('healthCondition', condition)}
+            selectedCondition={formData.healthCondition}
+            onSelect={(condition: HealthCondition) => handleInputChange('healthCondition', condition)}
           />
         </div>
       </Card>
 
-      <Button type="submit" className="w-full">
-        Gerar Plano Nutricional
+      <Button type="submit" className="w-full bg-green-500 hover:bg-green-600">
+        Próxima Etapa
       </Button>
     </form>
   );
