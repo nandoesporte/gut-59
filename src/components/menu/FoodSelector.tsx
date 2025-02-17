@@ -32,6 +32,7 @@ const MealSection = ({
     <div className="flex items-center gap-2 mb-2">
       {icon}
       <h3 className="font-medium text-gray-900">{title}</h3>
+      <span className="text-sm text-gray-500">({foods.length} opções)</span>
     </div>
     <div className="flex flex-wrap gap-2">
       {foods.length > 0 ? (
@@ -47,7 +48,12 @@ const MealSection = ({
                 : 'hover:bg-green-50 hover:border-green-200'}
             `}
           >
-            {food.name} ({food.calories} kcal)
+            <span className="flex flex-col items-start text-left">
+              <span>{food.name}</span>
+              <span className="text-xs opacity-75">
+                {food.calories} kcal / {food.portion_size}{food.serving_unit}
+              </span>
+            </span>
           </Button>
         ))
       ) : (
@@ -89,20 +95,11 @@ export const FoodSelector = ({
     }
   };
 
-  console.log('Protocol Foods:', protocolFoods); // Debug log
-
   // Organizar alimentos por grupo
   const breakfastFoods = protocolFoods.filter(food => food.food_group_id === 1);
   const lunchFoods = protocolFoods.filter(food => food.food_group_id === 2);
   const snackFoods = protocolFoods.filter(food => food.food_group_id === 3);
   const dinnerFoods = protocolFoods.filter(food => food.food_group_id === 4);
-
-  console.log('Filtered Foods:', { // Debug log
-    breakfast: breakfastFoods.length,
-    lunch: lunchFoods.length,
-    snack: snackFoods.length,
-    dinner: dinnerFoods.length
-  });
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
