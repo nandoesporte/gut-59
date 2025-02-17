@@ -135,10 +135,13 @@ export interface NutritionPreferences {
   gender: 'male' | 'female';
   activityLevel: 'sedentary' | 'light' | 'moderate' | 'intense';
   goal: 'lose_weight' | 'maintain' | 'gain_mass';
-  healthCondition?: 'hypertension' | 'diabetes' | 'depression_anxiety' | null;
+  healthCondition: 'hypertension' | 'diabetes' | 'depression_anxiety' | null;
   dietaryPreferences: string[];
   allergies: string[];
 }
+
+export type Goal = 'lose_weight' | 'maintain' | 'gain_mass';
+export type HealthCondition = 'hypertension' | 'diabetes' | 'depression_anxiety' | null;
 
 export interface NutritionPlan {
   id: string;

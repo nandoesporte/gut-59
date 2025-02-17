@@ -18,13 +18,23 @@ export const useNutritionPreferences = () => {
         return false;
       }
 
+      // Convert from frontend model to database model
+      const dbData = {
+        user_id: userData.user.id,
+        weight: data.weight,
+        height: data.height,
+        age: data.age,
+        gender: data.gender,
+        activity_level: data.activityLevel,
+        goal: data.goal,
+        health_condition: data.healthCondition,
+        dietary_preferences: data.dietaryPreferences,
+        allergies: data.allergies,
+      };
+
       const { error } = await supabase
         .from('nutrition_preferences')
-        .upsert({
-          user_id: userData.user.id,
-          ...data,
-          updated_at: new Date().toISOString()
-        });
+        .upsert(dbData);
 
       if (error) throw error;
 
@@ -54,27 +64,22 @@ export const useNutritionPreferences = () => {
         .from('nutrition_preferences')
         .select('*')
         .eq('user_id', userData.user.id)
-        .single();
+        .maybeSingle();
 
-      if (error) {
-        if (error.code === 'PGRST116') {
-          // No data found - this is fine for new users
-          return;
-        }
-        throw error;
-      }
+      if (error) throw error;
 
       if (data) {
+        // Convert from database model to frontend model
         setPreferences({
           weight: data.weight,
           height: data.height,
           age: data.age,
-          gender: data.gender,
+          gender: data.gender as 'male' | 'female',
           activityLevel: data.activity_level,
           goal: data.goal,
           healthCondition: data.health_condition,
-          dietaryPreferences: data.dietary_preferences,
-          allergies: data.allergies
+          dietaryPreferences: data.dietary_preferences || [],
+          allergies: data.allergies || []
         });
       }
     } catch (error) {
