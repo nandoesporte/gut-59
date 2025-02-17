@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import type { NutritionPreferences } from "./types";
+import type { NutritionPreferences, Goal, HealthCondition } from "./types";
 import { GoalCards } from "./GoalCards";
 import { HealthConditionCards } from "./HealthConditionCards";
 
@@ -44,7 +44,6 @@ export const NutritionForm = ({ onSubmit, initialData }: NutritionFormProps) => 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validação básica
     if (!formData.weight || !formData.height || !formData.age) {
       toast.error("Por favor, preencha todos os campos obrigatórios");
       return;
@@ -97,7 +96,7 @@ export const NutritionForm = ({ onSubmit, initialData }: NutritionFormProps) => 
               <Label htmlFor="gender">Sexo</Label>
               <Select
                 value={formData.gender}
-                onValueChange={(value) => handleInputChange('gender', value)}
+                onValueChange={(value: 'male' | 'female') => handleInputChange('gender', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o sexo" />
@@ -113,7 +112,7 @@ export const NutritionForm = ({ onSubmit, initialData }: NutritionFormProps) => 
               <Label htmlFor="activityLevel">Nível de Atividade Física</Label>
               <Select
                 value={formData.activityLevel}
-                onValueChange={(value) => handleInputChange('activityLevel', value)}
+                onValueChange={(value: NutritionPreferences['activityLevel']) => handleInputChange('activityLevel', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o nível" />
@@ -134,7 +133,7 @@ export const NutritionForm = ({ onSubmit, initialData }: NutritionFormProps) => 
         <div className="space-y-4">
           <h2 className="text-xl font-semibold">Objetivo</h2>
           <GoalCards
-            selectedGoal={formData.goal}
+            selectedGoal={formData.goal as Goal}
             onSelect={(goal) => handleInputChange('goal', goal)}
           />
         </div>
@@ -144,7 +143,7 @@ export const NutritionForm = ({ onSubmit, initialData }: NutritionFormProps) => 
         <div className="space-y-4">
           <h2 className="text-xl font-semibold">Condição de Saúde (se aplicável)</h2>
           <HealthConditionCards
-            selectedCondition={formData.healthCondition}
+            selectedCondition={formData.healthCondition as HealthCondition}
             onSelect={(condition) => handleInputChange('healthCondition', condition)}
           />
         </div>

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import type { CalorieCalculatorForm } from "./CalorieCalculator";
 import { useProtocolFoods } from "./hooks/useProtocolFoods";
@@ -5,6 +6,7 @@ import { useCalorieCalculator } from "./hooks/useCalorieCalculator";
 import { useFoodSelection } from "./hooks/useFoodSelection";
 import { useMealPlan } from "./hooks/useMealPlan";
 import { useNutritionPreferences } from "./hooks/useNutritionPreferences";
+import type { NutritionPreferences } from "./types";
 
 export const useMenuController = () => {
   const [currentStep, setCurrentStep] = useState<number>(1);
