@@ -29,46 +29,32 @@ serve(async (req) => {
     }
 
     const foods = foodsData as ProtocolFood[]
-    
-    // Remover duplicatas e embaralhar alimentos
-    const shuffledFoods = Array.from(new Map(foods.map(food => [food.id, food])).values())
-      .sort(() => Math.random() - 0.5);
 
-    // Dividir alimentos em 5 refeições
-    const mealsSize = Math.ceil(shuffledFoods.length / 5);
-    const mealFoods = {
-      breakfast: shuffledFoods.slice(0, mealsSize),
-      morningSnack: shuffledFoods.slice(mealsSize, mealsSize * 2),
-      lunch: shuffledFoods.slice(mealsSize * 2, mealsSize * 3),
-      afternoonSnack: shuffledFoods.slice(mealsSize * 3, mealsSize * 4),
-      dinner: shuffledFoods.slice(mealsSize * 4)
-    };
-
-    // Criar plano de refeições
+    // Criar plano de refeições apenas com os alimentos selecionados
     const mealPlan: MealPlan = {
       dailyPlan: {
         breakfast: {
-          foods: mealFoods.breakfast,
+          foods: foods,
           calories: 0,
           macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
         },
         morningSnack: {
-          foods: mealFoods.morningSnack,
+          foods: [],
           calories: 0,
           macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
         },
         lunch: {
-          foods: mealFoods.lunch,
+          foods: [],
           calories: 0,
           macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
         },
         afternoonSnack: {
-          foods: mealFoods.afternoonSnack,
+          foods: [],
           calories: 0,
           macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
         },
         dinner: {
-          foods: mealFoods.dinner,
+          foods: [],
           calories: 0,
           macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
         }
@@ -85,7 +71,7 @@ serve(async (req) => {
         postworkout: "",
         general: "",
         timing: [],
-        healthCondition: userData.healthCondition
+        healthCondition: null
       }
     };
 
