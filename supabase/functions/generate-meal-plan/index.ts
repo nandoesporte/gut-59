@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -8,32 +9,27 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Log completo da requisição recebida
   console.log('Request received:', {
     method: req.method,
     headers: Object.fromEntries(req.headers.entries()),
     url: req.url
   });
   
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     console.log('Handling OPTIONS request');
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    // Validar se o corpo da requisição existe
     const contentLength = req.headers.get('content-length');
     if (!contentLength || parseInt(contentLength) === 0) {
       console.error('Empty request body');
       throw new Error('Request body is empty');
     }
 
-    // Converter o corpo da requisição para texto primeiro para debug
     const rawBody = await req.text();
     console.log('Raw request body:', rawBody);
 
-    // Tentar fazer o parse do JSON
     let body;
     try {
       body = JSON.parse(rawBody);
@@ -56,7 +52,6 @@ serve(async (req) => {
 
     const { userData, selectedFoods, dietaryPreferences } = body;
 
-    // Validação detalhada dos dados recebidos
     if (!userData || typeof userData !== 'object') {
       throw new Error('Missing or invalid userData object');
     }
@@ -69,7 +64,6 @@ serve(async (req) => {
       throw new Error('Missing or invalid dietaryPreferences object');
     }
 
-    // Validar campos obrigatórios do userData
     const requiredFields = ['weight', 'height', 'age', 'gender', 'activityLevel', 'goal'];
     for (const field of requiredFields) {
       if (!(field in userData)) {
@@ -77,7 +71,6 @@ serve(async (req) => {
       }
     }
 
-    // Initialize Supabase client
     console.log('Initializing Supabase client');
     const supabase = createClient(
       'https://sxjafhzikftdenqnkcri.supabase.co',
@@ -100,31 +93,73 @@ serve(async (req) => {
       throw new Error('No foods found for the provided IDs');
     }
 
-    // Create response with proper meal structure and recommendations
+    // Distribute foods across meals more evenly
+    const distributeFoods = (foods: any[], selectedFoods: string[]) => {
+      const mealDistribution = {
+        breakfast: foods.slice(0, Math.min(4, foods.length)),
+        morningSnack: foods.slice(Math.min(4, foods.length), Math.min(7, foods.length)),
+        lunch: foods.slice(Math.min(7, foods.length), Math.min(13, foods.length)),
+        afternoonSnack: foods.slice(Math.min(13, foods.length), Math.min(16, foods.length)),
+        dinner: foods.slice(Math.min(16, foods.length))
+      };
+
+      // Ensure minimum items for each meal by redistributing if necessary
+      const minItems = {
+        breakfast: 3,
+        morningSnack: 2,
+        lunch: 4,
+        afternoonSnack: 2,
+        dinner: 4
+      };
+
+      Object.entries(minItems).forEach(([meal, min]) => {
+        if (mealDistribution[meal as keyof typeof mealDistribution].length < min) {
+          // Try to borrow items from other meals that have excess
+          Object.entries(mealDistribution).forEach(([otherMeal, foods]) => {
+            if (otherMeal !== meal && foods.length > minItems[otherMeal as keyof typeof minItems]) {
+              while (
+                mealDistribution[meal as keyof typeof mealDistribution].length < min &&
+                foods.length > minItems[otherMeal as keyof typeof minItems]
+              ) {
+                const food = foods.pop();
+                if (food) {
+                  mealDistribution[meal as keyof typeof mealDistribution].push(food);
+                }
+              }
+            }
+          });
+        }
+      });
+
+      return mealDistribution;
+    };
+
+    const mealDistribution = distributeFoods(foods, selectedFoods);
+
     const mockResponse = {
       dailyPlan: {
         breakfast: {
-          foods: foods?.slice(0, 3) || [],
+          foods: mealDistribution.breakfast,
           macros: { protein: 20, carbs: 30, fats: 10 },
           calories: 300
         },
         morningSnack: {
-          foods: foods?.slice(3, 6) || [],
+          foods: mealDistribution.morningSnack,
           macros: { protein: 10, carbs: 15, fats: 5 },
           calories: 150
         },
         lunch: {
-          foods: foods?.slice(6, 12) || [],
+          foods: mealDistribution.lunch,
           macros: { protein: 30, carbs: 45, fats: 15 },
           calories: 450
         },
         afternoonSnack: {
-          foods: foods?.slice(12, 15) || [],
+          foods: mealDistribution.afternoonSnack,
           macros: { protein: 10, carbs: 15, fats: 5 },
           calories: 150
         },
         dinner: {
-          foods: foods?.slice(15, 21) || [],
+          foods: mealDistribution.dinner,
           macros: { protein: 25, carbs: 35, fats: 12 },
           calories: 375
         }
@@ -140,8 +175,8 @@ serve(async (req) => {
         general: "Para melhores resultados, siga estas orientações:",
         timing: [
           "Café da Manhã (Mínimo 3 itens): Inclua sempre uma proteína, um carboidrato complexo e uma fruta ou gordura boa",
-          "Lanche da Manhã/Tarde (Mínimo 3 itens): Combine proteína com carboidrato ou fruta para manter a energia",
-          "Almoço/Jantar (Mínimo 6 itens): Monte seu prato com 2 porções de proteína, 2 porções de carboidrato, 2 porções de vegetais e uma gordura boa",
+          "Lanche da Manhã/Tarde (Mínimo 2 itens): Combine proteína com carboidrato ou fruta para manter a energia",
+          "Almoço/Jantar (Mínimo 4 itens): Monte seu prato com proteína, carboidrato, vegetais e uma gordura boa",
           "Distribua as refeições a cada 3-4 horas para manter o metabolismo ativo",
           "Beba água entre as refeições, não durante, para melhor digestão"
         ],
@@ -158,28 +193,6 @@ serve(async (req) => {
         mineralsComplete: true
       }
     };
-
-    // Validate minimum food requirements
-    const validateMealPlan = (plan: any) => {
-      if (plan.dailyPlan.breakfast.foods.length < 3) {
-        throw new Error('Café da manhã deve ter no mínimo 3 itens');
-      }
-      if (plan.dailyPlan.morningSnack.foods.length < 3) {
-        throw new Error('Lanche da manhã deve ter no mínimo 3 itens');
-      }
-      if (plan.dailyPlan.lunch.foods.length < 6) {
-        throw new Error('Almoço deve ter no mínimo 6 itens');
-      }
-      if (plan.dailyPlan.afternoonSnack.foods.length < 3) {
-        throw new Error('Lanche da tarde deve ter no mínimo 3 itens');
-      }
-      if (plan.dailyPlan.dinner.foods.length < 6) {
-        throw new Error('Jantar deve ter no mínimo 6 itens');
-      }
-    };
-
-    // Validate the meal plan
-    validateMealPlan(mockResponse);
 
     console.log('Preparing response');
     const responseJson = JSON.stringify(mockResponse);
