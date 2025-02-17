@@ -55,12 +55,18 @@ export const NutriPreferencesForm = ({ onSubmit }: NutriPreferencesFormProps) =>
       return;
     }
 
+    // Ensure all required properties are present with their non-optional types
     const preferences: NutriPreferences = {
-      ...values,
+      weight: values.weight,
+      height: values.height,
+      age: values.age,
+      gender: values.gender,
+      activityLevel: values.activityLevel,
+      goal: values.goal,
+      healthCondition: values.healthConditions?.[0] || null,
       selectedFoods,
       hasAllergies: false,
       allergies: [],
-      healthCondition: values.healthConditions?.[0] || null // Pega a primeira condição de saúde ou null
     };
 
     onSubmit(preferences);
