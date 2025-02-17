@@ -1,5 +1,52 @@
 
-import type { Food, MacroTargets, FoodWithPortion } from './types.ts';
+import type { Food, MacroTargets, FoodWithPortion } from './types';
+
+const STANDARD_PORTIONS = {
+  'pão': {
+    unit: 'fatia',
+    grams: 30
+  },
+  'arroz': {
+    unit: 'xícara',
+    grams: 100
+  },
+  'azeite': {
+    unit: 'colher de sopa',
+    grams: 15
+  },
+  'granola': {
+    unit: 'colher de sopa',
+    grams: 15
+  },
+  'quinoa': {
+    unit: 'xícara',
+    grams: 100
+  },
+  'feijão': {
+    unit: 'xícara',
+    grams: 100
+  },
+  'grão-de-bico': {
+    unit: 'xícara',
+    grams: 100
+  },
+  'legumes': {
+    unit: 'xícara',
+    grams: 100
+  },
+  'verduras': {
+    unit: 'xícara',
+    grams: 50
+  },
+  'frutas': {
+    unit: 'unidade',
+    grams: 100
+  },
+  'iogurte': {
+    unit: 'unidade',
+    grams: 170
+  }
+};
 
 export function calculatePortionSize(
   food: Food,
@@ -12,19 +59,12 @@ export function calculatePortionSize(
   let portionUnit = food.serving_unit;
   let friendlyPortion = targetPortion;
 
-  if (food.serving_unit === 'g' || food.serving_unit === 'ml') {
-    if (food.name.includes('pão')) {
-      portionUnit = 'fatia';
-      friendlyPortion = Math.round(targetPortion / 30);
-    } else if (food.name.includes('arroz') || food.name.includes('quinoa')) {
-      portionUnit = 'xícara';
-      friendlyPortion = Math.round((targetPortion / 100) * 10) / 10;
-    } else if (food.name.includes('azeite') || food.name.includes('manteiga')) {
-      portionUnit = 'colher de sopa';
-      friendlyPortion = Math.round((targetPortion / 15) * 10) / 10;
-    } else if (food.name.includes('granola')) {
-      portionUnit = 'colher de sopa';
-      friendlyPortion = Math.round(targetPortion / 15);
+  // Encontra a unidade de medida mais apropriada
+  for (const [keyword, standard] of Object.entries(STANDARD_PORTIONS)) {
+    if (food.name.toLowerCase().includes(keyword)) {
+      portionUnit = standard.unit;
+      friendlyPortion = Math.round((targetPortion / standard.grams) * 10) / 10;
+      break;
     }
   }
 

@@ -1,42 +1,132 @@
 
-import type { Food, MacroTargets, FoodWithPortion, WeeklyPlan } from './types';
+import type { Food, MacroTargets, FoodWithPortion } from './types';
 import { calculatePortionSize } from './portion-calculator';
-import { calculateNutritionalScore } from './nutritional-scorer';
-import { analyzeMeal } from './meal-analyzer';
 
-interface MealGuideline {
-  min_items: number;
-  required_categories: string[];
-  description: string;
-}
-
-const defaultGuidelines: Record<string, MealGuideline> = {
+const DEFAULT_MEAL_STRUCTURE = {
   breakfast: {
-    min_items: 3,
-    required_categories: ['carbs_complex', 'protein', 'healthy_fats'],
-    description: 'Café da manhã deve incluir carboidratos complexos, proteína e gorduras saudáveis'
+    targetCalories: 300,
+    requiredCategories: ['carbs_complex', 'protein', 'healthy_fats', 'fruit'],
+    examples: [
+      { name: 'pão integral', portion: '1 fatia', category: 'carbs_complex' },
+      { name: 'cream cheese light', portion: '1 colher de sopa', category: 'protein' },
+      { name: 'abacate', portion: '1/2 unidade pequena', category: 'healthy_fats' },
+      { name: 'chá verde', portion: '1 xícara', category: 'beverages' },
+      { name: 'maçã', portion: '1 unidade pequena', category: 'fruit' }
+    ]
   },
   morning_snack: {
-    min_items: 2,
-    required_categories: ['protein_or_fats', 'carbs_or_fiber'],
-    description: 'Lanche deve incluir proteína ou gordura saudável e carboidratos ou fibras'
+    targetCalories: 150,
+    requiredCategories: ['protein', 'carbs_complex'],
+    examples: [
+      { name: 'iogurte natural desnatado', portion: '1 unidade', category: 'protein' },
+      { name: 'granola sem açúcar', portion: '1 colher de sopa', category: 'carbs_complex' }
+    ]
   },
   lunch: {
-    min_items: 4,
-    required_categories: ['carbs_complex', 'protein', 'vegetables', 'healthy_fats'],
-    description: 'Almoço deve incluir carboidratos complexos, proteína, vegetais e gorduras saudáveis'
+    targetCalories: 400,
+    requiredCategories: ['carbs_complex', 'protein', 'vegetables', 'healthy_fats'],
+    examples: [
+      { name: 'arroz integral', portion: '1 xícara', category: 'carbs_complex' },
+      { name: 'feijão preto', portion: '1/2 xícara', category: 'protein' },
+      { name: 'brócolis', portion: '1 xícara', category: 'vegetables' },
+      { name: 'azeite de oliva', portion: '1 colher de sopa', category: 'healthy_fats' }
+    ]
   },
   afternoon_snack: {
-    min_items: 2,
-    required_categories: ['protein_or_fats', 'carbs_or_fiber'],
-    description: 'Lanche deve incluir proteína ou gordura saudável e carboidratos ou fibras'
+    targetCalories: 150,
+    requiredCategories: ['fruit', 'healthy_fats'],
+    examples: [
+      { name: 'banana', portion: '1 unidade média', category: 'fruit' },
+      { name: 'manteiga de amendoim', portion: '1 colher de sopa', category: 'healthy_fats' }
+    ]
   },
   dinner: {
-    min_items: 4,
-    required_categories: ['carbs_complex', 'protein', 'vegetables', 'healthy_fats'],
-    description: 'Jantar deve incluir carboidratos complexos, proteína, vegetais e gorduras saudáveis'
+    targetCalories: 300,
+    requiredCategories: ['carbs_complex', 'protein', 'vegetables', 'healthy_fats'],
+    examples: [
+      { name: 'quinoa', portion: '1 xícara', category: 'carbs_complex' },
+      { name: 'grão-de-bico', portion: '1/2 xícara', category: 'protein' },
+      { name: 'espinafre', portion: '1 xícara', category: 'vegetables' },
+      { name: 'azeite de oliva', portion: '1 colher de sopa', category: 'healthy_fats' }
+    ]
   }
 };
+
+function adjustCalorieDistribution(totalCalories: number) {
+  const baseDistribution = DEFAULT_MEAL_STRUCTURE;
+  const totalBaseCalories = Object.values(baseDistribution).reduce((sum, meal) => sum + meal.targetCalories, 0);
+  const ratio = totalCalories / totalBaseCalories;
+
+  return Object.entries(baseDistribution).reduce((acc, [mealType, meal]) => {
+    acc[mealType] = {
+      ...meal,
+      targetCalories: Math.round(meal.targetCalories * ratio)
+    };
+    return acc;
+  }, {} as typeof DEFAULT_MEAL_STRUCTURE);
+}
+
+function findBestFoodMatch(
+  availableFoods: Food[],
+  targetCategory: string,
+  targetCalories: number,
+  excludedFoods: string[] = []
+): FoodWithPortion | null {
+  return availableFoods
+    .filter(food => 
+      food.nutritional_category?.includes(targetCategory) &&
+      !excludedFoods.includes(food.id)
+    )
+    .map(food => ({
+      food,
+      caloriesDiff: Math.abs(food.calories - targetCalories)
+    }))
+    .sort((a, b) => a.caloriesDiff - b.caloriesDiff)
+    .map(({ food }) => calculatePortionSize(food, targetCalories, {
+      protein: 0,
+      carbs: 0,
+      fats: 0,
+      fiber: 0
+    }))[0] || null;
+}
+
+function generateMealPlan(
+  availableFoods: Food[],
+  userPreferences: {
+    dailyCalories: number;
+    excludedFoods?: string[];
+    healthCondition?: string;
+    allergies?: string[];
+  }
+) {
+  const adjustedMealStructure = adjustCalorieDistribution(userPreferences.dailyCalories);
+  const mealPlan: Record<string, FoodWithPortion[]> = {};
+
+  for (const [mealType, meal] of Object.entries(adjustedMealStructure)) {
+    const mealFoods: FoodWithPortion[] = [];
+    const caloriesPerCategory = meal.targetCalories / meal.requiredCategories.length;
+
+    for (const category of meal.requiredCategories) {
+      const foodMatch = findBestFoodMatch(
+        availableFoods,
+        category,
+        caloriesPerCategory,
+        [
+          ...userPreferences.excludedFoods || [],
+          ...mealFoods.map(f => f.id)
+        ]
+      );
+
+      if (foodMatch) {
+        mealFoods.push(foodMatch);
+      }
+    }
+
+    mealPlan[mealType] = mealFoods;
+  }
+
+  return mealPlan;
+}
 
 export function optimizeMealCombinations(
   foods: Food[],
@@ -46,95 +136,17 @@ export function optimizeMealCombinations(
   userPreferences: {
     likedFoods?: string[];
     dislikedFoods?: string[];
-  },
-  mealType: string
+    healthCondition?: string;
+    allergies?: string[];
+  }
 ): FoodWithPortion[] {
-  const requirements = {
-    targetCalories,
-    macroTargets,
-    mealGuidelines: defaultGuidelines
-  };
+  const mealPlan = generateMealPlan(foods, {
+    dailyCalories: targetCalories,
+    excludedFoods: userPreferences.dislikedFoods,
+    healthCondition: userPreferences.healthCondition,
+    allergies: userPreferences.allergies
+  });
 
-  const { foods: selectedFoods, meetsGuidelines, suggestions } = analyzeMeal(
-    foods,
-    requirements,
-    mealType
-  );
-
-  if (!meetsGuidelines && suggestions) {
-    console.log(`Meal optimization suggestions for ${mealType}:`, suggestions);
-  }
-
-  return selectedFoods;
-}
-
-export function generateWeeklyPlan(
-  availableFoods: Food[],
-  dailyCalories: number,
-  macroTargets: MacroTargets,
-  goal: string,
-  userPreferences: {
-    likedFoods?: string[];
-    dislikedFoods?: string[];
-  }
-): WeeklyPlan {
-  const weekDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-  const weeklyPlan: WeeklyPlan = {};
-
-  for (const day of weekDays) {
-    const breakfastFoods = availableFoods.filter(f => 
-      f.meal_type?.includes('breakfast') || f.meal_type?.includes('any')
-    );
-    const snackFoods = availableFoods.filter(f => 
-      f.meal_type?.includes('snack') || f.meal_type?.includes('any')
-    );
-    const lunchDinnerFoods = availableFoods.filter(f => 
-      f.meal_type?.includes('lunch') || f.meal_type?.includes('dinner') || f.meal_type?.includes('any')
-    );
-
-    weeklyPlan[day] = {
-      breakfast: optimizeMealCombinations(
-        breakfastFoods,
-        dailyCalories * 0.25,
-        macroTargets,
-        goal,
-        userPreferences,
-        'breakfast'
-      ),
-      morningSnack: optimizeMealCombinations(
-        snackFoods,
-        dailyCalories * 0.1,
-        macroTargets,
-        goal,
-        userPreferences,
-        'morning_snack'
-      ),
-      lunch: optimizeMealCombinations(
-        lunchDinnerFoods,
-        dailyCalories * 0.3,
-        macroTargets,
-        goal,
-        userPreferences,
-        'lunch'
-      ),
-      afternoonSnack: optimizeMealCombinations(
-        snackFoods,
-        dailyCalories * 0.1,
-        macroTargets,
-        goal,
-        userPreferences,
-        'afternoon_snack'
-      ),
-      dinner: optimizeMealCombinations(
-        lunchDinnerFoods,
-        dailyCalories * 0.25,
-        macroTargets,
-        goal,
-        userPreferences,
-        'dinner'
-      )
-    };
-  }
-
-  return weeklyPlan;
+  // Flatten all meals into a single array
+  return Object.values(mealPlan).flat();
 }
