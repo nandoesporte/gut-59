@@ -63,10 +63,10 @@ const Navigation = () => {
             active={isActive("/instructions")}
           />
           <NavLink
-            to="/trainer"
+            to="/workout"
             icon={<Dumbbell className="w-5 h-5 md:w-6 md:h-6" />}
             text="Treino"
-            active={isActive("/trainer")}
+            active={isActive("/workout")}
           />
           <a
             href="https://katiasantin.com.br/loja"

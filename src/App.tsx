@@ -13,8 +13,8 @@ import Layout from "./components/Layout";
 import Progress from "./pages/Progress";
 import Store from "./pages/Store";
 import Admin from "./pages/Admin";
-import Trainer from "./pages/Trainer";
 import Menu from "./pages/Menu";
+import Workout from "./pages/Workout";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -81,11 +81,11 @@ function App() {
                 }
               />
               <Route
-                path="/trainer"
+                path="/workout"
                 element={
                   <ProtectedRoute>
                     <Layout>
-                      <Trainer />
+                      <Workout />
                     </Layout>
                   </ProtectedRoute>
                 }
@@ -95,7 +95,7 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <Layout>
-                      <Trainer />
+                      <Workout />
                     </Layout>
                   </ProtectedRoute>
                 }
