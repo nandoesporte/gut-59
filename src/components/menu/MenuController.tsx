@@ -99,8 +99,7 @@ export const useMenuController = () => {
   const handleDietaryPreferences = async (preferences: DietaryPreferences) => {
     try {
       setLoading(true);
-      toast.loading("Gerando seu plano alimentar personalizado...");
-
+      
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) {
         toast.error("Usuário não autenticado");
@@ -119,7 +118,6 @@ export const useMenuController = () => {
 
       setDietaryPreferences(preferences);
 
-      // Preparar dados para o plano alimentar
       const requestData = {
         userData: {
           ...formData,
@@ -156,7 +154,6 @@ export const useMenuController = () => {
         throw new Error('Nenhum dado recebido do gerador de cardápio');
       }
 
-      // Converter as preferências para JSON antes de salvar
       const dietaryPreferencesJson = {
         hasAllergies: preferences.hasAllergies || false,
         allergies: preferences.allergies || [],
@@ -164,7 +161,6 @@ export const useMenuController = () => {
         trainingTime: preferences.trainingTime || null
       };
 
-      // Armazenar o plano no banco de dados
       const { error: saveError } = await supabase
         .from('meal_plans')
         .insert({
