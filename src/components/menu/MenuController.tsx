@@ -19,6 +19,7 @@ export const useMenuController = () => {
     age: "",
     gender: "male",
     activityLevel: "",
+    goal: undefined,
   });
 
   useEffect(() => {

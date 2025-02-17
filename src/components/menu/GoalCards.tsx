@@ -14,6 +14,7 @@ const goals = [
   {
     id: "lose",
     label: "Perder peso",
+    description: "Foco em queima de gordura",
     icon: Scale,
     color: "bg-[#FFE8E8]",
     hoverColor: "hover:bg-[#FFD5D5]",
@@ -24,6 +25,7 @@ const goals = [
   {
     id: "maintain",
     label: "Manter peso",
+    description: "Melhorar condicionamento",
     icon: ArrowRight,
     color: "bg-[#E8F4FF]",
     hoverColor: "hover:bg-[#D5EBFF]",
@@ -34,6 +36,7 @@ const goals = [
   {
     id: "gain",
     label: "Ganhar massa",
+    description: "Foco em hipertrofia",
     icon: Dumbbell,
     color: "bg-[#F2FCE2]",
     hoverColor: "hover:bg-[#E5F7CC]",
@@ -64,9 +67,14 @@ export const GoalCards = ({ selectedGoal, onSelect }: GoalCardsProps) => {
           >
             <div className="flex flex-col items-center space-y-3">
               <Icon className={cn("w-8 h-8", goal.iconColor)} />
-              <span className="text-lg font-medium text-gray-700 text-center">
-                {goal.label}
-              </span>
+              <div className="text-center">
+                <span className="text-lg font-medium text-gray-700">
+                  {goal.label}
+                </span>
+                <p className="text-sm text-gray-500 mt-1">
+                  {goal.description}
+                </p>
+              </div>
             </div>
           </Card>
         );
