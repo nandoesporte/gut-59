@@ -14,13 +14,42 @@ interface MealPlanDisplayProps {
 export const MealPlanDisplay = ({ mealPlan }: MealPlanDisplayProps) => {
   const { dailyPlan, recommendations, totalNutrition } = mealPlan;
 
+  // Função auxiliar para formatar a porção baseada no tipo de alimento
+  const formatPortion = (food: any): string => {
+    const size = food.portion_size || '';
+    const unit = food.portion_unit?.toLowerCase() || '';
+    
+    // Mapeamento de unidades de medida
+    if (unit.includes('fatia')) {
+      return `${size} fatia${size > 1 ? 's' : ''}`;
+    }
+    if (unit.includes('colher')) {
+      return `${size} colher${size > 1 ? 'es' : ''} de sopa`;
+    }
+    if (unit.includes('xicara')) {
+      return size === 0.5 ? '1/2 xícara' : `${size} xícara${size > 1 ? 's' : ''}`;
+    }
+    if (unit.includes('unidade')) {
+      return `${size} unidade${size > 1 ? 's' : ''}`;
+    }
+    if (unit.includes('meio')) {
+      return 'meio';
+    }
+    
+    // Adiciona descrição de tamanho quando disponível
+    const sizeDesc = food.size_description ? ` ${food.size_description}` : '';
+    
+    // Se não houver um mapeamento específico, retorna a medida padrão
+    return `${size} ${unit}${sizeDesc}`;
+  };
+
   // Função auxiliar para converter ProtocolFood[] para o formato esperado
   const formatFoods = (foods: any[]) => {
     return foods.map(food => ({
       name: food.name,
-      portion: `${food.portion_size || ''} ${food.portion_unit || 'g'}`,
+      portion: formatPortion(food),
       calories: food.calories,
-      description: food.description
+      description: food.preparation_method || food.description // Inclui método de preparo quando disponível
     }));
   };
 

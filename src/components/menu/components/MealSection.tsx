@@ -48,16 +48,18 @@ export const MealSection = ({
           <div key={index} className="text-gray-700">
             <div className="flex justify-between items-start">
               <div className="flex-1">
-                <span className="font-medium">{food.portion}</span>
-                <span className="text-gray-600"> de </span>
-                <span>{food.name}</span>
+                <div className="flex items-baseline gap-1">
+                  <span className="font-medium">{food.portion}</span>
+                  <span className="text-gray-600">de</span>
+                  <span>{food.name}</span>
+                </div>
                 {food.description && (
-                  <span className="text-gray-500 text-sm block ml-4">
+                  <span className="text-gray-500 text-sm block mt-1 ml-4">
                     {food.description}
                   </span>
                 )}
               </div>
-              <div className="text-right whitespace-nowrap text-gray-500 text-sm">
+              <div className="text-right whitespace-nowrap text-gray-500 text-sm font-medium">
                 {food.calories} kcal
               </div>
             </div>
