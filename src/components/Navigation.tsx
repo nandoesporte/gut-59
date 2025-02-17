@@ -1,6 +1,6 @@
+
 import * as React from "react"
-import Link from "next/link"
-import { usePathname } from 'next/navigation';
+import { Link, useLocation } from "react-router-dom";
 
 import { Icons } from "@/components/icons"
 import {
@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 
 export const Navigation = () => {
-  const pathname = usePathname();
+  const location = useLocation();
 
   const routes = [
     {
@@ -76,8 +76,8 @@ export const Navigation = () => {
           {routes.map((route) => (
             <Link
               key={route.href}
-              href={route.href}
-              className={`flex items-center space-x-2 py-2 px-4 rounded-md hover:bg-secondary ${pathname === route.href ? 'bg-secondary text-secondary-foreground font-medium' : 'text-muted-foreground'}`}
+              to={route.href}
+              className={`flex items-center space-x-2 py-2 px-4 rounded-md hover:bg-secondary ${location.pathname === route.href ? 'bg-secondary text-secondary-foreground font-medium' : 'text-muted-foreground'}`}
             >
               <route.icon className="h-4 w-4" />
               <span>{route.label}</span>
