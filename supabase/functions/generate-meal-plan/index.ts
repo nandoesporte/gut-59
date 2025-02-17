@@ -5,11 +5,11 @@ import { corsHeaders } from '../_shared/cors.ts'
 import { DietaryPreferences, ProtocolFood, MealPlan } from './types.ts'
 
 const MEAL_DISTRIBUTION = {
-  breakfast: { calories: 0.25, protein: 0.2, carbs: 0.3, fats: 0.25 },
-  morningSnack: { calories: 0.15, protein: 0.2, carbs: 0.2, fats: 0.15 },
-  lunch: { calories: 0.3, protein: 0.35, carbs: 0.3, fats: 0.3 },
-  afternoonSnack: { calories: 0.1, protein: 0.1, carbs: 0.1, fats: 0.15 },
-  dinner: { calories: 0.2, protein: 0.15, carbs: 0.1, fats: 0.15 }
+  breakfast: { percentage: 0.25 },
+  morningSnack: { percentage: 0.15 },
+  lunch: { percentage: 0.30 },
+  afternoonSnack: { percentage: 0.10 },
+  dinner: { percentage: 0.20 }
 };
 
 serve(async (req) => {
@@ -26,7 +26,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Buscar alimentos com informações nutricionais completas
+    // Buscar alimentos selecionados
     const { data: foodsData, error: foodsError } = await supabaseClient
       .from('protocol_foods')
       .select('*, food_groups!fk_food_group(name)')
@@ -36,15 +36,10 @@ serve(async (req) => {
       throw new Error(`Error fetching foods: ${foodsError.message}`)
     }
 
-    if (!foodsData || foodsData.length === 0) {
-      throw new Error('No foods data returned')
-    }
-
     const foods = foodsData as ProtocolFood[]
     
-    // Remover duplicatas baseado no ID do alimento
+    // Remover duplicatas
     const uniqueFoods = Array.from(new Map(foods.map(food => [food.id, food])).values());
-    console.log(`Found ${uniqueFoods.length} unique foods`)
 
     // Categorizar alimentos por grupo
     const foodsByGroup = uniqueFoods.reduce((acc, food) => {
@@ -54,120 +49,116 @@ serve(async (req) => {
       return acc;
     }, {});
 
-    // Distribuir alimentos considerando restrições e preferências
-    const distributeFoods = (foods: ProtocolFood[], targetCalories: number) => {
-      const mealPlan: MealPlan = {
-        dailyPlan: {
-          breakfast: {
-            foods: [],
-            calories: 0,
-            macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
-          },
-          morningSnack: {
-            foods: [],
-            calories: 0,
-            macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
-          },
-          lunch: {
-            foods: [],
-            calories: 0,
-            macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
-          },
-          afternoonSnack: {
-            foods: [],
-            calories: 0,
-            macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
-          },
-          dinner: {
-            foods: [],
-            calories: 0,
-            macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
-          }
-        },
-        totalNutrition: {
+    // Criar plano de refeições
+    const mealPlan: MealPlan = {
+      dailyPlan: {
+        breakfast: {
+          foods: [],
           calories: 0,
-          protein: 0,
-          carbs: 0,
-          fats: 0,
-          fiber: 0
+          macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
         },
-        recommendations: {
-          preworkout: "",
-          postworkout: "",
-          general: "",
-          timing: [],
-          healthCondition: userData.healthCondition
+        morningSnack: {
+          foods: [],
+          calories: 0,
+          macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+        },
+        lunch: {
+          foods: [],
+          calories: 0,
+          macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+        },
+        afternoonSnack: {
+          foods: [],
+          calories: 0,
+          macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+        },
+        dinner: {
+          foods: [],
+          calories: 0,
+          macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
         }
-      };
-
-      // Distribuir alimentos por refeição
-      Object.entries(MEAL_DISTRIBUTION).forEach(([meal, targets]) => {
-        const mealCalorieTarget = targetCalories * targets.calories;
-        const mealFoods = [];
-
-        // Selecionar alimentos apropriados para a refeição
-        if (meal === 'breakfast') {
-          mealFoods.push(...(foodsByGroup[1] || [])); // Grupo café da manhã
-        } else if (meal === 'lunch' || meal === 'dinner') {
-          mealFoods.push(...(foodsByGroup[2] || [])); // Grupo almoço/jantar
-        } else {
-          mealFoods.push(...(foodsByGroup[3] || [])); // Grupo lanches
-        }
-
-        mealPlan.dailyPlan[meal].foods = mealFoods.slice(0, 3); // Limitar a 3 alimentos por refeição
-      });
-
-      // Calcular nutrição para cada refeição
-      Object.keys(mealPlan.dailyPlan).forEach(mealKey => {
-        const meal = mealPlan.dailyPlan[mealKey];
-        meal.calories = meal.foods.reduce((sum, food) => sum + food.calories, 0);
-        meal.macros = meal.foods.reduce((macros, food) => ({
-          protein: macros.protein + (food.protein || 0),
-          carbs: macros.carbs + (food.carbs || 0),
-          fats: macros.fats + (food.fats || 0),
-          fiber: macros.fiber + (food.fiber || 0)
-        }), { protein: 0, carbs: 0, fats: 0, fiber: 0 });
-      });
-
-      // Calcular nutrição total
-      mealPlan.totalNutrition = Object.values(mealPlan.dailyPlan).reduce((total, meal) => ({
-        calories: total.calories + meal.calories,
-        protein: total.protein + meal.macros.protein,
-        carbs: total.carbs + meal.macros.carbs,
-        fats: total.fats + meal.macros.fats,
-        fiber: total.fiber + meal.macros.fiber
-      }), { calories: 0, protein: 0, carbs: 0, fats: 0, fiber: 0 });
-
-      // Gerar recomendações baseadas no perfil e preferências
-      const trainingTime = dietaryPreferences.trainingTime;
-      const recommendations = [];
-
-      if (trainingTime) {
-        recommendations.push(`Organize suas refeições considerando seu treino às ${trainingTime}`);
-        recommendations.push("Consuma carboidratos complexos 2-3 horas antes do treino");
-        recommendations.push("Proteína e carboidratos até 30 minutos após o treino");
-      }
-
-      if (dietaryPreferences.hasAllergies) {
-        recommendations.push("Atenção aos alimentos com potencial alérgico");
-      }
-
-      if (userData.healthCondition) {
-        recommendations.push(`Cardápio adaptado para ${userData.healthCondition}`);
-      }
-
-      mealPlan.recommendations = {
-        preworkout: "Consuma uma refeição rica em carboidratos 2-3 horas antes do treino",
-        postworkout: "Após o treino, priorize proteínas e carboidratos para recuperação",
-        general: "Mantenha-se hidratado ao longo do dia",
-        timing: recommendations,
+      },
+      totalNutrition: {
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fats: 0,
+        fiber: 0
+      },
+      recommendations: {
+        preworkout: "",
+        postworkout: "",
+        general: "",
+        timing: [],
         healthCondition: userData.healthCondition
-      };
-
-      return mealPlan;
+      }
     };
 
-    const mealPlan = distributeFoods(uniqueFoods, userData.dailyCalories);
+    // Distribuir alimentos por refeição
+    Object.entries(MEAL_DISTRIBUTION).forEach(([meal, distribution]) => {
+      const mealCalorieTarget = userData.dailyCalories * distribution.percentage;
+      let selectedMealFoods = [];
+
+      // Selecionar alimentos apropriados para cada refeição
+      if (meal === 'breakfast') {
+        selectedMealFoods = foodsByGroup[1] || []; // Grupo café da manhã
+      } else if (meal === 'lunch' || meal === 'dinner') {
+        selectedMealFoods = foodsByGroup[2] || []; // Grupo almoço/jantar
+      } else {
+        selectedMealFoods = foodsByGroup[3] || []; // Grupo lanches
+      }
+
+      // Limitar a 3 alimentos por refeição
+      mealPlan.dailyPlan[meal].foods = selectedMealFoods.slice(0, 3);
+
+      // Calcular nutrientes
+      const mealNutrition = mealPlan.dailyPlan[meal].foods.reduce((sum, food) => ({
+        calories: sum.calories + (food.calories || 0),
+        protein: sum.protein + (food.protein || 0),
+        carbs: sum.carbs + (food.carbs || 0),
+        fats: sum.fats + (food.fats || 0),
+        fiber: sum.fiber + (food.fiber || 0)
+      }), { calories: 0, protein: 0, carbs: 0, fats: 0, fiber: 0 });
+
+      mealPlan.dailyPlan[meal].calories = mealNutrition.calories;
+      mealPlan.dailyPlan[meal].macros = {
+        protein: mealNutrition.protein,
+        carbs: mealNutrition.carbs,
+        fats: mealNutrition.fats,
+        fiber: mealNutrition.fiber
+      };
+    });
+
+    // Calcular totais
+    mealPlan.totalNutrition = Object.values(mealPlan.dailyPlan).reduce((total, meal) => ({
+      calories: total.calories + meal.calories,
+      protein: total.protein + meal.macros.protein,
+      carbs: total.carbs + meal.macros.carbs,
+      fats: total.fats + meal.macros.fats,
+      fiber: total.fiber + meal.macros.fiber
+    }), { calories: 0, protein: 0, carbs: 0, fats: 0, fiber: 0 });
+
+    // Gerar recomendações básicas
+    const recommendations = [
+      "Mantenha uma alimentação equilibrada e variada",
+      "Realize 5-6 refeições por dia",
+      "Mantenha um intervalo de 2-3 horas entre as refeições"
+    ];
+
+    if (dietaryPreferences.trainingTime) {
+      recommendations.push(
+        `Faça uma refeição leve 2 horas antes do treino das ${dietaryPreferences.trainingTime}`,
+        "Consuma proteínas e carboidratos após o treino"
+      );
+    }
+
+    mealPlan.recommendations = {
+      preworkout: "Realize uma refeição leve 2 horas antes do treino",
+      postworkout: "Consuma proteínas e carboidratos após o treino",
+      general: "Mantenha-se hidratado ao longo do dia",
+      timing: recommendations,
+      healthCondition: userData.healthCondition
+    };
 
     return new Response(
       JSON.stringify(mealPlan),
