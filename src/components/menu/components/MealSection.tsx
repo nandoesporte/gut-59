@@ -112,45 +112,50 @@ export const MealSection = ({
         </Alert>
       )}
 
-      <div className="mt-4 space-y-2">
+      <div className="mt-4 space-y-3">
         {Array.isArray(foods) && foods.map((food) => (
-          <div key={food.id} className="flex justify-between items-center text-gray-700">
-            <div className="flex items-center gap-2">
-              <span>
+          <div key={food.id} className="flex justify-between items-start text-gray-700 break-words">
+            <div className="flex-1 pr-4">
+              <span className="block">
                 {food.portion} {food.portionUnit} de {food.name}
               </span>
-              {foodSubstitutions?.find(sub => sub.originalFoodId === food.id) && (
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      Substituições
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-80">
-                    <div className="space-y-2">
-                      <h4 className="font-medium">Alternativas equivalentes:</h4>
-                      {foodSubstitutions
-                        .find(sub => sub.originalFoodId === food.id)
-                        ?.alternatives.map((alt) => (
-                          <div key={alt.id} className="flex justify-between items-center">
-                            <span>{alt.name}</span>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => onFoodSubstitute?.(food.id, alt.id)}
-                            >
-                              Substituir
-                            </Button>
-                          </div>
-                        ))}
-                    </div>
-                  </PopoverContent>
-                </Popover>
+              {food.description && (
+                <span className="text-sm text-gray-500 block mt-1">
+                  {food.description}
+                </span>
               )}
             </div>
-            <span className="text-gray-500">
-              ({food.calculatedNutrients?.calories} kcal)
-            </span>
+            <div className="text-right whitespace-nowrap text-gray-500 text-sm">
+              {food.portion}g
+            </div>
+            {foodSubstitutions?.find(sub => sub.originalFoodId === food.id) && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="ml-2">
+                    Substituições
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80">
+                  <div className="space-y-2">
+                    <h4 className="font-medium">Alternativas equivalentes:</h4>
+                    {foodSubstitutions
+                      .find(sub => sub.originalFoodId === food.id)
+                      ?.alternatives.map((alt) => (
+                        <div key={alt.id} className="flex justify-between items-center">
+                          <span>{alt.name}</span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => onFoodSubstitute?.(food.id, alt.id)}
+                          >
+                            Substituir
+                          </Button>
+                        </div>
+                      ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
           </div>
         ))}
       </div>
