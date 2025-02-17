@@ -18,7 +18,9 @@ export const MealPlanDisplay = ({ mealPlan }: MealPlanDisplayProps) => {
   const formatFoods = (foods: any[]) => {
     return foods.map(food => ({
       name: food.name,
-      portion: `${food.portion || ''}${food.portionUnit || 'g'}`
+      portion: `${food.portion_size || ''} ${food.portion_unit || 'g'}`,
+      calories: food.calories,
+      description: food.description
     }));
   };
 
