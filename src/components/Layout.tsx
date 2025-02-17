@@ -1,6 +1,6 @@
 
 import { ReactNode, useEffect, useState } from "react";
-import Navigation from "./Navigation";
+import { Navigation } from "./Navigation";
 import { supabase } from "@/integrations/supabase/client";
 
 interface LayoutProps {
