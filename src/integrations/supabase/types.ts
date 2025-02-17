@@ -370,93 +370,6 @@ export type Database = {
           },
         ]
       }
-      nutrition_plans: {
-        Row: {
-          caloric_needs: number
-          created_at: string | null
-          end_date: string | null
-          id: string
-          is_active: boolean | null
-          meal_plan: Json
-          start_date: string | null
-          user_id: string
-        }
-        Insert: {
-          caloric_needs: number
-          created_at?: string | null
-          end_date?: string | null
-          id?: string
-          is_active?: boolean | null
-          meal_plan: Json
-          start_date?: string | null
-          user_id: string
-        }
-        Update: {
-          caloric_needs?: number
-          created_at?: string | null
-          end_date?: string | null
-          id?: string
-          is_active?: boolean | null
-          meal_plan?: Json
-          start_date?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      nutrition_preferences: {
-        Row: {
-          activity_level: Database["public"]["Enums"]["activity_level"]
-          age: number
-          allergies: string[] | null
-          created_at: string | null
-          dietary_preferences: string[] | null
-          gender: string
-          goal: Database["public"]["Enums"]["nutritional_goal"]
-          health_condition:
-            | Database["public"]["Enums"]["health_condition"]
-            | null
-          height: number
-          id: string
-          updated_at: string | null
-          user_id: string
-          weight: number
-        }
-        Insert: {
-          activity_level: Database["public"]["Enums"]["activity_level"]
-          age: number
-          allergies?: string[] | null
-          created_at?: string | null
-          dietary_preferences?: string[] | null
-          gender: string
-          goal: Database["public"]["Enums"]["nutritional_goal"]
-          health_condition?:
-            | Database["public"]["Enums"]["health_condition"]
-            | null
-          height: number
-          id?: string
-          updated_at?: string | null
-          user_id: string
-          weight: number
-        }
-        Update: {
-          activity_level?: Database["public"]["Enums"]["activity_level"]
-          age?: number
-          allergies?: string[] | null
-          created_at?: string | null
-          dietary_preferences?: string[] | null
-          gender?: string
-          goal?: Database["public"]["Enums"]["nutritional_goal"]
-          health_condition?:
-            | Database["public"]["Enums"]["health_condition"]
-            | null
-          height?: number
-          id?: string
-          updated_at?: string | null
-          user_id?: string
-          weight?: number
-        }
-        Relationships: []
-      }
       order_items: {
         Row: {
           created_at: string
@@ -1320,11 +1233,9 @@ export type Database = {
       }
     }
     Enums: {
-      activity_level: "sedentary" | "light" | "moderate" | "intense"
       app_role: "admin" | "user" | "personal"
       exercise_difficulty: "beginner" | "intermediate" | "advanced"
       exercise_type: "strength" | "cardio" | "mobility"
-      health_condition: "hypertension" | "diabetes" | "depression_anxiety"
       message_type: "nutricionista" | "personal"
       module_status: "active" | "inactive"
       muscle_group:
@@ -1337,7 +1248,6 @@ export type Database = {
         | "full_body"
         | "cardio"
         | "mobility"
-      nutritional_goal: "lose_weight" | "maintain" | "gain_mass"
     }
     CompositeTypes: {
       [_ in never]: never

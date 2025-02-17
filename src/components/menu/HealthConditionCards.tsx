@@ -4,19 +4,18 @@ import { Heart, Droplets, Brain } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type HealthCondition = 
-  | "hypertension" 
+  | "hipertensao" 
   | "diabetes" 
-  | "depression_anxiety" 
-  | null;
+  | "depressao_ansiedade";
 
 interface HealthConditionCardsProps {
-  selectedCondition: HealthCondition;
+  selectedCondition: HealthCondition | null;
   onSelect: (condition: HealthCondition) => void;
 }
 
 const conditions = [
   {
-    id: "hypertension",
+    id: "hipertensao",
     label: "Hipertensão",
     icon: Heart,
     color: "bg-[#FDE1D3]",
@@ -34,7 +33,7 @@ const conditions = [
     iconColor: "text-blue-500"
   },
   {
-    id: "depression_anxiety",
+    id: "depressao_ansiedade",
     label: "Depressão e Ansiedade",
     icon: Brain,
     color: "bg-[#E5DEFF]",

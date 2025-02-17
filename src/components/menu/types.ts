@@ -128,29 +128,3 @@ export interface WeeklyMealPlan {
     varietyScore: number;
   };
 }
-
-export interface NutritionPreferences {
-  weight: number;
-  height: number;
-  age: number;
-  gender: 'male' | 'female';
-  activityLevel: 'sedentary' | 'light' | 'moderate' | 'intense';
-  goal: 'lose_weight' | 'maintain' | 'gain_mass';
-  healthCondition: 'hypertension' | 'diabetes' | 'depression_anxiety' | null;
-  dietaryPreferences: string[];
-  allergies: string[];
-}
-
-export type Goal = 'lose_weight' | 'maintain' | 'gain_mass';
-export type HealthCondition = 'hypertension' | 'diabetes' | 'depression_anxiety' | null;
-
-export interface NutritionPlan {
-  id: string;
-  userId: string;
-  caloricNeeds: number;
-  mealPlan: MealPlan;
-  startDate: string;
-  endDate?: string;
-  isActive: boolean;
-  createdAt: string;
-}

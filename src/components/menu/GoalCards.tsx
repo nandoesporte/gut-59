@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Scale, ArrowRight, Dumbbell } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type Goal = "lose_weight" | "maintain" | "gain_mass";
+export type Goal = "lose" | "maintain" | "gain";
 
 interface GoalCardsProps {
   selectedGoal: Goal | null;
@@ -12,7 +12,7 @@ interface GoalCardsProps {
 
 const goals = [
   {
-    id: "lose_weight",
+    id: "lose",
     label: "Perder peso",
     icon: Scale,
     color: "bg-[#FFE8E8]",
@@ -32,7 +32,7 @@ const goals = [
     factor: 1
   },
   {
-    id: "gain_mass",
+    id: "gain",
     label: "Ganhar massa",
     icon: Dumbbell,
     color: "bg-[#F2FCE2]",

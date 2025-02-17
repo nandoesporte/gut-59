@@ -1,19 +1,16 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import type { CalorieCalculatorForm } from "./CalorieCalculator";
 import { useProtocolFoods } from "./hooks/useProtocolFoods";
 import { useCalorieCalculator } from "./hooks/useCalorieCalculator";
 import { useFoodSelection } from "./hooks/useFoodSelection";
 import { useMealPlan } from "./hooks/useMealPlan";
-import { useNutritionPreferences } from "./hooks/useNutritionPreferences";
-import type { NutritionPreferences } from "./types";
 
 export const useMenuController = () => {
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [calorieNeeds, setCalorieNeeds] = useState<number | null>(null);
 
   const { protocolFoods } = useProtocolFoods();
-  const { preferences, loading: preferencesLoading, savePreferences, loadPreferences } = useNutritionPreferences();
   
   const { formData, setFormData, loading: calculatorLoading, handleCalculateCalories } = 
     useCalorieCalculator((calories) => {
@@ -26,17 +23,6 @@ export const useMenuController = () => {
 
   const { loading: mealPlanLoading, mealPlan, handleDietaryPreferences: handleDietaryPreferencesBase } = 
     useMealPlan(formData, calorieNeeds, selectedFoods);
-
-  useEffect(() => {
-    loadPreferences();
-  }, []);
-
-  const handleSubmitNutritionForm = async (data: NutritionPreferences) => {
-    const success = await savePreferences(data);
-    if (success) {
-      handleCalculateCalories();
-    }
-  };
 
   const handleDietaryPreferences = async (preferences) => {
     const success = await handleDietaryPreferencesBase(preferences);
@@ -54,12 +40,10 @@ export const useMenuController = () => {
     totalCalories,
     mealPlan,
     formData,
-    preferences,
-    loading: calculatorLoading || mealPlanLoading || preferencesLoading,
+    loading: calculatorLoading || mealPlanLoading,
     handleCalculateCalories,
     handleFoodSelection,
     handleDietaryPreferences,
-    handleSubmitNutritionForm,
     setFormData,
   };
 };
