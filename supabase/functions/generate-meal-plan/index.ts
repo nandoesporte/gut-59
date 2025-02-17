@@ -2,15 +2,10 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { corsHeaders } from '../_shared/cors.ts'
-import { NutritionalScorer } from './nutritional-scorer.ts'
-import { MealOptimizer } from './meal-optimizer.ts'
-import { PortionCalculator } from './portion-calculator.ts'
-import { MealAnalyzer } from './meal-analyzer.ts'
-import { WorkoutAnalyzer } from './workout-analyzer.ts'
-import { generateRecommendations } from './recommendations.ts'
 import { DietaryPreferences, ProtocolFood, MealPlan } from './types.ts'
 
 serve(async (req) => {
+  // Handle CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -25,93 +20,92 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Buscar alimentos selecionados
+    // Buscar alimentos selecionados com a relação correta
     console.log('Fetching selected foods')
     const { data: foodsData, error: foodsError } = await supabaseClient
       .from('protocol_foods')
-      .select('*, food_groups(name)')
+      .select('*, food_groups!fk_food_group(name)')
       .in('id', selectedFoods)
 
     if (foodsError) {
       throw new Error(`Error fetching foods: ${foodsError.message}`)
     }
 
+    if (!foodsData) {
+      throw new Error('No foods data returned')
+    }
+
     const foods = foodsData as ProtocolFood[]
     console.log(`Found ${foods.length} foods`)
 
-    // Inicializar analisadores e otimizadores
-    const nutritionalScorer = new NutritionalScorer()
-    const mealOptimizer = new MealOptimizer()
-    const portionCalculator = new PortionCalculator()
-    const mealAnalyzer = new MealAnalyzer()
-    const workoutAnalyzer = new WorkoutAnalyzer()
-
-    // 1. Análise inicial
-    console.log('Starting initial analysis')
-    const initialAnalysis = await mealAnalyzer.analyze({
-      foods,
-      dailyCalories: userData.dailyCalories,
-      dietaryPreferences: dietaryPreferences as DietaryPreferences,
-      healthCondition: userData.healthCondition
-    })
-
-    // 2. Otimização do plano
-    console.log('Optimizing meal plan')
-    const optimizedPlan = await mealOptimizer.optimize({
-      foods,
-      analysis: initialAnalysis,
-      dailyCalories: userData.dailyCalories,
-      dietaryPreferences: dietaryPreferences as DietaryPreferences
-    })
-
-    // 3. Cálculo de porções
-    console.log('Calculating portions')
-    const planWithPortions = await portionCalculator.calculate({
-      mealPlan: optimizedPlan,
-      dailyCalories: userData.dailyCalories
-    })
-
-    // 4. Análise de treino (se aplicável)
-    console.log('Analyzing workout timing')
-    const planWithWorkout = await workoutAnalyzer.analyze({
-      mealPlan: planWithPortions,
-      trainingTime: dietaryPreferences.trainingTime
-    })
-
-    // 5. Avaliação nutricional
-    console.log('Scoring nutritional value')
-    const nutritionalScore = await nutritionalScorer.score({
-      mealPlan: planWithWorkout,
-      dietaryPreferences: dietaryPreferences as DietaryPreferences
-    })
-
-    // 6. Gerar recomendações
-    console.log('Generating recommendations')
-    const recommendations = await generateRecommendations({
-      mealPlan: planWithWorkout,
-      analysis: initialAnalysis,
-      nutritionalScore,
-      dietaryPreferences: dietaryPreferences as DietaryPreferences,
-      healthCondition: userData.healthCondition
-    })
-
-    // Montar plano final
-    const finalPlan: MealPlan = {
-      ...planWithWorkout,
-      nutritionalAnalysis: {
-        carbsPercentage: nutritionalScore.macroDistribution.carbs,
-        proteinPercentage: nutritionalScore.macroDistribution.protein,
-        fatsPercentage: nutritionalScore.macroDistribution.fats,
-        fiberAdequate: nutritionalScore.fiberAdequate,
-        vitaminsComplete: nutritionalScore.vitaminsComplete,
-        mineralsComplete: nutritionalScore.mineralsComplete
+    // Gerar plano de refeições básico para teste
+    const mealPlan: MealPlan = {
+      dailyPlan: {
+        breakfast: {
+          foods: foods.filter(f => f.food_group_id === 1),
+          calories: 0,
+          macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+        },
+        morningSnack: {
+          foods: foods.filter(f => f.food_group_id === 3).slice(0, 2),
+          calories: 0,
+          macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+        },
+        lunch: {
+          foods: foods.filter(f => f.food_group_id === 2),
+          calories: 0,
+          macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+        },
+        afternoonSnack: {
+          foods: foods.filter(f => f.food_group_id === 3).slice(2),
+          calories: 0,
+          macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+        },
+        dinner: {
+          foods: foods.filter(f => f.food_group_id === 4),
+          calories: 0,
+          macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+        }
       },
-      recommendations
+      totalNutrition: {
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fats: 0,
+        fiber: 0
+      },
+      recommendations: {
+        preworkout: "Consuma uma refeição rica em carboidratos 2-3 horas antes do treino",
+        postworkout: "Após o treino, priorize proteínas e carboidratos para recuperação",
+        general: "Mantenha-se hidratado ao longo do dia",
+        timing: ["Café da manhã: 7h", "Lanche: 10h", "Almoço: 13h", "Lanche: 16h", "Jantar: 19h"],
+        healthCondition: userData.healthCondition
+      }
     }
 
-    console.log('Plan generation completed')
+    // Calcular calorias e macros para cada refeição
+    Object.keys(mealPlan.dailyPlan).forEach(mealKey => {
+      const meal = mealPlan.dailyPlan[mealKey]
+      meal.calories = meal.foods.reduce((sum, food) => sum + food.calories, 0)
+      meal.macros = meal.foods.reduce((macros, food) => ({
+        protein: macros.protein + (food.protein || 0),
+        carbs: macros.carbs + (food.carbs || 0),
+        fats: macros.fats + (food.fats || 0),
+        fiber: macros.fiber + (food.fiber || 0)
+      }), { protein: 0, carbs: 0, fats: 0, fiber: 0 })
+    })
+
+    // Calcular nutrição total
+    mealPlan.totalNutrition = Object.values(mealPlan.dailyPlan).reduce((total, meal) => ({
+      calories: total.calories + meal.calories,
+      protein: total.protein + meal.macros.protein,
+      carbs: total.carbs + meal.macros.carbs,
+      fats: total.fats + meal.macros.fats,
+      fiber: total.fiber + meal.macros.fiber
+    }), { calories: 0, protein: 0, carbs: 0, fats: 0, fiber: 0 })
+
     return new Response(
-      JSON.stringify(finalPlan),
+      JSON.stringify(mealPlan),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
