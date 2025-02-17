@@ -8,10 +8,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { WorkoutLoadingState } from "./components/WorkoutLoadingState";
-import { WorkoutHistory } from "./components/WorkoutHistory";
+import { WorkoutHistoryView } from "./components/WorkoutHistory";
 import { CurrentWorkoutPlan } from "./components/CurrentWorkoutPlan";
 import { generateWorkoutPDF } from "./utils/pdf-generator";
-import { WorkoutPlan, WorkoutHistory as WorkoutHistoryType } from "./types/workout-plan";
+import { WorkoutPlan, WorkoutHistory } from "./types/workout-plan";
 
 interface WorkoutPlanDisplayProps {
   preferences: WorkoutPreferences;
@@ -56,7 +56,7 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as WorkoutHistoryType[];
+      return data as WorkoutHistory[];
     },
     enabled: showHistory
   });
@@ -99,7 +99,7 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
 
       <div ref={planContainerRef} className="bg-white">
         {showHistory ? (
-          <WorkoutHistory isLoading={isHistoryLoading} historyPlans={historyPlans} />
+          <WorkoutHistoryView isLoading={isHistoryLoading} historyPlans={historyPlans} />
         ) : currentPlan ? (
           <CurrentWorkoutPlan plan={currentPlan} />
         ) : (

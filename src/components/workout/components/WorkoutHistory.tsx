@@ -1,14 +1,14 @@
 
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
-import { WorkoutHistory } from "../types/workout-plan";
+import type { WorkoutHistory as WorkoutHistoryType } from "../types/workout-plan";
 import { WorkoutLoadingState } from "./WorkoutLoadingState";
 
 interface WorkoutHistoryProps {
   isLoading: boolean;
-  historyPlans?: WorkoutHistory[];
+  historyPlans?: WorkoutHistoryType[];
 }
 
-export const WorkoutHistory = ({ isLoading, historyPlans }: WorkoutHistoryProps) => {
+export const WorkoutHistoryView = ({ isLoading, historyPlans }: WorkoutHistoryProps) => {
   if (isLoading) {
     return <WorkoutLoadingState message="Carregando histórico de treinos..." />;
   }
