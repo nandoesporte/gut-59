@@ -3,13 +3,13 @@ import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { toast } from "sonner";
 
-export const generateWorkoutPDF = async (containerRef: React.RefObject<HTMLDivElement>) => {
-  if (!containerRef.current) return;
+export const generateWorkoutPDF = async (element: HTMLDivElement) => {
+  if (!element) return;
 
   try {
     toast.loading("Gerando PDF do seu plano de treino...");
 
-    const canvas = await html2canvas(containerRef.current, {
+    const canvas = await html2canvas(element, {
       scale: 2,
       useCORS: true,
       logging: false,
