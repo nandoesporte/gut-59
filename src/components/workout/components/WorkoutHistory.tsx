@@ -33,14 +33,32 @@ export const WorkoutHistoryView = ({ isLoading, historyPlans }: WorkoutHistoryPr
                 <h5 className="font-medium">Dia {session.day_number}</h5>
                 <div className="ml-2 md:ml-4">
                   <p className="text-sm text-gray-600">{session.warmup_description}</p>
-                  <ul className="list-disc ml-4 space-y-2 my-2">
+                  <ul className="list-none space-y-6 my-4">
                     {session.session_exercises?.map((exercise) => (
                       <li key={exercise.id} className="text-sm">
-                        {exercise.exercises.name} - {exercise.sets} séries x {exercise.reps} repetições
-                        <br className="md:hidden" />
-                        <span className="text-gray-500">
-                          (descanso: {exercise.rest_time_seconds} segundos)
-                        </span>
+                        <div className="flex flex-col md:flex-row gap-4 items-start">
+                          {exercise.exercises.gif_url && (
+                            <div className="w-full md:w-48 h-48 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                              <img 
+                                src={exercise.exercises.gif_url} 
+                                alt={exercise.exercises.name}
+                                className="w-full h-full object-cover"
+                                loading="lazy"
+                              />
+                            </div>
+                          )}
+                          <div className="flex-grow">
+                            <span className="font-medium text-base">{exercise.exercises.name}</span>
+                            <br className="md:hidden" />
+                            <div className="text-gray-600 mt-1">
+                              {exercise.sets} séries x {exercise.reps} repetições
+                              <br className="md:hidden" />
+                              <span className="text-gray-500 block mt-1">
+                                Descanso: {exercise.rest_time_seconds} segundos
+                              </span>
+                            </div>
+                          </div>
+                        </div>
                       </li>
                     ))}
                   </ul>

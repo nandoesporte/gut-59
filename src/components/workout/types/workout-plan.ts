@@ -20,6 +20,7 @@ export interface WorkoutExercise {
   sets: number;
   reps: number;
   rest_time_seconds: number;
+  gifUrl?: string;
 }
 
 export interface WorkoutHistory {
@@ -36,6 +37,7 @@ export interface WorkoutHistory {
       id: string;
       exercises: {
         name: string;
+        gif_url?: string;
       };
       sets: number;
       reps: number;
