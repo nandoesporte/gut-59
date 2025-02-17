@@ -209,6 +209,33 @@ export type Database = {
         }
         Relationships: []
       }
+      meal_guidelines: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: number
+          meal_type: string
+          min_items: number
+          required_categories: string[]
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: number
+          meal_type: string
+          min_items: number
+          required_categories: string[]
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: number
+          meal_type?: string
+          min_items?: number
+          required_categories?: string[]
+        }
+        Relationships: []
+      }
       meal_plans: {
         Row: {
           active: boolean | null
@@ -595,24 +622,33 @@ export type Database = {
         Row: {
           calories: number
           carbs: number | null
+          carbs_per_100g: number | null
           common_allergens: string[] | null
           created_at: string
           dietary_flags: string[] | null
           fats: number | null
+          fats_per_100g: number | null
           fiber: number | null
+          fiber_per_100g: number | null
+          food_category: string[] | null
           food_group_id: number | null
           glycemic_index: number | null
           id: string
           is_quick_meal: boolean | null
+          max_portion: number | null
           meal_type: string[] | null
+          min_portion: number | null
           minerals: Json | null
           name: string
           nutritional_category: string[] | null
           phase: number | null
+          portion_size: number | null
+          portion_unit: string | null
           post_workout_compatible: boolean | null
           pre_workout_compatible: boolean | null
           preparation_time_minutes: number | null
           protein: number | null
+          protein_per_100g: number | null
           serving_size: number | null
           serving_unit: string | null
           vitamins: Json | null
@@ -620,24 +656,33 @@ export type Database = {
         Insert: {
           calories: number
           carbs?: number | null
+          carbs_per_100g?: number | null
           common_allergens?: string[] | null
           created_at?: string
           dietary_flags?: string[] | null
           fats?: number | null
+          fats_per_100g?: number | null
           fiber?: number | null
+          fiber_per_100g?: number | null
+          food_category?: string[] | null
           food_group_id?: number | null
           glycemic_index?: number | null
           id?: string
           is_quick_meal?: boolean | null
+          max_portion?: number | null
           meal_type?: string[] | null
+          min_portion?: number | null
           minerals?: Json | null
           name: string
           nutritional_category?: string[] | null
           phase?: number | null
+          portion_size?: number | null
+          portion_unit?: string | null
           post_workout_compatible?: boolean | null
           pre_workout_compatible?: boolean | null
           preparation_time_minutes?: number | null
           protein?: number | null
+          protein_per_100g?: number | null
           serving_size?: number | null
           serving_unit?: string | null
           vitamins?: Json | null
@@ -645,24 +690,33 @@ export type Database = {
         Update: {
           calories?: number
           carbs?: number | null
+          carbs_per_100g?: number | null
           common_allergens?: string[] | null
           created_at?: string
           dietary_flags?: string[] | null
           fats?: number | null
+          fats_per_100g?: number | null
           fiber?: number | null
+          fiber_per_100g?: number | null
+          food_category?: string[] | null
           food_group_id?: number | null
           glycemic_index?: number | null
           id?: string
           is_quick_meal?: boolean | null
+          max_portion?: number | null
           meal_type?: string[] | null
+          min_portion?: number | null
           minerals?: Json | null
           name?: string
           nutritional_category?: string[] | null
           phase?: number | null
+          portion_size?: number | null
+          portion_unit?: string | null
           post_workout_compatible?: boolean | null
           pre_workout_compatible?: boolean | null
           preparation_time_minutes?: number | null
           protein?: number | null
+          protein_per_100g?: number | null
           serving_size?: number | null
           serving_unit?: string | null
           vitamins?: Json | null
