@@ -38,7 +38,7 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
   const [showHistory, setShowHistory] = React.useState(false);
   const planContainerRef = React.useRef<HTMLDivElement>(null);
 
-  const { data: currentPlan, isLoading } = useQuery({
+  const { data: currentPlan, isLoading: isPlanLoading } = useQuery({
     queryKey: ['workout-plan', preferences],
     queryFn: async () => {
       const { data: userData } = await supabase.auth.getUser();
@@ -53,7 +53,7 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
     }
   });
 
-  const { data: historyPlans } = useQuery({
+  const { data: historyPlans, isLoading: isHistoryLoading } = useQuery({
     queryKey: ['workout-history'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -97,7 +97,7 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
     }
   };
 
-  if (isLoading) {
+  if (isPlanLoading) {
     return (
       <Card className="p-6">
         <div className="flex flex-col items-center justify-center space-y-4">
@@ -132,7 +132,14 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
         {showHistory ? (
           <div className="space-y-4">
             <h3 className="text-lg font-medium">Histórico de Planos</h3>
-            {historyPlans?.map((plan) => (
+            {isHistoryLoading ? (
+              <Card className="p-6">
+                <div className="flex flex-col items-center justify-center space-y-4">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+                  <p className="text-lg font-medium">Carregando histórico de treinos...</p>
+                </div>
+              </Card>
+            ) : historyPlans?.map((plan) => (
               <Card key={plan.id} className="mb-4">
                 <CardHeader>
                   <h4 className="text-md font-medium">
