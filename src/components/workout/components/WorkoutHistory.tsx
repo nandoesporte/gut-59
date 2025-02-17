@@ -22,15 +22,23 @@ export const WorkoutHistoryView = ({ isLoading, historyPlans }: WorkoutHistoryPr
 
   const handleDelete = async (planId: string) => {
     try {
+      // Primeiro, removemos da interface para feedback imediato
+      queryClient.setQueryData(['workout-history'], (old: WorkoutHistoryType[] | undefined) => 
+        old ? old.filter(plan => plan.id !== planId) : []
+      );
+
       const { error } = await supabase
         .from('workout_plans')
         .delete()
         .eq('id', planId);
 
-      if (error) throw error;
+      if (error) {
+        // Se houver erro, revertemos a alteração da interface
+        queryClient.invalidateQueries({ queryKey: ['workout-history'] });
+        throw error;
+      }
 
       toast.success("Plano de treino excluído com sucesso");
-      queryClient.invalidateQueries({ queryKey: ['workout-history'] });
     } catch (error) {
       console.error('Erro ao excluir plano:', error);
       toast.error("Erro ao excluir plano de treino");
