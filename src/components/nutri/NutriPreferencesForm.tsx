@@ -60,6 +60,7 @@ export const NutriPreferencesForm = ({ onSubmit }: NutriPreferencesFormProps) =>
       selectedFoods,
       hasAllergies: false,
       allergies: [],
+      healthCondition: values.healthConditions?.[0] || null // Pega a primeira condição de saúde ou null
     };
 
     onSubmit(preferences);
