@@ -20,15 +20,67 @@ serve(async (req) => {
 
     const selectedFoodDetails = protocolFoods
       .filter((food: any) => selectedFoods.includes(food.id))
-      .map((food: any) => food.name);
+      .map((food: any) => ({
+        name: food.name,
+        calories: food.calories,
+        protein: food.protein,
+        carbs: food.carbs,
+        fats: food.fats
+      }));
 
-    const prompt = `Você é um nutricionista especializado em criar cardápios personalizados.
-    Gere um cardápio baseado nos alimentos: ${selectedFoodDetails.join(', ')},
-    para uma necessidade calórica diária de ${dailyCalories} calorias.
-    O cardápio deve ter 5 refeições distribuídas ao longo do dia.
-    Use apenas os alimentos listados. Inclua porções aproximadas.
-    Responda APENAS com um objeto JSON neste formato:
-    {"dailyPlan":{"breakfast":{"foods":[],"calories":0},"morningSnack":{"foods":[],"calories":0},"lunch":{"foods":[],"calories":0},"afternoonSnack":{"foods":[],"calories":0},"dinner":{"foods":[],"calories":0}},"recommendations":{"general":"","timing":[]}}`;
+    const prompt = `Como um nutricionista especializado, crie um cardápio diário usando APENAS os seguintes alimentos:
+    ${JSON.stringify(selectedFoodDetails, null, 2)}
+    
+    Regras importantes:
+    1. Distribuir ${dailyCalories} calorias totais entre as 5 refeições
+    2. Usar APENAS os alimentos listados acima
+    3. Incluir porções em gramas para cada alimento
+    4. Distribuir as calorias aproximadamente assim:
+       - Café da manhã: 25%
+       - Lanche da manhã: 15%
+       - Almoço: 30%
+       - Lanche da tarde: 15%
+       - Jantar: 15%
+    
+    RESPONDA EXATAMENTE NESTE FORMATO JSON:
+    {
+      "dailyPlan": {
+        "breakfast": {
+          "foods": [
+            {"name": "nome do alimento", "portion": "quantidade em gramas"}
+          ],
+          "calories": numero_de_calorias
+        },
+        "morningSnack": {
+          "foods": [
+            {"name": "nome do alimento", "portion": "quantidade em gramas"}
+          ],
+          "calories": numero_de_calorias
+        },
+        "lunch": {
+          "foods": [
+            {"name": "nome do alimento", "portion": "quantidade em gramas"}
+          ],
+          "calories": numero_de_calorias
+        },
+        "afternoonSnack": {
+          "foods": [
+            {"name": "nome do alimento", "portion": "quantidade em gramas"}
+          ],
+          "calories": numero_de_calorias
+        },
+        "dinner": {
+          "foods": [
+            {"name": "nome do alimento", "portion": "quantidade em gramas"}
+          ],
+          "calories": numero_de_calorias
+        }
+      },
+      "recommendations": {
+        "general": "recomendação geral sobre o cardápio",
+        "timing": ["horário sugerido para cada refeição"]
+      }
+    }`;
 
     console.log('Sending prompt to OpenAI:', prompt);
 
@@ -43,7 +95,7 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: 'Você é um assistente que responde APENAS com JSON válido, sem formatação markdown ou texto adicional.'
+            content: 'Você é um assistente que responde APENAS com JSON válido, sem formatação markdown ou texto adicional. Não inclua comentários, apenas o JSON puro.'
           },
           {
             role: 'user',
@@ -54,18 +106,42 @@ serve(async (req) => {
       }),
     });
 
+    if (!response.ok) {
+      console.error('OpenAI API error:', await response.text());
+      throw new Error('Failed to get response from OpenAI');
+    }
+
     const openAIResponse = await response.json();
     console.log('OpenAI raw response:', openAIResponse);
 
-    const mealPlan = openAIResponse.choices[0].message.content;
-    console.log('Meal plan content:', mealPlan);
+    if (!openAIResponse.choices?.[0]?.message?.content) {
+      throw new Error('Invalid response format from OpenAI');
+    }
 
-    return new Response(mealPlan, {
+    let mealPlan;
+    try {
+      const content = openAIResponse.choices[0].message.content.trim();
+      mealPlan = JSON.parse(content);
+      
+      // Validação básica da estrutura
+      if (!mealPlan.dailyPlan || !mealPlan.recommendations) {
+        throw new Error('Invalid meal plan structure');
+      }
+    } catch (parseError) {
+      console.error('Error parsing meal plan:', parseError);
+      console.log('Raw content:', openAIResponse.choices[0].message.content);
+      throw new Error('Failed to parse meal plan JSON');
+    }
+
+    return new Response(JSON.stringify(mealPlan), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
     console.error('Error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      details: "Erro ao gerar o cardápio. Por favor, tente novamente."
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
