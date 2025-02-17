@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,13 +14,11 @@ export const useMenuController = () => {
   const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<CalorieCalculatorForm>({
-    weight: 0,
-    height: 0,
-    age: 0,
+    weight: "",
+    height: "",
+    age: "",
     gender: "male",
     activityLevel: "",
-    goal: null,
-    healthCondition: null,
   });
 
   useEffect(() => {
@@ -55,10 +52,14 @@ export const useMenuController = () => {
   }, [selectedFoods, protocolFoods]);
 
   const calculateBMR = (data: CalorieCalculatorForm) => {
+    const weight = parseFloat(data.weight);
+    const height = parseFloat(data.height);
+    const age = parseFloat(data.age);
+
     if (data.gender === "male") {
-      return 88.36 + (13.4 * data.weight) + (4.8 * data.height) - (5.7 * data.age);
+      return 88.36 + (13.4 * weight) + (4.8 * height) - (5.7 * age);
     } else {
-      return 447.6 + (9.2 * data.weight) + (3.1 * data.height) - (4.3 * data.age);
+      return 447.6 + (9.2 * weight) + (3.1 * height) - (4.3 * age);
     }
   };
 
@@ -68,14 +69,9 @@ export const useMenuController = () => {
     // Simulate calculation delay
     setTimeout(() => {
       const bmr = calculateBMR(formData);
-      const activityFactor = activityLevels[formData.activityLevel as keyof typeof activityLevels].factor;
-      const goalFactors = {
-        lose: 0.8,
-        maintain: 1,
-        gain: 1.2
-      };
-      const goalFactor = goalFactors[formData.goal];
-      const dailyCalories = Math.round(bmr * activityFactor * goalFactor);
+      const selectedLevel = activityLevels.find(level => level.value === formData.activityLevel);
+      const activityMultiplier = selectedLevel ? selectedLevel.multiplier : 1.2;
+      const dailyCalories = Math.round(bmr * activityMultiplier);
 
       setCalorieNeeds(dailyCalories);
       setLoading(false);

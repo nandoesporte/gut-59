@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Scale, Activity, Running, Dumbbell } from "lucide-react";
+import { Scale, Activity, Run, Dumbbell } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface CalorieCalculatorForm {
@@ -42,7 +42,7 @@ export const activityLevels = [
     value: "moderatelyActive",
     label: "Moderadamente Ativo",
     description: "Exercício moderado (3-5 dias/semana)",
-    icon: Running,
+    icon: Run,
     multiplier: 1.55
   },
   {
