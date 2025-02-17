@@ -99,27 +99,33 @@ export const useMenuController = () => {
   };
 
   const handleDietaryPreferences = async (preferences: DietaryPreferences) => {
+    let toastId: string | number;
+    
     try {
       setLoading(true);
-      toast.loading("Gerando seu plano alimentar personalizado...");
+      toastId = toast.loading("Gerando seu plano alimentar personalizado...");
 
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) {
+        toast.dismiss(toastId);
         toast.error("Usuário não autenticado");
         return;
       }
 
       if (!calorieNeeds) {
+        toast.dismiss(toastId);
         toast.error("Necessidade calórica não calculada");
         return;
       }
 
       if (selectedFoods.length === 0) {
+        toast.dismiss(toastId);
         toast.error("Nenhum alimento selecionado");
         return;
       }
 
       if (!formData.goal) {
+        toast.dismiss(toastId);
         toast.error("Objetivo não selecionado");
         return;
       }
@@ -155,20 +161,24 @@ export const useMenuController = () => {
 
       if (error) {
         console.error('Erro da função edge:', error);
+        toast.dismiss(toastId);
         toast.error("Erro ao gerar cardápio. Por favor, tente novamente.");
         throw error;
       }
 
       if (!responseData) {
+        toast.dismiss(toastId);
         throw new Error('Nenhum dado recebido do gerador de cardápio');
       }
 
       console.log('Cardápio recebido:', responseData);
       setMealPlan(responseData);
       setCurrentStep(4);
+      toast.dismiss(toastId);
       toast.success("Cardápio personalizado gerado com sucesso!");
     } catch (error) {
       console.error('Erro ao gerar cardápio:', error);
+      toast.dismiss(toastId!);
       toast.error("Erro ao gerar cardápio personalizado. Por favor, tente novamente.");
     } finally {
       setLoading(false);
