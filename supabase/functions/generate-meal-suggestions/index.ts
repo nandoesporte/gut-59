@@ -23,26 +23,12 @@ serve(async (req) => {
       .map((food: any) => food.name);
 
     const prompt = `Você é um nutricionista especializado em criar cardápios personalizados.
-    Baseado nas seguintes preferências alimentares do usuário: ${selectedFoodDetails.join(', ')},
-    e necessidade calórica diária de ${dailyCalories} calorias,
-    crie um cardápio diário detalhado com 5 refeições (café da manhã, lanche da manhã, almoço, lanche da tarde e jantar).
-    Use apenas os alimentos listados acima.
-    Inclua porções aproximadas para cada alimento.
-    Distribua as calorias de forma equilibrada entre as refeições.
-    Retorne apenas um objeto JSON seguindo exatamente esta estrutura, sem texto adicional ou formatação markdown:
-    {
-      "dailyPlan": {
-        "breakfast": { "foods": [], "calories": 0 },
-        "morningSnack": { "foods": [], "calories": 0 },
-        "lunch": { "foods": [], "calories": 0 },
-        "afternoonSnack": { "foods": [], "calories": 0 },
-        "dinner": { "foods": [], "calories": 0 }
-      },
-      "recommendations": {
-        "general": "",
-        "timing": []
-      }
-    }`;
+    Gere um cardápio baseado nos alimentos: ${selectedFoodDetails.join(', ')},
+    para uma necessidade calórica diária de ${dailyCalories} calorias.
+    O cardápio deve ter 5 refeições distribuídas ao longo do dia.
+    Use apenas os alimentos listados. Inclua porções aproximadas.
+    Responda APENAS com um objeto JSON neste formato:
+    {"dailyPlan":{"breakfast":{"foods":[],"calories":0},"morningSnack":{"foods":[],"calories":0},"lunch":{"foods":[],"calories":0},"afternoonSnack":{"foods":[],"calories":0},"dinner":{"foods":[],"calories":0}},"recommendations":{"general":"","timing":[]}}`;
 
     console.log('Sending prompt to OpenAI:', prompt);
 
@@ -57,7 +43,7 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: 'Você é um nutricionista especializado que responde apenas em JSON válido, sem formatação markdown ou texto adicional.'
+            content: 'Você é um assistente que responde APENAS com JSON válido, sem formatação markdown ou texto adicional.'
           },
           {
             role: 'user',
@@ -69,18 +55,12 @@ serve(async (req) => {
     });
 
     const openAIResponse = await response.json();
-    console.log('OpenAI response:', openAIResponse);
+    console.log('OpenAI raw response:', openAIResponse);
 
-    let mealPlan;
-    try {
-      mealPlan = JSON.parse(openAIResponse.choices[0].message.content.trim());
-    } catch (parseError) {
-      console.error('Error parsing OpenAI response:', parseError);
-      console.log('Raw content:', openAIResponse.choices[0].message.content);
-      throw new Error('Invalid JSON response from AI');
-    }
+    const mealPlan = openAIResponse.choices[0].message.content;
+    console.log('Meal plan content:', mealPlan);
 
-    return new Response(JSON.stringify(mealPlan), {
+    return new Response(mealPlan, {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
