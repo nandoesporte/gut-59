@@ -61,6 +61,12 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
     enabled: showHistory
   });
 
+  const handleGeneratePDF = () => {
+    if (planContainerRef.current) {
+      generateWorkoutPDF(planContainerRef.current);
+    }
+  };
+
   if (isPlanLoading) {
     return <WorkoutLoadingState message="Gerando seu plano de treino personalizado..." />;
   }
@@ -80,7 +86,7 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
           </Button>
           <Button 
             variant="outline" 
-            onClick={() => generateWorkoutPDF(planContainerRef)}
+            onClick={handleGeneratePDF}
             className={isMobile ? 'flex-1' : ''}
           >
             <Download className="w-4 h-4 mr-2" />
