@@ -14,6 +14,7 @@ import Progress from "./pages/Progress";
 import Store from "./pages/Store";
 import Admin from "./pages/Admin";
 import Workout from "./pages/Workout";
+import Nutri from "./pages/Nutri";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -85,6 +86,16 @@ function App() {
                   <ProtectedRoute>
                     <Layout>
                       <Workout />
+                    </Layout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/nutri"
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <Nutri />
                     </Layout>
                   </ProtectedRoute>
                 }

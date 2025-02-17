@@ -1,6 +1,6 @@
 
 import { Link, useLocation } from "react-router-dom";
-import { Book, Home, LineChart, ShoppingBag, Settings, ScrollText, Dumbbell } from "lucide-react";
+import { Book, Home, LineChart, ShoppingBag, Settings, ScrollText, Dumbbell, Utensils } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -49,6 +49,12 @@ const Navigation = () => {
             icon={<Home className="w-5 h-5 md:w-6 md:h-6" />}
             text="Início"
             active={isActive("/")}
+          />
+          <NavLink
+            to="/nutri"
+            icon={<Utensils className="w-5 h-5 md:w-6 md:h-6" />}
+            text="Nutri"
+            active={isActive("/nutri")}
           />
           <NavLink
             to="/instructions"
