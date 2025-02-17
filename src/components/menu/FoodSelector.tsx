@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Coffee, Utensils, Apple, Moon } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ProtocolFood {
   id: string;
@@ -70,6 +72,30 @@ export const FoodSelector = ({
   onBack,
   onConfirm,
 }: FoodSelectorProps) => {
+  const handleConfirm = async () => {
+    if (selectedFoods.length === 0) {
+      toast.error("Selecione pelo menos um alimento");
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-meal-suggestions', {
+        body: {
+          selectedFoods,
+          protocolFoods,
+          dailyCalories: totalCalories,
+        }
+      });
+
+      if (error) throw error;
+      
+      onConfirm();
+    } catch (error) {
+      console.error('Error generating meal plan:', error);
+      toast.error("Erro ao gerar cardápio. Por favor, tente novamente.");
+    }
+  };
+
   // Organizar alimentos por grupo
   const breakfastFoods = protocolFoods.filter(food => food.food_group_id === 1);
   const lunchFoods = protocolFoods.filter(food => food.food_group_id === 2);
@@ -140,7 +166,7 @@ export const FoodSelector = ({
           </Button>
           <Button 
             disabled={selectedFoods.length === 0} 
-            onClick={onConfirm}
+            onClick={handleConfirm}
             className="flex-1 bg-green-500 hover:bg-green-600 text-white"
           >
             Confirmar Seleção
