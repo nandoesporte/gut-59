@@ -1,4 +1,3 @@
-
 import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -13,9 +12,9 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Card } from "@/components/ui/card";
 import { WorkoutPreferences, ExerciseType, ActivityLevel, WorkoutGoal, HealthCondition } from "./types";
+import { Building2, Home, MapPin, Ban } from "lucide-react";
 
 const formSchema = z.object({
   weight: z.number().min(30).max(300),
@@ -26,39 +25,8 @@ const formSchema = z.object({
   goal: z.enum(["lose_weight", "maintain", "gain_mass"]),
   healthConditions: z.array(z.enum(["hypertension", "diabetes", "depression", "anxiety"])).optional(),
   preferredExerciseTypes: z.array(z.enum(["strength", "cardio", "mobility"])),
-  availableEquipment: z.array(z.string()),
+  trainingLocation: z.enum(["gym", "home", "outdoors", "no_equipment"]),
 });
-
-const equipmentCategories = {
-  casa: [
-    "Halteres",
-    "Elásticos",
-    "Tapete de Yoga",
-    "Corda de Pular",
-    "Barra Fixa de Porta",
-    "Banco Improvisado",
-    "Cadeira Resistente",
-    "Garrafa de Água (peso)",
-  ],
-  academia: [
-    "Esteira",
-    "Bicicleta Ergométrica",
-    "Aparelhos de Musculação",
-    "Pesos Livres",
-    "Anilhas e Barras",
-    "Banco Regulável",
-    "TRX/Suspensão",
-    "Máquina Smith",
-  ],
-  parque: [
-    "Academia ao Ar Livre",
-    "Barras Paralelas",
-    "Bancos do Parque",
-    "Escadas",
-    "Pista de Corrida",
-  ],
-  nenhum: ["Sem Equipamentos"]
-};
 
 interface SelectCardProps {
   selected: boolean;
@@ -90,12 +58,24 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
     defaultValues: {
       healthConditions: [],
       preferredExerciseTypes: [],
-      availableEquipment: [],
+      trainingLocation: "gym",
     },
   });
 
   const handleSubmit = (values: z.infer<typeof formSchema>) => {
-    onSubmit(values as WorkoutPreferences);
+    const locationEquipmentMap = {
+      gym: ["Esteira", "Bicicleta Ergométrica", "Aparelhos de Musculação", "Pesos Livres", "Anilhas e Barras"],
+      home: ["Halteres", "Elásticos", "Tapete de Yoga", "Cadeira Resistente"],
+      outdoors: ["Academia ao Ar Livre", "Barras Paralelas", "Pista de Corrida"],
+      no_equipment: ["Sem Equipamentos"],
+    };
+
+    const modifiedValues = {
+      ...values,
+      availableEquipment: locationEquipmentMap[values.trainingLocation],
+    };
+
+    onSubmit(modifiedValues as WorkoutPreferences);
   };
 
   return (
@@ -353,35 +333,55 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
 
         <FormField
           control={form.control}
-          name="availableEquipment"
+          name="trainingLocation"
           render={({ field }) => (
-            <FormItem className="space-y-4">
-              <FormLabel>Equipamentos Disponíveis</FormLabel>
-              {Object.entries(equipmentCategories).map(([category, items]) => (
-                <div key={category} className="space-y-2">
-                  <h3 className="text-lg font-medium capitalize">{category}</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {items.map((equipment) => (
-                      <SelectCard
-                        key={equipment}
-                        selected={field.value?.includes(equipment)}
-                        onClick={() => {
-                          if (field.value?.includes(equipment)) {
-                            field.onChange(field.value?.filter((e) => e !== equipment));
-                          } else {
-                            field.onChange([...field.value || [], equipment]);
-                          }
-                        }}
-                        className="h-full"
-                      >
-                        <div className="text-center">
-                          <span>{equipment}</span>
-                        </div>
-                      </SelectCard>
-                    ))}
+            <FormItem>
+              <FormLabel>Local de Treino</FormLabel>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <SelectCard
+                  selected={field.value === "gym"}
+                  onClick={() => field.onChange("gym")}
+                >
+                  <div className="flex flex-col items-center gap-2">
+                    <Building2 className="w-8 h-8 text-primary-500" />
+                    <span className="text-lg">Academia</span>
+                    <p className="text-sm text-gray-500">Acesso a equipamentos profissionais</p>
                   </div>
-                </div>
-              ))}
+                </SelectCard>
+
+                <SelectCard
+                  selected={field.value === "home"}
+                  onClick={() => field.onChange("home")}
+                >
+                  <div className="flex flex-col items-center gap-2">
+                    <Home className="w-8 h-8 text-primary-500" />
+                    <span className="text-lg">Casa</span>
+                    <p className="text-sm text-gray-500">Treino com equipamentos básicos</p>
+                  </div>
+                </SelectCard>
+
+                <SelectCard
+                  selected={field.value === "outdoors"}
+                  onClick={() => field.onChange("outdoors")}
+                >
+                  <div className="flex flex-col items-center gap-2">
+                    <MapPin className="w-8 h-8 text-primary-500" />
+                    <span className="text-lg">Ar Livre</span>
+                    <p className="text-sm text-gray-500">Parques e áreas públicas</p>
+                  </div>
+                </SelectCard>
+
+                <SelectCard
+                  selected={field.value === "no_equipment"}
+                  onClick={() => field.onChange("no_equipment")}
+                >
+                  <div className="flex flex-col items-center gap-2">
+                    <Ban className="w-8 h-8 text-primary-500" />
+                    <span className="text-lg">Sem Equipamentos</span>
+                    <p className="text-sm text-gray-500">Apenas peso corporal</p>
+                  </div>
+                </SelectCard>
+              </div>
               <FormMessage />
             </FormItem>
           )}
