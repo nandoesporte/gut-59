@@ -14,6 +14,14 @@ interface MealPlanDisplayProps {
 export const MealPlanDisplay = ({ mealPlan }: MealPlanDisplayProps) => {
   const { dailyPlan, recommendations, totalNutrition } = mealPlan;
 
+  // Função auxiliar para converter ProtocolFood[] para o formato esperado
+  const formatFoods = (foods: any[]) => {
+    return foods.map(food => ({
+      name: food.name,
+      portion: `${food.portion || ''}${food.portionUnit || 'g'}`
+    }));
+  };
+
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <div className="flex justify-between items-center">
@@ -27,8 +35,7 @@ export const MealPlanDisplay = ({ mealPlan }: MealPlanDisplayProps) => {
         <MealSection
           title="Café da Manhã"
           icon={<Coffee className="w-5 h-5" />}
-          foods={dailyPlan.breakfast.foods}
-          description={dailyPlan.breakfast.description}
+          foods={formatFoods(dailyPlan.breakfast.foods)}
           macros={dailyPlan.breakfast.macros}
           calories={dailyPlan.breakfast.calories}
         />
@@ -36,8 +43,7 @@ export const MealPlanDisplay = ({ mealPlan }: MealPlanDisplayProps) => {
         <MealSection
           title="Lanche da Manhã"
           icon={<Apple className="w-5 h-5" />}
-          foods={dailyPlan.morningSnack.foods}
-          description={dailyPlan.morningSnack.description}
+          foods={formatFoods(dailyPlan.morningSnack.foods)}
           macros={dailyPlan.morningSnack.macros}
           calories={dailyPlan.morningSnack.calories}
         />
@@ -45,8 +51,7 @@ export const MealPlanDisplay = ({ mealPlan }: MealPlanDisplayProps) => {
         <MealSection
           title="Almoço"
           icon={<UtensilsCrossed className="w-5 h-5" />}
-          foods={dailyPlan.lunch.foods}
-          description={dailyPlan.lunch.description}
+          foods={formatFoods(dailyPlan.lunch.foods)}
           macros={dailyPlan.lunch.macros}
           calories={dailyPlan.lunch.calories}
         />
@@ -54,8 +59,7 @@ export const MealPlanDisplay = ({ mealPlan }: MealPlanDisplayProps) => {
         <MealSection
           title="Lanche da Tarde"
           icon={<Cookie className="w-5 h-5" />}
-          foods={dailyPlan.afternoonSnack.foods}
-          description={dailyPlan.afternoonSnack.description}
+          foods={formatFoods(dailyPlan.afternoonSnack.foods)}
           macros={dailyPlan.afternoonSnack.macros}
           calories={dailyPlan.afternoonSnack.calories}
         />
@@ -63,8 +67,7 @@ export const MealPlanDisplay = ({ mealPlan }: MealPlanDisplayProps) => {
         <MealSection
           title="Jantar"
           icon={<Moon className="w-5 h-5" />}
-          foods={dailyPlan.dinner.foods}
-          description={dailyPlan.dinner.description}
+          foods={formatFoods(dailyPlan.dinner.foods)}
           macros={dailyPlan.dinner.macros}
           calories={dailyPlan.dinner.calories}
         />

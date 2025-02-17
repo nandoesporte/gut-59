@@ -1,6 +1,5 @@
 
 import { Button } from "@/components/ui/button";
-import { ProtocolFood } from "../types";
 import {
   Popover,
   PopoverContent,
@@ -17,7 +16,6 @@ interface MealSectionProps {
     name: string;
     portion: string;
   }>;
-  description?: string;
   macros?: {
     protein: number;
     carbs: number;
@@ -31,7 +29,6 @@ export const MealSection = ({
   title, 
   icon, 
   foods, 
-  description, 
   macros, 
   calories,
 }: MealSectionProps) => {
@@ -73,12 +70,6 @@ export const MealSection = ({
             />
           </div>
         </div>
-      )}
-
-      {description && (
-        <p className="mt-4 text-sm text-gray-600 border-t pt-4">
-          {description}
-        </p>
       )}
     </div>
   );
