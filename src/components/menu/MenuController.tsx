@@ -28,7 +28,7 @@ export const useMenuController = () => {
     const fetchProtocolFoods = async () => {
       const { data, error } = await supabase
         .from('protocol_foods')
-        .select('*, food_groups(name)');
+        .select('*, food_groups!fk_food_group(name)');
 
       if (error) {
         console.error('Error fetching foods:', error);
