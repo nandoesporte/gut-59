@@ -32,11 +32,6 @@ const Menu = () => {
         <Card className="p-6 bg-white shadow-md border border-green-100">
           <div className="flex flex-col items-center justify-center py-8 space-y-4">
             <Loader2 className="w-8 h-8 animate-spin text-green-500" />
-            <p className="text-lg font-medium text-green-700">
-              {currentStep === 2 ? "Processando sua seleção..." :
-               currentStep === 3 ? "Gerando seu plano alimentar..." :
-               "Aguarde um momento..."}
-            </p>
           </div>
         </Card>
       );
