@@ -61,9 +61,9 @@ const CalorieCalculator = ({
   calorieNeeds,
 }: CalorieCalculatorProps) => {
   return (
-    <div className="space-y-6">
-      <div className="grid gap-6">
-        <Card className="p-6 bg-white shadow-md border border-green-100">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="grid gap-4 sm:gap-6">
+        <Card className="p-4 sm:p-6 bg-white shadow-md border border-green-100">
           <form onSubmit={(e) => {
             e.preventDefault();
             onCalculate();
@@ -130,7 +130,7 @@ const CalorieCalculator = ({
                     <Card
                       key={level.value}
                       className={cn(
-                        "relative flex items-center space-x-2 p-4 cursor-pointer transition-colors",
+                        "relative flex items-center space-x-2 p-3 sm:p-4 cursor-pointer transition-colors",
                         formData.activityLevel === level.value
                           ? "bg-green-50 border-green-200"
                           : "hover:bg-green-50/50"
@@ -138,14 +138,14 @@ const CalorieCalculator = ({
                       onClick={() => onInputChange("activityLevel", level.value)}
                     >
                       <level.icon className={cn(
-                        "w-4 h-4",
+                        "w-4 h-4 sm:w-5 sm:h-5",
                         formData.activityLevel === level.value
                           ? "text-green-600"
                           : "text-gray-500"
                       )} />
                       <div className="flex-1">
-                        <p className="font-medium">{level.label}</p>
-                        <p className="text-sm text-gray-500">{level.description}</p>
+                        <p className="text-sm sm:text-base font-medium">{level.label}</p>
+                        <p className="text-xs sm:text-sm text-gray-500">{level.description}</p>
                       </div>
                     </Card>
                   ))}
@@ -154,7 +154,7 @@ const CalorieCalculator = ({
 
               <Button
                 type="submit"
-                className="w-full bg-green-500 hover:bg-green-600 text-white"
+                className="w-full bg-green-500 hover:bg-green-600 text-white mt-4"
               >
                 Calcular Necessidades Calóricas
               </Button>
