@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,8 +27,7 @@ export const useMenuController = () => {
     const fetchProtocolFoods = async () => {
       const { data, error } = await supabase
         .from('protocol_foods')
-        .select('*')
-        .in('food_group_id', [1, 2, 3, 4]);
+        .select('*');
 
       if (error) {
         console.error('Error fetching foods:', error);
@@ -67,17 +67,22 @@ export const useMenuController = () => {
   const handleCalculateCalories = () => {
     setLoading(true);
     
-    // Simulate calculation delay
-    setTimeout(() => {
+    try {
       const bmr = calculateBMR(formData);
       const selectedLevel = activityLevels.find(level => level.value === formData.activityLevel);
       const activityMultiplier = selectedLevel ? selectedLevel.multiplier : 1.2;
       const dailyCalories = Math.round(bmr * activityMultiplier);
 
+      console.log('Calculated calories:', dailyCalories);
+
       setCalorieNeeds(dailyCalories);
-      setLoading(false);
       setCurrentStep(2);
-    }, 1500);
+    } catch (error) {
+      console.error('Error calculating calories:', error);
+      toast.error("Erro ao calcular necessidades calóricas");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleFoodSelection = (foodId: string) => {
@@ -114,18 +119,23 @@ export const useMenuController = () => {
         return;
       }
 
+      if (!formData.goal) {
+        toast.error("Objetivo não selecionado");
+        return;
+      }
+
       setDietaryPreferences(preferences);
 
-      // Garantir que todos os campos necessários estão presentes
       const requestData = {
         userData: {
-          ...formData,
+          weight: parseFloat(formData.weight),
+          height: parseFloat(formData.height),
+          age: parseFloat(formData.age),
+          gender: formData.gender,
+          activityLevel: formData.activityLevel,
+          goal: formData.goal,
           userId: userData.user.id,
-          dailyCalories: calorieNeeds,
-          lastFeedback: {
-            likedFoods: [],
-            dislikedFoods: []
-          }
+          dailyCalories: calorieNeeds
         },
         selectedFoods,
         dietaryPreferences: {
@@ -137,7 +147,6 @@ export const useMenuController = () => {
         }
       };
 
-      // Log da requisição para debug
       console.log('Enviando requisição:', JSON.stringify(requestData, null, 2));
 
       const { data: responseData, error } = await supabase.functions.invoke('generate-meal-plan', {
