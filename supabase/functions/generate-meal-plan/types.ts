@@ -1,31 +1,94 @@
 
-export interface MacroTargets {
-  protein: number;
-  carbs: number;
-  fats: number;
-  fiber: number;
-}
-
-export interface Food {
+export interface ProtocolFood {
   id: string;
   name: string;
   calories: number;
   protein: number;
   carbs: number;
   fats: number;
-  fiber: number;
   food_group_id: number;
-  serving_size: number;
-  serving_unit: string;
-  meal_type?: string[];
+  portion?: number;
+  portionUnit?: string;
+  description?: string;
+  calculatedNutrients?: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fats: number;
+    fiber: number;
+  };
+  vitamins_minerals?: Record<string, number>;
+  substitution_group?: string;
   nutritional_category?: string[];
 }
 
-export interface FoodWithPortion extends Food {
-  portion: number;
-  portionUnit: string;
-  calculatedNutrients: {
+export interface DietaryPreferences {
+  hasAllergies: boolean;
+  allergies: string[];
+  dietaryRestrictions: string[];
+  trainingTime: string | null;
+}
+
+export interface MealPlanAnalysis {
+  macroDistribution: {
+    protein: number;
+    carbs: number;
+    fats: number;
+  };
+  restrictedFoods: ProtocolFood[];
+  mealTiming: {
+    breakfast: string;
+    morningSnack: string;
+    lunch: string;
+    afternoonSnack: string;
+    dinner: string;
+  };
+  nutritionalAdequacy: {
+    hasAdequateVitamins: boolean;
+    hasAdequateMinerals: boolean;
+    hasAdequateFiber: boolean;
+    estimatedFiberIntake: number;
+  };
+  healthConditionConsiderations: string[];
+}
+
+export interface MealPlan {
+  dailyPlan: {
+    breakfast: Meal;
+    morningSnack: Meal;
+    lunch: Meal;
+    afternoonSnack: Meal;
+    dinner: Meal;
+  };
+  totalNutrition: {
     calories: number;
+    protein: number;
+    carbs: number;
+    fats: number;
+    fiber: number;
+  };
+  nutritionalAnalysis?: {
+    carbsPercentage: number;
+    proteinPercentage: number;
+    fatsPercentage: number;
+    fiberAdequate: boolean;
+    vitaminsComplete: boolean;
+    mineralsComplete: boolean;
+  };
+  recommendations: {
+    preworkout: string;
+    postworkout: string;
+    general: string;
+    timing: string[];
+    healthCondition?: string | null;
+    substitutions?: FoodSubstitution[];
+  };
+}
+
+export interface Meal {
+  foods: ProtocolFood[];
+  calories: number;
+  macros: {
     protein: number;
     carbs: number;
     fats: number;
@@ -33,19 +96,8 @@ export interface FoodWithPortion extends Food {
   };
 }
 
-export interface MealPlanResult {
-  breakfast: FoodWithPortion[];
-  morning_snack: FoodWithPortion[];
-  lunch: FoodWithPortion[];
-  afternoon_snack: FoodWithPortion[];
-  dinner: FoodWithPortion[];
-  nutritionalAnalysis: {
-    totalCalories: number;
-    macroDistribution: {
-      protein: number;
-      carbs: number;
-      fats: number;
-      fiber: number;
-    };
-  };
+export interface FoodSubstitution {
+  originalFood: ProtocolFood;
+  alternatives: ProtocolFood[];
+  similarityScore: number;
 }
