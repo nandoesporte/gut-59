@@ -1,89 +1,51 @@
 
-import type { Food, MacroTargets, FoodWithPortion } from './types';
+import { MealPlan, ProtocolFood } from './types.ts'
 
-const STANDARD_PORTIONS = {
-  'pão': {
-    unit: 'fatia',
-    grams: 30
-  },
-  'arroz': {
-    unit: 'xícara',
-    grams: 100
-  },
-  'azeite': {
-    unit: 'colher de sopa',
-    grams: 15
-  },
-  'granola': {
-    unit: 'colher de sopa',
-    grams: 15
-  },
-  'quinoa': {
-    unit: 'xícara',
-    grams: 100
-  },
-  'feijão': {
-    unit: 'xícara',
-    grams: 100
-  },
-  'grão-de-bico': {
-    unit: 'xícara',
-    grams: 100
-  },
-  'legumes': {
-    unit: 'xícara',
-    grams: 100
-  },
-  'verduras': {
-    unit: 'xícara',
-    grams: 50
-  },
-  'frutas': {
-    unit: 'unidade',
-    grams: 100
-  },
-  'iogurte': {
-    unit: 'unidade',
-    grams: 170
-  }
-};
-
-export function calculatePortionSize(
-  food: Food,
-  targetCalories: number,
-  macroTargets: MacroTargets
-): FoodWithPortion {
-  const caloriesPerGram = food.calories / food.serving_size;
-  let targetPortion = Math.round((targetCalories / caloriesPerGram) * 100) / 100;
-
-  let portionUnit = food.serving_unit;
-  let friendlyPortion = targetPortion;
-
-  // Encontra a unidade de medida mais apropriada
-  for (const [keyword, standard] of Object.entries(STANDARD_PORTIONS)) {
-    if (food.name.toLowerCase().includes(keyword)) {
-      portionUnit = standard.unit;
-      friendlyPortion = Math.round((targetPortion / standard.grams) * 10) / 10;
-      break;
+export class PortionCalculator {
+  async calculate({
+    mealPlan,
+    dailyCalories
+  }: {
+    mealPlan: MealPlan;
+    dailyCalories: number;
+  }): Promise<MealPlan> {
+    // Distribuição calórica por refeição
+    const mealDistribution = {
+      breakfast: 0.25,
+      morningSnack: 0.15,
+      lunch: 0.30,
+      afternoonSnack: 0.10,
+      dinner: 0.20
     }
+
+    // Para cada refeição, calcular as porções
+    Object.entries(mealPlan.dailyPlan).forEach(([mealType, meal]) => {
+      const mealCalories = dailyCalories * mealDistribution[mealType as keyof typeof mealDistribution]
+      
+      // Calcular porções proporcionais
+      meal.foods = this.calculatePortions(meal.foods, mealCalories)
+    })
+
+    return mealPlan
   }
 
-  const calculatedCalories = Math.round((food.calories / food.serving_size) * targetPortion);
-  const calculatedProtein = Math.round((food.protein / food.serving_size) * targetPortion * 10) / 10;
-  const calculatedCarbs = Math.round((food.carbs / food.serving_size) * targetPortion * 10) / 10;
-  const calculatedFats = Math.round((food.fats / food.serving_size) * targetPortion * 10) / 10;
-  const calculatedFiber = Math.round((food.fiber / food.serving_size) * targetPortion * 10) / 10;
+  private calculatePortions(foods: ProtocolFood[], targetCalories: number): ProtocolFood[] {
+    const totalCalories = foods.reduce((sum, food) => sum + food.calories, 0)
+    const calorieRatio = targetCalories / totalCalories
 
-  return {
-    ...food,
-    portion: friendlyPortion,
-    portionUnit,
-    calculatedNutrients: {
-      calories: calculatedCalories,
-      protein: calculatedProtein,
-      carbs: calculatedCarbs,
-      fats: calculatedFats,
-      fiber: calculatedFiber
-    }
-  };
+    return foods.map(food => {
+      const portion = Math.round((food.portion || 100) * calorieRatio)
+      return {
+        ...food,
+        portion,
+        calculatedNutrients: {
+          calories: Math.round(food.calories * (portion / 100)),
+          protein: Math.round(food.protein * (portion / 100) * 10) / 10,
+          carbs: Math.round(food.carbs * (portion / 100) * 10) / 10,
+          fats: Math.round(food.fats * (portion / 100) * 10) / 10,
+          fiber: food.fiber ? Math.round(food.fiber * (portion / 100) * 10) / 10 : 0
+        }
+      }
+    })
+  }
 }

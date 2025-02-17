@@ -140,10 +140,8 @@ export const useMenuController = () => {
         }
       };
 
-      // Log para debug
       console.log('Enviando requisição:', JSON.stringify(requestData, null, 2));
 
-      // Chamar a Edge Function para gerar o plano alimentar
       const { data: responseData, error } = await supabase.functions.invoke('generate-meal-plan', {
         body: requestData
       });
@@ -158,12 +156,20 @@ export const useMenuController = () => {
         throw new Error('Nenhum dado recebido do gerador de cardápio');
       }
 
+      // Converter as preferências para JSON antes de salvar
+      const dietaryPreferencesJson = {
+        hasAllergies: preferences.hasAllergies || false,
+        allergies: preferences.allergies || [],
+        dietaryRestrictions: preferences.dietaryRestrictions || [],
+        trainingTime: preferences.trainingTime || null
+      };
+
       // Armazenar o plano no banco de dados
       const { error: saveError } = await supabase
         .from('meal_plans')
         .insert({
           user_id: userData.user.id,
-          dietary_preferences: preferences,
+          dietary_preferences: dietaryPreferencesJson,
           calories: calorieNeeds,
           plan_data: responseData,
           macros: responseData.totalNutrition,
