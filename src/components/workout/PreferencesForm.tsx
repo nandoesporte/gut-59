@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { WorkoutPreferences, ExerciseType, ActivityLevel, WorkoutGoal, HealthCondition } from "./types";
-import { Building2, Home, MapPin, Ban } from "lucide-react";
+import { Building2, Home, MapPin, Ban, Dumbbell, Heart, Yoga } from "lucide-react";
 
 const formSchema = z.object({
   weight: z.number().min(30).max(300),
@@ -279,7 +279,14 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
                       }
                     }}
                   >
-                    <div className="text-center">
+                    <div className="flex flex-col items-center gap-2">
+                      {type === 'strength' ? (
+                        <Dumbbell className="w-8 h-8 text-primary-500" />
+                      ) : type === 'cardio' ? (
+                        <Heart className="w-8 h-8 text-primary-500" />
+                      ) : (
+                        <Yoga className="w-8 h-8 text-primary-500" />
+                      )}
                       <span className="text-lg">
                         {type === 'strength' ? 'Força' : 
                          type === 'cardio' ? 'Cardio' : 
