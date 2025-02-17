@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,6 +12,7 @@ export const useMenuController = () => {
   const [totalCalories, setTotalCalories] = useState(0);
   const [dietaryPreferences, setDietaryPreferences] = useState<DietaryPreferences | null>(null);
   const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<CalorieCalculatorForm>({
     weight: 0,
     height: 0,
@@ -62,24 +62,26 @@ export const useMenuController = () => {
   };
 
   const handleCalculateCalories = () => {
-    if (!formData.activityLevel || !formData.goal) {
-      toast.error("Por favor, preencha todos os campos");
-      return;
-    }
+    setLoading(true);
+    toast.loading("Calculando suas necessidades calóricas...");
+    
+    // Simulate calculation delay
+    setTimeout(() => {
+      const bmr = calculateBMR(formData);
+      const activityFactor = activityLevels[formData.activityLevel as keyof typeof activityLevels].factor;
+      const goalFactors = {
+        lose: 0.8,
+        maintain: 1,
+        gain: 1.2
+      };
+      const goalFactor = goalFactors[formData.goal];
+      const dailyCalories = Math.round(bmr * activityFactor * goalFactor);
 
-    const bmr = calculateBMR(formData);
-    const activityFactor = activityLevels[formData.activityLevel as keyof typeof activityLevels].factor;
-    const goalFactors = {
-      lose: 0.8,
-      maintain: 1,
-      gain: 1.2
-    };
-    const goalFactor = goalFactors[formData.goal];
-    const dailyCalories = Math.round(bmr * activityFactor * goalFactor);
-
-    setCalorieNeeds(dailyCalories);
-    setCurrentStep(2);
-    toast.success("Cálculo realizado com sucesso!");
+      setCalorieNeeds(dailyCalories);
+      setLoading(false);
+      toast.success("Cálculo concluído!");
+      setCurrentStep(2);
+    }, 1500);
   };
 
   const handleFoodSelection = (foodId: string) => {
@@ -97,6 +99,9 @@ export const useMenuController = () => {
 
   const handleDietaryPreferences = async (preferences: DietaryPreferences) => {
     try {
+      setLoading(true);
+      toast.loading("Gerando seu plano alimentar personalizado...");
+
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) {
         toast.error("Usuário não autenticado");
@@ -160,6 +165,8 @@ export const useMenuController = () => {
     } catch (error) {
       console.error('Erro ao gerar cardápio:', error);
       toast.error("Erro ao gerar cardápio personalizado. Por favor, tente novamente.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -172,6 +179,7 @@ export const useMenuController = () => {
     totalCalories,
     mealPlan,
     formData,
+    loading,
     handleCalculateCalories,
     handleFoodSelection,
     handleDietaryPreferences,
