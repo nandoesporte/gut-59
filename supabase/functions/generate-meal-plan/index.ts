@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import "https://deno.land/x/xhr@0.1.0/mod.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -26,7 +25,6 @@ interface DietaryPreferences {
   trainingTime: string | null
 }
 
-// Ajusta as calorias baseado no objetivo
 function adjustCaloriesForGoal(calories: number, goal: string) {
   switch (goal) {
     case 'lose':
@@ -38,7 +36,6 @@ function adjustCaloriesForGoal(calories: number, goal: string) {
   }
 }
 
-// Ajusta os macros baseado no objetivo e nível de atividade
 function calculateMacroNeeds(totalCalories: number, goal: string, activityLevel: string) {
   let proteinPercentage: number;
   let carbsPercentage: number;
@@ -61,7 +58,6 @@ function calculateMacroNeeds(totalCalories: number, goal: string, activityLevel:
       fatsPercentage = 0.25;    // 25% gorduras
   }
 
-  // Ajuste adicional baseado no nível de atividade
   if (activityLevel === 'veryActive' || activityLevel === 'moderatelyActive') {
     carbsPercentage += 0.05;
     fatsPercentage -= 0.05;
@@ -74,7 +70,6 @@ function calculateMacroNeeds(totalCalories: number, goal: string, activityLevel:
   };
 }
 
-// Distribuição de calorias por refeição baseada no objetivo e horário de treino
 function distributeMealCalories(totalCalories: number, goal: string, trainingTime: string | null) {
   let distribution = {
     breakfast: 0.25,
@@ -85,7 +80,6 @@ function distributeMealCalories(totalCalories: number, goal: string, trainingTim
   };
 
   if (goal === 'lose') {
-    // Para perda de peso: café da manhã mais substancial
     distribution = {
       breakfast: 0.30,
       morningSnack: 0.15,
@@ -94,7 +88,6 @@ function distributeMealCalories(totalCalories: number, goal: string, trainingTim
       dinner: 0.15,
     };
   } else if (goal === 'gain') {
-    // Para ganho de massa: refeições mais equilibradas
     distribution = {
       breakfast: 0.25,
       morningSnack: 0.15,
@@ -104,20 +97,16 @@ function distributeMealCalories(totalCalories: number, goal: string, trainingTim
     };
   }
 
-  // Ajuste baseado no horário de treino
   if (trainingTime) {
     const trainHour = parseInt(trainingTime.split(':')[0]);
     
     if (trainHour < 10) {
-      // Treino pela manhã
       distribution.breakfast = 0.20;
       distribution.morningSnack = 0.25;
     } else if (trainHour < 16) {
-      // Treino à tarde
       distribution.lunch = 0.20;
       distribution.afternoonSnack = 0.25;
     } else {
-      // Treino à noite
       distribution.dinner = 0.25;
       distribution.afternoonSnack = 0.20;
     }
@@ -132,7 +121,6 @@ function distributeMealCalories(totalCalories: number, goal: string, trainingTim
   };
 }
 
-// Função para selecionar alimentos apropriados para cada refeição
 async function selectFoodsForMeal(
   supabase: any,
   mealType: string,
@@ -149,11 +137,10 @@ async function selectFoodsForMeal(
     .contains('meal_type', [mealType])
     .not('common_allergens', 'cs', `{${allergies.join(',')}}`);
 
-  // Filtros adicionais baseados no objetivo
   if (goal === 'lose') {
-    query.lt('calories', 400); // Limita calorias por alimento
+    query.lt('calories', 400);
   } else if (goal === 'gain') {
-    query.gt('protein_per_100g', 15); // Prioriza alimentos ricos em proteína
+    query.gt('protein_per_100g', 15);
   }
 
   const { data: availableFoods, error } = await query;
@@ -169,7 +156,6 @@ async function selectFoodsForMeal(
   let currentCarbs = 0;
   let currentFats = 0;
 
-  // Ordena alimentos baseado no objetivo
   const sortedFoods = availableFoods.sort((a: any, b: any) => {
     if (goal === 'lose') {
       return (a.protein_per_100g / a.calories) - (b.protein_per_100g / b.calories);
@@ -204,14 +190,13 @@ async function selectFoodsForMeal(
   return selectedMealFoods;
 }
 
-// Calcula porção baseada no objetivo
 function calculatePortion(food: any, remainingCalories: number, goal: string) {
   let baseMultiplier = 1;
   
   if (goal === 'lose') {
-    baseMultiplier = 0.8; // Reduz porções para perda de peso
+    baseMultiplier = 0.8;
   } else if (goal === 'gain') {
-    baseMultiplier = 1.2; // Aumenta porções para ganho de massa
+    baseMultiplier = 1.2;
   }
 
   const suggestedPortion = (remainingCalories / food.calories) * food.portion_size * baseMultiplier;
@@ -235,12 +220,12 @@ function calculateNutrients(food: any, portion: number) {
   };
 }
 
-// Gera recomendações específicas baseadas no objetivo e preferências
 function generateRecommendations(
   goal: string,
   dietaryPreferences: DietaryPreferences,
   macros: any,
-  trainingTime: string | null
+  trainingTime: string | null,
+  activityLevel: string
 ) {
   const recommendations = {
     general: "",
@@ -249,10 +234,18 @@ function generateRecommendations(
     timing: [] as string[],
   };
 
-  // Recomendações baseadas no objetivo
+  if (activityLevel === 'sedentary' || activityLevel === 'lightlyActive') {
+    recommendations.general = 
+      "IMPORTANTE: Seu nível atual de atividade física está baixo. Recomendamos fortemente que você: \n" +
+      "1. Inicie uma rotina regular de exercícios físicos\n" +
+      "2. Comece com atividades leves como caminhada\n" +
+      "3. Busque orientação profissional para iniciar atividades físicas\n" +
+      "4. Atualize seu plano alimentar após estabelecer uma rotina de exercícios\n\n";
+  }
+
   switch (goal) {
     case 'lose':
-      recommendations.general = 
+      recommendations.general += 
         "Mantenha um déficit calórico controlado e foque em alimentos ricos em proteína para preservar a massa magra. " +
         "Distribua as refeições ao longo do dia para controlar a fome.";
       recommendations.timing.push(
@@ -261,7 +254,7 @@ function generateRecommendations(
       );
       break;
     case 'gain':
-      recommendations.general = 
+      recommendations.general += 
         "Mantenha um superávit calórico controlado com foco em proteínas de alta qualidade. " +
         "Priorize refeições mais calóricas após o treino.";
       recommendations.timing.push(
@@ -270,7 +263,7 @@ function generateRecommendations(
       );
       break;
     default:
-      recommendations.general = 
+      recommendations.general += 
         "Mantenha uma alimentação equilibrada com foco em alimentos nutritivos. " +
         "Distribua bem os macronutrientes ao longo do dia.";
       recommendations.timing.push(
@@ -279,7 +272,6 @@ function generateRecommendations(
       );
   }
 
-  // Recomendações específicas para treino
   if (trainingTime) {
     const trainHour = parseInt(trainingTime.split(':')[0]);
     
@@ -317,24 +309,20 @@ serve(async (req) => {
   try {
     const { userData, selectedFoods, dietaryPreferences } = await req.json()
 
-    // Ajusta calorias baseado no objetivo
     const adjustedCalories = adjustCaloriesForGoal(userData.dailyCalories, userData.goal);
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     const supabase = createClient(supabaseUrl!, supabaseKey!)
 
-    // Calcula macros baseado no objetivo e nível de atividade
     const macroNeeds = calculateMacroNeeds(adjustedCalories, userData.goal, userData.activityLevel);
 
-    // Distribui calorias entre as refeições
     const mealCalories = distributeMealCalories(
       adjustedCalories,
       userData.goal,
       dietaryPreferences.trainingTime
     );
 
-    // Gera as refeições considerando o objetivo
     const breakfast = await selectFoodsForMeal(
       supabase,
       'breakfast',
@@ -385,7 +373,6 @@ serve(async (req) => {
       selectedFoods
     );
 
-    // Calcula totais nutricionais
     const calculateMealMacros = (foods: any[]) => {
       return foods.reduce((acc, food) => ({
         protein: acc.protein + (food.calculatedNutrients?.protein || 0),
@@ -431,7 +418,8 @@ serve(async (req) => {
         userData.goal,
         dietaryPreferences,
         macroNeeds,
-        dietaryPreferences.trainingTime
+        dietaryPreferences.trainingTime,
+        userData.activityLevel
       ),
     };
 
