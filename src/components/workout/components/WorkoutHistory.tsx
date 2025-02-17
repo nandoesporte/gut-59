@@ -40,7 +40,8 @@ export const WorkoutHistoryView = ({ isLoading, historyPlans }: WorkoutHistoryPr
   const handleDownload = async (planId: string) => {
     const planRef = planRefs.current[planId];
     if (planRef) {
-      await generateWorkoutPDF(planRef);
+      const ref = { current: planRef };
+      await generateWorkoutPDF(ref);
     }
   };
 
