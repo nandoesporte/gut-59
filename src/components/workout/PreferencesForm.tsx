@@ -56,4 +56,14 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+        <BasicInfoFields form={form} />
+        <ActivityLevelField form={form} />
+        <GoalField form={form} />
+        <ExerciseTypesField form={form} />
+        <TrainingLocationField form={form} />
+        <Button type="submit" className="w-full">Gerar Plano de Treino</Button>
+      </form>
+    </Form>
+  );
+};
