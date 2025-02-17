@@ -13,7 +13,6 @@ import Layout from "./components/Layout";
 import Progress from "./pages/Progress";
 import Store from "./pages/Store";
 import Admin from "./pages/Admin";
-import Menu from "./pages/Menu";
 import Workout from "./pages/Workout";
 
 const queryClient = new QueryClient({
@@ -106,16 +105,6 @@ function App() {
                   <ProtectedRoute>
                     <Layout>
                       <Progress />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/menu"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <Menu />
                     </Layout>
                   </ProtectedRoute>
                 }
