@@ -54,10 +54,10 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 function App() {
   return (
-    <React.StrictMode>
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <TooltipProvider>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <React.StrictMode>
+          <TooltipProvider delayDuration={0}>
             <Routes>
               <Route
                 path="/"
@@ -134,9 +134,9 @@ function App() {
             </Routes>
             <Toaster />
           </TooltipProvider>
-        </BrowserRouter>
-      </QueryClientProvider>
-    </React.StrictMode>
+        </React.StrictMode>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }
 
