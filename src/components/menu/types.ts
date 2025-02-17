@@ -1,3 +1,4 @@
+
 export interface ProtocolFood {
   id: string;
   name: string;
@@ -8,6 +9,7 @@ export interface ProtocolFood {
   food_group_id: number;
   portion?: number;
   portionUnit?: string;
+  description?: string;
   calculatedNutrients?: {
     calories: number;
     protein: number;
