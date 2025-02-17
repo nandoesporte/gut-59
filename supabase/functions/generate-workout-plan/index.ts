@@ -156,14 +156,47 @@ serve(async (req) => {
       }
     }
 
+    // Return the plan with exercises mapped to their names
+    const transformedSessions = await Promise.all(workoutPlan.plan.sessions.map(async (session) => {
+      const exerciseDetails = await Promise.all(session.exercises.map(async (exercise) => {
+        const { data: exerciseData } = await supabase
+          .from('exercises')
+          .select('name')
+          .eq('id', exercise.exerciseId)
+          .single()
+
+        return {
+          name: exerciseData?.name || 'Unknown Exercise',
+          sets: exercise.sets,
+          reps: exercise.reps,
+          rest_time_seconds: exercise.restTimeSeconds
+        }
+      }))
+
+      return {
+        day_number: session.dayNumber,
+        warmup_description: session.warmupDescription,
+        exercises: exerciseDetails,
+        cooldown_description: session.cooldownDescription
+      }
+    }))
+
     return new Response(
-      JSON.stringify({ success: true, plan: workoutPlan.plan }),
+      JSON.stringify({
+        id: plan.id,
+        created_at: plan.created_at,
+        start_date: workoutPlan.plan.startDate,
+        end_date: workoutPlan.plan.endDate,
+        goal: preferences.goal,
+        sessions: transformedSessions
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       }
     )
   } catch (error) {
+    console.error('Error generating workout plan:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       {
