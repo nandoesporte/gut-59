@@ -1,25 +1,16 @@
 
 import * as React from "react";
-import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -38,15 +29,56 @@ const formSchema = z.object({
   availableEquipment: z.array(z.string()),
 });
 
-const availableEquipment = [
-  "Dumbbells",
-  "Barbell",
-  "Resistance Bands",
-  "Pull-up Bar",
-  "Bench",
-  "Yoga Mat",
-  "None",
-];
+const equipmentCategories = {
+  casa: [
+    "Halteres",
+    "Elásticos",
+    "Tapete de Yoga",
+    "Corda de Pular",
+    "Barra Fixa de Porta",
+    "Banco Improvisado",
+    "Cadeira Resistente",
+    "Garrafa de Água (peso)",
+  ],
+  academia: [
+    "Esteira",
+    "Bicicleta Ergométrica",
+    "Aparelhos de Musculação",
+    "Pesos Livres",
+    "Anilhas e Barras",
+    "Banco Regulável",
+    "TRX/Suspensão",
+    "Máquina Smith",
+  ],
+  parque: [
+    "Academia ao Ar Livre",
+    "Barras Paralelas",
+    "Bancos do Parque",
+    "Escadas",
+    "Pista de Corrida",
+  ],
+  nenhum: ["Sem Equipamentos"]
+};
+
+interface SelectCardProps {
+  selected: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  className?: string;
+}
+
+const SelectCard = ({ selected, onClick, children, className = "" }: SelectCardProps) => (
+  <div
+    onClick={onClick}
+    className={`p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
+      selected
+        ? "border-primary-500 bg-primary-50"
+        : "border-gray-200 hover:border-primary-200"
+    } ${className}`}
+  >
+    {children}
+  </div>
+);
 
 interface PreferencesFormProps {
   onSubmit: (data: WorkoutPreferences) => void;
@@ -68,7 +100,7 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField
             control={form.control}
@@ -135,17 +167,24 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Sexo</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione seu sexo" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="male">Masculino</SelectItem>
-                    <SelectItem value="female">Feminino</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="grid grid-cols-2 gap-4">
+                  <SelectCard
+                    selected={field.value === "male"}
+                    onClick={() => field.onChange("male")}
+                  >
+                    <div className="text-center">
+                      <span className="text-lg">Masculino</span>
+                    </div>
+                  </SelectCard>
+                  <SelectCard
+                    selected={field.value === "female"}
+                    onClick={() => field.onChange("female")}
+                  >
+                    <div className="text-center">
+                      <span className="text-lg">Feminino</span>
+                    </div>
+                  </SelectCard>
+                </div>
                 <FormMessage />
               </FormItem>
             )}
@@ -158,19 +197,44 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Nível de Atividade Física</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione seu nível de atividade" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="sedentary">Sedentário</SelectItem>
-                  <SelectItem value="light">Leve</SelectItem>
-                  <SelectItem value="moderate">Moderado</SelectItem>
-                  <SelectItem value="intense">Intenso</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                <SelectCard
+                  selected={field.value === "sedentary"}
+                  onClick={() => field.onChange("sedentary")}
+                >
+                  <div className="text-center">
+                    <span className="text-lg">Sedentário</span>
+                    <p className="text-sm text-gray-500">Pouco ou nenhum exercício</p>
+                  </div>
+                </SelectCard>
+                <SelectCard
+                  selected={field.value === "light"}
+                  onClick={() => field.onChange("light")}
+                >
+                  <div className="text-center">
+                    <span className="text-lg">Leve</span>
+                    <p className="text-sm text-gray-500">1-3 dias por semana</p>
+                  </div>
+                </SelectCard>
+                <SelectCard
+                  selected={field.value === "moderate"}
+                  onClick={() => field.onChange("moderate")}
+                >
+                  <div className="text-center">
+                    <span className="text-lg">Moderado</span>
+                    <p className="text-sm text-gray-500">3-5 dias por semana</p>
+                  </div>
+                </SelectCard>
+                <SelectCard
+                  selected={field.value === "intense"}
+                  onClick={() => field.onChange("intense")}
+                >
+                  <div className="text-center">
+                    <span className="text-lg">Intenso</span>
+                    <p className="text-sm text-gray-500">6-7 dias por semana</p>
+                  </div>
+                </SelectCard>
+              </div>
               <FormMessage />
             </FormItem>
           )}
@@ -182,18 +246,35 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Objetivo</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione seu objetivo" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="lose_weight">Perder Peso</SelectItem>
-                  <SelectItem value="maintain">Manter Peso</SelectItem>
-                  <SelectItem value="gain_mass">Ganhar Massa</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <SelectCard
+                  selected={field.value === "lose_weight"}
+                  onClick={() => field.onChange("lose_weight")}
+                >
+                  <div className="text-center">
+                    <span className="text-lg">Perder Peso</span>
+                    <p className="text-sm text-gray-500">Foco em queima de gordura</p>
+                  </div>
+                </SelectCard>
+                <SelectCard
+                  selected={field.value === "maintain"}
+                  onClick={() => field.onChange("maintain")}
+                >
+                  <div className="text-center">
+                    <span className="text-lg">Manter Peso</span>
+                    <p className="text-sm text-gray-500">Melhorar condicionamento</p>
+                  </div>
+                </SelectCard>
+                <SelectCard
+                  selected={field.value === "gain_mass"}
+                  onClick={() => field.onChange("gain_mass")}
+                >
+                  <div className="text-center">
+                    <span className="text-lg">Ganhar Massa</span>
+                    <p className="text-sm text-gray-500">Foco em hipertrofia</p>
+                  </div>
+                </SelectCard>
+              </div>
               <FormMessage />
             </FormItem>
           )}
@@ -207,19 +288,25 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
               <FormLabel>Tipos de Exercícios Preferidos</FormLabel>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {(['strength', 'cardio', 'mobility'] as ExerciseType[]).map((type) => (
-                  <label key={type} className="flex items-center space-x-2">
-                    <Checkbox
-                      checked={field.value?.includes(type)}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          field.onChange([...field.value, type]);
-                        } else {
-                          field.onChange(field.value?.filter((t) => t !== type));
-                        }
-                      }}
-                    />
-                    <span className="capitalize">{type === 'strength' ? 'Força' : type === 'cardio' ? 'Cardio' : 'Mobilidade'}</span>
-                  </label>
+                  <SelectCard
+                    key={type}
+                    selected={field.value?.includes(type)}
+                    onClick={() => {
+                      if (field.value?.includes(type)) {
+                        field.onChange(field.value?.filter((t) => t !== type));
+                      } else {
+                        field.onChange([...field.value || [], type]);
+                      }
+                    }}
+                  >
+                    <div className="text-center">
+                      <span className="text-lg">
+                        {type === 'strength' ? 'Força' : 
+                         type === 'cardio' ? 'Cardio' : 
+                         'Mobilidade'}
+                      </span>
+                    </div>
+                  </SelectCard>
                 ))}
               </div>
               <FormMessage />
@@ -236,24 +323,26 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {(['hypertension', 'diabetes', 'depression', 'anxiety'] as HealthCondition[]).map((condition) => 
                   condition && (
-                    <label key={condition} className="flex items-center space-x-2">
-                      <Checkbox
-                        checked={field.value?.includes(condition)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            field.onChange([...field.value, condition]);
-                          } else {
-                            field.onChange(field.value?.filter((c) => c !== condition));
-                          }
-                        }}
-                      />
-                      <span className="capitalize">
-                        {condition === 'hypertension' ? 'Hipertensão' : 
-                         condition === 'diabetes' ? 'Diabetes' : 
-                         condition === 'depression' ? 'Depressão' : 
-                         'Ansiedade'}
-                      </span>
-                    </label>
+                    <SelectCard
+                      key={condition}
+                      selected={field.value?.includes(condition)}
+                      onClick={() => {
+                        if (field.value?.includes(condition)) {
+                          field.onChange(field.value?.filter((c) => c !== condition));
+                        } else {
+                          field.onChange([...field.value || [], condition]);
+                        }
+                      }}
+                    >
+                      <div className="text-center">
+                        <span className="text-lg">
+                          {condition === 'hypertension' ? 'Hipertensão' : 
+                           condition === 'diabetes' ? 'Diabetes' : 
+                           condition === 'depression' ? 'Depressão' : 
+                           'Ansiedade'}
+                        </span>
+                      </div>
+                    </SelectCard>
                   )
                 )}
               </div>
@@ -266,25 +355,33 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
           control={form.control}
           name="availableEquipment"
           render={({ field }) => (
-            <FormItem>
+            <FormItem className="space-y-4">
               <FormLabel>Equipamentos Disponíveis</FormLabel>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {availableEquipment.map((equipment) => (
-                  <label key={equipment} className="flex items-center space-x-2">
-                    <Checkbox
-                      checked={field.value?.includes(equipment)}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          field.onChange([...field.value, equipment]);
-                        } else {
-                          field.onChange(field.value?.filter((e) => e !== equipment));
-                        }
-                      }}
-                    />
-                    <span>{equipment}</span>
-                  </label>
-                ))}
-              </div>
+              {Object.entries(equipmentCategories).map(([category, items]) => (
+                <div key={category} className="space-y-2">
+                  <h3 className="text-lg font-medium capitalize">{category}</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {items.map((equipment) => (
+                      <SelectCard
+                        key={equipment}
+                        selected={field.value?.includes(equipment)}
+                        onClick={() => {
+                          if (field.value?.includes(equipment)) {
+                            field.onChange(field.value?.filter((e) => e !== equipment));
+                          } else {
+                            field.onChange([...field.value || [], equipment]);
+                          }
+                        }}
+                        className="h-full"
+                      >
+                        <div className="text-center">
+                          <span>{equipment}</span>
+                        </div>
+                      </SelectCard>
+                    ))}
+                  </div>
+                </div>
+              ))}
               <FormMessage />
             </FormItem>
           )}
