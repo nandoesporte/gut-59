@@ -1,86 +1,51 @@
 
-import { MealPlan, DietaryPreferences } from './types.ts'
+import type { Food } from './types';
 
-export class NutritionalScorer {
-  async score({
-    mealPlan,
-    dietaryPreferences
-  }: {
-    mealPlan: MealPlan;
-    dietaryPreferences: DietaryPreferences;
-  }) {
-    const totalCalories = mealPlan.totalNutrition.calories;
-    
-    // Calcular distribuição de macronutrientes
-    const macroDistribution = {
-      protein: Math.round((mealPlan.totalNutrition.protein * 4 / totalCalories) * 100),
-      carbs: Math.round((mealPlan.totalNutrition.carbs * 4 / totalCalories) * 100),
-      fats: Math.round((mealPlan.totalNutrition.fats * 9 / totalCalories) * 100)
-    };
+export function calculateNutritionalScore(
+  food: Food,
+  goal: string,
+  userPreferences: {
+    likedFoods?: string[];
+    dislikedFoods?: string[];
+  }
+): number {
+  let score = 0;
 
-    // Verificar adequação de fibras (25g/dia como referência)
-    const fiberAdequate = mealPlan.totalNutrition.fiber >= 25;
+  // Base nutritional value score
+  if (food.protein) score += 2;
+  if (food.fiber) score += 1;
+  if (food.vitamins) score += Object.keys(food.vitamins).length * 0.2;
+  if (food.minerals) score += Object.keys(food.minerals).length * 0.2;
 
-    // Contar vitaminas e minerais únicos
-    const vitaminsAndMinerals = new Set();
-    Object.values(mealPlan.dailyPlan).forEach(meal => {
-      meal.foods.forEach(food => {
-        if (food.vitamins_minerals) {
-          Object.keys(food.vitamins_minerals).forEach(nutrient => {
-            vitaminsAndMinerals.add(nutrient);
-          });
-        }
-      });
-    });
-
-    // Verificar completude de vitaminas e minerais
-    const vitaminsComplete = vitaminsAndMinerals.size >= 8;
-    const mineralsComplete = vitaminsAndMinerals.size >= 5;
-
-    return {
-      macroDistribution,
-      fiberAdequate,
-      vitaminsComplete,
-      mineralsComplete,
-      score: this.calculateOverallScore({
-        macroDistribution,
-        fiberAdequate,
-        vitaminsComplete,
-        mineralsComplete
-      })
-    };
+  // Goal-specific scoring
+  switch (goal) {
+    case 'lose_weight':
+      if (food.fiber > 3) score += 2;
+      if (food.glycemic_index && food.glycemic_index < 55) score += 2;
+      if (food.protein / food.calories > 0.1) score += 2; // High protein density
+      break;
+    case 'gain_mass':
+      if (food.calories > 200) score += 1;
+      if (food.protein > 20) score += 2;
+      if (food.carbs / food.calories > 0.5) score += 1;
+      break;
+    case 'maintain':
+      if (food.fiber > 2) score += 1;
+      if (food.protein / food.calories > 0.15) score += 1;
+      break;
   }
 
-  private calculateOverallScore({
-    macroDistribution,
-    fiberAdequate,
-    vitaminsComplete,
-    mineralsComplete
-  }: {
-    macroDistribution: { protein: number; carbs: number; fats: number };
-    fiberAdequate: boolean;
-    vitaminsComplete: boolean;
-    mineralsComplete: boolean;
-  }) {
-    let score = 0;
-
-    // Pontuação para distribuição de macros (máx: 50 pontos)
-    const idealMacros = { protein: 25, carbs: 50, fats: 25 };
-    const macroDiff = Math.abs(macroDistribution.protein - idealMacros.protein) +
-                      Math.abs(macroDistribution.carbs - idealMacros.carbs) +
-                      Math.abs(macroDistribution.fats - idealMacros.fats);
-    
-    score += Math.max(0, 50 - macroDiff);
-
-    // Pontuação para fibras (20 pontos)
-    if (fiberAdequate) score += 20;
-
-    // Pontuação para vitaminas (15 pontos)
-    if (vitaminsComplete) score += 15;
-
-    // Pontuação para minerais (15 pontos)
-    if (mineralsComplete) score += 15;
-
-    return score;
+  // Category-based scoring
+  if (food.nutritional_category) {
+    if (food.nutritional_category.includes('vegetables')) score += 1;
+    if (food.nutritional_category.includes('protein')) score += 1;
+    if (food.nutritional_category.includes('healthy_fats')) score += 1;
+    if (food.nutritional_category.includes('carbs_complex')) score += 1;
   }
+
+  // User preferences
+  if (userPreferences.likedFoods?.includes(food.id)) score += 2;
+  if (userPreferences.dislikedFoods?.includes(food.id)) score -= 3;
+
+  return score;
 }

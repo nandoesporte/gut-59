@@ -4,7 +4,16 @@ import { Coffee, Utensils, Apple, Moon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import type { ProtocolFood } from "./types";
+
+interface ProtocolFood {
+  id: string;
+  name: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  food_group_id: number;
+}
 
 interface FoodSelectorProps {
   protocolFoods: ProtocolFood[];
@@ -32,33 +41,23 @@ const MealSection = ({
     <div className="flex items-center gap-2 mb-2">
       {icon}
       <h3 className="font-medium text-gray-900">{title}</h3>
-      <span className="text-sm text-gray-500">({foods.length} opções)</span>
     </div>
     <div className="flex flex-wrap gap-2">
-      {foods.length > 0 ? (
-        foods.map((food) => (
-          <Button
-            key={food.id}
-            variant={selectedFoods.includes(food.id) ? "default" : "outline"}
-            onClick={() => onFoodSelection(food.id)}
-            className={`
-              inline-flex items-center justify-center whitespace-nowrap h-auto py-1.5 px-3 text-sm
-              ${selectedFoods.includes(food.id)
-                ? 'bg-green-100 border-green-500 text-green-700 hover:bg-green-200 hover:text-green-800'
-                : 'hover:bg-green-50 hover:border-green-200'}
-            `}
-          >
-            <span className="flex flex-col items-start text-left">
-              <span>{food.name}</span>
-              <span className="text-xs opacity-75">
-                {food.calories} kcal / {food.portion_size}{food.portion_unit || food.serving_unit}
-              </span>
-            </span>
-          </Button>
-        ))
-      ) : (
-        <p className="text-gray-500 text-sm">Nenhum alimento disponível para esta refeição</p>
-      )}
+      {foods.map((food) => (
+        <Button
+          key={food.id}
+          variant={selectedFoods.includes(food.id) ? "default" : "outline"}
+          onClick={() => onFoodSelection(food.id)}
+          className={`
+            inline-flex items-center justify-center whitespace-nowrap h-auto py-1.5 px-3 text-sm
+            ${selectedFoods.includes(food.id)
+              ? 'bg-green-100 border-green-500 text-green-700 hover:bg-green-200 hover:text-green-800'
+              : 'hover:bg-green-50 hover:border-green-200'}
+          `}
+        >
+          {food.name}
+        </Button>
+      ))}
     </div>
   </Card>
 );
@@ -108,9 +107,6 @@ export const FoodSelector = ({
         <p className="text-gray-600 mt-2">
           Selecione todas as suas preferências alimentares para cada refeição do dia
         </p>
-        <p className="text-sm text-gray-500 mt-1">
-          Alimentos selecionados: {selectedFoods.length}/20
-        </p>
       </div>
 
       <div className="space-y-6">
@@ -147,7 +143,7 @@ export const FoodSelector = ({
         />
       </div>
 
-      <div className="sticky bottom-0 bg-white border-t pt-4 mt-6 pb-4">
+      <div className="sticky bottom-0 bg-white border-t pt-4 mt-6">
         <div className="flex justify-between gap-4">
           <Button variant="outline" onClick={onBack}>
             Voltar

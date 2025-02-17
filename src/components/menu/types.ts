@@ -7,9 +7,8 @@ export interface ProtocolFood {
   carbs: number;
   fats: number;
   food_group_id: number;
-  portion_size: number;
-  portion_unit?: string;
-  serving_unit: string;
+  portion?: number;
+  portionUnit?: string;
   description?: string;
   calculatedNutrients?: {
     calories: number;
