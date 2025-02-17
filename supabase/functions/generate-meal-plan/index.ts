@@ -1,219 +1,305 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
+import type { ProtocolFood, DietaryPreferences, MealPlan } from '../../../src/components/menu/types.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS'
-};
+}
+
+interface RequestData {
+  userData: {
+    userId: string;
+    weight: number;
+    height: number;
+    age: number;
+    gender: 'male' | 'female';
+    activityLevel: string;
+    goal: 'lose' | 'maintain' | 'gain';
+    healthCondition: string | null;
+    dailyCalories: number;
+  };
+  selectedFoods: string[];
+  dietaryPreferences: DietaryPreferences;
+}
 
 serve(async (req) => {
-  console.log('Request received:', {
-    method: req.method,
-    headers: Object.fromEntries(req.headers.entries()),
-    url: req.url
-  });
-  
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    console.log('Handling OPTIONS request');
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    const contentLength = req.headers.get('content-length');
-    if (!contentLength || parseInt(contentLength) === 0) {
-      console.error('Empty request body');
-      throw new Error('Request body is empty');
-    }
+    console.log('Starting meal plan generation...');
+    const { userData, selectedFoods, dietaryPreferences } = await req.json() as RequestData;
 
-    const rawBody = await req.text();
-    console.log('Raw request body:', rawBody);
+    // Conectar ao Supabase
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
-    let body;
-    try {
-      body = JSON.parse(rawBody);
-    } catch (parseError) {
-      console.error('JSON parse error:', parseError);
-      return new Response(
-        JSON.stringify({ 
-          error: 'Invalid JSON in request body',
-          details: parseError.message,
-          receivedBody: rawBody
-        }),
-        { 
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
-
-    console.log('Parsed request body:', JSON.stringify(body, null, 2));
-
-    const { userData, selectedFoods, dietaryPreferences } = body;
-
-    if (!userData || typeof userData !== 'object') {
-      throw new Error('Missing or invalid userData object');
-    }
-
-    if (!Array.isArray(selectedFoods)) {
-      throw new Error('selectedFoods must be an array');
-    }
-
-    if (!dietaryPreferences || typeof dietaryPreferences !== 'object') {
-      throw new Error('Missing or invalid dietaryPreferences object');
-    }
-
-    const requiredFields = ['weight', 'height', 'age', 'gender', 'activityLevel', 'goal'];
-    for (const field of requiredFields) {
-      if (!(field in userData)) {
-        throw new Error(`Missing required field in userData: ${field}`);
-      }
-    }
-
-    console.log('Initializing Supabase client');
-    const supabase = createClient(
-      'https://sxjafhzikftdenqnkcri.supabase.co',
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4amFmaHppa2Z0ZGVucW5rY3JpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzg5ODQ0NTMsImV4cCI6MjA1NDU2MDQ1M30.qc8SAzrY0FJSz34BMeelH9CPWFZar5_1P-tAFMr4zp4'
-    );
-
-    console.log('Fetching selected foods');
+    // Buscar alimentos selecionados
     const { data: foods, error: foodsError } = await supabase
       .from('protocol_foods')
       .select('*')
       .in('id', selectedFoods);
 
-    if (foodsError) {
-      console.error('Error fetching foods:', foodsError);
-      throw new Error('Failed to fetch foods data');
-    }
+    if (foodsError) throw foodsError;
 
-    if (!foods || foods.length === 0) {
-      console.warn('No foods found for the provided IDs');
-      throw new Error('No foods found for the provided IDs');
-    }
-
-    // Distribute foods across meals more evenly
-    const distributeFoods = (foods: any[], selectedFoods: string[]) => {
-      const mealDistribution = {
-        breakfast: foods.slice(0, Math.min(4, foods.length)),
-        morningSnack: foods.slice(Math.min(4, foods.length), Math.min(7, foods.length)),
-        lunch: foods.slice(Math.min(7, foods.length), Math.min(13, foods.length)),
-        afternoonSnack: foods.slice(Math.min(13, foods.length), Math.min(16, foods.length)),
-        dinner: foods.slice(Math.min(16, foods.length))
-      };
-
-      // Ensure minimum items for each meal by redistributing if necessary
-      const minItems = {
-        breakfast: 3,
-        morningSnack: 2,
-        lunch: 4,
-        afternoonSnack: 2,
-        dinner: 4
-      };
-
-      Object.entries(minItems).forEach(([meal, min]) => {
-        if (mealDistribution[meal as keyof typeof mealDistribution].length < min) {
-          // Try to borrow items from other meals that have excess
-          Object.entries(mealDistribution).forEach(([otherMeal, foods]) => {
-            if (otherMeal !== meal && foods.length > minItems[otherMeal as keyof typeof minItems]) {
-              while (
-                mealDistribution[meal as keyof typeof mealDistribution].length < min &&
-                foods.length > minItems[otherMeal as keyof typeof minItems]
-              ) {
-                const food = foods.pop();
-                if (food) {
-                  mealDistribution[meal as keyof typeof mealDistribution].push(food);
-                }
-              }
-            }
-          });
-        }
-      });
-
-      return mealDistribution;
-    };
-
-    const mealDistribution = distributeFoods(foods, selectedFoods);
-
-    const mockResponse = {
+    // Gerar plano de refeições
+    const mealPlan: MealPlan = {
       dailyPlan: {
         breakfast: {
-          foods: mealDistribution.breakfast,
-          macros: { protein: 20, carbs: 30, fats: 10 },
-          calories: 300
+          foods: [],
+          calories: 0,
+          macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
         },
         morningSnack: {
-          foods: mealDistribution.morningSnack,
-          macros: { protein: 10, carbs: 15, fats: 5 },
-          calories: 150
+          foods: [],
+          calories: 0,
+          macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
         },
         lunch: {
-          foods: mealDistribution.lunch,
-          macros: { protein: 30, carbs: 45, fats: 15 },
-          calories: 450
+          foods: [],
+          calories: 0,
+          macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
         },
         afternoonSnack: {
-          foods: mealDistribution.afternoonSnack,
-          macros: { protein: 10, carbs: 15, fats: 5 },
-          calories: 150
+          foods: [],
+          calories: 0,
+          macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
         },
         dinner: {
-          foods: mealDistribution.dinner,
-          macros: { protein: 25, carbs: 35, fats: 12 },
-          calories: 375
+          foods: [],
+          calories: 0,
+          macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
         }
       },
       totalNutrition: {
-        calories: 1425,
-        protein: 95,
-        carbs: 140,
-        fats: 47,
-        fiber: 25
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fats: 0,
+        fiber: 0
       },
       recommendations: {
-        general: "Para melhores resultados, siga estas orientações:",
-        timing: [
-          "Café da Manhã (Mínimo 3 itens): Inclua sempre uma proteína, um carboidrato complexo e uma fruta ou gordura boa",
-          "Lanche da Manhã/Tarde (Mínimo 2 itens): Combine proteína com carboidrato ou fruta para manter a energia",
-          "Almoço/Jantar (Mínimo 4 itens): Monte seu prato com proteína, carboidrato, vegetais e uma gordura boa",
-          "Distribua as refeições a cada 3-4 horas para manter o metabolismo ativo",
-          "Beba água entre as refeições, não durante, para melhor digestão"
-        ],
-        preworkout: "Consuma carboidratos complexos 1-2 horas antes do treino",
-        postworkout: "Priorize proteínas e carboidratos até 30 minutos após o treino",
-        substitutions: []
+        preworkout: generatePreWorkoutRecommendation(dietaryPreferences.trainingTime),
+        postworkout: generatePostWorkoutRecommendation(userData.goal),
+        general: generateGeneralRecommendation(userData),
+        timing: generateMealTiming(dietaryPreferences.trainingTime),
+        healthCondition: userData.healthCondition as "hipertensao" | "diabetes" | "depressao_ansiedade" | null,
       },
       nutritionalAnalysis: {
-        carbsPercentage: 45,
-        proteinPercentage: 30,
-        fatsPercentage: 25,
-        fiberAdequate: true,
-        vitaminsComplete: true,
-        mineralsComplete: true
+        carbsPercentage: 0,
+        proteinPercentage: 0,
+        fatsPercentage: 0,
+        fiberAdequate: false,
+        vitaminsComplete: false,
+        mineralsComplete: false
       }
     };
 
-    console.log('Preparing response');
-    const responseJson = JSON.stringify(mockResponse);
-    console.log('Response data:', responseJson);
+    // Distribuir alimentos nas refeições
+    distributeFoodsInMeals(mealPlan, foods as ProtocolFood[], userData.dailyCalories);
 
-    return new Response(responseJson, { 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    // Calcular análise nutricional
+    calculateNutritionalAnalysis(mealPlan);
 
-  } catch (error) {
-    console.error('Error in function:', error);
+    // Log do plano gerado
+    console.log('Generated meal plan:', JSON.stringify(mealPlan, null, 2));
+
     return new Response(
-      JSON.stringify({ 
-        error: 'Internal server error', 
-        details: error.message,
-        type: error.constructor.name
-      }),
+      JSON.stringify(mealPlan),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    )
+  } catch (error) {
+    console.error('Error:', error);
+    return new Response(
+      JSON.stringify({ error: error.message }),
       { 
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    );
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400
+      },
+    )
   }
-});
+})
+
+function generatePreWorkoutRecommendation(trainingTime: string | null): string {
+  if (!trainingTime) return "Recomendado consumir carboidratos de fácil absorção 30-60 minutos antes do treino.";
+  
+  const hour = parseInt(trainingTime.split(':')[0]);
+  if (hour < 12) {
+    return "Café da manhã reforçado em carboidratos 1 hora antes do treino.";
+  } else if (hour < 16) {
+    return "Almoço leve 2 horas antes do treino, com snack de carboidrato 30 minutos antes.";
+  } else {
+    return "Lanche com carboidratos e proteínas 1 hora antes do treino.";
+  }
+}
+
+function generatePostWorkoutRecommendation(goal: string): string {
+  switch (goal) {
+    case 'gain':
+      return "Consumir proteínas e carboidratos em até 30 minutos após o treino para maximizar ganhos.";
+    case 'lose':
+      return "Priorizar proteínas magras após o treino, moderando carboidratos.";
+    default:
+      return "Equilibrar proteínas e carboidratos após o treino para recuperação muscular.";
+  }
+}
+
+function generateGeneralRecommendation(userData: RequestData['userData']): string {
+  const recommendations = [];
+  
+  if (userData.healthCondition === 'hipertensao') {
+    recommendations.push("Controlar consumo de sódio, priorizando alimentos in natura.");
+  }
+  if (userData.healthCondition === 'diabetes') {
+    recommendations.push("Distribuir carboidratos ao longo do dia, priorizando baixo índice glicêmico.");
+  }
+  if (userData.goal === 'lose') {
+    recommendations.push("Criar déficit calórico moderado, mantendo alta ingestão proteica.");
+  }
+  if (userData.goal === 'gain') {
+    recommendations.push("Superávit calórico com foco em proteínas e carboidratos para ganho muscular.");
+  }
+
+  return recommendations.join(" ");
+}
+
+function generateMealTiming(trainingTime: string | null): string[] {
+  const timings = [];
+  
+  if (trainingTime) {
+    const hour = parseInt(trainingTime.split(':')[0]);
+    if (hour < 12) {
+      timings.push("Café da manhã: 2h antes do treino");
+      timings.push("Pré-treino: 30min antes");
+      timings.push("Pós-treino: até 30min após");
+    } else if (hour < 16) {
+      timings.push("Almoço: 2h antes do treino");
+      timings.push("Pré-treino: 30min antes");
+      timings.push("Pós-treino: até 30min após");
+    } else {
+      timings.push("Lanche da tarde: 1h antes do treino");
+      timings.push("Pós-treino: até 30min após");
+      timings.push("Jantar: 1h após pós-treino");
+    }
+  }
+
+  return timings;
+}
+
+function distributeFoodsInMeals(
+  mealPlan: MealPlan,
+  foods: ProtocolFood[],
+  targetCalories: number
+) {
+  // Distribuição calórica por refeição
+  const mealDistribution = {
+    breakfast: 0.25,
+    morningSnack: 0.15,
+    lunch: 0.3,
+    afternoonSnack: 0.1,
+    dinner: 0.2
+  };
+
+  // Distribuir alimentos por refeição
+  Object.entries(mealDistribution).forEach(([meal, percentage]) => {
+    const mealCalories = targetCalories * percentage;
+    const mealFoods = selectFoodsForMeal(foods, mealCalories, meal);
+    
+    if (meal in mealPlan.dailyPlan) {
+      const mealKey = meal as keyof typeof mealPlan.dailyPlan;
+      mealPlan.dailyPlan[mealKey].foods = mealFoods;
+      calculateMealNutrition(mealPlan.dailyPlan[mealKey]);
+    }
+  });
+
+  // Calcular totais
+  calculateTotalNutrition(mealPlan);
+}
+
+function selectFoodsForMeal(
+  foods: ProtocolFood[],
+  targetCalories: number,
+  mealType: string
+): ProtocolFood[] {
+  const selectedFoods: ProtocolFood[] = [];
+  let currentCalories = 0;
+
+  // Filtrar alimentos adequados para o tipo de refeição
+  const suitableFoods = foods.filter(food => 
+    food.meal_type?.includes('any') || food.meal_type?.includes(mealType)
+  );
+
+  // Selecionar alimentos até atingir as calorias alvo
+  while (currentCalories < targetCalories && suitableFoods.length > 0) {
+    const randomIndex = Math.floor(Math.random() * suitableFoods.length);
+    const food = suitableFoods[randomIndex];
+    
+    if (currentCalories + food.calories <= targetCalories * 1.1) {
+      selectedFoods.push(food);
+      currentCalories += food.calories;
+    }
+    
+    suitableFoods.splice(randomIndex, 1);
+  }
+
+  return selectedFoods;
+}
+
+function calculateMealNutrition(meal: MealPlan['dailyPlan']['breakfast']) {
+  meal.calories = 0;
+  meal.macros = { protein: 0, carbs: 0, fats: 0, fiber: 0 };
+
+  meal.foods.forEach(food => {
+    meal.calories += food.calories;
+    meal.macros.protein += food.protein;
+    meal.macros.carbs += food.carbs;
+    meal.macros.fats += food.fats;
+    meal.macros.fiber += food.fiber || 0;
+  });
+}
+
+function calculateTotalNutrition(mealPlan: MealPlan) {
+  const total = mealPlan.totalNutrition;
+  total.calories = 0;
+  total.protein = 0;
+  total.carbs = 0;
+  total.fats = 0;
+  total.fiber = 0;
+
+  Object.values(mealPlan.dailyPlan).forEach(meal => {
+    total.calories += meal.calories;
+    total.protein += meal.macros.protein;
+    total.carbs += meal.macros.carbs;
+    total.fats += meal.macros.fats;
+    total.fiber += meal.macros.fiber;
+  });
+}
+
+function calculateNutritionalAnalysis(mealPlan: MealPlan) {
+  const total = mealPlan.totalNutrition;
+  const totalMacros = total.protein + total.carbs + total.fats;
+
+  mealPlan.nutritionalAnalysis = {
+    carbsPercentage: (total.carbs * 4 / (total.calories || 1)) * 100,
+    proteinPercentage: (total.protein * 4 / (total.calories || 1)) * 100,
+    fatsPercentage: (total.fats * 9 / (total.calories || 1)) * 100,
+    fiberAdequate: total.fiber >= 25,
+    vitaminsComplete: checkVitaminsComplete(mealPlan),
+    mineralsComplete: checkMineralsComplete(mealPlan)
+  };
+}
+
+function checkVitaminsComplete(mealPlan: MealPlan): boolean {
+  // Implementar lógica de verificação de vitaminas
+  return true;
+}
+
+function checkMineralsComplete(mealPlan: MealPlan): boolean {
+  // Implementar lógica de verificação de minerais
+  return true;
+}
