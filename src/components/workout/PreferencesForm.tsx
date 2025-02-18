@@ -14,6 +14,7 @@ import { TrainingLocationField } from "./components/TrainingLocationField";
 import { WorkoutPreferences } from "./types";
 import { Clipboard, ArrowRight } from "lucide-react";
 
+// Schema atualizado para tornar todos os campos obrigatórios
 const formSchema = z.object({
   age: z.number().min(16).max(100),
   weight: z.number().min(30).max(200),
@@ -21,16 +22,18 @@ const formSchema = z.object({
   gender: z.enum(["male", "female"]),
   goal: z.enum(["lose_weight", "maintain", "gain_mass"]),
   activityLevel: z.enum(["sedentary", "light", "moderate", "intense"]),
-  preferredExerciseTypes: z.array(z.enum(["strength", "cardio", "mobility"])),
+  preferredExerciseTypes: z.array(z.enum(["strength", "cardio", "mobility"])).min(1),
   trainingLocation: z.enum(["home", "gym"]),
 });
+
+type FormSchema = z.infer<typeof formSchema>;
 
 interface PreferencesFormProps {
   onSubmit: (data: WorkoutPreferences) => void;
 }
 
 export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<FormSchema>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       age: 30,
@@ -44,9 +47,17 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
     },
   });
 
-  const handleSubmit = (data: z.infer<typeof formSchema>) => {
+  const handleSubmit = (data: FormSchema) => {
+    // Garantindo que todos os campos estejam presentes
     const workoutPreferences: WorkoutPreferences = {
-      ...data,
+      age: data.age,
+      weight: data.weight,
+      height: data.height,
+      gender: data.gender,
+      goal: data.goal,
+      activityLevel: data.activityLevel,
+      preferredExerciseTypes: data.preferredExerciseTypes,
+      trainingLocation: data.trainingLocation,
       availableEquipment: data.trainingLocation === "gym" 
         ? ["all"] 
         : ["bodyweight", "resistance-bands"],
