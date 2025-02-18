@@ -3,15 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { TrainingModule, TrainingVideo } from "@/components/admin/types";
 import { Card } from "@/components/ui/card";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import { Loader2 } from "lucide-react";
+import { Play, Video } from "lucide-react";
+import { useState } from "react";
 
 export const InstructionVideos = () => {
+  const [activeVideo, setActiveVideo] = useState<string | null>(null);
+
   const { data: modules, isLoading: isLoadingModules } = useQuery({
     queryKey: ['training-modules'],
     queryFn: async () => {
@@ -41,7 +38,7 @@ export const InstructionVideos = () => {
   if (isLoadingModules || isLoadingVideos) {
     return (
       <div className="flex justify-center items-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin" />
+        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
       </div>
     );
   }
@@ -57,11 +54,12 @@ export const InstructionVideos = () => {
   }
 
   return (
-    <Card className="p-6">
-      <h2 className="text-2xl font-bold text-primary-700 mb-6">
+    <div className="space-y-8">
+      <h2 className="text-2xl font-bold text-primary-700 text-center">
         Vídeos de Instrução
       </h2>
-      <Accordion type="single" collapsible className="space-y-4">
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {modules?.map((module) => {
           const moduleVideos = videos?.filter(
             (video) => video.module_id === module.id
@@ -69,42 +67,48 @@ export const InstructionVideos = () => {
 
           if (!moduleVideos.length) return null;
 
-          return (
-            <AccordionItem
-              key={module.id}
-              value={module.id}
-              className="border rounded-lg p-4"
+          return moduleVideos.map((video) => (
+            <Card 
+              key={video.id} 
+              className="group overflow-hidden transition-all duration-300 hover:shadow-xl"
             >
-              <AccordionTrigger className="text-lg font-semibold hover:no-underline">
-                {module.name}
-              </AccordionTrigger>
-              <AccordionContent className="pt-4 space-y-4">
-                {moduleVideos.map((video) => (
-                  <div key={video.id} className="space-y-2">
-                    <h3 className="font-medium text-gray-900">
-                      {video.title}
-                    </h3>
-                    {video.description && (
-                      <p className="text-gray-600 text-sm mb-2">
-                        {video.description}
-                      </p>
-                    )}
-                    <div className="aspect-video">
-                      <iframe
-                        src={video.url}
-                        title={video.title}
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                        className="w-full h-full rounded-lg"
-                      />
+              {activeVideo === video.id ? (
+                <div className="aspect-video">
+                  <iframe
+                    src={video.url}
+                    title={video.title}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    className="w-full h-full"
+                  />
+                </div>
+              ) : (
+                <div 
+                  className="aspect-video bg-gradient-to-br from-primary-100 to-primary-50 relative cursor-pointer"
+                  onClick={() => setActiveVideo(video.id)}
+                >
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6">
+                    <div className="w-16 h-16 rounded-full bg-primary-500/90 flex items-center justify-center text-white group-hover:bg-primary-600 transition-colors">
+                      <Play className="w-8 h-8 ml-1" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-semibold text-gray-800 mb-1">{video.title}</p>
+                      <p className="text-sm text-gray-600">{module.name}</p>
                     </div>
                   </div>
-                ))}
-              </AccordionContent>
-            </AccordionItem>
-          );
+                </div>
+              )}
+              {video.description && !activeVideo && (
+                <div className="p-4 border-t">
+                  <p className="text-gray-600 text-sm line-clamp-2">
+                    {video.description}
+                  </p>
+                </div>
+              )}
+            </Card>
+          ));
         })}
-      </Accordion>
-    </Card>
+      </div>
+    </div>
   );
 };
