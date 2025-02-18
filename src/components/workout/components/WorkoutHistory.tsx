@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
@@ -31,11 +30,8 @@ export const WorkoutHistoryView = ({ isLoading, historyPlans, onRefresh }: Worko
     }
   };
 
-  const handleDownload = (planId: string) => {
-    const plan = historyPlans?.find(p => p.id === planId);
-    if (plan) {
-      generateWorkoutPDF(plan);
-    }
+  const handleDownload = (plan: WorkoutHistory) => {
+    generateWorkoutPDF(plan);
   };
 
   if (isLoading) {
@@ -92,7 +88,7 @@ export const WorkoutHistoryView = ({ isLoading, historyPlans, onRefresh }: Worko
                     size="icon"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleDownload(plan.id);
+                      handleDownload(plan);
                     }}
                   >
                     <Download className="w-4 h-4" />

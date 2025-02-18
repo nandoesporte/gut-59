@@ -1,53 +1,70 @@
 
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
-import { toast } from "sonner";
+import { WorkoutHistory } from "../types/workout-plan";
+import { jsPDF } from "jspdf";
 
-export const generateWorkoutPDF = async (element: HTMLDivElement) => {
-  if (!element) return;
-
-  try {
-    toast.loading("Gerando PDF do seu plano de treino...");
-
-    const canvas = await html2canvas(element, {
-      scale: 2,
-      useCORS: true,
-      logging: false,
-      backgroundColor: "#ffffff"
-    });
-
-    const imgData = canvas.toDataURL('image/jpeg', 1.0);
-    const pdf = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4'
-    });
-
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = pdf.internal.pageSize.getHeight();
-    const imgWidth = canvas.width;
-    const imgHeight = canvas.height;
-    const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-    const imgX = (pdfWidth - imgWidth * ratio) / 2;
-    const imgY = 0;
-
-    pdf.addImage(
-      imgData, 
-      'JPEG', 
-      imgX, 
-      imgY, 
-      imgWidth * ratio, 
-      imgHeight * ratio,
-      undefined,
-      'FAST'
-    );
+export const generateWorkoutPDF = (plan: WorkoutHistory) => {
+  const doc = new jsPDF();
+  
+  // Configuração do documento
+  doc.setFont("helvetica");
+  doc.setFontSize(16);
+  
+  // Título
+  doc.text("Plano de Treino", 20, 20);
+  
+  // Datas
+  doc.setFontSize(12);
+  doc.text(`Período: ${new Date(plan.start_date).toLocaleDateString()} até ${new Date(plan.end_date).toLocaleDateString()}`, 20, 30);
+  
+  let yPos = 40;
+  
+  // Para cada sessão de treino
+  plan.workout_sessions?.forEach((session) => {
+    // Título da sessão
+    doc.setFontSize(14);
+    doc.text(`Dia ${session.day_number}`, 20, yPos);
+    yPos += 10;
     
-    pdf.save('plano-treino.pdf');
-    toast.dismiss();
-    toast.success("PDF do plano de treino baixado com sucesso!");
-  } catch (error) {
-    console.error('Erro ao gerar PDF:', error);
-    toast.dismiss();
-    toast.error("Erro ao gerar PDF do plano de treino");
-  }
+    // Aquecimento
+    doc.setFontSize(12);
+    doc.text("Aquecimento:", 20, yPos);
+    yPos += 7;
+    doc.setFontSize(10);
+    const warmupLines = doc.splitTextToSize(session.warmup_description, 170);
+    doc.text(warmupLines, 20, yPos);
+    yPos += warmupLines.length * 7;
+    
+    // Exercícios
+    doc.setFontSize(12);
+    doc.text("Exercícios:", 20, yPos);
+    yPos += 10;
+    
+    session.session_exercises?.forEach((exercise) => {
+      doc.setFontSize(10);
+      doc.text(`• ${exercise.exercises.name}`, 25, yPos);
+      yPos += 5;
+      doc.text(`  ${exercise.sets} séries x ${exercise.reps} repetições`, 25, yPos);
+      yPos += 5;
+      doc.text(`  Descanso: ${exercise.rest_time_seconds} segundos`, 25, yPos);
+      yPos += 10;
+    });
+    
+    // Volta à calma
+    doc.setFontSize(12);
+    doc.text("Volta à calma:", 20, yPos);
+    yPos += 7;
+    doc.setFontSize(10);
+    const cooldownLines = doc.splitTextToSize(session.cooldown_description, 170);
+    doc.text(cooldownLines, 20, yPos);
+    yPos += cooldownLines.length * 7 + 10;
+    
+    // Nova página se necessário
+    if (yPos > 270) {
+      doc.addPage();
+      yPos = 20;
+    }
+  });
+  
+  // Salvar o PDF
+  doc.save(`plano-treino-${new Date().toISOString().split('T')[0]}.pdf`);
 };
