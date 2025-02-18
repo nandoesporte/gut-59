@@ -53,7 +53,7 @@ const Navigation = () => {
           <NavLink
             to="/menu"
             icon={<UtensilsCrossed className="w-5 h-5 md:w-6 md:h-6" />}
-            text="Cardápio"
+            text="Nutri"
             active={isActive("/menu")}
           />
           <NavLink
