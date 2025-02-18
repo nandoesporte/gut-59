@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
@@ -47,12 +48,12 @@ async function translateToPortuguese(text: string): Promise<string> {
   }
 }
 
-// Atualiza a função fetchExerciseGif para usar apenas APIs gratuitas
+// Função para buscar GIF do exercício
 async function fetchExerciseGif(exerciseName: string): Promise<string | null> {
   try {
-    // Tenta primeiro no Giphy (API gratuita com limite de requests)
+    // Tenta primeiro no Giphy
     const giphyResponse = await fetch(
-      `https://api.giphy.com/v1/gifs/search?api_key=P5EDHjFx7h4TfqB4JsGX8JBvGa4V3p1K&q=${encodeURIComponent(exerciseName + " exercício")}&limit=1&rating=g`
+      `https://api.giphy.com/v1/gifs/search?api_key=P5EDHjFx7h4TfqB4JsGX8JBvGa4V3p1K&q=${encodeURIComponent(exerciseName + " exercise")}&limit=1&rating=g`
     );
     const giphyData = await giphyResponse.json();
     
@@ -60,14 +61,14 @@ async function fetchExerciseGif(exerciseName: string): Promise<string | null> {
       return giphyData.data[0].images.fixed_height.url;
     }
 
-    // Se não encontrar no Giphy, usa o banco de exercícios do wger.de (API gratuita)
+    // Se não encontrar no Giphy, tenta no Wger
     const wgerResponse = await fetch(
-      `https://wger.de/api/v2/exercise?language=2&name=${encodeURIComponent(exerciseName)}`
+      `https://wger.de/api/v2/exerciseimage/?exercise_name=${encodeURIComponent(exerciseName)}`
     );
     const wgerData = await wgerResponse.json();
     
     if (wgerData.results && wgerData.results.length > 0) {
-      return `https://wger.de${wgerData.results[0].images[0]}`;
+      return wgerData.results[0].image;
     }
 
     return null;
@@ -91,7 +92,7 @@ serve(async (req) => {
 
     const healthConditions = preferences.healthConditions || [];
 
-    // Busca exercícios disponíveis do banco de dados com melhor organização
+    // Fetch available exercises from the database
     const { data: exercises, error: exercisesError } = await supabase
       .from('exercises')
       .select('*')
@@ -103,15 +104,6 @@ serve(async (req) => {
       throw new Error('No exercises found matching the criteria')
     }
 
-    // Organiza exercícios por grupo muscular
-    const exercisesByMuscleGroup = exercises.reduce((acc, exercise) => {
-      if (!acc[exercise.muscle_group]) {
-        acc[exercise.muscle_group] = [];
-      }
-      acc[exercise.muscle_group].push(exercise);
-      return acc;
-    }, {} as Record<string, typeof exercises>);
-
     // Traduz os nomes dos exercícios
     const translatedExercises = await Promise.all(
       exercises.map(async (exercise) => ({
@@ -120,9 +112,9 @@ serve(async (req) => {
       }))
     );
 
-    // Modifica o prompt para gerar treinos mais variados e atrativos
+    // Generate prompt for OpenAI
     const prompt = `
-      Create an engaging and varied workout plan based on these preferences:
+      Create a personalized workout plan based on the following preferences:
       - Gender: ${preferences.gender}
       - Age: ${preferences.age}
       - Weight: ${preferences.weight}kg
@@ -133,26 +125,18 @@ serve(async (req) => {
       - Available Equipment: ${preferences.availableEquipment?.join(', ') || 'None'}
       - Training Location: ${preferences.trainingLocation}
 
-      IMPORTANT GUIDELINES:
-      1. Create a varied plan that targets different muscle groups each session
-      2. Don't repeat exercises in the same week unless absolutely necessary
-      3. Include a good mix of compound and isolation exercises
-      4. Structure workouts with proper exercise order (compound first, then isolation)
-      5. Adjust volume and intensity based on experience level
-      6. Include progressive overload elements
+      IMPORTANT: You MUST use ONLY the exercise IDs from the following list when creating the workout plan. DO NOT use exercise names or create new exercises.
 
-      Available exercises by muscle group:
-      ${Object.entries(exercisesByMuscleGroup).map(([group, exs]) => 
-        `${group}:\n${exs.map(e => `- ID: "${e.id}" - ${e.name}`).join('\n')}`
-      ).join('\n\n')}
+      Available exercises:
+      ${translatedExercises.map(e => `- ID: "${e.id}" - ${e.name} (${e.exercise_type}, ${e.muscle_group})`).join('\n')}
 
-      Create a 4-week plan with 3-4 sessions per week. For each session, include:
+      Create a 4-week workout plan with 3-4 sessions per week. For each session, include:
       1. Warmup description in Portuguese
-      2. 4-6 exercises (use ONLY IDs from the list above)
-      3. Sets, reps, and rest times
+      2. Main exercises (ONLY use exerciseId from the list above)
+      3. Sets, reps, and rest times for each exercise
       4. Cooldown description in Portuguese
       
-      Format as JSON:
+      Format the response as a JSON object with the following structure:
       {
         "plan": {
           "startDate": "YYYY-MM-DD",
@@ -172,11 +156,11 @@ serve(async (req) => {
         }
       }
 
-      IMPORTANT: Use ONLY the exact exercise IDs provided above.
+      VERY IMPORTANT: The exerciseId MUST be one of the exact IDs provided in the list above.
       Write warmupDescription and cooldownDescription in Portuguese.
-    `;
+    `
 
-    // Generate prompt for OpenAI
+    // Call OpenAI API
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -257,31 +241,12 @@ serve(async (req) => {
       }
     }
 
-    // Adiciona verificação de exercícios repetidos por semana
-    const exercisesUsedThisWeek = new Set<string>();
-    let currentWeek = 1;
-
-    for (const session of workoutPlan.plan.sessions) {
-      const sessionWeek = Math.ceil(session.dayNumber / 7);
-      
-      if (sessionWeek !== currentWeek) {
-        exercisesUsedThisWeek.clear();
-        currentWeek = sessionWeek;
-      }
-
-      for (const exercise of session.exercises) {
-        if (exercisesUsedThisWeek.has(exercise.exerciseId)) {
-          console.warn(`Exercise ${exercise.exerciseId} is repeated in week ${currentWeek}`);
-        }
-        exercisesUsedThisWeek.add(exercise.exerciseId);
-      }
-    }
-
-    // Return the plan with exercises mapped to their names and links
+    // Return the plan with exercises mapped to their names and GIFs
     const transformedSessions = await Promise.all(workoutPlan.plan.sessions.map(async (session) => {
       const exerciseDetails = await Promise.all(session.exercises.map(async (exercise) => {
         const exerciseData = translatedExercises.find(e => e.id === exercise.exerciseId)
-        const gifUrl = await fetchExerciseGif(exerciseData?.name || '');
+        // Busca GIF para o exercício se ainda não tiver
+        const gifUrl = exerciseData?.gif_url || await fetchExerciseGif(exerciseData?.name || '');
         
         return {
           name: exerciseData?.name || 'Exercício Desconhecido',
