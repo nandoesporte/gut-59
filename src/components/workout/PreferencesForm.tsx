@@ -5,23 +5,23 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
-import { WorkoutPreferences } from "./types";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { BasicInfoFields } from "./components/BasicInfoFields";
-import { ActivityLevelField } from "./components/ActivityLevelField";
 import { GoalField } from "./components/GoalField";
+import { ActivityLevelField } from "./components/ActivityLevelField";
 import { ExerciseTypesField } from "./components/ExerciseTypesField";
 import { TrainingLocationField } from "./components/TrainingLocationField";
+import { WorkoutPreferences } from "./types";
+import { Clipboard, ArrowRight } from "lucide-react";
 
 const formSchema = z.object({
-  weight: z.number().min(30).max(300),
-  height: z.number().min(100).max(250),
   age: z.number().min(16).max(100),
-  gender: z.enum(["male", "female"]),
-  activityLevel: z.enum(["sedentary", "light", "moderate", "intense"]),
+  weight: z.number().min(30).max(200),
+  height: z.number().min(100).max(250),
   goal: z.enum(["lose_weight", "maintain", "gain_mass"]),
-  healthConditions: z.array(z.enum(["hypertension", "diabetes", "depression", "anxiety"])).optional(),
+  activityLevel: z.enum(["sedentary", "light", "moderate", "intense"]),
   preferredExerciseTypes: z.array(z.enum(["strength", "cardio", "mobility"])),
-  trainingLocation: z.enum(["gym", "home", "outdoors", "no_equipment"]),
+  trainingLocation: z.enum(["home", "gym"]),
 });
 
 interface PreferencesFormProps {
@@ -32,37 +32,37 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      healthConditions: [],
-      preferredExerciseTypes: [],
+      age: 30,
+      weight: 70,
+      height: 170,
+      goal: "maintain",
+      activityLevel: "moderate",
+      preferredExerciseTypes: ["strength"],
       trainingLocation: "gym",
     },
   });
 
-  const handleSubmit = (values: z.infer<typeof formSchema>) => {
-    const locationEquipmentMap = {
-      gym: ["Esteira", "Bicicleta Ergométrica", "Aparelhos de Musculação", "Pesos Livres", "Anilhas e Barras"],
-      home: ["Halteres", "Elásticos", "Tapete de Yoga", "Cadeira Resistente"],
-      outdoors: ["Academia ao Ar Livre", "Barras Paralelas", "Pista de Corrida"],
-      no_equipment: ["Sem Equipamentos"],
-    };
-
-    const modifiedValues = {
-      ...values,
-      availableEquipment: locationEquipmentMap[values.trainingLocation],
-    };
-
-    onSubmit(modifiedValues as WorkoutPreferences);
-  };
-
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
-        <BasicInfoFields form={form} />
-        <ActivityLevelField form={form} />
-        <GoalField form={form} />
-        <ExerciseTypesField form={form} />
-        <TrainingLocationField form={form} />
-        <Button type="submit" className="w-full">Gerar Plano de Treino</Button>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center gap-2 p-6">
+            <Clipboard className="w-6 h-6 text-primary-500" />
+            <h3 className="text-xl font-semibold">Informações para seu Plano de Treino</h3>
+          </CardHeader>
+          <CardContent className="p-6 pt-0 space-y-6">
+            <BasicInfoFields form={form} />
+            <GoalField form={form} />
+            <ActivityLevelField form={form} />
+            <ExerciseTypesField form={form} />
+            <TrainingLocationField form={form} />
+            
+            <Button type="submit" className="w-full">
+              Gerar Plano de Treino
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          </CardContent>
+        </Card>
       </form>
     </Form>
   );

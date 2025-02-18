@@ -1,149 +1,109 @@
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
+import { History, ChevronDown, Calendar, Target, Activity } from "lucide-react";
+import type { WorkoutHistory } from "../types/workout-plan";
 
-import { Card, CardHeader, CardContent } from "@/components/ui/card";
-import type { WorkoutHistory as WorkoutHistoryType } from "../types/workout-plan";
-import { WorkoutLoadingState } from "./WorkoutLoadingState";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, Download, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
-import { generateWorkoutPDF } from "../utils/pdf-generator";
-import { useRef } from "react";
-
-interface WorkoutHistoryProps {
+interface WorkoutHistoryViewProps {
   isLoading: boolean;
-  historyPlans?: WorkoutHistoryType[];
+  historyPlans?: WorkoutHistory[];
 }
 
-export const WorkoutHistoryView = ({ isLoading, historyPlans }: WorkoutHistoryProps) => {
-  const queryClient = useQueryClient();
-  const planRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
-
-  const handleDelete = async (planId: string) => {
-    try {
-      // Primeiro, removemos da interface para feedback imediato
-      queryClient.setQueryData(['workout-history'], (old: WorkoutHistoryType[] | undefined) => 
-        old ? old.filter(plan => plan.id !== planId) : []
-      );
-
-      const { error } = await supabase
-        .from('workout_plans')
-        .delete()
-        .eq('id', planId);
-
-      if (error) {
-        // Se houver erro, revertemos a alteração da interface
-        queryClient.invalidateQueries({ queryKey: ['workout-history'] });
-        throw error;
-      }
-
-      toast.success("Plano de treino excluído com sucesso");
-    } catch (error) {
-      console.error('Erro ao excluir plano:', error);
-      toast.error("Erro ao excluir plano de treino");
-    }
-  };
-
-  const handleDownload = async (planId: string) => {
-    const planRef = planRefs.current[planId];
-    if (planRef) {
-      await generateWorkoutPDF(planRef);
-    }
-  };
-
+export const WorkoutHistoryView = ({ isLoading, historyPlans }: WorkoutHistoryViewProps) => {
   if (isLoading) {
-    return <WorkoutLoadingState message="Carregando histórico de treinos..." />;
+    return (
+      <Card className="p-4">
+        <div className="flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500" />
+        </div>
+      </Card>
+    );
+  }
+
+  if (!historyPlans || historyPlans.length === 0) {
+    return (
+      <Card className="p-4">
+        <div className="flex items-center justify-center gap-2 text-gray-500">
+          <History className="w-5 h-5" />
+          <p>Nenhum histórico de treino encontrado.</p>
+        </div>
+      </Card>
+    );
   }
 
   return (
     <div className="space-y-4">
-      {historyPlans?.map((plan) => (
-        <Collapsible key={plan.id} className="w-full">
+      <div className="flex items-center gap-2 mb-4">
+        <History className="w-6 h-6 text-primary-500" />
+        <h2 className="text-xl font-semibold">Histórico de Treinos</h2>
+      </div>
+      
+      {historyPlans.map((plan) => (
+        <Collapsible key={plan.id}>
           <Card>
             <CollapsibleTrigger className="w-full">
-              <CardHeader className="p-4 md:p-6 flex flex-row items-center justify-between">
-                <div>
-                  <h4 className="text-md font-medium">
-                    Plano de {new Date(plan.start_date).toLocaleDateString('pt-BR')} até{" "}
-                    {new Date(plan.end_date).toLocaleDateString('pt-BR')}
-                  </h4>
-                  <p className="text-sm text-gray-500">
-                    Objetivo: {plan.goal}
-                  </p>
+              <CardHeader className="flex flex-row items-center justify-between p-4">
+                <div className="flex items-start gap-4">
+                  <Target className="w-5 h-5 text-primary-500 mt-1" />
+                  <div>
+                    <h3 className="font-medium">
+                      Plano de {new Date(plan.created_at).toLocaleDateString()}
+                    </h3>
+                    <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
+                      <Calendar className="w-4 h-4" />
+                      <span>
+                        {new Date(plan.start_date).toLocaleDateString()} até{' '}
+                        {new Date(plan.end_date).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleDownload(plan.id);
-                    }}
-                    className="h-8 w-8"
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleDelete(plan.id);
-                    }}
-                    className="h-8 w-8 text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                  <ChevronDown className="h-5 w-5 text-gray-500 transition-transform duration-200 ease-in-out group-data-[state=open]:rotate-180" />
-                </div>
+                <ChevronDown className="w-5 h-5 text-gray-500" />
               </CardHeader>
             </CollapsibleTrigger>
             
             <CollapsibleContent>
-              <CardContent className="p-4 md:p-6 pt-0">
-                <div ref={el => planRefs.current[plan.id] = el}>
-                  {plan.workout_sessions?.map((session) => (
-                    <div key={session.id} className="mb-4">
-                      <h5 className="font-medium">Dia {session.day_number}</h5>
-                      <div className="ml-2 md:ml-4">
-                        <p className="text-sm text-gray-600">{session.warmup_description}</p>
-                        <ul className="list-none space-y-6 my-4">
-                          {session.session_exercises?.map((exercise) => (
-                            <li key={exercise.id} className="text-sm">
-                              <div className="flex flex-col md:flex-row gap-4 items-start">
-                                {exercise.exercises.gif_url && (
-                                  <div className="w-full md:w-48 h-48 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                                    <img 
-                                      src={exercise.exercises.gif_url} 
-                                      alt={exercise.exercises.name}
-                                      className="w-full h-full object-cover"
-                                      loading="lazy"
-                                    />
-                                  </div>
-                                )}
-                                <div className="flex-grow">
-                                  <span className="font-medium text-base">{exercise.exercises.name}</span>
+              <CardContent className="p-4 pt-0">
+                {plan.workout_sessions.map((session) => (
+                  <div key={session.id} className="border-t pt-4 mt-4 first:border-t-0 first:pt-0 first:mt-0">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Activity className="w-5 h-5 text-primary-500" />
+                      <h4 className="font-medium">Dia {session.day_number}</h4>
+                    </div>
+                    <div className="ml-2 md:ml-4">
+                      <p className="text-sm text-gray-600">{session.warmup_description}</p>
+                      <ul className="list-none space-y-6 my-4">
+                        {session.session_exercises?.map((exercise) => (
+                          <li key={exercise.id} className="text-sm">
+                            <div className="flex flex-col md:flex-row gap-4 items-start">
+                              {exercise.exercises.gif_url && (
+                                <div className="w-full md:w-48 h-48 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                                  <img 
+                                    src={exercise.exercises.gif_url} 
+                                    alt={exercise.exercises.name}
+                                    className="w-full h-full object-cover"
+                                    loading="lazy"
+                                  />
+                                </div>
+                              )}
+                              <div className="flex-grow">
+                                <span className="font-medium text-base">{exercise.exercises.name}</span>
+                                <br className="md:hidden" />
+                                <div className="text-gray-600 mt-1">
+                                  {exercise.sets} séries x {exercise.reps} repetições
                                   <br className="md:hidden" />
-                                  <div className="text-gray-600 mt-1">
-                                    {exercise.sets} séries x {exercise.reps} repetições
-                                    <br className="md:hidden" />
-                                    <span className="text-gray-500 block mt-1">
-                                      Descanso: {exercise.rest_time_seconds} segundos
-                                    </span>
-                                  </div>
+                                  <span className="text-gray-500 block mt-1">
+                                    Descanso: {exercise.rest_time_seconds} segundos
+                                  </span>
                                 </div>
                               </div>
-                            </li>
-                          ))}
-                        </ul>
-                        <p className="text-sm text-gray-600 mt-2">{session.cooldown_description}</p>
-                      </div>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="text-sm text-gray-600 mt-2">{session.cooldown_description}</p>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </CardContent>
             </CollapsibleContent>
           </Card>
