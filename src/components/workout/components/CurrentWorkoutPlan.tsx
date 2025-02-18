@@ -50,7 +50,7 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
         </CardHeader>
       </Card>
 
-      {plan.sessions.map((session) => (
+      {plan.workout_sessions.map((session) => (
         <Card key={session.day_number} className="overflow-hidden bg-white shadow-lg transition-all hover:shadow-xl">
           <CardHeader className="p-6 bg-gradient-to-r from-primary-500 to-primary-600">
             <h4 className="text-xl font-semibold text-white flex items-center gap-2">
