@@ -9,11 +9,26 @@ export const generateMealPlanPDF = async (element: HTMLDivElement) => {
   try {
     toast.loading("Gerando PDF do seu plano alimentar...");
 
+    // Configurações melhoradas para qualidade do PDF
     const canvas = await html2canvas(element, {
-      scale: 2,
-      useCORS: true,
+      scale: 2, // Aumenta a qualidade
+      useCORS: true, // Permite carregar imagens de outros domínios
       logging: false,
-      backgroundColor: "#ffffff"
+      backgroundColor: "#ffffff",
+      windowWidth: 1200, // Largura fixa para melhor formatação
+      onclone: (document) => {
+        // Ajusta estilos específicos para o PDF
+        const element = document.body;
+        const styles = `
+          .text-primary-500 { color: #10B981 !important; }
+          .text-primary-600 { color: #059669 !important; }
+          .bg-primary-50 { background-color: #ECFDF5 !important; }
+          .border-primary-100 { border-color: #D1FAE5 !important; }
+        `;
+        const styleElement = document.createElement('style');
+        styleElement.innerHTML = styles;
+        element.appendChild(styleElement);
+      }
     });
 
     const imgData = canvas.toDataURL('image/jpeg', 1.0);

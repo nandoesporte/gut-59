@@ -1,13 +1,16 @@
 
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, Trash2, ChevronDown } from "lucide-react";
+import { Download, Trash2, ChevronDown, Coffee, Apple, UtensilsCrossed, Cookie, Moon } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useRef } from "react";
 import { generateMealPlanPDF } from "./utils/pdf-generator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type { MealPlan } from "./types";
+import { MealSection } from "./components/MealSection";
+import { DailyTotals } from "./components/DailyTotals";
+import { Recommendations } from "./components/Recommendations";
 
 interface MealPlanHistoryProps {
   isLoading: boolean;
@@ -47,7 +50,6 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
       toast.dismiss(toastId);
       toast.success("Plano alimentar excluído com sucesso");
       
-      // Forçar atualização da lista
       await onRefresh();
       
     } catch (error) {
@@ -72,6 +74,28 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
       </Card>
     );
   }
+
+  const getMealIcon = (mealType: string) => {
+    switch (mealType) {
+      case 'breakfast': return <Coffee className="w-5 h-5" />;
+      case 'morningSnack': return <Apple className="w-5 h-5" />;
+      case 'lunch': return <UtensilsCrossed className="w-5 h-5" />;
+      case 'afternoonSnack': return <Cookie className="w-5 h-5" />;
+      case 'dinner': return <Moon className="w-5 h-5" />;
+      default: return null;
+    }
+  };
+
+  const getMealTitle = (mealType: string) => {
+    switch (mealType) {
+      case 'breakfast': return 'Café da Manhã';
+      case 'morningSnack': return 'Lanche da Manhã';
+      case 'lunch': return 'Almoço';
+      case 'afternoonSnack': return 'Lanche da Tarde';
+      case 'dinner': return 'Jantar';
+      default: return mealType;
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -122,19 +146,23 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
             <CollapsibleContent>
               <CardContent className="p-4 md:p-6 pt-0">
                 <div ref={el => planRefs.current[plan.id] = el}>
-                  <div className="space-y-4">
-                    {Object.entries(plan.plan_data).map(([mealType, items]) => (
-                      <div key={mealType} className="border-b pb-4 last:border-b-0">
-                        <h5 className="font-medium capitalize mb-2">{mealType}</h5>
-                        <ul className="list-disc list-inside space-y-1">
-                          {Array.isArray(items) && items.map((item: any, index: number) => (
-                            <li key={index} className="text-sm text-gray-600">
-                              {item.name} {item.portion && `- ${item.portion}`}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                  <div className="space-y-6">
+                    {Object.entries(plan.plan_data.dailyPlan).map(([mealType, meal]) => (
+                      <MealSection
+                        key={mealType}
+                        title={getMealTitle(mealType)}
+                        icon={getMealIcon(mealType)}
+                        foods={meal.foods}
+                        macros={meal.macros}
+                        calories={meal.calories}
+                      />
                     ))}
+                    
+                    <DailyTotals totalNutrition={plan.plan_data.totalNutrition} />
+                    
+                    {plan.plan_data.recommendations && (
+                      <Recommendations recommendations={plan.plan_data.recommendations} />
+                    )}
                   </div>
                 </div>
               </CardContent>
