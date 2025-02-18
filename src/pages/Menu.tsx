@@ -78,11 +78,6 @@ const Menu = () => {
         return (
           <div className="space-y-8">
             <InitialMenuContent onStartDiet={() => setCurrentStep(1.5)} />
-            <MealPlanHistory 
-              isLoading={isHistoryLoading}
-              historyPlans={historyPlans}
-              onRefresh={fetchMealPlans}
-            />
           </div>
         );
       case 1.5:
@@ -114,7 +109,16 @@ const Menu = () => {
         );
       case 4:
         if (!mealPlan) return null;
-        return <MealPlanDisplay mealPlan={mealPlan} />;
+        return (
+          <div className="space-y-8">
+            <MealPlanDisplay mealPlan={mealPlan} />
+            <MealPlanHistory 
+              isLoading={isHistoryLoading}
+              historyPlans={historyPlans}
+              onRefresh={fetchMealPlans}
+            />
+          </div>
+        );
       default:
         return null;
     }
@@ -125,6 +129,15 @@ const Menu = () => {
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
           {renderStep()}
+          {currentStep === 1 && (
+            <div className="mt-8">
+              <MealPlanHistory 
+                isLoading={isHistoryLoading}
+                historyPlans={historyPlans}
+                onRefresh={fetchMealPlans}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -1,15 +1,43 @@
 
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
-import { History, ChevronDown, Calendar, Target, Activity } from "lucide-react";
+import { History, ChevronDown, Calendar, Target, Activity, Download, Trash2 } from "lucide-react";
 import type { WorkoutHistory } from "../types/workout-plan";
+import { generateWorkoutPDF } from "../utils/pdf-generator";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface WorkoutHistoryViewProps {
   isLoading: boolean;
   historyPlans?: WorkoutHistory[];
+  onRefresh?: () => void;
 }
 
-export const WorkoutHistoryView = ({ isLoading, historyPlans }: WorkoutHistoryViewProps) => {
+export const WorkoutHistoryView = ({ isLoading, historyPlans, onRefresh }: WorkoutHistoryViewProps) => {
+  const handleDelete = async (planId: string) => {
+    try {
+      const { error } = await supabase
+        .from('workout_plans')
+        .delete()
+        .eq('id', planId);
+
+      if (error) throw error;
+      toast.success("Plano excluído com sucesso");
+      onRefresh?.();
+    } catch (error) {
+      console.error('Error deleting plan:', error);
+      toast.error("Erro ao excluir plano");
+    }
+  };
+
+  const handleDownload = (planId: string) => {
+    const plan = historyPlans?.find(p => p.id === planId);
+    if (plan) {
+      generateWorkoutPDF(plan);
+    }
+  };
+
   if (isLoading) {
     return (
       <Card className="p-4">
@@ -33,10 +61,10 @@ export const WorkoutHistoryView = ({ isLoading, historyPlans }: WorkoutHistoryVi
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-4">
+      <h2 className="text-xl font-semibold flex items-center gap-2">
         <History className="w-6 h-6 text-primary-500" />
-        <h2 className="text-xl font-semibold">Histórico de Treinos</h2>
-      </div>
+        Histórico de Treinos
+      </h2>
       
       {historyPlans.map((plan) => (
         <Collapsible key={plan.id}>
@@ -58,7 +86,29 @@ export const WorkoutHistoryView = ({ isLoading, historyPlans }: WorkoutHistoryVi
                     </div>
                   </div>
                 </div>
-                <ChevronDown className="w-5 h-5 text-gray-500" />
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDownload(plan.id);
+                    }}
+                  >
+                    <Download className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(plan.id);
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </Button>
+                  <ChevronDown className="w-5 h-5 text-gray-500" />
+                </div>
               </CardHeader>
             </CollapsibleTrigger>
             
