@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
@@ -14,57 +15,6 @@ interface GenerateWorkoutRequest {
   userId: string;
 }
 
-const exercises = [
-  {
-    name: "Supino Reto",
-    gifUrl: "https://giphy.com/embed/3oKIPvcdnW1xs9m5IA",
-    muscle: "chest",
-    equipment: "barbell"
-  },
-  {
-    name: "Agachamento",
-    gifUrl: "https://giphy.com/embed/5hq3wKjgW95iqN1Fba",
-    muscle: "legs",
-    equipment: "barbell"
-  },
-  {
-    name: "Levantamento Terra",
-    gifUrl: "https://giphy.com/embed/3o7TKPAg5yPVR7bXkA",
-    muscle: "back",
-    equipment: "barbell"
-  },
-  {
-    name: "Rosca Direta",
-    gifUrl: "https://giphy.com/embed/3o7TKPvB6YPJvQqe8E",
-    muscle: "biceps",
-    equipment: "dumbbell"
-  },
-  {
-    name: "Desenvolvimento",
-    gifUrl: "https://giphy.com/embed/3o7TKQlqzXnEL5X5Zu",
-    muscle: "shoulders",
-    equipment: "barbell"
-  }
-];
-
-const generateExercise = (muscle: string, equipment: string[] = ['barbell', 'dumbbell']) => {
-  const muscleExercises = exercises.filter(
-    e => e.muscle === muscle && equipment.includes(e.equipment)
-  );
-  
-  if (muscleExercises.length === 0) return null;
-  
-  const exercise = muscleExercises[Math.floor(Math.random() * muscleExercises.length)];
-  
-  return {
-    name: exercise.name,
-    sets: Math.floor(Math.random() * 3) + 3, // 3-5 sets
-    reps: Math.floor(Math.random() * 8) + 8, // 8-15 reps
-    rest_time_seconds: (Math.floor(Math.random() * 3) + 1) * 30, // 30-90 seconds
-    gifUrl: exercise.gifUrl
-  };
-};
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -77,20 +27,20 @@ serve(async (req) => {
       throw new Error('Missing required parameters')
     }
 
+    // Garantir que healthConditions seja sempre um array, mesmo que vazio
+    const healthConditions = preferences.healthConditions || [];
+
     // Fetch available exercises from the database
     const { data: exercises, error: exercisesError } = await supabase
       .from('exercises')
       .select('*')
       .filter('difficulty', 'eq', preferences.activityLevel === 'sedentary' ? 'beginner' : preferences.activityLevel === 'light' ? 'beginner' : preferences.activityLevel === 'moderate' ? 'intermediate' : 'advanced')
-      .in('exercise_type', preferences.preferredExerciseTypes)
+      .in('exercise_type', preferences.preferredExerciseTypes || [])
 
     if (exercisesError) throw exercisesError
     if (!exercises || exercises.length === 0) {
       throw new Error('No exercises found matching the criteria')
     }
-
-    // Create a map of available exercises for validation
-    const availableExercises = new Map(exercises.map(e => [e.id, e]))
 
     // Generate prompt for OpenAI
     const prompt = `
@@ -101,8 +51,8 @@ serve(async (req) => {
       - Height: ${preferences.height}cm
       - Activity Level: ${preferences.activityLevel}
       - Goal: ${preferences.goal}
-      - Health Conditions: ${preferences.healthConditions.join(', ') || 'None'}
-      - Available Equipment: ${preferences.availableEquipment.join(', ')}
+      - Health Conditions: ${healthConditions.join(', ') || 'None'}
+      - Available Equipment: ${preferences.availableEquipment?.join(', ') || 'None'}
       - Training Location: ${preferences.trainingLocation}
 
       IMPORTANT: You MUST use ONLY the exercise IDs from the following list when creating the workout plan. DO NOT use exercise names or create new exercises.
@@ -169,7 +119,7 @@ serve(async (req) => {
     // Validate that all exercise IDs are valid
     for (const session of workoutPlan.plan.sessions) {
       for (const exercise of session.exercises) {
-        if (!availableExercises.has(exercise.exerciseId)) {
+        if (!exercises.some(e => e.id === exercise.exerciseId)) {
           throw new Error(`Invalid exercise ID: ${exercise.exerciseId}`)
         }
       }
@@ -223,12 +173,13 @@ serve(async (req) => {
     // Return the plan with exercises mapped to their names
     const transformedSessions = await Promise.all(workoutPlan.plan.sessions.map(async (session) => {
       const exerciseDetails = await Promise.all(session.exercises.map(async (exercise) => {
-        const exerciseData = availableExercises.get(exercise.exerciseId)
+        const exerciseData = exercises.find(e => e.id === exercise.exerciseId)
         return {
           name: exerciseData?.name || 'Unknown Exercise',
           sets: exercise.sets,
           reps: exercise.reps,
-          rest_time_seconds: exercise.restTimeSeconds
+          rest_time_seconds: exercise.restTimeSeconds,
+          gifUrl: exerciseData?.gif_url
         }
       }))
 
@@ -247,7 +198,7 @@ serve(async (req) => {
         start_date: workoutPlan.plan.startDate,
         end_date: workoutPlan.plan.endDate,
         goal: preferences.goal,
-        sessions: transformedSessions
+        workout_sessions: transformedSessions
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
