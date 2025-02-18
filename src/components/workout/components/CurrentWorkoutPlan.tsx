@@ -2,29 +2,25 @@
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { WorkoutPlan } from "../types/workout-plan";
-import { Calendar, Clock, Dumbbell } from "lucide-react";
+import { Calendar, Clock, Dumbbell, AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 interface CurrentWorkoutPlanProps {
   plan: WorkoutPlan;
 }
 
 export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
-  const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
-
-  const fetchExerciseGif = async (exerciseName: string) => {
-    try {
-      const response = await fetch(`https://api.giphy.com/v1/gifs/search?api_key=P5EDHjFx7h4TfqB4JsGX8JBvGa4V3p1K&q=${encodeURIComponent(exerciseName + " exercise")}&limit=1&rating=g`);
-      const data = await response.json();
-      if (data.data && data.data.length > 0) {
-        return data.data[0].images.fixed_height.url;
+  useEffect(() => {
+    // Verifica se cada sessão tem pelo menos 5 exercícios
+    plan.workout_sessions.forEach(session => {
+      if (session.exercises.length < 5) {
+        toast.warning(`Dia ${session.day_number} tem menos de 5 exercícios recomendados`, {
+          description: "Para um treino mais efetivo, recomenda-se no mínimo 5 exercícios diferentes."
+        });
       }
-      return null;
-    } catch (error) {
-      console.error('Erro ao buscar GIF:', error);
-      return null;
-    }
-  };
+    });
+  }, [plan]);
 
   return (
     <div className="space-y-6">
@@ -53,10 +49,18 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
       {plan.workout_sessions.map((session) => (
         <Card key={session.day_number} className="overflow-hidden bg-white shadow-lg transition-all hover:shadow-xl">
           <CardHeader className="p-6 bg-gradient-to-r from-primary-500 to-primary-600">
-            <h4 className="text-xl font-semibold text-white flex items-center gap-2">
-              <Dumbbell className="w-5 h-5" />
-              Dia {session.day_number}
-            </h4>
+            <div className="flex justify-between items-center">
+              <h4 className="text-xl font-semibold text-white flex items-center gap-2">
+                <Dumbbell className="w-5 h-5" />
+                Dia {session.day_number}
+              </h4>
+              {session.exercises.length < 5 && (
+                <div className="flex items-center gap-2 text-yellow-200">
+                  <AlertTriangle className="w-5 h-5" />
+                  <span className="text-sm">Mínimo de 5 exercícios recomendado</span>
+                </div>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="p-6">
             <div className="space-y-6">
