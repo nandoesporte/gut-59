@@ -1,5 +1,6 @@
 
 import { ProfessionalsSection } from "@/components/professionals/ProfessionalsSection";
+import { InstructionVideos } from "@/components/instruction/InstructionVideos";
 import { Card } from "@/components/ui/card";
 
 const Instructions = () => {
@@ -18,6 +19,8 @@ const Instructions = () => {
             </div>
           </Card>
 
+          <InstructionVideos />
+          
           <ProfessionalsSection />
         </div>
       </div>
