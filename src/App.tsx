@@ -14,6 +14,7 @@ import Store from "./pages/Store";
 import Admin from "./pages/Admin";
 import Menu from "./pages/Menu";
 import Workout from "./pages/Workout";
+import Instructions from "./pages/Instructions";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -94,7 +95,7 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <Layout>
-                      <Workout />
+                      <Instructions />
                     </Layout>
                   </ProtectedRoute>
                 }
