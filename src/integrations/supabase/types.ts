@@ -1310,6 +1310,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      reset_daily_water_intake: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       update_user_water_goal: {
         Args: {
           p_user_id: string

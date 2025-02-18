@@ -3,7 +3,7 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { WorkoutPreferences } from "./types";
-import { RefreshCw, Download, History, Dumbbell, Target, Calendar, Activity } from "lucide-react";
+import { RefreshCw, Download, History, Target, Calendar, Activity } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -20,7 +20,6 @@ interface WorkoutPlanDisplayProps {
 
 export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayProps) => {
   const [showHistory, setShowHistory] = React.useState(false);
-  const planContainerRef = React.useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
 
   const { data: currentPlan, isLoading: isPlanLoading } = useQuery({
@@ -38,7 +37,7 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
     }
   });
 
-  const { data: historyPlans, isLoading: isHistoryLoading } = useQuery({
+  const { data: historyPlans, isLoading: isHistoryLoading, refetch: refetchHistory } = useQuery({
     queryKey: ['workout-history'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -62,8 +61,8 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
   });
 
   const handleGeneratePDF = () => {
-    if (planContainerRef.current) {
-      generateWorkoutPDF(planContainerRef.current);
+    if (currentPlan) {
+      generateWorkoutPDF(currentPlan as WorkoutHistory);
     }
   };
 
@@ -110,9 +109,13 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
         </CardContent>
       </Card>
 
-      <div ref={planContainerRef} className="bg-white">
+      <div className="bg-white">
         {showHistory ? (
-          <WorkoutHistoryView isLoading={isHistoryLoading} historyPlans={historyPlans} />
+          <WorkoutHistoryView 
+            isLoading={isHistoryLoading} 
+            historyPlans={historyPlans} 
+            onRefresh={() => refetchHistory()} 
+          />
         ) : currentPlan ? (
           <CurrentWorkoutPlan plan={currentPlan} />
         ) : (
