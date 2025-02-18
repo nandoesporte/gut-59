@@ -15,6 +15,69 @@ interface GenerateWorkoutRequest {
   userId: string;
 }
 
+// Função para traduzir o texto para português usando a API do OpenAI
+async function translateToPortuguese(text: string): Promise<string> {
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4',
+        messages: [
+          {
+            role: 'system',
+            content: 'Você é um tradutor especializado em exercícios físicos. Traduza o nome do exercício para português do Brasil, mantendo termos técnicos quando necessário.'
+          },
+          {
+            role: 'user',
+            content: `Translate to Brazilian Portuguese: "${text}"`
+          }
+        ],
+        temperature: 0.3,
+      }),
+    });
+
+    const data = await response.json();
+    return data.choices[0].message.content.replace(/"/g, '').trim();
+  } catch (error) {
+    console.error('Error translating:', error);
+    return text; // Retorna o texto original em caso de erro
+  }
+}
+
+// Função para buscar GIF do exercício
+async function fetchExerciseGif(exerciseName: string): Promise<string | null> {
+  try {
+    // Tenta primeiro no Giphy
+    const giphyResponse = await fetch(
+      `https://api.giphy.com/v1/gifs/search?api_key=P5EDHjFx7h4TfqB4JsGX8JBvGa4V3p1K&q=${encodeURIComponent(exerciseName + " exercise")}&limit=1&rating=g`
+    );
+    const giphyData = await giphyResponse.json();
+    
+    if (giphyData.data && giphyData.data.length > 0) {
+      return giphyData.data[0].images.fixed_height.url;
+    }
+
+    // Se não encontrar no Giphy, tenta no Wger
+    const wgerResponse = await fetch(
+      `https://wger.de/api/v2/exerciseimage/?exercise_name=${encodeURIComponent(exerciseName)}`
+    );
+    const wgerData = await wgerResponse.json();
+    
+    if (wgerData.results && wgerData.results.length > 0) {
+      return wgerData.results[0].image;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error fetching exercise gif:', error);
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -27,7 +90,6 @@ serve(async (req) => {
       throw new Error('Missing required parameters')
     }
 
-    // Garantir que healthConditions seja sempre um array, mesmo que vazio
     const healthConditions = preferences.healthConditions || [];
 
     // Fetch available exercises from the database
@@ -41,6 +103,14 @@ serve(async (req) => {
     if (!exercises || exercises.length === 0) {
       throw new Error('No exercises found matching the criteria')
     }
+
+    // Traduz os nomes dos exercícios
+    const translatedExercises = await Promise.all(
+      exercises.map(async (exercise) => ({
+        ...exercise,
+        name: await translateToPortuguese(exercise.name),
+      }))
+    );
 
     // Generate prompt for OpenAI
     const prompt = `
@@ -58,13 +128,13 @@ serve(async (req) => {
       IMPORTANT: You MUST use ONLY the exercise IDs from the following list when creating the workout plan. DO NOT use exercise names or create new exercises.
 
       Available exercises:
-      ${exercises.map(e => `- ID: "${e.id}" - ${e.name} (${e.exercise_type}, ${e.muscle_group})`).join('\n')}
+      ${translatedExercises.map(e => `- ID: "${e.id}" - ${e.name} (${e.exercise_type}, ${e.muscle_group})`).join('\n')}
 
       Create a 4-week workout plan with 3-4 sessions per week. For each session, include:
-      1. Warmup description
+      1. Warmup description in Portuguese
       2. Main exercises (ONLY use exerciseId from the list above)
       3. Sets, reps, and rest times for each exercise
-      4. Cooldown description
+      4. Cooldown description in Portuguese
       
       Format the response as a JSON object with the following structure:
       {
@@ -87,6 +157,7 @@ serve(async (req) => {
       }
 
       VERY IMPORTANT: The exerciseId MUST be one of the exact IDs provided in the list above.
+      Write warmupDescription and cooldownDescription in Portuguese.
     `
 
     // Call OpenAI API
@@ -100,7 +171,7 @@ serve(async (req) => {
         model: 'gpt-4',
         messages: [{
           role: 'system',
-          content: 'You are a professional fitness trainer specialized in creating personalized workout plans. You must only use the exact exercise IDs provided.'
+          content: 'You are a professional fitness trainer specialized in creating personalized workout plans. Write in Portuguese (Brazil). You must only use the exact exercise IDs provided.'
         }, {
           role: 'user',
           content: prompt
@@ -170,16 +241,19 @@ serve(async (req) => {
       }
     }
 
-    // Return the plan with exercises mapped to their names
+    // Return the plan with exercises mapped to their names and GIFs
     const transformedSessions = await Promise.all(workoutPlan.plan.sessions.map(async (session) => {
       const exerciseDetails = await Promise.all(session.exercises.map(async (exercise) => {
-        const exerciseData = exercises.find(e => e.id === exercise.exerciseId)
+        const exerciseData = translatedExercises.find(e => e.id === exercise.exerciseId)
+        // Busca GIF para o exercício se ainda não tiver
+        const gifUrl = exerciseData?.gif_url || await fetchExerciseGif(exerciseData?.name || '');
+        
         return {
-          name: exerciseData?.name || 'Unknown Exercise',
+          name: exerciseData?.name || 'Exercício Desconhecido',
           sets: exercise.sets,
           reps: exercise.reps,
           rest_time_seconds: exercise.restTimeSeconds,
-          gifUrl: exerciseData?.gif_url
+          gifUrl: gifUrl
         }
       }))
 
