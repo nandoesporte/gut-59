@@ -74,9 +74,6 @@ const StepCounter = () => {
 
         console.log('Contador de passos iniciado');
         
-        // Configurar intervalo de amostragem para 20Hz (50ms)
-        await Motion.setInterval(50);
-        
       } catch (error) {
         console.error('Erro ao acessar sensores de movimento:', error);
       }
