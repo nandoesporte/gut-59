@@ -17,7 +17,7 @@ interface MealPlanHistoryProps {
     plan_data: MealPlan;
     calories: number;
   }>;
-  onRefresh: () => void;
+  onRefresh: () => Promise<void> | void;
 }
 
 export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlanHistoryProps) => {
@@ -32,16 +32,24 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
         return;
       }
 
+      const toastId = toast.loading("Excluindo plano alimentar...");
+
       const { error } = await supabase
         .from('meal_plans')
         .delete()
-        .eq('id', planId)
-        .eq('user_id', userData.user.id);
+        .eq('id', planId);
 
-      if (error) throw error;
+      if (error) {
+        toast.dismiss(toastId);
+        throw error;
+      }
 
+      toast.dismiss(toastId);
       toast.success("Plano alimentar excluído com sucesso");
-      onRefresh(); // Recarrega a lista após excluir
+      
+      // Forçar atualização da lista
+      await onRefresh();
+      
     } catch (error) {
       console.error('Erro ao excluir plano:', error);
       toast.error("Erro ao excluir plano alimentar");
@@ -114,10 +122,20 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
             <CollapsibleContent>
               <CardContent className="p-4 md:p-6 pt-0">
                 <div ref={el => planRefs.current[plan.id] = el}>
-                  {/* Renderiza os detalhes do plano aqui */}
-                  <pre className="whitespace-pre-wrap text-sm">
-                    {JSON.stringify(plan.plan_data, null, 2)}
-                  </pre>
+                  <div className="space-y-4">
+                    {Object.entries(plan.plan_data).map(([mealType, items]) => (
+                      <div key={mealType} className="border-b pb-4 last:border-b-0">
+                        <h5 className="font-medium capitalize mb-2">{mealType}</h5>
+                        <ul className="list-disc list-inside space-y-1">
+                          {Array.isArray(items) && items.map((item: any, index: number) => (
+                            <li key={index} className="text-sm text-gray-600">
+                              {item.name} {item.portion && `- ${item.portion}`}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </CardContent>
             </CollapsibleContent>
