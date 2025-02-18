@@ -1,14 +1,66 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+interface MealGuideline {
+  mealType: string;
+  targetCalories: number;
+  requiredCategories: string[];
+  minItems: number;
+}
+
+const mealGuidelines: MealGuideline[] = [
+  {
+    mealType: 'breakfast',
+    targetCalories: 300,
+    requiredCategories: ['grains', 'protein', 'fruit'],
+    minItems: 3
+  },
+  {
+    mealType: 'morningSnack',
+    targetCalories: 150,
+    requiredCategories: ['protein', 'fruit'],
+    minItems: 2
+  },
+  {
+    mealType: 'lunch',
+    targetCalories: 400,
+    requiredCategories: ['protein', 'grains', 'vegetables'],
+    minItems: 4
+  },
+  {
+    mealType: 'afternoonSnack',
+    targetCalories: 150,
+    requiredCategories: ['protein', 'fruit'],
+    minItems: 2
+  },
+  {
+    mealType: 'dinner',
+    targetCalories: 300,
+    requiredCategories: ['protein', 'vegetables', 'grains'],
+    minItems: 3
+  }
+];
+
+function generatePortionSize(food: any, targetCalories: number): number {
+  if (!food.calories_per_100g) return 100;
+  return Math.round((targetCalories / food.calories_per_100g) * 100);
+}
+
+function formatPortion(size: number, unit: string = 'g'): string {
+  if (unit === 'g' && size >= 1000) {
+    return `${(size/1000).toFixed(1)} kg`;
+  }
+  return `${size} ${unit}`;
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -16,226 +68,115 @@ serve(async (req) => {
   try {
     const { userData, selectedFoods, dietaryPreferences } = await req.json();
     
-    console.log('Received request:', { userData, selectedFoods, dietaryPreferences });
-
-    // Fetch foods data
     const supabaseUrl = Deno.env.get('SUPABASE_URL') as string;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // Buscar alimentos selecionados
     const { data: foodsData, error: foodsError } = await supabase
       .from('protocol_foods')
       .select('*')
       .in('id', selectedFoods);
 
-    if (foodsError) {
-      console.error('Error fetching foods:', foodsError);
-      throw new Error('Failed to fetch foods data');
-    }
+    if (foodsError) throw foodsError;
 
-    if (!foodsData || foodsData.length === 0) {
-      throw new Error('No foods found');
-    }
+    const foods = foodsData || [];
+    console.log('Alimentos disponíveis:', foods.length);
 
-    console.log('Foods data:', foodsData);
-
-    // Calculate adjusted calories based on goal
-    let adjustedCalories = userData.dailyCalories;
-    if (userData.goal === 'lose') {
-      adjustedCalories = Math.round(userData.dailyCalories * 0.8);
-    } else if (userData.goal === 'gain') {
-      adjustedCalories = Math.round(userData.dailyCalories * 1.2);
-    }
-
-    // Calculate macro distribution
-    const macroNeeds = {
-      protein: Math.round(userData.weight * (userData.goal === 'gain' ? 2.2 : 2)),
-      carbs: Math.round((adjustedCalories * 0.45) / 4),
-      fats: Math.round((adjustedCalories * 0.25) / 9)
-    };
-
-    // Distribute calories across meals
-    const mealDistribution = {
-      breakfast: 0.3,
-      morningSnack: 0.15,
-      lunch: 0.25,
-      afternoonSnack: 0.15,
-      dinner: 0.15
-    };
-
-    // Helper function to distribute foods into meals
-    const distributeFoodsIntoMeals = (foods: any[], totalCalories: number) => {
-      const meals = {
-        breakfast: { foods: [], calories: Math.round(totalCalories * mealDistribution.breakfast), macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 } },
-        morningSnack: { foods: [], calories: Math.round(totalCalories * mealDistribution.morningSnack), macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 } },
-        lunch: { foods: [], calories: Math.round(totalCalories * mealDistribution.lunch), macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 } },
-        afternoonSnack: { foods: [], calories: Math.round(totalCalories * mealDistribution.afternoonSnack), macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 } },
-        dinner: { foods: [], calories: Math.round(totalCalories * mealDistribution.dinner), macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 } }
-      };
-
-      // Distribute foods across meals
-      foods.forEach(food => {
-        const mealTypes = food.meal_type || ['any'];
-        let assigned = false;
-
-        if (mealTypes.includes('breakfast') && meals.breakfast.calories > 0) {
-          meals.breakfast.foods.push(food);
-          meals.breakfast.macros.protein += food.protein || 0;
-          meals.breakfast.macros.carbs += food.carbs || 0;
-          meals.breakfast.macros.fats += food.fats || 0;
-          meals.breakfast.macros.fiber += food.fiber || 0;
-          assigned = true;
-        } else if (mealTypes.includes('lunch') && meals.lunch.calories > 0) {
-          meals.lunch.foods.push(food);
-          meals.lunch.macros.protein += food.protein || 0;
-          meals.lunch.macros.carbs += food.carbs || 0;
-          meals.lunch.macros.fats += food.fats || 0;
-          meals.lunch.macros.fiber += food.fiber || 0;
-          assigned = true;
-        } else if (mealTypes.includes('snack') && meals.morningSnack.calories > 0) {
-          meals.morningSnack.foods.push(food);
-          meals.morningSnack.macros.protein += food.protein || 0;
-          meals.morningSnack.macros.carbs += food.carbs || 0;
-          meals.morningSnack.macros.fats += food.fats || 0;
-          meals.morningSnack.macros.fiber += food.fiber || 0;
-          assigned = true;
-        }
-
-        if (!assigned) {
-          // Distribute remaining foods based on calories
-          if (meals.breakfast.foods.length < 3) {
-            meals.breakfast.foods.push(food);
-            meals.breakfast.macros.protein += food.protein || 0;
-            meals.breakfast.macros.carbs += food.carbs || 0;
-            meals.breakfast.macros.fats += food.fats || 0;
-            meals.breakfast.macros.fiber += food.fiber || 0;
-          } else if (meals.lunch.foods.length < 4) {
-            meals.lunch.foods.push(food);
-            meals.lunch.macros.protein += food.protein || 0;
-            meals.lunch.macros.carbs += food.carbs || 0;
-            meals.lunch.macros.fats += food.fats || 0;
-            meals.lunch.macros.fiber += food.fiber || 0;
-          } else if (meals.dinner.foods.length < 3) {
-            meals.dinner.foods.push(food);
-            meals.dinner.macros.protein += food.protein || 0;
-            meals.dinner.macros.carbs += food.carbs || 0;
-            meals.dinner.macros.fats += food.fats || 0;
-            meals.dinner.macros.fiber += food.fiber || 0;
-          }
-        }
+    // Categorizar alimentos por tipo de refeição
+    const foodsByCategory = foods.reduce((acc: any, food: any) => {
+      const categories = food.nutritional_category || [];
+      categories.forEach((category: string) => {
+        if (!acc[category]) acc[category] = [];
+        acc[category].push(food);
       });
+      return acc;
+    }, {});
 
-      return meals;
-    };
+    // Gerar plano de refeições
+    const dailyPlan = mealGuidelines.reduce((plan: any, guideline) => {
+      const mealFoods = [];
+      let mealCalories = 0;
+      const targetCalories = (userData.dailyCalories * (guideline.targetCalories / 1300));
 
-    const dailyPlan = distributeFoodsIntoMeals(foodsData, adjustedCalories);
-
-    // Generate recommendations
-    const recommendations = {
-      general: "",
-      preworkout: "",
-      postworkout: "",
-      timing: [] as string[],
-    };
-
-    // Adiciona recomendação específica para níveis baixos de atividade física
-    if (userData.activityLevel === 'sedentary' || userData.activityLevel === 'lightlyActive') {
-      recommendations.general = 
-        "IMPORTANTE: Seu nível atual de atividade física está baixo. Recomendamos fortemente que você: \n" +
-        "1. Inicie uma rotina regular de exercícios físicos\n" +
-        "2. Comece com atividades leves como caminhada\n" +
-        "3. Busque orientação profissional para iniciar atividades físicas\n" +
-        "4. Atualize seu plano alimentar após estabelecer uma rotina de exercícios\n\n";
-    }
-
-    // Adiciona recomendações baseadas no objetivo
-    switch (userData.goal) {
-      case 'lose':
-        recommendations.general += 
-          "Mantenha um déficit calórico controlado e foque em alimentos ricos em proteína para preservar a massa magra. " +
-          "Distribua as refeições ao longo do dia para controlar a fome.";
-        recommendations.timing.push(
-          "Faça refeições a cada 3-4 horas para manter o metabolismo ativo",
-          "Evite refeições pesadas próximo ao horário de dormir"
-        );
-        break;
-      case 'gain':
-        recommendations.general += 
-          "Mantenha um superávit calórico controlado com foco em proteínas de alta qualidade. " +
-          "Priorize refeições mais calóricas após o treino.";
-        recommendations.timing.push(
-          "Aumente gradualmente o tamanho das porções",
-          "Consuma proteína em todas as refeições principais"
-        );
-        break;
-      default:
-        recommendations.general += 
-          "Mantenha uma alimentação equilibrada com foco em alimentos nutritivos. " +
-          "Distribua bem os macronutrientes ao longo do dia.";
-        recommendations.timing.push(
-          "Mantenha horários regulares para as refeições",
-          "Equilibre proteínas, carboidratos e gorduras boas"
-        );
-    }
-
-    // Recomendações específicas para treino
-    if (dietaryPreferences.trainingTime) {
-      const trainHour = parseInt(dietaryPreferences.trainingTime.split(':')[0]);
-      
-      if (userData.goal === 'lose') {
-        recommendations.preworkout = 
-          "Consuma uma refeição leve com carboidratos complexos 1-2 horas antes do treino.";
-        recommendations.postworkout = 
-          "Priorize proteínas magras e carboidratos moderados após o treino.";
-      } else if (userData.goal === 'gain') {
-        recommendations.preworkout = 
-          "Faça uma refeição rica em carboidratos e proteínas 1-2 horas antes do treino.";
-        recommendations.postworkout = 
-          "Consuma proteínas de rápida absorção e carboidratos logo após o treino.";
-      } else {
-        recommendations.preworkout = 
-          "Consuma carboidratos de fácil digestão 30-60 minutos antes do treino.";
-        recommendations.postworkout = 
-          "Equilibre proteínas e carboidratos após o treino para recuperação.";
+      // Garantir que temos alimentos de cada categoria requerida
+      for (const category of guideline.requiredCategories) {
+        const availableFoods = foodsByCategory[category] || [];
+        if (availableFoods.length > 0) {
+          const food = availableFoods[Math.floor(Math.random() * availableFoods.length)];
+          const portionSize = generatePortionSize(food, targetCalories / guideline.minItems);
+          const calories = Math.round((food.calories / 100) * portionSize);
+          
+          mealFoods.push({
+            ...food,
+            portion: formatPortion(portionSize, food.portion_unit || 'g'),
+            calories: calories
+          });
+          mealCalories += calories;
+        }
       }
 
-      recommendations.timing.push(
-        `Faça sua refeição pré-treino cerca de 1-2 horas antes do exercício (${trainHour-2}:00)`,
-        `Consuma sua refeição pós-treino em até 30 minutos após o término do exercício (${trainHour+1}:00)`
-      );
-    }
+      // Calcular macronutrientes totais da refeição
+      const macros = mealFoods.reduce((acc: any, food: any) => {
+        const multiplier = parseFloat(food.portion) / 100;
+        return {
+          protein: acc.protein + (food.protein || 0) * multiplier,
+          carbs: acc.carbs + (food.carbs || 0) * multiplier,
+          fats: acc.fats + (food.fats || 0) * multiplier,
+          fiber: acc.fiber + (food.fiber || 0) * multiplier
+        };
+      }, { protein: 0, carbs: 0, fats: 0, fiber: 0 });
+
+      // Arredondar macronutrientes
+      Object.keys(macros).forEach(key => {
+        macros[key] = Math.round(macros[key] * 10) / 10;
+      });
+
+      return {
+        ...plan,
+        [guideline.mealType]: {
+          foods: mealFoods,
+          calories: mealCalories,
+          macros
+        }
+      };
+    }, {});
+
+    // Calcular totais do dia
+    const totalNutrition = Object.values(dailyPlan).reduce((total: any, meal: any) => ({
+      calories: total.calories + meal.calories,
+      protein: total.protein + meal.macros.protein,
+      carbs: total.carbs + meal.macros.carbs,
+      fats: total.fats + meal.macros.fats,
+      fiber: total.fiber + meal.macros.fiber
+    }), { calories: 0, protein: 0, carbs: 0, fats: 0, fiber: 0 });
+
+    // Gerar recomendações
+    const recommendations = {
+      preworkout: "Consuma sua refeição pré-treino 2 horas antes do exercício",
+      postworkout: "Após o treino, priorize proteínas de rápida absorção e carboidratos",
+      general: "Mantenha-se hidratado bebendo água ao longo do dia",
+      timing: [
+        "Faça refeições a cada 3-4 horas",
+        "Evite refeições pesadas próximo ao horário de dormir"
+      ]
+    };
 
     const response = {
       dailyPlan,
-      totalNutrition: {
-        calories: adjustedCalories,
-        ...macroNeeds,
-      },
-      recommendations,
+      totalNutrition,
+      recommendations
     };
 
-    console.log('Generated meal plan:', response);
+    return new Response(JSON.stringify(response), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
 
-    return new Response(
-      JSON.stringify(response),
-      { 
-        headers: { 
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
-      },
-    );
   } catch (error) {
-    console.error('Error:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { 
-        status: 400,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
-      },
-    );
+    console.error('Erro ao gerar plano:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });
