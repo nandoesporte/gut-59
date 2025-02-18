@@ -5,7 +5,7 @@ import { MealSection } from "./components/MealSection";
 import { DailyTotals } from "./components/DailyTotals";
 import { Recommendations } from "./components/Recommendations";
 import { Coffee, Apple, UtensilsCrossed, Cookie, Moon } from "lucide-react";
-import { MealPlan } from "./types";
+import { MealPlan, ProtocolFood } from "./types";
 
 interface MealPlanDisplayProps {
   mealPlan: MealPlan;
@@ -14,44 +14,19 @@ interface MealPlanDisplayProps {
 export const MealPlanDisplay = ({ mealPlan }: MealPlanDisplayProps) => {
   const { dailyPlan, recommendations, totalNutrition } = mealPlan;
 
-  // Função auxiliar para formatar a porção baseada no tipo de alimento
-  const formatPortion = (food: any): string => {
-    const size = food.portion_size || '';
-    const unit = food.portion_unit?.toLowerCase() || '';
-    
-    // Mapeamento de unidades de medida
-    if (unit.includes('fatia')) {
-      return `${size} fatia${size > 1 ? 's' : ''}`;
-    }
-    if (unit.includes('colher')) {
-      return `${size} colher${size > 1 ? 'es' : ''} de sopa`;
-    }
-    if (unit.includes('xicara')) {
-      return size === 0.5 ? '1/2 xícara' : `${size} xícara${size > 1 ? 's' : ''}`;
-    }
-    if (unit.includes('unidade')) {
-      return `${size} unidade${size > 1 ? 's' : ''}`;
-    }
-    if (unit.includes('meio')) {
-      return 'meio';
-    }
-    
-    // Adiciona descrição de tamanho quando disponível
-    const sizeDesc = food.size_description ? ` ${food.size_description}` : '';
-    
-    // Se não houver um mapeamento específico, retorna a medida padrão
-    return `${size} ${unit}${sizeDesc}`;
-  };
-
-  // Função auxiliar para converter ProtocolFood[] para o formato esperado
-  const formatFoods = (foods: any[]) => {
-    return foods.map(food => ({
-      name: food.name,
-      portion: formatPortion(food),
-      calories: food.calories,
-      description: food.preparation_method || food.description // Inclui método de preparo quando disponível
-    }));
-  };
+  // Função auxiliar para converter para ProtocolFood com todos os campos necessários
+  const formatFood = (food: any): ProtocolFood => ({
+    id: food.id || `temp-${Math.random()}`,
+    name: food.name,
+    calories: food.calories,
+    protein: food.protein || 0,
+    carbs: food.carbs || 0,
+    fats: food.fats || 0,
+    food_group_id: food.food_group_id || 0,
+    portion: food.portion_size || food.portion || 0,
+    portionUnit: food.portion_unit || 'g',
+    description: food.preparation_method || food.description || '',
+  });
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
@@ -66,7 +41,7 @@ export const MealPlanDisplay = ({ mealPlan }: MealPlanDisplayProps) => {
         <MealSection
           title="Café da Manhã"
           icon={<Coffee className="w-5 h-5" />}
-          foods={formatFoods(dailyPlan.breakfast.foods)}
+          foods={dailyPlan.breakfast.foods.map(formatFood)}
           macros={dailyPlan.breakfast.macros}
           calories={dailyPlan.breakfast.calories}
         />
@@ -74,7 +49,7 @@ export const MealPlanDisplay = ({ mealPlan }: MealPlanDisplayProps) => {
         <MealSection
           title="Lanche da Manhã"
           icon={<Apple className="w-5 h-5" />}
-          foods={formatFoods(dailyPlan.morningSnack.foods)}
+          foods={dailyPlan.morningSnack.foods.map(formatFood)}
           macros={dailyPlan.morningSnack.macros}
           calories={dailyPlan.morningSnack.calories}
         />
@@ -82,7 +57,7 @@ export const MealPlanDisplay = ({ mealPlan }: MealPlanDisplayProps) => {
         <MealSection
           title="Almoço"
           icon={<UtensilsCrossed className="w-5 h-5" />}
-          foods={formatFoods(dailyPlan.lunch.foods)}
+          foods={dailyPlan.lunch.foods.map(formatFood)}
           macros={dailyPlan.lunch.macros}
           calories={dailyPlan.lunch.calories}
         />
@@ -90,7 +65,7 @@ export const MealPlanDisplay = ({ mealPlan }: MealPlanDisplayProps) => {
         <MealSection
           title="Lanche da Tarde"
           icon={<Cookie className="w-5 h-5" />}
-          foods={formatFoods(dailyPlan.afternoonSnack.foods)}
+          foods={dailyPlan.afternoonSnack.foods.map(formatFood)}
           macros={dailyPlan.afternoonSnack.macros}
           calories={dailyPlan.afternoonSnack.calories}
         />
@@ -98,7 +73,7 @@ export const MealPlanDisplay = ({ mealPlan }: MealPlanDisplayProps) => {
         <MealSection
           title="Jantar"
           icon={<Moon className="w-5 h-5" />}
-          foods={formatFoods(dailyPlan.dinner.foods)}
+          foods={dailyPlan.dinner.foods.map(formatFood)}
           macros={dailyPlan.dinner.macros}
           calories={dailyPlan.dinner.calories}
         />

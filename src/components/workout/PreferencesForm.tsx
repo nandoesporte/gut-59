@@ -18,6 +18,7 @@ const formSchema = z.object({
   age: z.number().min(16).max(100),
   weight: z.number().min(30).max(200),
   height: z.number().min(100).max(250),
+  gender: z.enum(["male", "female"]),
   goal: z.enum(["lose_weight", "maintain", "gain_mass"]),
   activityLevel: z.enum(["sedentary", "light", "moderate", "intense"]),
   preferredExerciseTypes: z.array(z.enum(["strength", "cardio", "mobility"])),
@@ -35,6 +36,7 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
       age: 30,
       weight: 70,
       height: 170,
+      gender: "male",
       goal: "maintain",
       activityLevel: "moderate",
       preferredExerciseTypes: ["strength"],
@@ -42,9 +44,19 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
     },
   });
 
+  const handleSubmit = (data: z.infer<typeof formSchema>) => {
+    const workoutPreferences: WorkoutPreferences = {
+      ...data,
+      availableEquipment: data.trainingLocation === "gym" 
+        ? ["all"] 
+        : ["bodyweight", "resistance-bands"],
+    };
+    onSubmit(workoutPreferences);
+  };
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
         <Card>
           <CardHeader className="flex flex-row items-center gap-2 p-6">
             <Clipboard className="w-6 h-6 text-primary-500" />

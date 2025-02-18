@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { History, ChevronDown, Calendar, Target, Activity } from "lucide-react";
@@ -46,7 +47,7 @@ export const WorkoutHistoryView = ({ isLoading, historyPlans }: WorkoutHistoryVi
                   <Target className="w-5 h-5 text-primary-500 mt-1" />
                   <div>
                     <h3 className="font-medium">
-                      Plano de {new Date(plan.created_at).toLocaleDateString()}
+                      Plano {plan.id}
                     </h3>
                     <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
                       <Calendar className="w-4 h-4" />
