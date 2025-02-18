@@ -25,15 +25,23 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
 
   const handleDelete = async (planId: string) => {
     try {
+      const { data: userData } = await supabase.auth.getUser();
+      
+      if (!userData.user) {
+        toast.error("Usuário não autenticado");
+        return;
+      }
+
       const { error } = await supabase
         .from('meal_plans')
         .delete()
-        .eq('id', planId);
+        .eq('id', planId)
+        .eq('user_id', userData.user.id);
 
       if (error) throw error;
 
       toast.success("Plano alimentar excluído com sucesso");
-      onRefresh();
+      onRefresh(); // Recarrega a lista após excluir
     } catch (error) {
       console.error('Erro ao excluir plano:', error);
       toast.error("Erro ao excluir plano alimentar");
@@ -107,6 +115,9 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
               <CardContent className="p-4 md:p-6 pt-0">
                 <div ref={el => planRefs.current[plan.id] = el}>
                   {/* Renderiza os detalhes do plano aqui */}
+                  <pre className="whitespace-pre-wrap text-sm">
+                    {JSON.stringify(plan.plan_data, null, 2)}
+                  </pre>
                 </div>
               </CardContent>
             </CollapsibleContent>
