@@ -1,25 +1,15 @@
 
 import { Button } from "@/components/ui/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { MacroDistributionBar } from "./MacroDistributionBar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
-
-interface MealFoodItem {
-  name: string;
-  portion: string;
-  calories: number;
-  description?: string;
-}
+import { ProtocolFood } from "../types";
 
 interface MealSectionProps {
   title: string;
   icon: React.ReactNode;
-  foods: MealFoodItem[];
+  foods: ProtocolFood[];
   macros?: {
     protein: number;
     carbs: number;
@@ -36,6 +26,11 @@ export const MealSection = ({
   macros, 
   calories,
 }: MealSectionProps) => {
+  const formatPortion = (food: ProtocolFood): string => {
+    if (!food.portion) return '';
+    return `${food.portion}${food.portionUnit || 'g'}`;
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-sm p-6">
       <h2 className="text-lg font-semibold flex items-center gap-2 text-green-700 mb-4">
@@ -49,7 +44,7 @@ export const MealSection = ({
             <div className="flex justify-between items-start">
               <div className="flex-1">
                 <div className="flex items-baseline gap-1">
-                  <span className="font-medium">{food.portion}</span>
+                  <span className="font-medium">{formatPortion(food)}</span>
                   <span className="text-gray-600">de</span>
                   <span>{food.name}</span>
                 </div>
