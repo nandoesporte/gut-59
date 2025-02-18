@@ -14,6 +14,8 @@ interface StepData {
 const STEPS_GOAL = 10000;
 const STEP_LENGTH = 0.762; // metros (média)
 const CALORIES_PER_STEP = 0.04;
+const ACCELERATION_THRESHOLD = 10; // Ajustado para ser mais sensível
+const MIN_TIME_BETWEEN_STEPS = 250; // Tempo mínimo entre passos em ms
 
 const StepCounter = () => {
   const [stepData, setStepData] = useState<StepData>({
@@ -29,25 +31,54 @@ const StepCounter = () => {
   };
 
   useEffect(() => {
-    let lastReading = 0;
+    let lastStepTime = 0;
+    let lastMagnitude = 0;
     let steps = 0;
+    let isInitialized = false;
 
     const startStepCounting = async () => {
       try {
         await Motion.addListener('accel', (event) => {
           const { x, y, z } = event.acceleration;
-          const magnitude = Math.sqrt(x * x + y * y + z * z);
           
-          // Detecção simplificada de passos
-          if (magnitude > 12 && (Date.now() - lastReading) > 300) {
+          // Ignora leituras iniciais para estabilização
+          if (!isInitialized) {
+            isInitialized = true;
+            return;
+          }
+
+          // Calcula a magnitude da aceleração
+          const magnitude = Math.sqrt(x * x + y * y + z * z);
+          const now = Date.now();
+
+          // Detecta pico de aceleração como passo
+          if (magnitude > ACCELERATION_THRESHOLD && 
+              magnitude > lastMagnitude && 
+              (now - lastStepTime) > MIN_TIME_BETWEEN_STEPS) {
+            
             steps++;
-            lastReading = Date.now();
+            lastStepTime = now;
+            
             const metrics = calculateMetrics(steps);
             setStepData(metrics);
+
+            console.log('Passo detectado!', {
+              magnitude,
+              acceleration: { x, y, z },
+              totalSteps: steps
+            });
           }
+
+          lastMagnitude = magnitude;
         });
+
+        console.log('Contador de passos iniciado');
+        
+        // Configurar intervalo de amostragem para 20Hz (50ms)
+        await Motion.setInterval(50);
+        
       } catch (error) {
-        console.error('Error accessing motion sensors:', error);
+        console.error('Erro ao acessar sensores de movimento:', error);
       }
     };
 
