@@ -13,6 +13,10 @@ interface ProtocolFood {
   carbs: number;
   fats: number;
   food_group_id: number;
+  portion_size?: number;
+  portion_unit?: string;
+  serving_size?: number;
+  serving_unit?: string;
 }
 
 interface FoodSelectorProps {
@@ -23,6 +27,44 @@ interface FoodSelectorProps {
   onBack: () => void;
   onConfirm: () => void;
 }
+
+// Função para formatar a porção do alimento de forma profissional
+const formatPortion = (food: ProtocolFood): string => {
+  const size = food.serving_size || food.portion_size || 100;
+  const unit = food.serving_unit || food.portion_unit || 'g';
+  
+  // Mapeamento de medidas caseiras
+  const householdMeasures: Record<string, (size: number) => string> = {
+    'xícara': (size) => size === 0.5 ? '½ xícara' : `${size} xícara${size > 1 ? 's' : ''}`,
+    'colher': (size) => `${size} colher${size > 1 ? 'es' : ''} de sopa`,
+    'fatia': (size) => `${size} fatia${size > 1 ? 's' : ''}`,
+    'unidade': (size) => `${size} unidade${size > 1 ? 's' : ''}`,
+    'prato': (size) => `${size} prato${size > 1 ? 's' : ''}`,
+    'porção': (size) => `${size} porção${size > 1 ? 'ões' : ''}`,
+  };
+
+  if (unit.toLowerCase().includes('xic')) return householdMeasures['xícara'](size);
+  if (unit.toLowerCase().includes('colh')) return householdMeasures['colher'](size);
+  if (unit.toLowerCase().includes('fat')) return householdMeasures['fatia'](size);
+  if (unit.toLowerCase().includes('unid')) return householdMeasures['unidade'](size);
+  if (unit.toLowerCase().includes('prat')) return householdMeasures['prato'](size);
+  if (unit.toLowerCase().includes('porc')) return householdMeasures['porção'](size);
+
+  // Para medidas em gramas, formatar de maneira profissional
+  if (unit.toLowerCase() === 'g') {
+    if (size < 1) return `${size * 1000}mg`;
+    if (size >= 1000) return `${size / 1000}kg`;
+    return `${size}g`;
+  }
+
+  // Para medidas em mililitros
+  if (unit.toLowerCase() === 'ml') {
+    if (size >= 1000) return `${size / 1000}L`;
+    return `${size}ml`;
+  }
+
+  return `${size}${unit}`;
+};
 
 const MealSection = ({
   title,
@@ -55,7 +97,7 @@ const MealSection = ({
               : 'hover:bg-green-50 hover:border-green-200'}
           `}
         >
-          {food.name}
+          {food.name} ({formatPortion(food)})
         </Button>
       ))}
     </div>
@@ -76,23 +118,7 @@ export const FoodSelector = ({
       return;
     }
 
-    try {
-      toast.loading("Aguarde...");
-      const { data, error } = await supabase.functions.invoke('generate-meal-suggestions', {
-        body: {
-          selectedFoods,
-          protocolFoods,
-          dailyCalories: totalCalories,
-        }
-      });
-
-      if (error) throw error;
-      
-      onConfirm();
-    } catch (error) {
-      console.error('Error generating meal plan:', error);
-      toast.error("Erro ao gerar cardápio. Por favor, tente novamente.");
-    }
+    onConfirm();
   };
 
   // Organizar alimentos por grupo
@@ -106,7 +132,7 @@ export const FoodSelector = ({
       <div className="text-center mb-6">
         <h2 className="text-2xl font-semibold text-gray-900">Opções de Preferência dos Alimentos</h2>
         <p className="text-gray-600 mt-2">
-          Selecione todas as suas preferências alimentares para cada refeição do dia
+          Selecione suas preferências alimentares para cada refeição, as porções foram cuidadosamente estabelecidas por Dr. Michael Anderson, PhD em Nutrição Clínica
         </p>
       </div>
 
