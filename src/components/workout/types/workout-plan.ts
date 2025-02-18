@@ -5,10 +5,11 @@ export interface WorkoutPlan {
   start_date: string;
   end_date: string;
   goal: string;
-  sessions: Array<WorkoutSession>;
+  workout_sessions: Array<WorkoutSession>;
 }
 
 export interface WorkoutSession {
+  id: string;
   day_number: number;
   warmup_description: string;
   exercises: Array<WorkoutExercise>;

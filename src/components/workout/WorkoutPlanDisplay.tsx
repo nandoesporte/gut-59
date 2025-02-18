@@ -61,9 +61,33 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
   });
 
   const handleGeneratePDF = () => {
-    if (currentPlan) {
-      generateWorkoutPDF(currentPlan as WorkoutHistory);
-    }
+    if (!currentPlan) return;
+
+    // Converter WorkoutPlan para WorkoutHistory
+    const historyPlan: WorkoutHistory = {
+      id: currentPlan.id,
+      start_date: currentPlan.start_date,
+      end_date: currentPlan.end_date,
+      goal: currentPlan.goal,
+      workout_sessions: currentPlan.workout_sessions.map(session => ({
+        id: session.id,
+        day_number: session.day_number,
+        warmup_description: session.warmup_description,
+        cooldown_description: session.cooldown_description,
+        session_exercises: session.exercises.map(exercise => ({
+          id: Math.random().toString(), // Gerando ID temporário
+          exercises: {
+            name: exercise.name,
+            gif_url: exercise.gifUrl
+          },
+          sets: exercise.sets,
+          reps: exercise.reps,
+          rest_time_seconds: exercise.rest_time_seconds
+        }))
+      }))
+    };
+
+    generateWorkoutPDF(historyPlan);
   };
 
   if (isPlanLoading) {
