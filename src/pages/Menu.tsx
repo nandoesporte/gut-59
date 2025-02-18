@@ -129,15 +129,6 @@ const Menu = () => {
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
           {renderStep()}
-          {currentStep === 1 && (
-            <div className="mt-8">
-              <MealPlanHistory 
-                isLoading={isHistoryLoading}
-                historyPlans={historyPlans}
-                onRefresh={fetchMealPlans}
-              />
-            </div>
-          )}
         </div>
       </div>
     </div>
