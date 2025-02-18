@@ -8,6 +8,10 @@ import { MealPlanDisplay } from "@/components/menu/MealPlanDisplay";
 import { MenuHeader } from "@/components/menu/MenuHeader";
 import { useMenuController } from "@/components/menu/MenuController";
 import { Loader2 } from "lucide-react";
+import { MealPlanHistory } from "@/components/menu/MealPlanHistory";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const Menu = () => {
   const {
@@ -26,6 +30,31 @@ const Menu = () => {
     setFormData,
   } = useMenuController();
 
+  const [historyPlans, setHistoryPlans] = useState<any[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
+
+  const fetchMealPlans = async () => {
+    try {
+      setIsHistoryLoading(true);
+      const { data, error } = await supabase
+        .from('meal_plans')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setHistoryPlans(data || []);
+    } catch (error) {
+      console.error('Erro ao carregar histórico:', error);
+      toast.error("Erro ao carregar histórico de planos alimentares");
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMealPlans();
+  }, []);
+
   const renderStep = () => {
     if (loading && currentStep !== 1.5) {
       return (
@@ -38,7 +67,16 @@ const Menu = () => {
     switch (currentStep) {
       case 1:
         return (
-          <InitialMenuContent onStartDiet={() => setCurrentStep(1.5)} />
+          <>
+            <InitialMenuContent onStartDiet={() => setCurrentStep(1.5)} />
+            <div className="mt-8">
+              <MealPlanHistory 
+                isLoading={isHistoryLoading}
+                historyPlans={historyPlans}
+                onRefresh={fetchMealPlans}
+              />
+            </div>
+          </>
         );
       case 1.5:
         return (
