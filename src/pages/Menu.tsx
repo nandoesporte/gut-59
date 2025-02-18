@@ -76,16 +76,14 @@ const Menu = () => {
     switch (currentStep) {
       case 1:
         return (
-          <>
+          <div className="space-y-8">
             <InitialMenuContent onStartDiet={() => setCurrentStep(1.5)} />
-            <div className="mt-8">
-              <MealPlanHistory 
-                isLoading={isHistoryLoading}
-                historyPlans={historyPlans}
-                onRefresh={fetchMealPlans}
-              />
-            </div>
-          </>
+            <MealPlanHistory 
+              isLoading={isHistoryLoading}
+              historyPlans={historyPlans}
+              onRefresh={fetchMealPlans}
+            />
+          </div>
         );
       case 1.5:
         return (
