@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
@@ -14,6 +13,57 @@ interface GenerateWorkoutRequest {
   preferences: WorkoutPreferences;
   userId: string;
 }
+
+const exercises = [
+  {
+    name: "Supino Reto",
+    gifUrl: "https://giphy.com/embed/3oKIPvcdnW1xs9m5IA",
+    muscle: "chest",
+    equipment: "barbell"
+  },
+  {
+    name: "Agachamento",
+    gifUrl: "https://giphy.com/embed/5hq3wKjgW95iqN1Fba",
+    muscle: "legs",
+    equipment: "barbell"
+  },
+  {
+    name: "Levantamento Terra",
+    gifUrl: "https://giphy.com/embed/3o7TKPAg5yPVR7bXkA",
+    muscle: "back",
+    equipment: "barbell"
+  },
+  {
+    name: "Rosca Direta",
+    gifUrl: "https://giphy.com/embed/3o7TKPvB6YPJvQqe8E",
+    muscle: "biceps",
+    equipment: "dumbbell"
+  },
+  {
+    name: "Desenvolvimento",
+    gifUrl: "https://giphy.com/embed/3o7TKQlqzXnEL5X5Zu",
+    muscle: "shoulders",
+    equipment: "barbell"
+  }
+];
+
+const generateExercise = (muscle: string, equipment: string[] = ['barbell', 'dumbbell']) => {
+  const muscleExercises = exercises.filter(
+    e => e.muscle === muscle && equipment.includes(e.equipment)
+  );
+  
+  if (muscleExercises.length === 0) return null;
+  
+  const exercise = muscleExercises[Math.floor(Math.random() * muscleExercises.length)];
+  
+  return {
+    name: exercise.name,
+    sets: Math.floor(Math.random() * 3) + 3, // 3-5 sets
+    reps: Math.floor(Math.random() * 8) + 8, // 8-15 reps
+    rest_time_seconds: (Math.floor(Math.random() * 3) + 1) * 30, // 30-90 seconds
+    gifUrl: exercise.gifUrl
+  };
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
