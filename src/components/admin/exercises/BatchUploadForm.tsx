@@ -31,7 +31,7 @@ export const BatchUploadForm = ({
   uploading,
 }: BatchUploadFormProps) => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB por arquivo
+  const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB por arquivo
 
   const validateFile = (file: File): boolean => {
     if (!file.type.includes('gif')) {
@@ -40,7 +40,7 @@ export const BatchUploadForm = ({
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      toast.error(`${file.name} é muito grande. O tamanho máximo é 5MB`);
+      toast.error(`${file.name} é muito grande. O tamanho máximo é 20MB`);
       return false;
     }
 
@@ -114,7 +114,7 @@ export const BatchUploadForm = ({
               className="mt-1"
             />
             <p className="text-sm text-gray-500 mt-1">
-              Selecione múltiplos arquivos GIF (máx. 5MB cada). Os nomes dos arquivos serão usados como nomes dos exercícios.
+              Selecione múltiplos arquivos GIF (máx. 20MB cada). Os nomes dos arquivos serão usados como nomes dos exercícios.
             </p>
           </div>
 
