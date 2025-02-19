@@ -1,17 +1,13 @@
 
-import * as React from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { WorkoutPreferences } from "./types";
-import { RefreshCw, Download, History, Target, Calendar, Activity } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { WorkoutLoadingState } from "./components/WorkoutLoadingState";
-import { WorkoutHistoryView } from "./components/WorkoutHistory";
+import { WorkoutPlan } from "./types/workout-plan";
 import { CurrentWorkoutPlan } from "./components/CurrentWorkoutPlan";
-import { generateWorkoutPDF } from "./utils/pdf-generator";
-import { WorkoutPlan, WorkoutHistory } from "./types/workout-plan";
+import { WorkoutHistory } from "./components/WorkoutHistory";
+import { WorkoutLoadingState } from "./components/WorkoutLoadingState";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface WorkoutPlanDisplayProps {
   preferences: WorkoutPreferences;
@@ -19,139 +15,78 @@ interface WorkoutPlanDisplayProps {
 }
 
 export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayProps) => {
-  const [showHistory, setShowHistory] = React.useState(false);
-  const isMobile = useIsMobile();
+  const [loading, setLoading] = useState(true);
+  const [workoutPlan, setWorkoutPlan] = useState<WorkoutPlan | null>(null);
 
-  const { data: currentPlan, isLoading: isPlanLoading } = useQuery({
-    queryKey: ['workout-plan', preferences],
-    queryFn: async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error("Usuário não autenticado");
+  useEffect(() => {
+    generateWorkoutPlan();
+  }, []);
 
-      const response = await supabase.functions.invoke('generate-workout-plan', {
-        body: { preferences, userId: userData.user.id }
+  const generateWorkoutPlan = async () => {
+    try {
+      setLoading(true);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Usuário não autenticado");
+        return;
+      }
+
+      console.log("Gerando plano de treino com preferências:", preferences);
+
+      const { data: response, error } = await supabase.functions.invoke('generate-workout-plan', {
+        body: {
+          preferences: {
+            ...preferences,
+            muscleGroup: preferences.exerciseTypes[0] // Usando o primeiro tipo como grupo muscular inicial
+          },
+          userId: user.id
+        }
       });
 
-      if (response.error) throw response.error;
-      return response.data as WorkoutPlan;
+      if (error) {
+        console.error("Erro ao gerar plano:", error);
+        throw error;
+      }
+
+      console.log("Plano gerado:", response);
+
+      if (!response) {
+        throw new Error("Nenhum plano foi gerado");
+      }
+
+      setWorkoutPlan(response);
+      toast.success("Plano de treino gerado com sucesso!");
+    } catch (error) {
+      console.error("Erro ao gerar plano:", error);
+      toast.error("Erro ao gerar plano de treino. Por favor, tente novamente.");
+    } finally {
+      setLoading(false);
     }
-  });
-
-  const { data: historyPlans, isLoading: isHistoryLoading, refetch: refetchHistory } = useQuery({
-    queryKey: ['workout-history'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('workout_plans')
-        .select(`
-          *,
-          workout_sessions (
-            *,
-            session_exercises (
-              *,
-              exercises (*)
-            )
-          )
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      return data as WorkoutHistory[];
-    },
-    enabled: showHistory
-  });
-
-  const handleGeneratePDF = () => {
-    if (!currentPlan) return;
-
-    // Converter WorkoutPlan para WorkoutHistory
-    const historyPlan: WorkoutHistory = {
-      id: currentPlan.id,
-      start_date: currentPlan.start_date,
-      end_date: currentPlan.end_date,
-      goal: currentPlan.goal,
-      workout_sessions: currentPlan.workout_sessions.map(session => ({
-        id: session.id,
-        day_number: session.day_number,
-        warmup_description: session.warmup_description,
-        cooldown_description: session.cooldown_description,
-        session_exercises: session.exercises.map(exercise => ({
-          id: Math.random().toString(), // Gerando ID temporário
-          exercises: {
-            name: exercise.name,
-            gif_url: exercise.gifUrl
-          },
-          sets: exercise.sets,
-          reps: exercise.reps,
-          rest_time_seconds: exercise.rest_time_seconds
-        }))
-      }))
-    };
-
-    generateWorkoutPDF(historyPlan);
   };
 
-  if (isPlanLoading) {
-    return <WorkoutLoadingState message="Gerando seu plano de treino personalizado..." />;
+  if (loading) {
+    return <WorkoutLoadingState />;
+  }
+
+  if (!workoutPlan) {
+    return (
+      <div className="text-center space-y-4">
+        <p className="text-red-600">Erro ao gerar o plano de treino.</p>
+        <Button onClick={onReset}>Tentar Novamente</Button>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-4 md:space-y-6">
-      <Card className="bg-white">
-        <CardContent className="p-6">
-          <div className={`flex ${isMobile ? 'flex-col space-y-3' : 'justify-between'} items-center`}>
-            <div className="flex items-center gap-2">
-              <Target className="w-6 h-6 text-primary-500" />
-              <h2 className="text-xl font-semibold">Seu Plano de Treino Personalizado</h2>
-            </div>
-            <div className={`flex ${isMobile ? 'w-full' : ''} gap-2 flex-wrap justify-end`}>
-              <Button 
-                variant="outline" 
-                onClick={() => setShowHistory(!showHistory)}
-                className={isMobile ? 'flex-1' : ''}
-              >
-                <History className="w-4 h-4 mr-2" />
-                {showHistory ? "Ocultar Histórico" : "Ver Histórico"}
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={handleGeneratePDF}
-                className={isMobile ? 'flex-1' : ''}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Baixar PDF
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={onReset}
-                className={isMobile ? 'flex-1' : ''}
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Refazer
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="bg-white">
-        {showHistory ? (
-          <WorkoutHistoryView 
-            isLoading={isHistoryLoading} 
-            historyPlans={historyPlans} 
-            onRefresh={() => refetchHistory()} 
-          />
-        ) : currentPlan ? (
-          <CurrentWorkoutPlan plan={currentPlan} />
-        ) : (
-          <Card>
-            <CardContent className="p-4 md:p-6">
-              <div className="flex items-center gap-2 text-gray-500">
-                <Activity className="w-5 h-5" />
-                <p>Nenhum plano de treino gerado ainda.</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+    <div className="space-y-8">
+      <CurrentWorkoutPlan plan={workoutPlan} />
+      <WorkoutHistory />
+      
+      <div className="flex justify-center">
+        <Button onClick={onReset} variant="outline">
+          Criar Novo Plano
+        </Button>
       </div>
     </div>
   );
