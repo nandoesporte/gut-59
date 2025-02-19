@@ -14,6 +14,8 @@ import { Progress } from "@/components/ui/progress";
 import { MuscleGroup } from "./types";
 import { categories } from "./categoryOptions";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { X } from "lucide-react";
 
 interface BatchUploadFormProps {
   onUpload: (file: File, category: MuscleGroup) => Promise<void>;
@@ -28,48 +30,56 @@ export const BatchUploadForm = ({
   onCategoryChange,
   uploading,
 }: BatchUploadFormProps) => {
-  const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB por arquivo
 
   const validateFile = (file: File): boolean => {
-    if (!file.type.includes('zip')) {
-      toast.error('Por favor, selecione um arquivo ZIP');
+    if (!file.type.includes('gif')) {
+      toast.error(`${file.name} não é um arquivo GIF`);
       return false;
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      toast.error('O arquivo é muito grande. O tamanho máximo é 50MB');
+      toast.error(`${file.name} é muito grande. O tamanho máximo é 5MB`);
       return false;
     }
 
     return true;
   };
 
-  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    
-    if (!file) {
-      return;
-    }
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    const validFiles = files.filter(validateFile);
+    setSelectedFiles(prev => [...prev, ...validFiles]);
+    event.target.value = ''; // Reset input
+  };
 
-    if (!validateFile(file)) {
-      event.target.value = '';
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUploadAll = async () => {
+    if (selectedFiles.length === 0) {
+      toast.error('Selecione pelo menos um arquivo para fazer upload');
       return;
     }
 
     try {
-      await onUpload(file, selectedCategory);
-      event.target.value = '';
+      for (const file of selectedFiles) {
+        await onUpload(file, selectedCategory);
+      }
+      setSelectedFiles([]); // Limpa a lista após upload bem sucedido
+      toast.success('Todos os arquivos foram enviados com sucesso!');
     } catch (error) {
       console.error('Erro no upload:', error);
-      toast.error('Erro ao fazer upload. Tente com um arquivo menor ou menos arquivos.');
-      event.target.value = '';
+      toast.error('Erro ao fazer upload dos arquivos. Tente novamente.');
     }
   };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Upload em Lote (ZIP)</CardTitle>
+        <CardTitle className="text-lg">Upload em Lote</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
@@ -93,25 +103,57 @@ export const BatchUploadForm = ({
           </div>
 
           <div>
-            <Label htmlFor="zipFile">Arquivo ZIP com GIFs</Label>
+            <Label htmlFor="files">Selecionar GIFs</Label>
             <Input
-              id="zipFile"
+              id="files"
               type="file"
-              accept=".zip"
-              onChange={handleUpload}
+              accept=".gif"
+              multiple
+              onChange={handleFileSelect}
               disabled={uploading}
               className="mt-1"
             />
             <p className="text-sm text-gray-500 mt-1">
-              Envie um arquivo ZIP (máx. 50MB) contendo apenas GIFs. Os nomes dos arquivos serão usados como nomes dos exercícios. Recomendamos enviar no máximo 5 arquivos por vez.
+              Selecione múltiplos arquivos GIF (máx. 5MB cada). Os nomes dos arquivos serão usados como nomes dos exercícios.
             </p>
           </div>
+
+          {selectedFiles.length > 0 && (
+            <div className="space-y-2">
+              <Label>Arquivos Selecionados ({selectedFiles.length})</Label>
+              <div className="max-h-40 overflow-y-auto space-y-2">
+                {selectedFiles.map((file, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-2 bg-gray-50 rounded-md"
+                  >
+                    <span className="truncate flex-1">{file.name}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeFile(index)}
+                      className="ml-2"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <Button
+                onClick={handleUploadAll}
+                disabled={uploading}
+                className="w-full mt-2"
+              >
+                {uploading ? 'Enviando...' : 'Enviar Todos'}
+              </Button>
+            </div>
+          )}
 
           {uploading && (
             <div className="space-y-2">
               <Progress value={100} className="w-full" />
               <p className="text-sm text-center text-gray-500">
-                Processando arquivos... Isso pode levar alguns minutos.
+                Processando arquivos... Por favor, aguarde.
               </p>
             </div>
           )}
