@@ -30,79 +30,104 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Ler e processar o arquivo ZIP
+    console.log('Iniciando processamento do arquivo ZIP')
     const arrayBuffer = await zipFile.arrayBuffer()
     const zip = new JSZip()
     await zip.loadAsync(arrayBuffer)
     
     const uploadedFiles = []
     const errors = []
+    let processedCount = 0
 
-    // Processar cada arquivo do ZIP
-    for (const [filename, file] of Object.entries(zip.files)) {
-      if (file.dir) continue // Pular diretórios
+    // Processar arquivos em lotes menores
+    const batchSize = 5
+    const files = Object.entries(zip.files).filter(([_, file]) => !file.dir)
+    
+    console.log(`Total de arquivos encontrados: ${files.length}`)
 
-      // Verificar se é um GIF
-      if (!filename.toLowerCase().endsWith('.gif')) {
-        errors.push(`${filename} não é um arquivo GIF`)
-        continue
-      }
+    for (let i = 0; i < files.length; i += batchSize) {
+      const batch = files.slice(i, i + batchSize)
+      console.log(`Processando lote ${i / batchSize + 1}`)
 
-      try {
-        const content = await file.async('blob')
-        const sanitizedName = filename.split('/').pop()?.replace(/[^a-zA-Z0-9.-]/g, '_')
-        const filePath = `${category}/${sanitizedName}`
+      const batchPromises = batch.map(async ([filename, file]) => {
+        if (!filename.toLowerCase().endsWith('.gif')) {
+          errors.push(`${filename} não é um arquivo GIF`)
+          return
+        }
 
-        // Upload do arquivo para o Supabase Storage
-        const { error: uploadError } = await supabase.storage
-          .from('exercise-gifs-by-category')
-          .upload(filePath, content, {
-            contentType: 'image/gif',
-            upsert: true
-          })
+        try {
+          const content = await file.async('blob')
+          const sanitizedName = filename.split('/').pop()?.replace(/[^a-zA-Z0-9.-]/g, '_')
+          const filePath = `${category}/${sanitizedName}`
 
-        if (uploadError) throw uploadError
+          console.log(`Fazendo upload de ${filePath}`)
+          const { error: uploadError } = await supabase.storage
+            .from('exercise-gifs-by-category')
+            .upload(filePath, content, {
+              contentType: 'image/gif',
+              upsert: true
+            })
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('exercise-gifs-by-category')
-          .getPublicUrl(filePath)
+          if (uploadError) throw uploadError
 
-        // Criar o exercício no banco de dados
-        const exerciseName = sanitizedName?.replace('.gif', '').replace(/_/g, ' ')
-        const { error: dbError } = await supabase
-          .from('exercises')
-          .insert({
-            name: exerciseName,
-            description: `Exercício ${exerciseName}`,
-            gif_url: publicUrl,
-            muscle_group: category as any,
-            exercise_type: category === 'cardio' ? 'cardio' : 
-                         category === 'mobility' ? 'mobility' : 'strength',
-            difficulty: 'beginner',
-            min_reps: 8,
-            max_reps: 12,
-            min_sets: 3,
-            max_sets: 5,
-            rest_time_seconds: 60
-          })
+          const { data: { publicUrl } } = supabase.storage
+            .from('exercise-gifs-by-category')
+            .getPublicUrl(filePath)
 
-        if (dbError) throw dbError
+          const exerciseName = sanitizedName?.replace('.gif', '').replace(/_/g, ' ')
+          const { error: dbError } = await supabase
+            .from('exercises')
+            .insert({
+              name: exerciseName,
+              description: `Exercício ${exerciseName}`,
+              gif_url: publicUrl,
+              muscle_group: category as any,
+              exercise_type: category === 'cardio' ? 'cardio' : 
+                           category === 'mobility' ? 'mobility' : 'strength',
+              difficulty: 'beginner',
+              min_reps: 8,
+              max_reps: 12,
+              min_sets: 3,
+              max_sets: 5,
+              rest_time_seconds: 60
+            })
 
-        uploadedFiles.push({ name: filename, url: publicUrl })
-      } catch (error) {
-        errors.push(`Erro ao processar ${filename}: ${error.message}`)
+          if (dbError) throw dbError
+
+          uploadedFiles.push({ name: filename, url: publicUrl })
+          processedCount++
+          console.log(`Arquivo ${filename} processado com sucesso`)
+        } catch (error) {
+          console.error(`Erro ao processar ${filename}:`, error)
+          errors.push(`Erro ao processar ${filename}: ${error.message}`)
+        }
+      })
+
+      // Aguardar o processamento do lote atual
+      await Promise.all(batchPromises)
+      console.log(`Lote ${i / batchSize + 1} concluído`)
+      
+      // Pequena pausa entre lotes para evitar sobrecarga
+      if (i + batchSize < files.length) {
+        await new Promise(resolve => setTimeout(resolve, 1000))
       }
     }
+
+    console.log('Processamento concluído')
+    console.log(`Total processado: ${processedCount} arquivos`)
+    console.log(`Erros encontrados: ${errors.length}`)
 
     return new Response(
       JSON.stringify({ 
         message: 'Processamento concluído', 
         uploaded: uploadedFiles,
-        errors: errors
+        errors: errors,
+        total: processedCount
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
+    console.error('Erro geral:', error)
     return new Response(
       JSON.stringify({ error: 'Erro ao processar arquivo ZIP', details: error.message }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }

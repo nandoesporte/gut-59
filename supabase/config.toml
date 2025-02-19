@@ -1,6 +1,5 @@
 
 project_id = "sxjafhzikftdenqnkcri"
 
-[functions.generate-meal-plan]
+[functions.process-exercise-gifs]
 verify_jwt = false
-
