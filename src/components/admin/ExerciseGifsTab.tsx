@@ -5,16 +5,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { UploadCloud, Trash2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
+type MuscleGroup = "chest" | "back" | "legs" | "shoulders" | "arms" | "core" | "full_body" | "cardio" | "mobility";
+type ExerciseType = "strength" | "cardio" | "mobility";
+type Difficulty = "beginner" | "intermediate" | "advanced";
+
 interface Exercise {
   id: string;
-  name: string;
-  description: string;
+  description: string | null;
   gif_url: string | null;
-  muscle_group: string;
+  muscle_group: MuscleGroup;
+  exercise_type: ExerciseType;
+  difficulty: Difficulty;
 }
 
 interface FileWithPreview extends File {
@@ -27,9 +33,10 @@ export const ExerciseGifsTab = () => {
   const [uploading, setUploading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<FileWithPreview[]>([]);
   const [newExercise, setNewExercise] = useState({
-    name: "",
     description: "",
-    muscle_group: ""
+    muscle_group: "chest" as MuscleGroup,
+    exercise_type: "strength" as ExerciseType,
+    difficulty: "beginner" as Difficulty
   });
 
   useEffect(() => {
@@ -41,7 +48,7 @@ export const ExerciseGifsTab = () => {
       const { data, error } = await supabase
         .from('exercises')
         .select('*')
-        .order('name');
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       setExercises(data || []);
@@ -54,14 +61,12 @@ export const ExerciseGifsTab = () => {
   };
 
   const validateFile = (file: File) => {
-    // Validar se é um GIF
     if (!file.type.includes('gif')) {
       toast.error(`${file.name} não é um arquivo GIF`);
       return false;
     }
 
-    // Validar tamanho (5MB)
-    const maxSize = 5 * 1024 * 1024; // 5MB em bytes
+    const maxSize = 5 * 1024 * 1024;
     if (file.size > maxSize) {
       toast.error(`${file.name} excede o tamanho máximo de 5MB`);
       return false;
@@ -84,10 +89,6 @@ export const ExerciseGifsTab = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newExercise.name || !newExercise.muscle_group) {
-      toast.error('Nome e grupo muscular são obrigatórios');
-      return;
-    }
 
     try {
       setUploading(true);
@@ -96,9 +97,10 @@ export const ExerciseGifsTab = () => {
       const { data: exerciseData, error: exerciseError } = await supabase
         .from('exercises')
         .insert({
-          name: newExercise.name,
           description: newExercise.description,
-          muscle_group: newExercise.muscle_group
+          muscle_group: newExercise.muscle_group,
+          exercise_type: newExercise.exercise_type,
+          difficulty: newExercise.difficulty
         })
         .select()
         .single();
@@ -131,7 +133,12 @@ export const ExerciseGifsTab = () => {
       }
 
       toast.success('Exercício criado com sucesso!');
-      setNewExercise({ name: "", description: "", muscle_group: "" });
+      setNewExercise({
+        description: "",
+        muscle_group: "chest",
+        exercise_type: "strength",
+        difficulty: "beginner"
+      });
       setSelectedFiles([]);
       fetchExercises();
     } catch (error) {
@@ -144,14 +151,12 @@ export const ExerciseGifsTab = () => {
 
   const removeGif = async (exerciseId: string, fileName: string) => {
     try {
-      // Remover arquivo do storage
       const { error: deleteError } = await supabase.storage
         .from('exercise-gifs')
         .remove([fileName]);
 
       if (deleteError) throw deleteError;
 
-      // Limpar URL do GIF no exercício
       const { error: updateError } = await supabase
         .from('exercises')
         .update({ gif_url: null })
@@ -179,24 +184,68 @@ export const ExerciseGifsTab = () => {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <Label htmlFor="name">Nome do Exercício</Label>
-                <Input
-                  id="name"
-                  value={newExercise.name}
-                  onChange={(e) => setNewExercise(prev => ({ ...prev, name: e.target.value }))}
-                  required
-                />
+                <Label htmlFor="exercise_type">Tipo de Exercício</Label>
+                <Select
+                  value={newExercise.exercise_type}
+                  onValueChange={(value: ExerciseType) => 
+                    setNewExercise(prev => ({ ...prev, exercise_type: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="strength">Força</SelectItem>
+                    <SelectItem value="cardio">Cardio</SelectItem>
+                    <SelectItem value="mobility">Mobilidade</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+
               <div>
                 <Label htmlFor="muscle_group">Grupo Muscular</Label>
-                <Input
-                  id="muscle_group"
+                <Select
                   value={newExercise.muscle_group}
-                  onChange={(e) => setNewExercise(prev => ({ ...prev, muscle_group: e.target.value }))}
-                  required
-                />
+                  onValueChange={(value: MuscleGroup) => 
+                    setNewExercise(prev => ({ ...prev, muscle_group: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o grupo muscular" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="chest">Peito</SelectItem>
+                    <SelectItem value="back">Costas</SelectItem>
+                    <SelectItem value="legs">Pernas</SelectItem>
+                    <SelectItem value="shoulders">Ombros</SelectItem>
+                    <SelectItem value="arms">Braços</SelectItem>
+                    <SelectItem value="core">Core</SelectItem>
+                    <SelectItem value="full_body">Corpo Inteiro</SelectItem>
+                    <SelectItem value="cardio">Cardio</SelectItem>
+                    <SelectItem value="mobility">Mobilidade</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="difficulty">Dificuldade</Label>
+                <Select
+                  value={newExercise.difficulty}
+                  onValueChange={(value: Difficulty) => 
+                    setNewExercise(prev => ({ ...prev, difficulty: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a dificuldade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="beginner">Iniciante</SelectItem>
+                    <SelectItem value="intermediate">Intermediário</SelectItem>
+                    <SelectItem value="advanced">Avançado</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             
@@ -257,10 +306,19 @@ export const ExerciseGifsTab = () => {
               <div key={exercise.id} className="border p-4 rounded-lg">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                   <div>
-                    <h3 className="font-medium">{exercise.name}</h3>
-                    <p className="text-sm text-gray-500">{exercise.muscle_group}</p>
+                    <div className="flex gap-2 items-center">
+                      <span className="px-2 py-1 text-xs rounded bg-primary/10 text-primary">
+                        {exercise.exercise_type}
+                      </span>
+                      <span className="px-2 py-1 text-xs rounded bg-secondary/10 text-secondary">
+                        {exercise.muscle_group}
+                      </span>
+                      <span className="px-2 py-1 text-xs rounded bg-muted text-muted-foreground">
+                        {exercise.difficulty}
+                      </span>
+                    </div>
                     {exercise.description && (
-                      <p className="text-sm mt-1">{exercise.description}</p>
+                      <p className="text-sm mt-2">{exercise.description}</p>
                     )}
                   </div>
                   
@@ -269,7 +327,7 @@ export const ExerciseGifsTab = () => {
                       <div className="flex items-center gap-2">
                         <img
                           src={exercise.gif_url}
-                          alt={exercise.name}
+                          alt="Demonstração do exercício"
                           className="w-16 h-16 object-cover rounded"
                         />
                         <Button
