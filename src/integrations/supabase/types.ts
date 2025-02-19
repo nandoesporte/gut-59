@@ -1341,6 +1341,10 @@ export type Database = {
         | "full_body"
         | "cardio"
         | "mobility"
+        | "weight_training"
+        | "stretching"
+        | "ball_exercises"
+        | "resistance_band"
       nutritional_goal: "lose_weight" | "maintain" | "gain_mass"
     }
     CompositeTypes: {
