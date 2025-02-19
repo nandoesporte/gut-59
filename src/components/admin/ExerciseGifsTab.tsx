@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,8 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { UploadCloud, Trash2, AlertCircle } from "lucide-react";
+import { UploadCloud, Trash2, AlertCircle, FileZip } from "lucide-react";
 import { toast } from "sonner";
+import { Progress } from "@/components/ui/progress";
 
 type MuscleGroup = "chest" | "back" | "legs" | "shoulders" | "arms" | "core" | "full_body" | "cardio" | "mobility";
 type ExerciseType = "strength" | "cardio" | "mobility";
@@ -16,6 +16,7 @@ type Difficulty = "beginner" | "intermediate" | "advanced";
 
 interface Exercise {
   id: string;
+  name: string;
   description: string | null;
   gif_url: string | null;
   muscle_group: MuscleGroup;
@@ -185,6 +186,49 @@ export const ExerciseGifsTab = () => {
     }
   };
 
+  const handleBatchUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !file.type.includes('zip')) {
+      toast.error('Por favor, selecione um arquivo ZIP');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('category', newExercise.muscle_group);
+
+    try {
+      setUploading(true);
+      const response = await fetch('https://sxjafhzikftdenqnkcri.supabase.co/functions/v1/process-exercise-gifs', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Authorization': `Bearer ${supabase.auth.session()?.access_token}`
+        }
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao processar arquivos');
+      }
+
+      if (result.errors.length > 0) {
+        toast.warning(`Upload concluído com alguns erros: ${result.errors.join(', ')}`);
+      } else {
+        toast.success('Upload em lote concluído com sucesso!');
+      }
+
+      fetchExercises();
+    } catch (error) {
+      toast.error('Erro ao fazer upload em lote');
+      console.error('Error:', error);
+    } finally {
+      setUploading(false);
+      event.target.value = '';
+    }
+  };
+
   if (loading) {
     return <div className="flex justify-center p-8">Carregando...</div>;
   }
@@ -196,126 +240,191 @@ export const ExerciseGifsTab = () => {
           <CardTitle>Adicionar Novo Exercício</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <Label htmlFor="name">Nome do Exercício</Label>
-              <Input
-                id="name"
-                value={newExercise.name}
-                onChange={(e) => setNewExercise(prev => ({ ...prev, name: e.target.value }))}
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="exercise_type">Tipo de Exercício</Label>
-                <Select
-                  value={newExercise.exercise_type}
-                  onValueChange={(value: ExerciseType) => 
-                    setNewExercise(prev => ({ ...prev, exercise_type: value }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="strength">Força</SelectItem>
-                    <SelectItem value="cardio">Cardio</SelectItem>
-                    <SelectItem value="mobility">Mobilidade</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="muscle_group">Grupo Muscular</Label>
-                <Select
-                  value={newExercise.muscle_group}
-                  onValueChange={(value: MuscleGroup) => 
-                    setNewExercise(prev => ({ ...prev, muscle_group: value }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o grupo muscular" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="chest">Peito</SelectItem>
-                    <SelectItem value="back">Costas</SelectItem>
-                    <SelectItem value="legs">Pernas</SelectItem>
-                    <SelectItem value="shoulders">Ombros</SelectItem>
-                    <SelectItem value="arms">Braços</SelectItem>
-                    <SelectItem value="core">Core</SelectItem>
-                    <SelectItem value="full_body">Corpo Inteiro</SelectItem>
-                    <SelectItem value="cardio">Cardio</SelectItem>
-                    <SelectItem value="mobility">Mobilidade</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="difficulty">Dificuldade</Label>
-                <Select
-                  value={newExercise.difficulty}
-                  onValueChange={(value: Difficulty) => 
-                    setNewExercise(prev => ({ ...prev, difficulty: value }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a dificuldade" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="beginner">Iniciante</SelectItem>
-                    <SelectItem value="intermediate">Intermediário</SelectItem>
-                    <SelectItem value="advanced">Avançado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
-            <div>
-              <Label htmlFor="description">Descrição</Label>
-              <Textarea
-                id="description"
-                value={newExercise.description}
-                onChange={(e) => setNewExercise(prev => ({ ...prev, description: e.target.value }))}
-                className="min-h-[100px]"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="gif">GIF do Exercício (Max: 5MB)</Label>
-              <Input
-                id="gif"
-                type="file"
-                accept=".gif"
-                onChange={handleFileSelect}
-                className="mt-1"
-              />
-              {selectedFiles.length > 0 && (
-                <div className="mt-2 flex gap-2">
-                  {selectedFiles.map((file) => (
-                    <img
-                      key={file.name}
-                      src={file.preview}
-                      alt="Preview"
-                      className="w-20 h-20 object-cover rounded border"
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Upload Individual</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <Label htmlFor="name">Nome do Exercício</Label>
+                    <Input
+                      id="name"
+                      value={newExercise.name}
+                      onChange={(e) => setNewExercise(prev => ({ ...prev, name: e.target.value }))}
+                      required
                     />
-                  ))}
-                </div>
-              )}
-            </div>
+                  </div>
 
-            <Button type="submit" disabled={uploading}>
-              {uploading ? (
-                <>Salvando...</>
-              ) : (
-                <>
-                  <UploadCloud className="w-4 h-4 mr-2" />
-                  Salvar Exercício
-                </>
-              )}
-            </Button>
-          </form>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="exercise_type">Tipo de Exercício</Label>
+                      <Select
+                        value={newExercise.exercise_type}
+                        onValueChange={(value: ExerciseType) => 
+                          setNewExercise(prev => ({ ...prev, exercise_type: value }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o tipo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="strength">Força</SelectItem>
+                          <SelectItem value="cardio">Cardio</SelectItem>
+                          <SelectItem value="mobility">Mobilidade</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="muscle_group">Grupo Muscular</Label>
+                      <Select
+                        value={newExercise.muscle_group}
+                        onValueChange={(value: MuscleGroup) => 
+                          setNewExercise(prev => ({ ...prev, muscle_group: value }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o grupo muscular" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="chest">Peito</SelectItem>
+                          <SelectItem value="back">Costas</SelectItem>
+                          <SelectItem value="legs">Pernas</SelectItem>
+                          <SelectItem value="shoulders">Ombros</SelectItem>
+                          <SelectItem value="arms">Braços</SelectItem>
+                          <SelectItem value="core">Core</SelectItem>
+                          <SelectItem value="full_body">Corpo Inteiro</SelectItem>
+                          <SelectItem value="cardio">Cardio</SelectItem>
+                          <SelectItem value="mobility">Mobilidade</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="difficulty">Dificuldade</Label>
+                      <Select
+                        value={newExercise.difficulty}
+                        onValueChange={(value: Difficulty) => 
+                          setNewExercise(prev => ({ ...prev, difficulty: value }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a dificuldade" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="beginner">Iniciante</SelectItem>
+                          <SelectItem value="intermediate">Intermediário</SelectItem>
+                          <SelectItem value="advanced">Avançado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="description">Descrição</Label>
+                    <Textarea
+                      id="description"
+                      value={newExercise.description}
+                      onChange={(e) => setNewExercise(prev => ({ ...prev, description: e.target.value }))}
+                      className="min-h-[100px]"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="gif">GIF do Exercício (Max: 5MB)</Label>
+                    <Input
+                      id="gif"
+                      type="file"
+                      accept=".gif"
+                      onChange={handleFileSelect}
+                      className="mt-1"
+                    />
+                    {selectedFiles.length > 0 && (
+                      <div className="mt-2 flex gap-2">
+                        {selectedFiles.map((file) => (
+                          <img
+                            key={file.name}
+                            src={file.preview}
+                            alt="Preview"
+                            className="w-20 h-20 object-cover rounded border"
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <Button type="submit" disabled={uploading}>
+                    {uploading ? (
+                      <>Salvando...</>
+                    ) : (
+                      <>
+                        <UploadCloud className="w-4 h-4 mr-2" />
+                        Salvar Exercício
+                      </>
+                    )}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Upload em Lote (ZIP)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <Label>Categoria dos Exercícios</Label>
+                    <Select
+                      value={newExercise.muscle_group}
+                      onValueChange={(value: MuscleGroup) => 
+                        setNewExercise(prev => ({ ...prev, muscle_group: value }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a categoria" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="chest">Peito</SelectItem>
+                        <SelectItem value="back">Costas</SelectItem>
+                        <SelectItem value="legs">Pernas</SelectItem>
+                        <SelectItem value="shoulders">Ombros</SelectItem>
+                        <SelectItem value="arms">Braços</SelectItem>
+                        <SelectItem value="core">Core</SelectItem>
+                        <SelectItem value="full_body">Corpo Inteiro</SelectItem>
+                        <SelectItem value="cardio">Cardio</SelectItem>
+                        <SelectItem value="mobility">Mobilidade</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="zipFile">Arquivo ZIP com GIFs</Label>
+                    <Input
+                      id="zipFile"
+                      type="file"
+                      accept=".zip"
+                      onChange={handleBatchUpload}
+                      disabled={uploading}
+                      className="mt-1"
+                    />
+                    <p className="text-sm text-gray-500 mt-1">
+                      Envie um arquivo ZIP contendo apenas GIFs. Os nomes dos arquivos serão usados como nomes dos exercícios.
+                    </p>
+                  </div>
+
+                  {uploading && (
+                    <div className="space-y-2">
+                      <Progress value={100} className="w-full" />
+                      <p className="text-sm text-center text-gray-500">Processando arquivos...</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </CardContent>
       </Card>
 
