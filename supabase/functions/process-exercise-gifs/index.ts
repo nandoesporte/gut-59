@@ -44,14 +44,16 @@ serve(async (req) => {
     const errors = []
     let processedCount = 0
 
-    // Obter lista de arquivos do ZIP
-    const files = Object.values(zip.files).filter(file => !file.dir)
-    console.log(`Total de arquivos no ZIP: ${files.length}`);
+    console.log('Listando arquivos no ZIP...');
+    // Listar todos os arquivos no ZIP
+    for (const [filename, file] of Object.entries(zip.files)) {
+      console.log(`Encontrado arquivo: ${filename}`);
+      
+      if (file.dir) {
+        console.log(`${filename} é um diretório, pulando...`);
+        continue;
+      }
 
-    for (const file of files) {
-      const filename = file.name
-      console.log(`\nProcessando arquivo: ${filename}`);
-        
       if (!filename.toLowerCase().endsWith('.gif')) {
         console.log(`${filename} ignorado: não é um arquivo GIF`);
         errors.push(`${filename} não é um arquivo GIF`);
@@ -59,6 +61,7 @@ serve(async (req) => {
       }
 
       try {
+        console.log(`\nProcessando arquivo: ${filename}`);
         console.log('Convertendo arquivo para Blob...');
         const content = await file.async('blob')
         const sanitizedName = filename.split('/').pop()?.replace(/[^a-zA-Z0-9.-]/g, '_')
