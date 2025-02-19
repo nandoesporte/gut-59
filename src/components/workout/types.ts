@@ -18,3 +18,4 @@ export interface WorkoutPreferences {
 
 export type ActivityLevel = "sedentary" | "light" | "moderate" | "intense";
 export type ExerciseType = "strength" | "cardio" | "mobility";
+export type TrainingLocation = "gym" | "home" | "outdoors" | "no_equipment";

@@ -22,7 +22,7 @@ const formSchema = z.object({
   goal: z.enum(["lose_weight", "maintain", "gain_mass"]),
   activityLevel: z.enum(["sedentary", "light", "moderate", "intense"]),
   preferredExerciseTypes: z.array(z.enum(["strength", "cardio", "mobility"])).min(1),
-  trainingLocation: z.enum(["home", "gym"]),
+  trainingLocation: z.enum(["gym", "home", "outdoors", "no_equipment"]),
 });
 
 type FormSchema = z.infer<typeof formSchema>;
@@ -41,7 +41,7 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
       gender: "male",
       goal: "maintain",
       activityLevel: "moderate",
-      preferredExerciseTypes: ["strength"],
+      preferredExerciseTypes: [],
       trainingLocation: "gym",
     },
   });
@@ -63,9 +63,13 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
       equipment: [],
       availableEquipment: data.trainingLocation === "gym" 
         ? ["all"] 
-        : ["bodyweight", "resistance-bands"],
+        : data.trainingLocation === "home"
+        ? ["bodyweight", "resistance-bands", "dumbbells"]
+        : data.trainingLocation === "outdoors"
+        ? ["bodyweight", "resistance-bands"]
+        : ["bodyweight"],
     };
-    console.log("Enviando preferências:", workoutPreferences);
+    console.log("Enviando preferências para geração de plano:", workoutPreferences);
     onSubmit(workoutPreferences);
   };
 
@@ -84,7 +88,11 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
             <ExerciseTypesField form={form} />
             <TrainingLocationField form={form} />
             
-            <Button type="submit" className="w-full">
+            <Button 
+              type="submit" 
+              className="w-full"
+              disabled={!form.formState.isValid}
+            >
               Gerar Plano de Treino
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
