@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,13 +6,15 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { UploadCloud, Trash2, AlertCircle, Archive } from "lucide-react";
+import { UploadCloud, Trash2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
+import { Database } from "@/integrations/supabase/types";
 
-type MuscleGroup = "chest" | "back" | "legs" | "shoulders" | "arms" | "core" | "full_body" | "cardio" | "mobility" | "weight_training" | "stretching" | "ball_exercises" | "resistance_band";
-type ExerciseType = "strength" | "cardio" | "mobility";
-type Difficulty = "beginner" | "intermediate" | "advanced";
+type DbExercise = Database['public']['Tables']['exercises']['Row'];
+type MuscleGroup = DbExercise['muscle_group'];
+type ExerciseType = DbExercise['exercise_type'];
+type Difficulty = DbExercise['difficulty'];
 
 interface Exercise {
   id: string;
@@ -101,33 +102,33 @@ export const ExerciseGifsTab = () => {
     try {
       setUploading(true);
 
-      // Criar o exercício primeiro
-      const { data: exerciseData, error: exerciseError } = await supabase
+      const exerciseData = {
+        name: newExercise.name,
+        description: newExercise.description || null,
+        muscle_group: newExercise.muscle_group,
+        exercise_type: newExercise.exercise_type,
+        difficulty: newExercise.difficulty,
+        min_reps: 8,
+        max_reps: 12,
+        min_sets: 3,
+        max_sets: 5,
+        rest_time_seconds: 60,
+        alternative_exercises: [],
+        equipment_needed: []
+      };
+
+      const { data, error: exerciseError } = await supabase
         .from('exercises')
-        .insert({
-          name: newExercise.name,
-          description: newExercise.description || null,
-          muscle_group: newExercise.muscle_group,
-          exercise_type: newExercise.exercise_type,
-          difficulty: newExercise.difficulty,
-          min_reps: 8,
-          max_reps: 12,
-          min_sets: 3,
-          max_sets: 5,
-          rest_time_seconds: 60,
-          alternative_exercises: [],
-          equipment_needed: []
-        })
+        .insert(exerciseData)
         .select()
         .single();
 
       if (exerciseError) throw exerciseError;
 
-      // Se houver arquivo selecionado, fazer upload
-      if (selectedFiles.length > 0) {
+      if (selectedFiles.length > 0 && data) {
         const file = selectedFiles[0];
         const fileExt = file.name.split('.').pop();
-        const fileName = `${exerciseData.id}.${fileExt}`;
+        const fileName = `${data.id}.${fileExt}`;
 
         const { error: uploadError } = await supabase.storage
           .from('exercise-gifs')
@@ -139,11 +140,10 @@ export const ExerciseGifsTab = () => {
           .from('exercise-gifs')
           .getPublicUrl(fileName);
 
-        // Atualizar o exercício com a URL do GIF
         const { error: updateError } = await supabase
           .from('exercises')
           .update({ gif_url: publicUrl })
-          .eq('id', exerciseData.id);
+          .eq('id', data.id);
 
         if (updateError) throw updateError;
       }
@@ -253,7 +253,7 @@ export const ExerciseGifsTab = () => {
       { value: "full_body", label: "Corpo Inteiro" },
       { value: "cardio", label: "Cardio" },
       { value: "mobility", label: "Mobilidade" },
-    ];
+    ] as const;
 
     return categories.map(category => (
       <SelectItem key={category.value} value={category.value}>
