@@ -1,7 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
-import { JSZip } from 'https://deno.land/x/jszip@0.11.0/mod.ts'
+import * as JSZip from 'https://deno.land/x/jszip@0.11.0/mod.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -37,18 +37,18 @@ serve(async (req) => {
 
     console.log('Carregando arquivo ZIP...');
     const arrayBuffer = await zipFile.arrayBuffer()
-    const zip = new JSZip()
-    const loadedZip = await zip.loadAsync(arrayBuffer)
+    const zip = await JSZip.loadAsync(arrayBuffer)
     
     const uploadedFiles = []
     const errors = []
     let processedCount = 0
 
     // Obter lista de arquivos do ZIP
-    const files = Object.entries(loadedZip.files).filter(([_, file]) => !file.dir)
+    const files = Object.values(zip.files).filter(file => !file.dir)
     console.log(`Total de arquivos no ZIP: ${files.length}`);
 
-    for (const [filename, file] of files) {
+    for (const file of files) {
+      const filename = file.name
       console.log(`\nProcessando arquivo: ${filename}`);
         
       if (!filename.toLowerCase().endsWith('.gif')) {
