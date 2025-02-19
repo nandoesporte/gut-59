@@ -58,13 +58,14 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
       trainingLocation: data.trainingLocation,
       frequency: 3,
       duration: 60,
-      muscleGroup: "full_body",
+      muscleGroup: "full_body" as const,
       experienceLevel: "beginner",
       equipment: [],
       availableEquipment: data.trainingLocation === "gym" 
         ? ["all"] 
         : ["bodyweight", "resistance-bands"],
     };
+    console.log("Enviando preferências:", workoutPreferences);
     onSubmit(workoutPreferences);
   };
 
