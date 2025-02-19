@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +10,7 @@ import { UploadCloud, Trash2, AlertCircle, Archive } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 
-type MuscleGroup = "chest" | "back" | "legs" | "shoulders" | "arms" | "core" | "full_body" | "cardio" | "mobility";
+type MuscleGroup = "chest" | "back" | "legs" | "shoulders" | "arms" | "core" | "full_body" | "cardio" | "mobility" | "weight_training" | "stretching" | "ball_exercises" | "resistance_band";
 type ExerciseType = "strength" | "cardio" | "mobility";
 type Difficulty = "beginner" | "intermediate" | "advanced";
 
@@ -236,6 +235,30 @@ export const ExerciseGifsTab = () => {
     }
   };
 
+  const renderCategorySelectItems = () => {
+    const categories = [
+      { value: "weight_training", label: "Musculação" },
+      { value: "stretching", label: "Alongamento" },
+      { value: "ball_exercises", label: "Exercícios com Bola" },
+      { value: "resistance_band", label: "Exercícios com Elástico" },
+      { value: "chest", label: "Peito" },
+      { value: "back", label: "Costas" },
+      { value: "legs", label: "Pernas" },
+      { value: "shoulders", label: "Ombros" },
+      { value: "arms", label: "Braços" },
+      { value: "core", label: "Core" },
+      { value: "full_body", label: "Corpo Inteiro" },
+      { value: "cardio", label: "Cardio" },
+      { value: "mobility", label: "Mobilidade" },
+    ];
+
+    return categories.map(category => (
+      <SelectItem key={category.value} value={category.value}>
+        {category.label}
+      </SelectItem>
+    ));
+  };
+
   if (loading) {
     return <div className="flex justify-center p-8">Carregando...</div>;
   }
@@ -296,15 +319,7 @@ export const ExerciseGifsTab = () => {
                           <SelectValue placeholder="Selecione o grupo muscular" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="chest">Peito</SelectItem>
-                          <SelectItem value="back">Costas</SelectItem>
-                          <SelectItem value="legs">Pernas</SelectItem>
-                          <SelectItem value="shoulders">Ombros</SelectItem>
-                          <SelectItem value="arms">Braços</SelectItem>
-                          <SelectItem value="core">Core</SelectItem>
-                          <SelectItem value="full_body">Corpo Inteiro</SelectItem>
-                          <SelectItem value="cardio">Cardio</SelectItem>
-                          <SelectItem value="mobility">Mobilidade</SelectItem>
+                          {renderCategorySelectItems()}
                         </SelectContent>
                       </Select>
                     </div>
@@ -394,15 +409,7 @@ export const ExerciseGifsTab = () => {
                         <SelectValue placeholder="Selecione a categoria" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="chest">Peito</SelectItem>
-                        <SelectItem value="back">Costas</SelectItem>
-                        <SelectItem value="legs">Pernas</SelectItem>
-                        <SelectItem value="shoulders">Ombros</SelectItem>
-                        <SelectItem value="arms">Braços</SelectItem>
-                        <SelectItem value="core">Core</SelectItem>
-                        <SelectItem value="full_body">Corpo Inteiro</SelectItem>
-                        <SelectItem value="cardio">Cardio</SelectItem>
-                        <SelectItem value="mobility">Mobilidade</SelectItem>
+                        {renderCategorySelectItems()}
                       </SelectContent>
                     </Select>
                   </div>
