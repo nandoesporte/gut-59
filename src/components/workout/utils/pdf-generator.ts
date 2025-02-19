@@ -39,9 +39,9 @@ export const generateWorkoutPDF = (plan: WorkoutHistory) => {
     doc.text("Exercícios:", 20, yPos);
     yPos += 10;
     
-    session.session_exercises?.forEach((exercise) => {
+    session.exercises.forEach((exercise) => {
       doc.setFontSize(10);
-      doc.text(`• ${exercise.exercises.name}`, 25, yPos);
+      doc.text(`• ${exercise.name}`, 25, yPos);
       yPos += 5;
       doc.text(`  ${exercise.sets} séries x ${exercise.reps} repetições`, 25, yPos);
       yPos += 5;
