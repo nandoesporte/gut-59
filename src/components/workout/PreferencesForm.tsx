@@ -14,7 +14,6 @@ import { TrainingLocationField } from "./components/TrainingLocationField";
 import { WorkoutPreferences } from "./types";
 import { Clipboard, ArrowRight } from "lucide-react";
 
-// Schema atualizado para tornar todos os campos obrigatórios
 const formSchema = z.object({
   age: z.number().min(16).max(100),
   weight: z.number().min(30).max(200),
@@ -48,16 +47,13 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
   });
 
   const handleSubmit = (data: FormSchema) => {
-    // Garantindo que todos os campos estejam presentes
     const workoutPreferences: WorkoutPreferences = {
-      age: data.age,
-      weight: data.weight,
-      height: data.height,
-      gender: data.gender,
-      goal: data.goal,
-      activityLevel: data.activityLevel,
-      preferredExerciseTypes: data.preferredExerciseTypes,
-      trainingLocation: data.trainingLocation,
+      ...data,
+      frequency: 3,
+      duration: 60,
+      muscleGroup: "full_body",
+      experienceLevel: "beginner",
+      equipment: [],
       availableEquipment: data.trainingLocation === "gym" 
         ? ["all"] 
         : ["bodyweight", "resistance-bands"],

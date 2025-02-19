@@ -13,6 +13,7 @@ export interface WorkoutPreferences {
   equipment: string[];
   trainingLocation: string;
   preferredExerciseTypes: ExerciseType[];
+  availableEquipment: string[];
 }
 
 export type ActivityLevel = "sedentary" | "light" | "moderate" | "intense";
