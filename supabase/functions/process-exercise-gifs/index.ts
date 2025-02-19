@@ -26,21 +26,11 @@ serve(async (req) => {
       )
     }
 
+    console.log('Criando cliente Supabase');
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
-
-    // Verificar se o bucket existe, se não existir, criar
-    const { data: buckets } = await supabase.storage.listBuckets()
-    if (!buckets?.find(b => b.name === 'exercise-gifs')) {
-      const { error } = await supabase.storage.createBucket('exercise-gifs', {
-        public: true
-      })
-      if (error) {
-        throw new Error(`Erro ao criar bucket: ${error.message}`)
-      }
-    }
 
     const arrayBuffer = await zipFile.arrayBuffer()
     const zip = new JSZip()
@@ -50,97 +40,95 @@ serve(async (req) => {
     const errors = []
     let processedCount = 0
 
-    // Processar apenas 5 arquivos por vez
-    const batchSize = 2 
     const files = Object.entries(zip.files).filter(([_, file]) => !file.dir)
-    
     console.log(`Total de arquivos encontrados: ${files.length}`)
 
-    for (let i = 0; i < files.length; i += batchSize) {
-      console.log(`Processando lote ${Math.floor(i / batchSize) + 1} de ${Math.ceil(files.length / batchSize)}`);
-      
-      const batch = files.slice(i, i + batchSize)
-      
-      // Adicionar delay entre lotes
-      if (i > 0) {
-        console.log('Aguardando 3 segundos antes do próximo lote...');
-        await new Promise(resolve => setTimeout(resolve, 3000));
+    for (let i = 0; i < files.length; i++) {
+      const [filename, file] = files[i]
+      console.log(`Processando arquivo ${i + 1}/${files.length}: ${filename}`);
+        
+      if (!filename.toLowerCase().endsWith('.gif')) {
+        console.log(`${filename} ignorado: não é um arquivo GIF`);
+        errors.push(`${filename} não é um arquivo GIF`);
+        continue;
       }
 
-      for (const [filename, file] of batch) {
-        console.log(`Processando arquivo: ${filename}`);
+      try {
+        const content = await file.async('blob')
+        const sanitizedName = filename.split('/').pop()?.replace(/[^a-zA-Z0-9.-]/g, '_')
+        const exerciseName = sanitizedName?.replace('.gif', '').replace(/_/g, ' ')
         
-        if (!filename.toLowerCase().endsWith('.gif')) {
-          console.log(`${filename} ignorado: não é um arquivo GIF`);
-          errors.push(`${filename} não é um arquivo GIF`);
-          continue;
-        }
-
-        try {
-          const content = await file.async('blob')
-          const sanitizedName = filename.split('/').pop()?.replace(/[^a-zA-Z0-9.-]/g, '_')
-          const exerciseName = sanitizedName?.replace('.gif', '').replace(/_/g, ' ')
-          
-          console.log(`Fazendo upload de ${filename} para a categoria ${category}`);
-          
-          // Upload do arquivo para o storage
-          const filePath = `${category}/${sanitizedName}`
-          const { error: uploadError } = await supabase.storage
-            .from('exercise-gifs')
-            .upload(filePath, content, {
-              contentType: 'image/gif',
-              upsert: true
-            })
-
-          if (uploadError) {
-            console.error(`Erro no upload do arquivo ${filename}:`, uploadError);
-            throw uploadError;
-          }
-
-          const { data: { publicUrl } } = supabase.storage
-            .from('exercise-gifs')
-            .getPublicUrl(filePath)
-
-          // Criar registro do exercício no banco
-          console.log(`Criando registro para exercício: ${exerciseName}`);
-          const { data: exerciseData, error: dbError } = await supabase
-            .from('exercises')
-            .insert({
-              name: exerciseName,
-              description: `Exercício ${exerciseName}`,
-              gif_url: publicUrl,
-              muscle_group: category,
-              exercise_type: category === 'cardio' ? 'cardio' : 
-                           category === 'mobility' ? 'mobility' : 'strength',
-              difficulty: 'beginner',
-              min_reps: 8,
-              max_reps: 12,
-              min_sets: 3,
-              max_sets: 5,
-              rest_time_seconds: 60,
-              alternative_exercises: [],
-              equipment_needed: []
-            })
-            .select()
-            .single()
-
-          if (dbError) {
-            console.error(`Erro ao criar registro para ${filename}:`, dbError);
-            throw dbError;
-          }
-
-          uploadedFiles.push({ 
-            name: filename, 
-            url: publicUrl,
-            exercise: exerciseData 
+        console.log(`Fazendo upload de ${filename} para a categoria ${category}`);
+        
+        // Upload do arquivo para o storage
+        const filePath = `${category}/${sanitizedName}`
+        console.log('Iniciando upload do arquivo:', filePath);
+        
+        const { error: uploadError } = await supabase.storage
+          .from('exercise-gifs')
+          .upload(filePath, content, {
+            contentType: 'image/gif',
+            upsert: true
           })
-          processedCount++
-          console.log(`Arquivo ${filename} processado com sucesso`);
-          
-        } catch (error) {
-          console.error(`Erro ao processar ${filename}:`, error);
-          errors.push(`Erro ao processar ${filename}: ${error.message}`);
+
+        if (uploadError) {
+          console.error(`Erro no upload do arquivo ${filename}:`, uploadError);
+          throw uploadError;
         }
+
+        console.log('Upload concluído, obtendo URL pública');
+        const { data: { publicUrl } } = supabase.storage
+          .from('exercise-gifs')
+          .getPublicUrl(filePath)
+
+        // Criar registro do exercício no banco
+        console.log(`Criando registro para exercício: ${exerciseName}`);
+        
+        const exerciseData = {
+          name: exerciseName,
+          description: `Exercício ${exerciseName}`,
+          gif_url: publicUrl,
+          muscle_group: category,
+          exercise_type: category === 'cardio' ? 'cardio' : 
+                        category === 'mobility' ? 'mobility' : 'strength',
+          difficulty: 'beginner',
+          min_reps: 8,
+          max_reps: 12,
+          min_sets: 3,
+          max_sets: 5,
+          rest_time_seconds: 60,
+          alternative_exercises: [],
+          equipment_needed: []
+        }
+
+        console.log('Dados do exercício:', exerciseData);
+        
+        const { data: insertedExercise, error: dbError } = await supabase
+          .from('exercises')
+          .insert(exerciseData)
+          .select()
+          .single()
+
+        if (dbError) {
+          console.error(`Erro ao criar registro para ${filename}:`, dbError);
+          throw dbError;
+        }
+
+        console.log('Exercício salvo com sucesso:', insertedExercise);
+
+        uploadedFiles.push({ 
+          name: filename, 
+          url: publicUrl,
+          exercise: insertedExercise
+        })
+        processedCount++
+        
+        // Pequeno delay entre processamentos
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+      } catch (error) {
+        console.error(`Erro ao processar ${filename}:`, error);
+        errors.push(`Erro ao processar ${filename}: ${error.message}`);
       }
     }
 

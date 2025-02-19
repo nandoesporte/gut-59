@@ -58,12 +58,12 @@ export const BatchUploadForm = ({
 
     try {
       await onUpload(file, selectedCategory);
+      event.target.value = '';
     } catch (error) {
       console.error('Erro no upload:', error);
       toast.error('Erro ao fazer upload. Tente com um arquivo menor ou menos arquivos.');
+      event.target.value = '';
     }
-    
-    event.target.value = '';
   };
 
   return (
@@ -103,7 +103,7 @@ export const BatchUploadForm = ({
               className="mt-1"
             />
             <p className="text-sm text-gray-500 mt-1">
-              Envie um arquivo ZIP (máx. 50MB) contendo apenas GIFs. Os nomes dos arquivos serão usados como nomes dos exercícios. Recomendamos enviar no máximo 10 arquivos por vez.
+              Envie um arquivo ZIP (máx. 50MB) contendo apenas GIFs. Os nomes dos arquivos serão usados como nomes dos exercícios. Recomendamos enviar no máximo 5 arquivos por vez.
             </p>
           </div>
 
@@ -120,4 +120,3 @@ export const BatchUploadForm = ({
     </Card>
   );
 };
-
