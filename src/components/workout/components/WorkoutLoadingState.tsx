@@ -2,7 +2,11 @@
 import { Card } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 
-export const WorkoutLoadingState = ({ message }: { message: string }) => {
+interface WorkoutLoadingStateProps {
+  message: string;
+}
+
+export const WorkoutLoadingState = ({ message }: WorkoutLoadingStateProps) => {
   return (
     <Card className="p-4 md:p-6">
       <div className="flex flex-col items-center justify-center space-y-4">

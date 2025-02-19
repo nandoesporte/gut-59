@@ -65,7 +65,7 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
   };
 
   if (loading) {
-    return <WorkoutLoadingState />;
+    return <WorkoutLoadingState message="Gerando seu plano de treino..." />;
   }
 
   if (!workoutPlan) {

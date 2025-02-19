@@ -23,3 +23,16 @@ export interface WorkoutPlan {
   end_date: string;
   workout_sessions: WorkoutSession[];
 }
+
+export interface WorkoutHistory extends WorkoutPlan {
+  session_exercises?: Array<{
+    id: string;
+    exercises: {
+      name: string;
+      gif_url?: string;
+    };
+    sets: number;
+    reps: number;
+    rest_time_seconds: number;
+  }>;
+}
