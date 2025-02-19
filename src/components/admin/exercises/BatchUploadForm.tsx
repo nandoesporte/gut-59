@@ -13,6 +13,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { MuscleGroup } from "./types";
 import { categories } from "./categoryOptions";
+import { toast } from "sonner";
 
 interface BatchUploadFormProps {
   onUpload: (file: File, category: MuscleGroup) => Promise<void>;
@@ -27,12 +28,41 @@ export const BatchUploadForm = ({
   onCategoryChange,
   uploading,
 }: BatchUploadFormProps) => {
+  const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+
+  const validateFile = (file: File): boolean => {
+    if (!file.type.includes('zip')) {
+      toast.error('Por favor, selecione um arquivo ZIP');
+      return false;
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error('O arquivo é muito grande. O tamanho máximo é 50MB');
+      return false;
+    }
+
+    return true;
+  };
+
   const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !file.type.includes('zip')) {
-      throw new Error('Por favor, selecione um arquivo ZIP');
+    
+    if (!file) {
+      return;
     }
-    await onUpload(file, selectedCategory);
+
+    if (!validateFile(file)) {
+      event.target.value = '';
+      return;
+    }
+
+    try {
+      await onUpload(file, selectedCategory);
+    } catch (error) {
+      console.error('Erro no upload:', error);
+      toast.error('Erro ao fazer upload. Tente com um arquivo menor ou menos arquivos.');
+    }
+    
     event.target.value = '';
   };
 
@@ -73,14 +103,16 @@ export const BatchUploadForm = ({
               className="mt-1"
             />
             <p className="text-sm text-gray-500 mt-1">
-              Envie um arquivo ZIP contendo apenas GIFs. Os nomes dos arquivos serão usados como nomes dos exercícios.
+              Envie um arquivo ZIP (máx. 50MB) contendo apenas GIFs. Os nomes dos arquivos serão usados como nomes dos exercícios. Recomendamos enviar no máximo 10 arquivos por vez.
             </p>
           </div>
 
           {uploading && (
             <div className="space-y-2">
               <Progress value={100} className="w-full" />
-              <p className="text-sm text-center text-gray-500">Processando arquivos...</p>
+              <p className="text-sm text-center text-gray-500">
+                Processando arquivos... Isso pode levar alguns minutos.
+              </p>
             </div>
           )}
         </div>

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -114,10 +113,13 @@ export const ExerciseGifsTab = () => {
       const result = await response.json();
 
       if (!response.ok) {
+        if (response.status === 546) {
+          throw new Error('Erro no processamento. Tente com menos arquivos ou arquivos menores.');
+        }
         throw new Error(result.error || 'Erro ao processar arquivos');
       }
 
-      if (result.errors.length > 0) {
+      if (result.errors?.length > 0) {
         toast.warning(`Upload concluído com alguns erros: ${result.errors.join(', ')}`);
       } else {
         toast.success('Upload em lote concluído com sucesso!');
@@ -125,7 +127,11 @@ export const ExerciseGifsTab = () => {
 
       fetchExercises();
     } catch (error) {
-      toast.error('Erro ao fazer upload em lote');
+      if (error instanceof Error) {
+        toast.error(error.message);
+      } else {
+        toast.error('Erro ao fazer upload em lote');
+      }
       console.error('Error:', error);
     } finally {
       setUploading(false);
@@ -190,4 +196,3 @@ export const ExerciseGifsTab = () => {
     </div>
   );
 };
-
