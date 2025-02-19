@@ -4,14 +4,33 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
-import { UploadCloud, Trash2 } from "lucide-react";
+import { UploadCloud, Trash2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
+interface Exercise {
+  id: string;
+  name: string;
+  description: string;
+  gif_url: string | null;
+  muscle_group: string;
+}
+
+interface FileWithPreview extends File {
+  preview?: string;
+}
+
 export const ExerciseGifsTab = () => {
-  const [exercises, setExercises] = useState<any[]>([]);
+  const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<FileWithPreview[]>([]);
+  const [newExercise, setNewExercise] = useState({
+    name: "",
+    description: "",
+    muscle_group: ""
+  });
 
   useEffect(() => {
     fetchExercises();
@@ -34,44 +53,89 @@ export const ExerciseGifsTab = () => {
     }
   };
 
-  const handleFileUpload = async (exerciseId: string, file: File) => {
+  const validateFile = (file: File) => {
+    // Validar se é um GIF
+    if (!file.type.includes('gif')) {
+      toast.error(`${file.name} não é um arquivo GIF`);
+      return false;
+    }
+
+    // Validar tamanho (5MB)
+    const maxSize = 5 * 1024 * 1024; // 5MB em bytes
+    if (file.size > maxSize) {
+      toast.error(`${file.name} excede o tamanho máximo de 5MB`);
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    const validFiles = files.filter(validateFile);
+    
+    const filesWithPreview = validFiles.map(file => {
+      const preview = URL.createObjectURL(file);
+      return Object.assign(file, { preview });
+    });
+
+    setSelectedFiles(filesWithPreview);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newExercise.name || !newExercise.muscle_group) {
+      toast.error('Nome e grupo muscular são obrigatórios');
+      return;
+    }
+
     try {
       setUploading(true);
 
-      // Validar se é um GIF
-      if (!file.type.includes('gif')) {
-        toast.error('Por favor, envie apenas arquivos GIF');
-        return;
+      // Criar o exercício primeiro
+      const { data: exerciseData, error: exerciseError } = await supabase
+        .from('exercises')
+        .insert({
+          name: newExercise.name,
+          description: newExercise.description,
+          muscle_group: newExercise.muscle_group
+        })
+        .select()
+        .single();
+
+      if (exerciseError) throw exerciseError;
+
+      // Se houver arquivo selecionado, fazer upload
+      if (selectedFiles.length > 0) {
+        const file = selectedFiles[0];
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${exerciseData.id}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('exercise-gifs')
+          .upload(fileName, file, { upsert: true });
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('exercise-gifs')
+          .getPublicUrl(fileName);
+
+        // Atualizar o exercício com a URL do GIF
+        const { error: updateError } = await supabase
+          .from('exercises')
+          .update({ gif_url: publicUrl })
+          .eq('id', exerciseData.id);
+
+        if (updateError) throw updateError;
       }
 
-      // Criar nome único para o arquivo
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${exerciseId}.${fileExt}`;
-
-      // Upload do arquivo para o bucket
-      const { error: uploadError } = await supabase.storage
-        .from('exercise-gifs')
-        .upload(fileName, file, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      // Obter URL pública do arquivo
-      const { data: { publicUrl } } = supabase.storage
-        .from('exercise-gifs')
-        .getPublicUrl(fileName);
-
-      // Atualizar URL do GIF no exercício
-      const { error: updateError } = await supabase
-        .from('exercises')
-        .update({ gif_url: publicUrl })
-        .eq('id', exerciseId);
-
-      if (updateError) throw updateError;
-
-      toast.success('GIF enviado com sucesso!');
+      toast.success('Exercício criado com sucesso!');
+      setNewExercise({ name: "", description: "", muscle_group: "" });
+      setSelectedFiles([]);
       fetchExercises();
     } catch (error) {
-      toast.error('Erro ao enviar GIF');
+      toast.error('Erro ao criar exercício');
       console.error('Error:', error);
     } finally {
       setUploading(false);
@@ -111,7 +175,81 @@ export const ExerciseGifsTab = () => {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Gerenciar GIFs dos Exercícios</CardTitle>
+          <CardTitle>Adicionar Novo Exercício</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="name">Nome do Exercício</Label>
+                <Input
+                  id="name"
+                  value={newExercise.name}
+                  onChange={(e) => setNewExercise(prev => ({ ...prev, name: e.target.value }))}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="muscle_group">Grupo Muscular</Label>
+                <Input
+                  id="muscle_group"
+                  value={newExercise.muscle_group}
+                  onChange={(e) => setNewExercise(prev => ({ ...prev, muscle_group: e.target.value }))}
+                  required
+                />
+              </div>
+            </div>
+            
+            <div>
+              <Label htmlFor="description">Descrição</Label>
+              <Textarea
+                id="description"
+                value={newExercise.description}
+                onChange={(e) => setNewExercise(prev => ({ ...prev, description: e.target.value }))}
+                className="min-h-[100px]"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="gif">GIF do Exercício (Max: 5MB)</Label>
+              <Input
+                id="gif"
+                type="file"
+                accept=".gif"
+                onChange={handleFileSelect}
+                className="mt-1"
+              />
+              {selectedFiles.length > 0 && (
+                <div className="mt-2 flex gap-2">
+                  {selectedFiles.map((file) => (
+                    <img
+                      key={file.name}
+                      src={file.preview}
+                      alt="Preview"
+                      className="w-20 h-20 object-cover rounded border"
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <Button type="submit" disabled={uploading}>
+              {uploading ? (
+                <>Salvando...</>
+              ) : (
+                <>
+                  <UploadCloud className="w-4 h-4 mr-2" />
+                  Salvar Exercício
+                </>
+              )}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Exercícios Cadastrados</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid gap-6">
@@ -121,6 +259,9 @@ export const ExerciseGifsTab = () => {
                   <div>
                     <h3 className="font-medium">{exercise.name}</h3>
                     <p className="text-sm text-gray-500">{exercise.muscle_group}</p>
+                    {exercise.description && (
+                      <p className="text-sm mt-1">{exercise.description}</p>
+                    )}
                   </div>
                   
                   <div className="flex items-center gap-4">
@@ -135,31 +276,17 @@ export const ExerciseGifsTab = () => {
                           variant="destructive"
                           size="icon"
                           onClick={() => {
-                            const fileName = exercise.gif_url.split('/').pop();
-                            removeGif(exercise.id, fileName);
+                            const fileName = exercise.gif_url!.split('/').pop();
+                            if (fileName) removeGif(exercise.id, fileName);
                           }}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="file"
-                          accept=".gif"
-                          className="w-full"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              handleFileUpload(exercise.id, file);
-                            }
-                          }}
-                          disabled={uploading}
-                        />
-                        <Button disabled={uploading}>
-                          <UploadCloud className="h-4 w-4 mr-2" />
-                          Upload
-                        </Button>
+                      <div className="flex items-center gap-2 text-yellow-600">
+                        <AlertCircle className="h-4 w-4" />
+                        <span className="text-sm">Sem GIF</span>
                       </div>
                     )}
                   </div>
