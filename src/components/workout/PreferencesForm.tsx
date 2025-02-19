@@ -48,7 +48,14 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
 
   const handleSubmit = (data: FormSchema) => {
     const workoutPreferences: WorkoutPreferences = {
-      ...data,
+      age: data.age,
+      weight: data.weight,
+      height: data.height,
+      gender: data.gender,
+      goal: data.goal,
+      activityLevel: data.activityLevel,
+      preferredExerciseTypes: data.preferredExerciseTypes,
+      trainingLocation: data.trainingLocation,
       frequency: 3,
       duration: 60,
       muscleGroup: "full_body",
