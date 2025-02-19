@@ -13,15 +13,16 @@ import { ExerciseTypesField } from "./components/ExerciseTypesField";
 import { TrainingLocationField } from "./components/TrainingLocationField";
 import { WorkoutPreferences } from "./types";
 import { Clipboard, ArrowRight } from "lucide-react";
+import { toast } from "sonner";
 
 const formSchema = z.object({
-  age: z.number().min(16).max(100),
-  weight: z.number().min(30).max(200),
-  height: z.number().min(100).max(250),
+  age: z.number().min(16, "Idade mínima é 16 anos").max(100, "Idade máxima é 100 anos"),
+  weight: z.number().min(30, "Peso mínimo é 30kg").max(200, "Peso máximo é 200kg"),
+  height: z.number().min(100, "Altura mínima é 100cm").max(250, "Altura máxima é 250cm"),
   gender: z.enum(["male", "female"]),
   goal: z.enum(["lose_weight", "maintain", "gain_mass"]),
   activityLevel: z.enum(["sedentary", "light", "moderate", "intense"]),
-  preferredExerciseTypes: z.array(z.enum(["strength", "cardio", "mobility"])).min(1),
+  preferredExerciseTypes: z.array(z.enum(["strength", "cardio", "mobility"])).min(1, "Selecione pelo menos um tipo de exercício"),
   trainingLocation: z.enum(["gym", "home", "outdoors", "no_equipment"]),
 });
 
@@ -69,19 +70,31 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
         ? ["bodyweight", "resistance-bands"]
         : ["bodyweight"],
     };
-    console.log("Enviando preferências para geração de plano:", workoutPreferences);
+    
+    console.log("Gerando plano com preferências:", workoutPreferences);
+    toast.info("Gerando seu plano de treino personalizado...");
     onSubmit(workoutPreferences);
   };
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center gap-2 p-6">
-            <Clipboard className="w-6 h-6 text-primary-500" />
-            <h3 className="text-xl font-semibold">Informações para seu Plano de Treino</h3>
+        <Card className="overflow-hidden border-none shadow-lg bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800">
+          <CardHeader className="border-b bg-primary/5 p-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Clipboard className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold">Informações para seu Plano</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Preencha os dados abaixo para gerar seu plano personalizado
+                </p>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent className="p-6 pt-0 space-y-6">
+          
+          <CardContent className="p-6 space-y-8">
             <BasicInfoFields form={form} />
             <GoalField form={form} />
             <ActivityLevelField form={form} />
@@ -92,9 +105,10 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
               type="submit" 
               className="w-full"
               disabled={!form.formState.isValid}
+              size="lg"
             >
               Gerar Plano de Treino
-              <ArrowRight className="w-4 h-4 ml-2" />
+              <ArrowRight className="w-5 h-5 ml-2" />
             </Button>
           </CardContent>
         </Card>

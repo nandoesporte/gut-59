@@ -7,6 +7,7 @@ import { CurrentWorkoutPlan } from "./components/CurrentWorkoutPlan";
 import { WorkoutLoadingState } from "./components/WorkoutLoadingState";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { RotateCcw } from "lucide-react";
 
 interface WorkoutPlanDisplayProps {
   preferences: WorkoutPreferences;
@@ -30,8 +31,6 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
         toast.error("Usuário não autenticado");
         return;
       }
-
-      console.log("Gerando plano de treino com preferências:", preferences);
 
       const { data: response, error } = await supabase.functions.invoke('generate-workout-plan', {
         body: {
@@ -65,14 +64,22 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
   };
 
   if (loading) {
-    return <WorkoutLoadingState message="Gerando seu plano de treino..." />;
+    return <WorkoutLoadingState message="Gerando seu plano de treino personalizado" />;
   }
 
   if (!workoutPlan) {
     return (
-      <div className="text-center space-y-4">
-        <p className="text-red-600">Erro ao gerar o plano de treino.</p>
-        <Button onClick={onReset}>Tentar Novamente</Button>
+      <div className="text-center space-y-4 p-12">
+        <h3 className="text-xl font-semibold text-red-600">
+          Erro ao gerar o plano de treino
+        </h3>
+        <p className="text-muted-foreground">
+          Não foi possível gerar seu plano. Por favor, tente novamente.
+        </p>
+        <Button onClick={onReset} variant="outline" size="lg">
+          <RotateCcw className="w-4 h-4 mr-2" />
+          Tentar Novamente
+        </Button>
       </div>
     );
   }
@@ -82,7 +89,13 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
       <CurrentWorkoutPlan plan={workoutPlan} />
       
       <div className="flex justify-center">
-        <Button onClick={onReset} variant="outline">
+        <Button 
+          onClick={onReset} 
+          variant="outline"
+          size="lg"
+          className="hover:bg-primary/5"
+        >
+          <RotateCcw className="w-4 h-4 mr-2" />
           Criar Novo Plano
         </Button>
       </div>

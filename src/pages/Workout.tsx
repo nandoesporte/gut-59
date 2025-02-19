@@ -4,28 +4,36 @@ import { useState } from 'react';
 import { WorkoutPreferences } from '@/components/workout/types';
 import { PreferencesForm } from '@/components/workout/PreferencesForm';
 import { WorkoutPlanDisplay } from '@/components/workout/WorkoutPlanDisplay';
-import { Card } from '@/components/ui/card';
 import { Dumbbell } from 'lucide-react';
 
 const Workout = () => {
   const [preferences, setPreferences] = useState<WorkoutPreferences | null>(null);
 
   return (
-    <div className="space-y-6 pb-8">
-      <div className="flex items-center gap-3 mb-8">
-        <Dumbbell className="w-8 h-8 text-primary-500" />
-        <h1 className="text-2xl font-bold bg-gradient-to-r from-primary-500 to-primary-600 bg-clip-text text-transparent">
-          Plano de Treino Personalizado
-        </h1>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+      <div className="container mx-auto px-4 py-8 space-y-8">
+        <div className="text-center space-y-4">
+          <div className="inline-flex items-center justify-center p-2 bg-primary/10 rounded-full">
+            <Dumbbell className="w-6 h-6 text-primary" />
+          </div>
+          <h1 className="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary-600">
+            Plano de Treino Personalizado
+          </h1>
+          <p className="text-muted-foreground max-w-2xl mx-auto">
+            Crie um plano de treino personalizado baseado em suas preferências e objetivos
+          </p>
+        </div>
 
-      {!preferences ? (
-        <Card className="p-6">
-          <PreferencesForm onSubmit={setPreferences} />
-        </Card>
-      ) : (
-        <WorkoutPlanDisplay preferences={preferences} onReset={() => setPreferences(null)} />
-      )}
+        <div className="max-w-4xl mx-auto">
+          {!preferences ? (
+            <div className="transform transition-all duration-500 hover:scale-[1.01]">
+              <PreferencesForm onSubmit={setPreferences} />
+            </div>
+          ) : (
+            <WorkoutPlanDisplay preferences={preferences} onReset={() => setPreferences(null)} />
+          )}
+        </div>
+      </div>
     </div>
   );
 };
