@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { WorkoutPreferences } from "./types";
 import { WorkoutPlan } from "./types/workout-plan";
 import { CurrentWorkoutPlan } from "./components/CurrentWorkoutPlan";
-import { WorkoutHistory } from "./components/WorkoutHistory";
 import { WorkoutLoadingState } from "./components/WorkoutLoadingState";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -38,7 +37,7 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
         body: {
           preferences: {
             ...preferences,
-            muscleGroup: preferences.exerciseTypes[0] // Usando o primeiro tipo como grupo muscular inicial
+            muscleGroup: preferences.muscleGroup
           },
           userId: user.id
         }
@@ -57,9 +56,9 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
 
       setWorkoutPlan(response);
       toast.success("Plano de treino gerado com sucesso!");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao gerar plano:", error);
-      toast.error("Erro ao gerar plano de treino. Por favor, tente novamente.");
+      toast.error(error.message || "Erro ao gerar plano de treino. Por favor, tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -81,7 +80,6 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
   return (
     <div className="space-y-8">
       <CurrentWorkoutPlan plan={workoutPlan} />
-      <WorkoutHistory />
       
       <div className="flex justify-center">
         <Button onClick={onReset} variant="outline">
