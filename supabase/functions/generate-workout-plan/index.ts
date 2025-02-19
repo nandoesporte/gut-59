@@ -44,11 +44,11 @@ async function translateToPortuguese(text: string): Promise<string> {
     return data.choices[0].message.content.replace(/"/g, '').trim();
   } catch (error) {
     console.error('Error translating:', error);
-    return text; // Retorna o texto original em caso de erro
+    return text;
   }
 }
 
-// Função para buscar GIF do exercício
+// Função para buscar GIFs demonstrativos
 async function fetchExerciseGif(exerciseName: string): Promise<string | null> {
   try {
     // Tenta primeiro no Giphy
@@ -61,7 +61,7 @@ async function fetchExerciseGif(exerciseName: string): Promise<string | null> {
       return giphyData.data[0].images.fixed_height.url;
     }
 
-    // Se não encontrar no Giphy, tenta no Wger
+    // Se não encontrar no Giphy, tenta na API do wger
     const wgerResponse = await fetch(
       `https://wger.de/api/v2/exerciseimage/?exercise_name=${encodeURIComponent(exerciseName)}`
     );
@@ -104,7 +104,16 @@ serve(async (req) => {
       throw new Error('No exercises found matching the criteria')
     }
 
-    // Traduz os nomes dos exercícios
+    // Organiza exercícios por grupo muscular para melhor distribuição
+    const exercisesByMuscleGroup = exercises.reduce((acc, exercise) => {
+      if (!acc[exercise.muscle_group]) {
+        acc[exercise.muscle_group] = [];
+      }
+      acc[exercise.muscle_group].push(exercise);
+      return acc;
+    }, {} as Record<string, typeof exercises>);
+
+    // Traduz os exercícios
     const translatedExercises = await Promise.all(
       exercises.map(async (exercise) => ({
         ...exercise,
@@ -112,9 +121,9 @@ serve(async (req) => {
       }))
     );
 
-    // Generate prompt for OpenAI
+    // Gera um prompt mais detalhado para criar treinos robustos
     const prompt = `
-      Create a personalized workout plan based on the following preferences:
+      Create a comprehensive and engaging workout plan based on:
       - Gender: ${preferences.gender}
       - Age: ${preferences.age}
       - Weight: ${preferences.weight}kg
@@ -125,18 +134,37 @@ serve(async (req) => {
       - Available Equipment: ${preferences.availableEquipment?.join(', ') || 'None'}
       - Training Location: ${preferences.trainingLocation}
 
-      IMPORTANT: You MUST use ONLY the exercise IDs from the following list when creating the workout plan. DO NOT use exercise names or create new exercises.
+      IMPORTANT GUIDELINES:
+      1. Create a varied and comprehensive plan targeting all major muscle groups
+      2. Include a balanced mix of:
+         - Compound exercises for overall strength
+         - Isolation exercises for specific muscle development
+         - Functional movements for daily activities
+      3. Structure each workout with:
+         - Progressive warmup targeting the day's muscle groups
+         - Main exercises in optimal order (compound first, then isolation)
+         - Proper rest periods based on exercise intensity
+         - Appropriate cooldown and stretching
+      4. Include periodization elements:
+         - Vary intensity and volume across weeks
+         - Progressive overload principles
+         - Deload periods when necessary
 
-      Available exercises:
-      ${translatedExercises.map(e => `- ID: "${e.id}" - ${e.name} (${e.exercise_type}, ${e.muscle_group})`).join('\n')}
+      Available exercises by muscle group:
+      ${Object.entries(exercisesByMuscleGroup).map(([group, exs]) => 
+        `${group}:\n${exs.map(e => `- ID: "${e.id}" - ${e.name}`).join('\n')}`
+      ).join('\n\n')}
 
-      Create a 4-week workout plan with 3-4 sessions per week. For each session, include:
-      1. Warmup description in Portuguese
-      2. Main exercises (ONLY use exerciseId from the list above)
-      3. Sets, reps, and rest times for each exercise
-      4. Cooldown description in Portuguese
+      Create a detailed 4-week plan with 3-4 sessions per week. For each session, include:
+      1. Comprehensive warmup description in Portuguese
+      2. Main exercises (ONLY use exerciseIds from the list above)
+         - Include sufficient exercises for a complete workout
+         - Proper exercise order and combinations
+         - Progressive overload recommendations
+      3. Detailed sets, reps, and rest times
+      4. Thorough cooldown description in Portuguese
       
-      Format the response as a JSON object with the following structure:
+      Format the response as a JSON object with:
       {
         "plan": {
           "startDate": "YYYY-MM-DD",
@@ -156,9 +184,13 @@ serve(async (req) => {
         }
       }
 
-      VERY IMPORTANT: The exerciseId MUST be one of the exact IDs provided in the list above.
-      Write warmupDescription and cooldownDescription in Portuguese.
-    `
+      IMPORTANT RULES:
+      1. Use ONLY the exact exercise IDs provided above
+      2. Write warmupDescription and cooldownDescription in Portuguese
+      3. Create comprehensive sessions with appropriate exercise volume
+      4. Include clear progression patterns across the weeks
+      5. Ensure proper exercise distribution and muscle group balance
+    `;
 
     // Call OpenAI API
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -171,7 +203,7 @@ serve(async (req) => {
         model: 'gpt-4',
         messages: [{
           role: 'system',
-          content: 'You are a professional fitness trainer specialized in creating personalized workout plans. Write in Portuguese (Brazil). You must only use the exact exercise IDs provided.'
+          content: 'Você é um personal trainer profissional especializado em criar planos de treino personalizados. Escreva em português do Brasil e use apenas os IDs de exercícios fornecidos.'
         }, {
           role: 'user',
           content: prompt
@@ -187,7 +219,7 @@ serve(async (req) => {
     const aiResponse = await response.json()
     const workoutPlan = JSON.parse(aiResponse.choices[0].message.content)
 
-    // Validate that all exercise IDs are valid
+    // Validate exercise IDs
     for (const session of workoutPlan.plan.sessions) {
       for (const exercise of session.exercises) {
         if (!exercises.some(e => e.id === exercise.exerciseId)) {
@@ -196,7 +228,7 @@ serve(async (req) => {
       }
     }
 
-    // Save the workout plan to the database
+    // Save workout plan
     const { data: plan, error: planError } = await supabase
       .from('workout_plans')
       .insert({
@@ -210,7 +242,7 @@ serve(async (req) => {
 
     if (planError) throw planError
 
-    // Save all sessions and exercises
+    // Save sessions and exercises
     for (const session of workoutPlan.plan.sessions) {
       const { data: workoutSession, error: sessionError } = await supabase
         .from('workout_sessions')
@@ -241,11 +273,10 @@ serve(async (req) => {
       }
     }
 
-    // Return the plan with exercises mapped to their names and GIFs
+    // Return plan with exercises mapped to names and GIFs
     const transformedSessions = await Promise.all(workoutPlan.plan.sessions.map(async (session) => {
       const exerciseDetails = await Promise.all(session.exercises.map(async (exercise) => {
         const exerciseData = translatedExercises.find(e => e.id === exercise.exerciseId)
-        // Busca GIF para o exercício se ainda não tiver
         const gifUrl = exerciseData?.gif_url || await fetchExerciseGif(exerciseData?.name || '');
         
         return {
