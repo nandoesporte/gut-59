@@ -1,83 +1,87 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.0";
-import { corsHeaders } from "../_shared/cors.ts";
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const { preferences, userId } = await req.json();
+    console.log("Recebendo requisição com preferências:", preferences);
 
-    // Fetch available exercises from the database
-    const { data: availableExercises, error: exercisesError } = await supabase
-      .from('exercises')
-      .select('*')
-      .eq('muscle_group', preferences.muscleGroup);
-
-    if (exercisesError) throw exercisesError;
-
-    // Check if we have enough exercises with GIFs
-    const exercisesWithGifs = availableExercises.filter(ex => ex.gif_url);
-    const exercisesWithoutGifs = availableExercises.filter(ex => !ex.gif_url);
-
-    // If there are exercises without GIFs, notify admin
-    if (exercisesWithoutGifs.length > 0) {
-      // Create a list of exercises that need GIFs
-      const missingGifsMessage = {
-        content: `Os seguintes exercícios precisam de GIFs:\n${exercisesWithoutGifs.map(ex => ex.name).join('\n')}`,
-        type: 'sistema',
-        sender_id: userId,
-        receiver_id: userId // Este deve ser alterado para o ID do admin
-      };
-
-      await supabase.from('messages').insert(missingGifsMessage);
+    if (!userId) {
+      throw new Error("User ID é obrigatório");
     }
 
-    // Generate workout plan using available exercises
+    // Inicializa o cliente Supabase
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Busca exercícios disponíveis
+    const { data: exercises, error: exercisesError } = await supabase
+      .from('exercises')
+      .select('*')
+      .eq('muscle_group', 'full_body');
+
+    if (exercisesError) {
+      console.error("Erro ao buscar exercícios:", exercisesError);
+      throw new Error("Erro ao buscar exercícios");
+    }
+
+    if (!exercises || exercises.length === 0) {
+      throw new Error("Nenhum exercício encontrado");
+    }
+
+    // Gera um plano de treino baseado nas preferências
     const workoutPlan = {
       id: crypto.randomUUID(),
       user_id: userId,
       goal: preferences.goal,
       start_date: new Date().toISOString(),
-      end_date: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString(), // 28 dias
+      end_date: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString(),
       workout_sessions: Array.from({ length: 3 }, (_, i) => ({
         id: crypto.randomUUID(),
         day_number: i + 1,
-        warmup_description: "Aquecimento dinâmico de 10 minutos",
-        cooldown_description: "Alongamento estático de 10 minutos",
-        exercises: exercisesWithGifs.slice(0, 6).map(exercise => ({
+        warmup_description: "Aquecimento dinâmico de 10 minutos incluindo mobilidade articular",
+        cooldown_description: "Alongamento estático de 10 minutos focando nos músculos trabalhados",
+        exercises: exercises.slice(0, 6).map(exercise => ({
           name: exercise.name,
-          sets: exercise.min_sets,
-          reps: exercise.min_reps,
-          rest_time_seconds: exercise.rest_time_seconds,
+          sets: 3,
+          reps: 12,
+          rest_time_seconds: 60,
           gifUrl: exercise.gif_url
         }))
       }))
     };
 
-    // Save the workout plan
-    const { data: savedPlan, error: planError } = await supabase
+    console.log("Plano gerado:", workoutPlan);
+
+    // Salva o plano no banco de dados
+    const { error: insertError } = await supabase
       .from('workout_plans')
-      .insert({
+      .insert([{
         id: workoutPlan.id,
         user_id: userId,
         goal: workoutPlan.goal,
         start_date: workoutPlan.start_date,
         end_date: workoutPlan.end_date
-      })
-      .select()
-      .single();
+      }]);
 
-    if (planError) throw planError;
+    if (insertError) {
+      console.error("Erro ao salvar plano:", insertError);
+      throw new Error("Erro ao salvar plano de treino");
+    }
 
-    // Save workout sessions
+    // Salva as sessões de treino
     for (const session of workoutPlan.workout_sessions) {
       const { error: sessionError } = await supabase
         .from('workout_sessions')
@@ -89,12 +93,15 @@ serve(async (req) => {
           cooldown_description: session.cooldown_description
         });
 
-      if (sessionError) throw sessionError;
+      if (sessionError) {
+        console.error("Erro ao salvar sessão:", sessionError);
+        throw new Error("Erro ao salvar sessões de treino");
+      }
 
-      // Save session exercises
+      // Salva os exercícios da sessão
       const sessionExercises = session.exercises.map((exercise, index) => ({
         session_id: session.id,
-        exercise_id: exercisesWithGifs[index].id,
+        exercise_id: exercises[index].id,
         sets: exercise.sets,
         reps: exercise.reps,
         rest_time_seconds: exercise.rest_time_seconds,
@@ -105,18 +112,37 @@ serve(async (req) => {
         .from('session_exercises')
         .insert(sessionExercises);
 
-      if (exercisesError) throw exercisesError;
+      if (exercisesError) {
+        console.error("Erro ao salvar exercícios:", exercisesError);
+        throw new Error("Erro ao salvar exercícios da sessão");
+      }
     }
 
-    return new Response(JSON.stringify(workoutPlan), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    });
+    return new Response(
+      JSON.stringify(workoutPlan),
+      { 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        },
+        status: 200 
+      }
+    );
 
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400,
-    });
+    console.error("Erro na função:", error);
+    
+    return new Response(
+      JSON.stringify({
+        error: error instanceof Error ? error.message : "Erro interno ao gerar plano de treino"
+      }),
+      { 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        },
+        status: 400
+      }
+    );
   }
 });
