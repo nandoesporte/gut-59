@@ -38,20 +38,14 @@ serve(async (req) => {
     console.log('Carregando arquivo ZIP...');
     const arrayBuffer = await zipFile.arrayBuffer()
     const zip = new JSZip()
-    await zip.loadAsync(arrayBuffer)
+    const loadedZip = await zip.loadAsync(arrayBuffer)
     
     const uploadedFiles = []
     const errors = []
     let processedCount = 0
 
-    // Filtrar apenas arquivos (não diretórios) e listar conteúdo do ZIP
-    const files = []
-    zip.forEach((relativePath, file) => {
-      if (!file.dir) {
-        files.push([relativePath, file])
-      }
-    })
-
+    // Obter lista de arquivos do ZIP
+    const files = Object.entries(loadedZip.files).filter(([_, file]) => !file.dir)
     console.log(`Total de arquivos no ZIP: ${files.length}`);
 
     for (const [filename, file] of files) {
