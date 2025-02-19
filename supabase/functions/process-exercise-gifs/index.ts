@@ -20,18 +20,22 @@ serve(async (req) => {
     const category = formData.get('category') as string
 
     if (!zipFile || !category) {
+      console.error('Arquivo ZIP ou categoria não fornecidos');
       return new Response(
         JSON.stringify({ error: 'Arquivo ZIP e categoria são obrigatórios' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
     }
 
-    console.log('Criando cliente Supabase');
+    console.log(`Arquivo recebido: ${zipFile.name}, Categoria: ${category}`);
+    console.log(`Tamanho do arquivo: ${zipFile.size} bytes`);
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    console.log('Carregando arquivo ZIP...');
     const arrayBuffer = await zipFile.arrayBuffer()
     const zip = new JSZip()
     await zip.loadAsync(arrayBuffer)
@@ -40,12 +44,18 @@ serve(async (req) => {
     const errors = []
     let processedCount = 0
 
-    const files = Object.entries(zip.files).filter(([_, file]) => !file.dir)
-    console.log(`Total de arquivos encontrados: ${files.length}`)
+    // Filtrar apenas arquivos (não diretórios) e listar conteúdo do ZIP
+    const files = []
+    zip.forEach((relativePath, file) => {
+      if (!file.dir) {
+        files.push([relativePath, file])
+      }
+    })
 
-    for (let i = 0; i < files.length; i++) {
-      const [filename, file] = files[i]
-      console.log(`Processando arquivo ${i + 1}/${files.length}: ${filename}`);
+    console.log(`Total de arquivos no ZIP: ${files.length}`);
+
+    for (const [filename, file] of files) {
+      console.log(`\nProcessando arquivo: ${filename}`);
         
       if (!filename.toLowerCase().endsWith('.gif')) {
         console.log(`${filename} ignorado: não é um arquivo GIF`);
@@ -54,17 +64,19 @@ serve(async (req) => {
       }
 
       try {
+        console.log('Convertendo arquivo para Blob...');
         const content = await file.async('blob')
         const sanitizedName = filename.split('/').pop()?.replace(/[^a-zA-Z0-9.-]/g, '_')
         const exerciseName = sanitizedName?.replace('.gif', '').replace(/_/g, ' ')
         
-        console.log(`Fazendo upload de ${filename} para a categoria ${category}`);
+        if (!sanitizedName || !exerciseName) {
+          throw new Error('Nome do arquivo inválido');
+        }
         
-        // Upload do arquivo para o storage
         const filePath = `${category}/${sanitizedName}`
-        console.log('Iniciando upload do arquivo:', filePath);
+        console.log(`Iniciando upload para ${filePath}`);
         
-        const { error: uploadError } = await supabase.storage
+        const { data: uploadData, error: uploadError } = await supabase.storage
           .from('exercise-gifs')
           .upload(filePath, content, {
             contentType: 'image/gif',
@@ -72,18 +84,16 @@ serve(async (req) => {
           })
 
         if (uploadError) {
-          console.error(`Erro no upload do arquivo ${filename}:`, uploadError);
+          console.error('Erro no upload:', uploadError);
           throw uploadError;
         }
 
-        console.log('Upload concluído, obtendo URL pública');
+        console.log('Upload concluído, gerando URL pública');
         const { data: { publicUrl } } = supabase.storage
           .from('exercise-gifs')
           .getPublicUrl(filePath)
 
-        // Criar registro do exercício no banco
-        console.log(`Criando registro para exercício: ${exerciseName}`);
-        
+        console.log('Criando registro do exercício...');
         const exerciseData = {
           name: exerciseName,
           description: `Exercício ${exerciseName}`,
@@ -101,8 +111,6 @@ serve(async (req) => {
           equipment_needed: []
         }
 
-        console.log('Dados do exercício:', exerciseData);
-        
         const { data: insertedExercise, error: dbError } = await supabase
           .from('exercises')
           .insert(exerciseData)
@@ -110,12 +118,11 @@ serve(async (req) => {
           .single()
 
         if (dbError) {
-          console.error(`Erro ao criar registro para ${filename}:`, dbError);
+          console.error('Erro ao salvar exercício:', dbError);
           throw dbError;
         }
 
-        console.log('Exercício salvo com sucesso:', insertedExercise);
-
+        console.log(`Exercício ${exerciseName} salvo com sucesso!`);
         uploadedFiles.push({ 
           name: filename, 
           url: publicUrl,
@@ -123,18 +130,16 @@ serve(async (req) => {
         })
         processedCount++
         
-        // Pequeno delay entre processamentos
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
+        await new Promise(resolve => setTimeout(resolve, 500));
       } catch (error) {
         console.error(`Erro ao processar ${filename}:`, error);
         errors.push(`Erro ao processar ${filename}: ${error.message}`);
       }
     }
 
-    console.log('Processamento concluído');
-    console.log(`Total processado: ${processedCount} arquivos`);
-    console.log(`Erros encontrados: ${errors.length}`);
+    console.log('\nResumo do processamento:');
+    console.log(`Total de arquivos processados: ${processedCount}`);
+    console.log(`Total de erros: ${errors.length}`);
 
     return new Response(
       JSON.stringify({ 
@@ -146,7 +151,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
-    console.error('Erro geral:', error);
+    console.error('Erro geral no processamento:', error);
     return new Response(
       JSON.stringify({ error: 'Erro ao processar arquivo ZIP', details: error.message }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
