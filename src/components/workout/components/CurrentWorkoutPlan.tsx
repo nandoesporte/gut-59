@@ -3,29 +3,12 @@ import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { WorkoutPlan } from "../types/workout-plan";
 import { Calendar, Clock, Dumbbell } from "lucide-react";
-import { useEffect, useState } from "react";
 
 interface CurrentWorkoutPlanProps {
   plan: WorkoutPlan;
 }
 
 export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
-  const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
-
-  const fetchExerciseGif = async (exerciseName: string) => {
-    try {
-      const response = await fetch(`https://api.giphy.com/v1/gifs/search?api_key=P5EDHjFx7h4TfqB4JsGX8JBvGa4V3p1K&q=${encodeURIComponent(exerciseName + " exercise")}&limit=1&rating=g`);
-      const data = await response.json();
-      if (data.data && data.data.length > 0) {
-        return data.data[0].images.fixed_height.url;
-      }
-      return null;
-    } catch (error) {
-      console.error('Erro ao buscar GIF:', error);
-      return null;
-    }
-  };
-
   return (
     <div className="space-y-6">
       <Card className="bg-white shadow-lg">
