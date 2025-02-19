@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Exercise, MuscleGroup } from "./exercises/types";
+import { Exercise, MuscleGroup, ExerciseType, Difficulty } from "./exercises/types";
 import { ExerciseForm } from "./exercises/ExerciseForm";
 import { BatchUploadForm } from "./exercises/BatchUploadForm";
 import { ExerciseList } from "./exercises/ExerciseList";
@@ -46,8 +46,8 @@ export const ExerciseGifsTab = () => {
         min_sets: 3,
         max_sets: 5,
         rest_time_seconds: 60,
-        alternative_exercises: [],
-        equipment_needed: []
+        alternative_exercises: [] as string[],
+        equipment_needed: [] as string[]
       };
 
       const { data, error: exerciseError } = await supabase
@@ -94,23 +94,29 @@ export const ExerciseGifsTab = () => {
     try {
       setUploading(true);
 
-      // Criar o exercício primeiro
+      // Define exercise type based on category
+      let exerciseType: ExerciseType = "strength";
+      if (category === "cardio") {
+        exerciseType = "cardio";
+      } else if (category === "mobility") {
+        exerciseType = "mobility";
+      }
+
       const exerciseName = file.name.replace('.gif', '').replace(/_/g, ' ');
       
       const exercisePayload = {
         name: exerciseName,
         description: `Exercício ${exerciseName}`,
         muscle_group: category,
-        exercise_type: category === 'cardio' ? 'cardio' : 
-                      category === 'mobility' ? 'mobility' : 'strength',
-        difficulty: 'beginner',
+        exercise_type: exerciseType,
+        difficulty: "beginner" as Difficulty,
         min_reps: 8,
         max_reps: 12,
         min_sets: 3,
         max_sets: 5,
         rest_time_seconds: 60,
-        alternative_exercises: [],
-        equipment_needed: []
+        alternative_exercises: [] as string[],
+        equipment_needed: [] as string[]
       };
 
       const { data: exercise, error: exerciseError } = await supabase
