@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { UploadCloud, Trash2, AlertCircle, FileZip } from "lucide-react";
+import { UploadCloud, Trash2, AlertCircle, Archive } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 
@@ -199,11 +200,17 @@ export const ExerciseGifsTab = () => {
 
     try {
       setUploading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        throw new Error('Usuário não autenticado');
+      }
+
       const response = await fetch('https://sxjafhzikftdenqnkcri.supabase.co/functions/v1/process-exercise-gifs', {
         method: 'POST',
         body: formData,
         headers: {
-          'Authorization': `Bearer ${supabase.auth.session()?.access_token}`
+          'Authorization': `Bearer ${session.access_token}`
         }
       });
 
