@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -90,49 +91,63 @@ export const ExerciseGifsTab = () => {
   };
 
   const handleBatchUpload = async (file: File, category: MuscleGroup) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('category', category);
-
     try {
       setUploading(true);
-      const { data: { session } } = await supabase.auth.getSession();
+
+      // Criar o exercício primeiro
+      const exerciseName = file.name.replace('.gif', '').replace(/_/g, ' ');
       
-      if (!session?.access_token) {
-        throw new Error('Usuário não autenticado');
-      }
+      const exercisePayload = {
+        name: exerciseName,
+        description: `Exercício ${exerciseName}`,
+        muscle_group: category,
+        exercise_type: category === 'cardio' ? 'cardio' : 
+                      category === 'mobility' ? 'mobility' : 'strength',
+        difficulty: 'beginner',
+        min_reps: 8,
+        max_reps: 12,
+        min_sets: 3,
+        max_sets: 5,
+        rest_time_seconds: 60,
+        alternative_exercises: [],
+        equipment_needed: []
+      };
 
-      const response = await fetch('https://sxjafhzikftdenqnkcri.supabase.co/functions/v1/process-exercise-gifs', {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
-      });
+      const { data: exercise, error: exerciseError } = await supabase
+        .from('exercises')
+        .insert(exercisePayload)
+        .select()
+        .single();
 
-      const result = await response.json();
+      if (exerciseError) throw exerciseError;
 
-      if (!response.ok) {
-        if (response.status === 546) {
-          throw new Error('Erro no processamento. Tente com menos arquivos ou arquivos menores.');
-        }
-        throw new Error(result.error || 'Erro ao processar arquivos');
-      }
+      // Upload do arquivo GIF
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${exercise.id}.${fileExt}`;
 
-      if (result.errors?.length > 0) {
-        toast.warning(`Upload concluído com alguns erros: ${result.errors.join(', ')}`);
-      } else {
-        toast.success('Upload em lote concluído com sucesso!');
-      }
+      const { error: uploadError } = await supabase.storage
+        .from('exercise-gifs')
+        .upload(fileName, file, { upsert: true });
 
-      fetchExercises();
+      if (uploadError) throw uploadError;
+
+      // Atualizar o exercício com a URL do GIF
+      const { data: { publicUrl } } = supabase.storage
+        .from('exercise-gifs')
+        .getPublicUrl(fileName);
+
+      const { error: updateError } = await supabase
+        .from('exercises')
+        .update({ gif_url: publicUrl })
+        .eq('id', exercise.id);
+
+      if (updateError) throw updateError;
+
+      await fetchExercises();
     } catch (error) {
-      if (error instanceof Error) {
-        toast.error(error.message);
-      } else {
-        toast.error('Erro ao fazer upload em lote');
-      }
       console.error('Error:', error);
+      toast.error('Erro ao fazer upload do arquivo');
+      throw error;
     } finally {
       setUploading(false);
     }
