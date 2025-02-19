@@ -33,6 +33,7 @@ export const ExerciseGifsTab = () => {
   const [uploading, setUploading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<FileWithPreview[]>([]);
   const [newExercise, setNewExercise] = useState({
+    name: "",
     description: "",
     muscle_group: "chest" as MuscleGroup,
     exercise_type: "strength" as ExerciseType,
@@ -90,6 +91,11 @@ export const ExerciseGifsTab = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!newExercise.name) {
+      toast.error('Nome do exercício é obrigatório');
+      return;
+    }
+
     try {
       setUploading(true);
 
@@ -97,10 +103,16 @@ export const ExerciseGifsTab = () => {
       const { data: exerciseData, error: exerciseError } = await supabase
         .from('exercises')
         .insert({
-          description: newExercise.description,
+          name: newExercise.name,
+          description: newExercise.description || null,
           muscle_group: newExercise.muscle_group,
           exercise_type: newExercise.exercise_type,
-          difficulty: newExercise.difficulty
+          difficulty: newExercise.difficulty,
+          min_reps: 8, // valores padrão
+          max_reps: 12,
+          min_sets: 3,
+          max_sets: 5,
+          rest_time_seconds: 60
         })
         .select()
         .single();
@@ -134,6 +146,7 @@ export const ExerciseGifsTab = () => {
 
       toast.success('Exercício criado com sucesso!');
       setNewExercise({
+        name: "",
         description: "",
         muscle_group: "chest",
         exercise_type: "strength",
@@ -184,6 +197,16 @@ export const ExerciseGifsTab = () => {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label htmlFor="name">Nome do Exercício</Label>
+              <Input
+                id="name"
+                value={newExercise.name}
+                onChange={(e) => setNewExercise(prev => ({ ...prev, name: e.target.value }))}
+                required
+              />
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <Label htmlFor="exercise_type">Tipo de Exercício</Label>
@@ -306,7 +329,8 @@ export const ExerciseGifsTab = () => {
               <div key={exercise.id} className="border p-4 rounded-lg">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                   <div>
-                    <div className="flex gap-2 items-center">
+                    <h3 className="font-medium">{exercise.name}</h3>
+                    <div className="flex gap-2 items-center mt-2">
                       <span className="px-2 py-1 text-xs rounded bg-primary/10 text-primary">
                         {exercise.exercise_type}
                       </span>
