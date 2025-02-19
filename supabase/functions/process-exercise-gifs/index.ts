@@ -44,98 +44,104 @@ serve(async (req) => {
     const errors = []
     let processedCount = 0
 
-    console.log('Listando arquivos no ZIP...');
-    // Listar todos os arquivos no ZIP
-    for (const [filename, file] of Object.entries(zip.files)) {
-      console.log(`Encontrado arquivo: ${filename}`);
+    // Obter uma lista de promessas para processar todos os arquivos
+    const filePromises = []
+
+    // Primeiro, vamos listar todos os arquivos
+    for (const filename of Object.keys(zip.files)) {
+      const file = zip.files[filename]
+      
+      console.log(`Verificando arquivo: ${filename}`);
       
       if (file.dir) {
-        console.log(`${filename} é um diretório, pulando...`);
+        console.log(`${filename} é um diretório, ignorando...`);
         continue;
       }
 
       if (!filename.toLowerCase().endsWith('.gif')) {
-        console.log(`${filename} ignorado: não é um arquivo GIF`);
+        console.log(`${filename} não é um GIF, ignorando...`);
         errors.push(`${filename} não é um arquivo GIF`);
         continue;
       }
 
-      try {
-        console.log(`\nProcessando arquivo: ${filename}`);
-        console.log('Convertendo arquivo para Blob...');
-        const content = await file.async('blob')
-        const sanitizedName = filename.split('/').pop()?.replace(/[^a-zA-Z0-9.-]/g, '_')
-        const exerciseName = sanitizedName?.replace('.gif', '').replace(/_/g, ' ')
-        
-        if (!sanitizedName || !exerciseName) {
-          throw new Error('Nome do arquivo inválido');
+      // Adicionar à lista de promessas
+      filePromises.push(async () => {
+        try {
+          console.log(`Processando ${filename}...`);
+          const content = await file.async('blob')
+          const sanitizedName = filename.split('/').pop()?.replace(/[^a-zA-Z0-9.-]/g, '_')
+          const exerciseName = sanitizedName?.replace('.gif', '').replace(/_/g, ' ')
+
+          if (!sanitizedName || !exerciseName) {
+            throw new Error('Nome do arquivo inválido');
+          }
+
+          const filePath = `${category}/${sanitizedName}`
+          
+          // Upload do arquivo
+          const { error: uploadError } = await supabase.storage
+            .from('exercise-gifs')
+            .upload(filePath, content, {
+              contentType: 'image/gif',
+              upsert: true
+            })
+
+          if (uploadError) throw uploadError;
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('exercise-gifs')
+            .getPublicUrl(filePath)
+
+          // Criar registro do exercício
+          const exerciseData = {
+            name: exerciseName,
+            description: `Exercício ${exerciseName}`,
+            gif_url: publicUrl,
+            muscle_group: category,
+            exercise_type: category === 'cardio' ? 'cardio' : 
+                          category === 'mobility' ? 'mobility' : 'strength',
+            difficulty: 'beginner',
+            min_reps: 8,
+            max_reps: 12,
+            min_sets: 3,
+            max_sets: 5,
+            rest_time_seconds: 60,
+            alternative_exercises: [],
+            equipment_needed: []
+          }
+
+          const { data: insertedExercise, error: dbError } = await supabase
+            .from('exercises')
+            .insert(exerciseData)
+            .select()
+            .single()
+
+          if (dbError) throw dbError;
+
+          console.log(`Exercício ${exerciseName} processado com sucesso`);
+          processedCount++;
+          uploadedFiles.push({
+            name: filename,
+            url: publicUrl,
+            exercise: insertedExercise
+          });
+
+        } catch (error) {
+          console.error(`Erro processando ${filename}:`, error);
+          errors.push(`Erro ao processar ${filename}: ${error.message}`);
         }
-        
-        const filePath = `${category}/${sanitizedName}`
-        console.log(`Iniciando upload para ${filePath}`);
-        
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('exercise-gifs')
-          .upload(filePath, content, {
-            contentType: 'image/gif',
-            upsert: true
-          })
+      });
+    }
 
-        if (uploadError) {
-          console.error('Erro no upload:', uploadError);
-          throw uploadError;
-        }
-
-        console.log('Upload concluído, gerando URL pública');
-        const { data: { publicUrl } } = supabase.storage
-          .from('exercise-gifs')
-          .getPublicUrl(filePath)
-
-        console.log('Criando registro do exercício...');
-        const exerciseData = {
-          name: exerciseName,
-          description: `Exercício ${exerciseName}`,
-          gif_url: publicUrl,
-          muscle_group: category,
-          exercise_type: category === 'cardio' ? 'cardio' : 
-                        category === 'mobility' ? 'mobility' : 'strength',
-          difficulty: 'beginner',
-          min_reps: 8,
-          max_reps: 12,
-          min_sets: 3,
-          max_sets: 5,
-          rest_time_seconds: 60,
-          alternative_exercises: [],
-          equipment_needed: []
-        }
-
-        const { data: insertedExercise, error: dbError } = await supabase
-          .from('exercises')
-          .insert(exerciseData)
-          .select()
-          .single()
-
-        if (dbError) {
-          console.error('Erro ao salvar exercício:', dbError);
-          throw dbError;
-        }
-
-        console.log(`Exercício ${exerciseName} salvo com sucesso!`);
-        uploadedFiles.push({ 
-          name: filename, 
-          url: publicUrl,
-          exercise: insertedExercise
-        })
-        processedCount++
-        
-        await new Promise(resolve => setTimeout(resolve, 500));
-      } catch (error) {
-        console.error(`Erro ao processar ${filename}:`, error);
-        errors.push(`Erro ao processar ${filename}: ${error.message}`);
-      }
+    // Processar arquivos sequencialmente para evitar sobrecarga
+    for (const processFile of filePromises) {
+      await processFile();
+      // Pequena pausa entre processamentos
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
 
     console.log('\nResumo do processamento:');
+    console.log(`Total de arquivos encontrados: ${filePromises.length}`);
     console.log(`Total de arquivos processados: ${processedCount}`);
     console.log(`Total de erros: ${errors.length}`);
 
