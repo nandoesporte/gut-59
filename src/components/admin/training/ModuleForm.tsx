@@ -11,7 +11,7 @@ export interface ModuleFormProps {
 }
 
 export const ModuleForm = ({ onModuleChange }: ModuleFormProps) => {
-  const [title, setTitle] = useState("");
+  const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [displayOrder, setDisplayOrder] = useState("");
 
@@ -22,7 +22,7 @@ export const ModuleForm = ({ onModuleChange }: ModuleFormProps) => {
       const { error } = await supabase
         .from('training_modules')
         .insert({
-          title,
+          name,
           description,
           display_order: parseInt(displayOrder)
         });
@@ -30,7 +30,7 @@ export const ModuleForm = ({ onModuleChange }: ModuleFormProps) => {
       if (error) throw error;
 
       toast.success('Módulo criado com sucesso!');
-      setTitle("");
+      setName("");
       setDescription("");
       setDisplayOrder("");
       await onModuleChange();
@@ -43,11 +43,11 @@ export const ModuleForm = ({ onModuleChange }: ModuleFormProps) => {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <Label htmlFor="title">Título</Label>
+        <Label htmlFor="name">Nome do Módulo</Label>
         <Input
-          id="title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          id="name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
           required
         />
       </div>
