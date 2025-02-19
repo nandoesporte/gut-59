@@ -31,6 +31,17 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // Verificar se o bucket existe, se não existir, criar
+    const { data: buckets } = await supabase.storage.listBuckets()
+    if (!buckets?.find(b => b.name === 'exercise-gifs')) {
+      const { error } = await supabase.storage.createBucket('exercise-gifs', {
+        public: true
+      })
+      if (error) {
+        throw new Error(`Erro ao criar bucket: ${error.message}`)
+      }
+    }
+
     const arrayBuffer = await zipFile.arrayBuffer()
     const zip = new JSZip()
     await zip.loadAsync(arrayBuffer)
@@ -39,8 +50,8 @@ serve(async (req) => {
     const errors = []
     let processedCount = 0
 
-    // Processar arquivos em lotes menores
-    const batchSize = 3 // Reduzido para 3 arquivos por lote
+    // Processar apenas 5 arquivos por vez
+    const batchSize = 2 
     const files = Object.entries(zip.files).filter(([_, file]) => !file.dir)
     
     console.log(`Total de arquivos encontrados: ${files.length}`)
@@ -50,19 +61,19 @@ serve(async (req) => {
       
       const batch = files.slice(i, i + batchSize)
       
-      // Adicionar delay entre lotes para evitar sobrecarga
+      // Adicionar delay entre lotes
       if (i > 0) {
-        console.log('Aguardando 2 segundos antes do próximo lote...');
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        console.log('Aguardando 3 segundos antes do próximo lote...');
+        await new Promise(resolve => setTimeout(resolve, 3000));
       }
 
-      const batchPromises = batch.map(async ([filename, file]) => {
-        console.log(`Iniciando processamento do arquivo: ${filename}`);
+      for (const [filename, file] of batch) {
+        console.log(`Processando arquivo: ${filename}`);
         
         if (!filename.toLowerCase().endsWith('.gif')) {
           console.log(`${filename} ignorado: não é um arquivo GIF`);
           errors.push(`${filename} não é um arquivo GIF`);
-          return;
+          continue;
         }
 
         try {
@@ -92,7 +103,7 @@ serve(async (req) => {
 
           // Criar registro do exercício no banco
           console.log(`Criando registro para exercício: ${exerciseName}`);
-          const { error: dbError } = await supabase
+          const { data: exerciseData, error: dbError } = await supabase
             .from('exercises')
             .insert({
               name: exerciseName,
@@ -110,13 +121,19 @@ serve(async (req) => {
               alternative_exercises: [],
               equipment_needed: []
             })
+            .select()
+            .single()
 
           if (dbError) {
             console.error(`Erro ao criar registro para ${filename}:`, dbError);
             throw dbError;
           }
 
-          uploadedFiles.push({ name: filename, url: publicUrl })
+          uploadedFiles.push({ 
+            name: filename, 
+            url: publicUrl,
+            exercise: exerciseData 
+          })
           processedCount++
           console.log(`Arquivo ${filename} processado com sucesso`);
           
@@ -124,11 +141,7 @@ serve(async (req) => {
           console.error(`Erro ao processar ${filename}:`, error);
           errors.push(`Erro ao processar ${filename}: ${error.message}`);
         }
-      })
-
-      // Aguardar o processamento do lote atual
-      await Promise.all(batchPromises)
-      console.log(`Lote ${Math.floor(i / batchSize) + 1} concluído`);
+      }
     }
 
     console.log('Processamento concluído');
@@ -152,4 +165,3 @@ serve(async (req) => {
     )
   }
 })
-
