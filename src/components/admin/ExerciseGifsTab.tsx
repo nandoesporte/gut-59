@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -109,11 +110,13 @@ export const ExerciseGifsTab = () => {
           muscle_group: newExercise.muscle_group,
           exercise_type: newExercise.exercise_type,
           difficulty: newExercise.difficulty,
-          min_reps: 8, // valores padrão
+          min_reps: 8,
           max_reps: 12,
           min_sets: 3,
           max_sets: 5,
-          rest_time_seconds: 60
+          rest_time_seconds: 60,
+          alternative_exercises: [],
+          equipment_needed: []
         })
         .select()
         .single();
