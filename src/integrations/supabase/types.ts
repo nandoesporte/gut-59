@@ -1347,6 +1347,7 @@ export type Database = {
         | "resistance_band"
       nutritional_goal: "lose_weight" | "maintain" | "gain_mass"
       training_goal: "lose_weight" | "maintain" | "gain_mass"
+      workout_goal: "lose_weight" | "maintain" | "gain_mass"
     }
     CompositeTypes: {
       [_ in never]: never

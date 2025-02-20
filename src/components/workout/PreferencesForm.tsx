@@ -14,6 +14,7 @@ import { TrainingLocationField } from "./components/TrainingLocationField";
 import { WorkoutPreferences } from "./types";
 import { Clipboard, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const formSchema = z.object({
   age: z.number().min(16, "Idade mínima é 16 anos").max(100, "Idade máxima é 100 anos"),
@@ -47,27 +48,57 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
     },
   });
 
-  const handleSubmit = (data: FormSchema) => {
-    const workoutPreferences: WorkoutPreferences = {
-      age: data.age,
-      weight: data.weight,
-      height: data.height,
-      gender: data.gender,
-      goal: data.goal,
-      activity_level: data.activity_level,
-      preferred_exercise_types: data.preferred_exercise_types,
-      available_equipment: data.training_location === "gym" 
-        ? ["all"] 
-        : data.training_location === "home"
-        ? ["bodyweight", "resistance-bands", "dumbbells"]
-        : data.training_location === "outdoors"
-        ? ["bodyweight", "resistance-bands"]
-        : ["bodyweight"],
-    };
-    
-    console.log("Gerando plano com preferências:", workoutPreferences);
-    toast.info("Gerando seu plano de treino personalizado...");
-    onSubmit(workoutPreferences);
+  const handleSubmit = async (data: FormSchema) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast.error("Usuário não autenticado");
+        return;
+      }
+
+      const workoutPreferences: WorkoutPreferences = {
+        age: data.age,
+        weight: data.weight,
+        height: data.height,
+        gender: data.gender,
+        goal: data.goal,
+        activity_level: data.activity_level,
+        preferred_exercise_types: data.preferred_exercise_types,
+        available_equipment: data.training_location === "gym" 
+          ? ["all"] 
+          : data.training_location === "home"
+          ? ["bodyweight", "resistance-bands", "dumbbells"]
+          : data.training_location === "outdoors"
+          ? ["bodyweight", "resistance-bands"]
+          : ["bodyweight"],
+      };
+
+      // Save preferences to database
+      const { error: upsertError } = await supabase
+        .from('user_workout_preferences')
+        .upsert({
+          user_id: user.id,
+          ...workoutPreferences
+        }, {
+          onConflict: 'user_id'
+        });
+
+      if (upsertError) {
+        console.error("Erro ao salvar preferências:", upsertError);
+        throw upsertError;
+      }
+
+      console.log("Preferências salvas com sucesso!");
+      console.log("Gerando plano com preferências:", workoutPreferences);
+      toast.success("Preferências salvas com sucesso!");
+      toast.info("Gerando seu plano de treino personalizado...");
+      
+      onSubmit(workoutPreferences);
+    } catch (error: any) {
+      console.error("Erro ao processar formulário:", error);
+      toast.error(error.message || "Erro ao salvar preferências. Por favor, tente novamente.");
+    }
   };
 
   return (
