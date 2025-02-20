@@ -7,11 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const openai = {
-  key: Deno.env.get('OPENAI_API_KEY'),
-  url: 'https://api.openai.com/v1/chat/completions',
-};
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -20,73 +15,89 @@ serve(async (req) => {
   try {
     const { userData, selectedFoods, dietaryPreferences } = await req.json();
     
-    console.log('Dados recebidos:', {
-      userData,
-      selectedFoodsCount: selectedFoods.length,
-      dietaryPreferences
+    console.log('Dados recebidos para geração do plano:', {
+      goal: userData.goal,
+      calories: userData.dailyCalories,
+      foodsCount: selectedFoods.length
     });
 
-    if (!openai.key) {
+    const openAIKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openAIKey) {
       throw new Error('OpenAI API key não configurada');
     }
 
-    const systemPrompt = `Você é um nutricionista especializado em criar planos alimentares personalizados. 
-    Forneça um plano alimentar detalhado no formato JSON que seja compatível com o seguinte tipo:
-    {
-      dailyPlan: {
-        breakfast: { foods: Array<Food>, calories: number, macros: { protein: number, carbs: number, fats: number, fiber: number } },
-        morningSnack: { foods: Array<Food>, calories: number, macros: { protein: number, carbs: number, fats: number, fiber: number } },
-        lunch: { foods: Array<Food>, calories: number, macros: { protein: number, carbs: number, fats: number, fiber: number } },
-        afternoonSnack: { foods: Array<Food>, calories: number, macros: { protein: number, carbs: number, fats: number, fiber: number } },
-        dinner: { foods: Array<Food>, calories: number, macros: { protein: number, carbs: number, fats: number, fiber: number } }
-      },
-      recommendations: {
-        preworkout: string,
-        postworkout: string,
-        general: string,
-        timing: string[]
-      }
-    }`;
-
-    const userPrompt = `Crie um plano alimentar personalizado com base nas seguintes informações:
+    const prompt = `Como um nutricionista especialista, crie um plano alimentar detalhado para uma pessoa com as seguintes características:
     
     Objetivo: ${userData.goal}
-    Calorias diárias necessárias: ${userData.dailyCalories}
+    Calorias diárias: ${userData.dailyCalories}
     Gênero: ${userData.gender}
     Peso: ${userData.weight}kg
     Altura: ${userData.height}cm
     Idade: ${userData.age} anos
     Nível de atividade: ${userData.activityLevel}
-    
-    Alergias: ${dietaryPreferences.allergies?.join(', ') || 'Nenhuma'}
-    Restrições alimentares: ${dietaryPreferences.dietaryRestrictions?.join(', ') || 'Nenhuma'}
     Horário de treino: ${dietaryPreferences.trainingTime || 'Não especificado'}
     
-    Alimentos disponíveis para seleção:
+    Alimentos disponíveis:
     ${selectedFoods.map(food => 
-      `- ${food.name} (Proteína: ${food.protein}g, Carboidratos: ${food.carbs}g, Gorduras: ${food.fats}g)`
+      `- ${food.name} (${food.calories} kcal, P:${food.protein}g, C:${food.carbs}g, G:${food.fats}g)`
     ).join('\n')}
     
-    Importante:
-    1. Use APENAS os alimentos listados acima
-    2. Distribua as ${userData.dailyCalories} calorias entre as 5 refeições
-    3. Calcule os macronutrientes para cada refeição
-    4. Forneça recomendações específicas considerando o horário de treino
-    5. A resposta deve ser um objeto JSON válido`;
+    Retorne um plano alimentar APENAS no formato JSON seguindo exatamente esta estrutura:
+    {
+      "dailyPlan": {
+        "breakfast": {
+          "foods": [{"name": "string", "portion": number, "portionUnit": "string"}],
+          "calories": number,
+          "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number}
+        },
+        "morningSnack": {
+          "foods": [{"name": "string", "portion": number, "portionUnit": "string"}],
+          "calories": number,
+          "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number}
+        },
+        "lunch": {
+          "foods": [{"name": "string", "portion": number, "portionUnit": "string"}],
+          "calories": number,
+          "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number}
+        },
+        "afternoonSnack": {
+          "foods": [{"name": "string", "portion": number, "portionUnit": "string"}],
+          "calories": number,
+          "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number}
+        },
+        "dinner": {
+          "foods": [{"name": "string", "portion": number, "portionUnit": "string"}],
+          "calories": number,
+          "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number}
+        }
+      },
+      "recommendations": {
+        "preworkout": "string",
+        "postworkout": "string",
+        "general": "string",
+        "timing": ["string"]
+      }
+    }`;
 
     console.log('Chamando OpenAI...');
     
-    const aiResponse = await fetch(openai.url, {
+    const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openai.key}`,
+        'Authorization': `Bearer ${openAIKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-4o-mini',
         messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
+          { 
+            role: 'system', 
+            content: 'Você é um nutricionista especializado que gera planos alimentares em formato JSON estruturado.'
+          },
+          { 
+            role: 'user', 
+            content: prompt 
+          }
         ],
         temperature: 0.7,
         max_tokens: 2000,
@@ -94,9 +105,9 @@ serve(async (req) => {
     });
 
     if (!aiResponse.ok) {
-      const error = await aiResponse.text();
-      console.error('Erro na resposta da OpenAI:', error);
-      throw new Error(`Erro na chamada da OpenAI: ${error}`);
+      const errorText = await aiResponse.text();
+      console.error('Erro na resposta da OpenAI:', errorText);
+      throw new Error('Erro ao gerar plano alimentar');
     }
 
     const aiData = await aiResponse.json();
@@ -104,18 +115,16 @@ serve(async (req) => {
       throw new Error('Resposta inválida da OpenAI');
     }
 
-    console.log('Resposta da IA recebida, processando...');
+    console.log('Processando resposta da IA...');
 
     let mealPlan;
     try {
       mealPlan = JSON.parse(aiData.choices[0].message.content);
       
-      // Validar estrutura básica do plano
       if (!mealPlan.dailyPlan || !mealPlan.recommendations) {
         throw new Error('Estrutura do plano alimentar inválida');
       }
 
-      // Calcular totais
       const totalNutrition = {
         calories: 0,
         protein: 0,
@@ -134,35 +143,23 @@ serve(async (req) => {
         }
       });
 
-      mealPlan.totalNutrition = {
-        calories: Math.round(totalNutrition.calories),
-        protein: Math.round(totalNutrition.protein),
-        carbs: Math.round(totalNutrition.carbs),
-        fats: Math.round(totalNutrition.fats),
-        fiber: Math.round(totalNutrition.fiber)
-      };
-
-      console.log('Plano alimentar processado com sucesso:', {
-        totalCalorias: mealPlan.totalNutrition.calories,
-        refeicoes: Object.keys(mealPlan.dailyPlan).length
-      });
-
+      mealPlan.totalNutrition = totalNutrition;
+      
+      console.log('Plano alimentar gerado com sucesso');
+      
     } catch (error) {
-      console.error('Erro ao processar resposta da IA:', error);
-      throw new Error('Formato inválido na resposta da IA');
+      console.error('Erro ao processar resposta:', error);
+      throw new Error('Erro ao processar plano alimentar');
     }
 
     return new Response(JSON.stringify(mealPlan), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200
     });
 
   } catch (error) {
-    console.error('Erro na função generate-meal-plan:', error);
+    console.error('Erro na função:', error);
     return new Response(
-      JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Erro interno ao gerar plano alimentar'
-      }),
+      JSON.stringify({ error: error.message || 'Erro interno' }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
