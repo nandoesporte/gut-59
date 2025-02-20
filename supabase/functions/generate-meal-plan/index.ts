@@ -6,12 +6,14 @@ import { validateMealPlan, standardizeUnits } from "./validator.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Content-Type': 'application/json'
 };
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { 
-      status: 200,
+      status: 204,
       headers: corsHeaders 
     });
   }
@@ -19,19 +21,30 @@ serve(async (req) => {
   try {
     const { userData, selectedFoods, dietaryPreferences } = await req.json();
     
-    console.log('Dados recebidos para geração do plano:', {
-      goal: userData.goal,
-      calories: userData.dailyCalories,
-      foodsCount: selectedFoods.length
-    });
+    console.log('Starting meal plan generation...');
+    console.log('User data:', JSON.stringify(userData));
+    console.log('Selected foods count:', selectedFoods.length);
 
     const openAIKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAIKey) {
       return new Response(
-        JSON.stringify({ error: 'OpenAI API key não configurada' }), 
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'OpenAI API key not configured' }), 
+        { status: 200, headers: corsHeaders }
       );
     }
+
+    const systemPrompt = `You are a nutrition expert. Create a daily meal plan using ONLY the provided foods.
+    Return ONLY the JSON structure, no additional text.`;
+
+    const userPrompt = `Create a meal plan with:
+    Calories: ${userData.dailyCalories}kcal
+    Profile: ${userData.age}y, ${userData.gender}, ${userData.weight}kg
+    Goal: ${userData.goal}
+    Foods: ${selectedFoods.map(f => f.name).join(', ')}
+    Restrictions: ${dietaryPreferences.dietaryRestrictions?.join(', ') || 'None'}
+    Allergies: ${dietaryPreferences.allergies?.join(', ') || 'None'}`;
+
+    console.log('Sending request to OpenAI...');
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -42,21 +55,8 @@ serve(async (req) => {
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: [
-          { 
-            role: 'system', 
-            content: `Como nutricionista, crie um plano alimentar diário usando apenas os alimentos fornecidos.
-            Retorne apenas o JSON com a estrutura especificada, sem texto adicional.` 
-          },
-          { 
-            role: 'user', 
-            content: `Crie um plano usando:
-            - Calorias: ${userData.dailyCalories}kcal
-            - Perfil: ${userData.age} anos, ${userData.gender}, ${userData.weight}kg
-            - Objetivo: ${userData.goal}
-            - Alimentos: ${selectedFoods.map(f => f.name).join(', ')}
-            - Restrições: ${dietaryPreferences.dietaryRestrictions?.join(', ') || 'Nenhuma'}
-            - Alergias: ${dietaryPreferences.allergies?.join(', ') || 'Nenhuma'}`
-          }
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
         ],
         temperature: 0.3,
         max_tokens: 2000
@@ -64,44 +64,53 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
-      console.error('Erro OpenAI:', await response.text());
+      const errorText = await response.text();
+      console.error('OpenAI Error:', errorText);
       return new Response(
-        JSON.stringify({ error: 'Erro ao gerar plano alimentar' }), 
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'Failed to generate meal plan' }), 
+        { status: 200, headers: corsHeaders }
       );
     }
 
     const data = await response.json();
-    
+    console.log('Received response from OpenAI');
+
     if (!data.choices?.[0]?.message?.content) {
+      console.error('Invalid OpenAI response:', data);
       return new Response(
-        JSON.stringify({ error: 'Resposta inválida do modelo' }), 
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'Invalid model response' }), 
+        { status: 200, headers: corsHeaders }
       );
     }
 
     try {
-      const mealPlan = JSON.parse(data.choices[0].message.content);
+      const content = data.choices[0].message.content;
+      console.log('Parsing response...');
+      const mealPlan = JSON.parse(content);
       const validatedPlan = validateMealPlan(mealPlan);
-      
+      console.log('Meal plan generated successfully');
+
       return new Response(
-        JSON.stringify(validatedPlan), 
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify(validatedPlan),
+        { status: 200, headers: corsHeaders }
       );
 
     } catch (error) {
-      console.error('Erro ao processar plano:', error);
+      console.error('Error processing meal plan:', error);
       return new Response(
-        JSON.stringify({ error: 'Erro ao processar plano alimentar' }), 
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'Failed to process meal plan' }), 
+        { status: 200, headers: corsHeaders }
       );
     }
 
   } catch (error) {
-    console.error('Erro na edge function:', error);
+    console.error('Edge function error:', error);
     return new Response(
-      JSON.stringify({ error: 'Erro interno do servidor' }), 
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ 
+        error: 'Internal server error',
+        details: error.message 
+      }), 
+      { status: 200, headers: corsHeaders }
     );
   }
 });
