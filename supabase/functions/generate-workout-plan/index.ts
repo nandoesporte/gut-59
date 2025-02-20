@@ -1,144 +1,193 @@
 
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.0";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+const supabaseUrl = Deno.env.get('SUPABASE_URL');
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
 serve(async (req) => {
+  // Handle CORS
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const { preferences, userId } = await req.json();
-    console.log("Recebendo preferências:", JSON.stringify(preferences, null, 2));
+    const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
 
-    if (!userId) {
-      return new Response(
-        JSON.stringify({ error: "User ID é obrigatório" }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400
-        }
-      );
-    }
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-    if (!supabaseUrl || !supabaseKey) {
-      return new Response(
-        JSON.stringify({ error: "Configuração do Supabase ausente" }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500
-        }
-      );
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // Busca exercícios básicos primeiro
+    // Fetch available exercises from the database
     const { data: exercises, error: exercisesError } = await supabase
       .from('exercises')
       .select('*')
-      .limit(20);
+      .in('exercise_type', preferences.preferred_exercise_types)
+      .in('equipment_needed', preferences.available_equipment);
 
     if (exercisesError) {
-      console.error("Erro ao buscar exercícios:", exercisesError);
-      return new Response(
-        JSON.stringify({ error: "Erro ao buscar exercícios" }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500
-        }
-      );
+      throw new Error('Failed to fetch exercises');
     }
 
-    if (!exercises || exercises.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "Nenhum exercício encontrado na base de dados" }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 404
+    console.log('Generating workout plan with preferences:', preferences);
+    console.log('Available exercises:', exercises.length);
+
+    // Create system prompt for workout plan generation
+    const systemPrompt = `You are an expert personal trainer tasked with creating personalized workout plans. 
+    Create a plan based on these preferences:
+    - Age: ${preferences.age}
+    - Gender: ${preferences.gender}
+    - Weight: ${preferences.weight}kg
+    - Height: ${preferences.height}cm
+    - Goal: ${preferences.goal}
+    - Activity Level: ${preferences.activity_level}
+    - Available Equipment: ${preferences.available_equipment.join(', ')}
+    
+    Format the response as a JSON object with:
+    1. A 7-day workout plan
+    2. Each day should have:
+       - warmup_description
+       - cooldown_description
+       - 4-6 exercises from the provided list
+       - For each exercise specify: sets, reps, and rest_time_seconds
+    3. Consider the user's goals and fitness level
+    4. Structure the response exactly as shown in the example.`;
+
+    const userPrompt = `Available exercises: ${JSON.stringify(exercises.map(e => ({
+      id: e.id,
+      name: e.name,
+      type: e.exercise_type,
+      equipment: e.equipment_needed,
+      difficulty: e.difficulty
+    })))}
+
+    Example response format:
+    {
+      "workout_sessions": [
+        {
+          "day_number": 1,
+          "warmup_description": "5 minutes light cardio followed by dynamic stretches",
+          "cooldown_description": "5 minutes static stretching",
+          "exercises": [
+            {
+              "name": "Push-ups",
+              "sets": 3,
+              "reps": 12,
+              "rest_time_seconds": 60
+            }
+          ]
         }
-      );
+      ]
+    }`;
+
+    // Generate workout plan using GPT
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.7,
+      }),
+    });
+
+    const gptResponse = await response.json();
+    
+    if (!gptResponse.choices?.[0]?.message?.content) {
+      throw new Error('Failed to generate workout plan');
     }
 
-    console.log(`Encontrados ${exercises.length} exercícios`);
+    // Parse the generated plan
+    const workoutPlan = JSON.parse(gptResponse.choices[0].message.content);
 
-    // Gera as sessões de treino
-    const workoutSessions = Array.from({ length: 3 }, (_, i) => ({
-      id: crypto.randomUUID(),
-      day_number: i + 1,
-      warmup_description: "Aquecimento dinâmico de 10 minutos incluindo mobilidade articular",
-      cooldown_description: "Alongamento estático de 10 minutos focando nos músculos trabalhados",
-      exercises: exercises
-        .slice(0, 6)
-        .map(exercise => ({
-          name: exercise.name,
-          sets: 3,
-          reps: 12,
-          rest_time_seconds: 60,
-          gifUrl: exercise.gif_url
-        }))
-    }));
-
-    const workoutPlan = {
-      id: crypto.randomUUID(),
-      user_id: userId,
-      goal: preferences.goal || 'general_fitness',
-      start_date: new Date().toISOString(),
-      end_date: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString(),
-      workout_sessions: workoutSessions
-    };
-
-    // Salva o plano
-    const { error: planError } = await supabase
+    // Save the plan to the database
+    const { data: planData, error: planError } = await supabase
       .from('workout_plans')
       .insert({
-        id: workoutPlan.id,
         user_id: userId,
-        plan_data: workoutPlan,
-        goal: workoutPlan.goal,
-        start_date: workoutPlan.start_date,
-        end_date: workoutPlan.end_date,
-        active: true
-      });
+        goal: preferences.goal,
+        start_date: new Date().toISOString(),
+        end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
+      })
+      .select()
+      .single();
 
     if (planError) {
-      console.error("Erro ao salvar plano:", planError);
-      return new Response(
-        JSON.stringify({ error: "Erro ao salvar plano de treino" }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500
-        }
-      );
+      throw new Error('Failed to save workout plan');
     }
 
-    return new Response(
-      JSON.stringify(workoutPlan),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200 
+    // Save workout sessions
+    const sessionsToInsert = workoutPlan.workout_sessions.map(session => ({
+      plan_id: planData.id,
+      day_number: session.day_number,
+      warmup_description: session.warmup_description,
+      cooldown_description: session.cooldown_description,
+    }));
+
+    const { data: sessionsData, error: sessionsError } = await supabase
+      .from('workout_sessions')
+      .insert(sessionsToInsert)
+      .select();
+
+    if (sessionsError) {
+      throw new Error('Failed to save workout sessions');
+    }
+
+    // Save exercises for each session
+    for (let i = 0; i < sessionsData.length; i++) {
+      const session = sessionsData[i];
+      const exercises = workoutPlan.workout_sessions[i].exercises;
+      
+      const exercisesToInsert = exercises.map((exercise, index) => ({
+        session_id: session.id,
+        order_in_session: index + 1,
+        sets: exercise.sets,
+        reps: exercise.reps,
+        rest_time_seconds: exercise.rest_time_seconds,
+        exercise_id: getExerciseIdByName(exercises, exercise.name),
+      }));
+
+      const { error: exercisesError } = await supabase
+        .from('session_exercises')
+        .insert(exercisesToInsert);
+
+      if (exercisesError) {
+        throw new Error('Failed to save session exercises');
       }
-    );
+    }
+
+    // Return the complete workout plan
+    return new Response(JSON.stringify({
+      id: planData.id,
+      user_id: userId,
+      goal: preferences.goal,
+      start_date: planData.start_date,
+      end_date: planData.end_date,
+      workout_sessions: workoutPlan.workout_sessions,
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
 
   } catch (error) {
-    console.error("Erro na função:", error);
-    
-    return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : "Erro interno ao gerar plano de treino"
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500
-      }
-    );
+    console.error('Error generating workout plan:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });
+
+function getExerciseIdByName(exercises: any[], name: string): string | undefined {
+  const exercise = exercises.find(e => e.name.toLowerCase() === name.toLowerCase());
+  return exercise?.id;
+}
