@@ -10,12 +10,12 @@ const corsHeaders = {
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const { preferences, userId } = await req.json();
-    console.log("Recebendo requisição com preferências:", preferences);
+    console.log("Recebendo preferências:", preferences);
 
     if (!userId) {
       throw new Error("User ID é obrigatório");
@@ -23,14 +23,15 @@ serve(async (req) => {
 
     // Inicializa o cliente Supabase
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Busca exercícios disponíveis
+    // Busca exercícios baseados no grupo muscular selecionado
     const { data: exercises, error: exercisesError } = await supabase
       .from('exercises')
       .select('*')
-      .eq('muscle_group', 'full_body');
+      .eq('muscle_group', preferences.muscleGroup || 'full_body')
+      .eq('exercise_type', preferences.preferredExerciseTypes?.[0] || 'strength');
 
     if (exercisesError) {
       console.error("Erro ao buscar exercícios:", exercisesError);
@@ -38,51 +39,67 @@ serve(async (req) => {
     }
 
     if (!exercises || exercises.length === 0) {
-      throw new Error("Nenhum exercício encontrado");
+      throw new Error("Nenhum exercício encontrado para as preferências selecionadas");
     }
 
-    // Gera um plano de treino baseado nas preferências
+    // Função auxiliar para embaralhar array
+    const shuffleArray = (array: any[]) => {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    };
+
+    // Seleciona exercícios aleatórios para cada sessão
+    const exercisesPerSession = Math.min(6, exercises.length);
+    const sessions = Array.from({ length: preferences.frequency }, (_, i) => {
+      const sessionExercises = shuffleArray([...exercises])
+        .slice(0, exercisesPerSession)
+        .map(exercise => ({
+          name: exercise.name,
+          sets: preferences.experienceLevel === 'beginner' ? 3 : 4,
+          reps: preferences.goal === 'gain_mass' ? 8 : 12,
+          rest_time_seconds: preferences.goal === 'gain_mass' ? 90 : 60,
+          gifUrl: exercise.gif_url
+        }));
+
+      return {
+        id: crypto.randomUUID(),
+        day_number: i + 1,
+        warmup_description: "Aquecimento dinâmico de 10 minutos incluindo mobilidade articular",
+        cooldown_description: "Alongamento estático de 10 minutos focando nos músculos trabalhados",
+        exercises: sessionExercises
+      };
+    });
+
+    // Gera o plano completo
     const workoutPlan = {
       id: crypto.randomUUID(),
       user_id: userId,
       goal: preferences.goal,
       start_date: new Date().toISOString(),
-      end_date: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString(),
-      workout_sessions: Array.from({ length: 3 }, (_, i) => ({
-        id: crypto.randomUUID(),
-        day_number: i + 1,
-        warmup_description: "Aquecimento dinâmico de 10 minutos incluindo mobilidade articular",
-        cooldown_description: "Alongamento estático de 10 minutos focando nos músculos trabalhados",
-        exercises: exercises.slice(0, 6).map(exercise => ({
-          name: exercise.name,
-          sets: 3,
-          reps: 12,
-          rest_time_seconds: 60,
-          gifUrl: exercise.gif_url
-        }))
-      }))
+      end_date: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString(), // 28 dias
+      workout_sessions: sessions
     };
 
-    console.log("Plano gerado:", workoutPlan);
-
     // Salva o plano no banco de dados
-    const { error: insertError } = await supabase
+    const { error: planError } = await supabase
       .from('workout_plans')
       .insert([{
         id: workoutPlan.id,
         user_id: userId,
-        goal: workoutPlan.goal,
-        start_date: workoutPlan.start_date,
-        end_date: workoutPlan.end_date
+        plan_data: workoutPlan,
+        active: true
       }]);
 
-    if (insertError) {
-      console.error("Erro ao salvar plano:", insertError);
+    if (planError) {
+      console.error("Erro ao salvar plano:", planError);
       throw new Error("Erro ao salvar plano de treino");
     }
 
-    // Salva as sessões de treino
-    for (const session of workoutPlan.workout_sessions) {
+    // Salva as sessões
+    for (const session of sessions) {
       const { error: sessionError } = await supabase
         .from('workout_sessions')
         .insert({
@@ -97,34 +114,12 @@ serve(async (req) => {
         console.error("Erro ao salvar sessão:", sessionError);
         throw new Error("Erro ao salvar sessões de treino");
       }
-
-      // Salva os exercícios da sessão
-      const sessionExercises = session.exercises.map((exercise, index) => ({
-        session_id: session.id,
-        exercise_id: exercises[index].id,
-        sets: exercise.sets,
-        reps: exercise.reps,
-        rest_time_seconds: exercise.rest_time_seconds,
-        order_in_session: index + 1
-      }));
-
-      const { error: exercisesError } = await supabase
-        .from('session_exercises')
-        .insert(sessionExercises);
-
-      if (exercisesError) {
-        console.error("Erro ao salvar exercícios:", exercisesError);
-        throw new Error("Erro ao salvar exercícios da sessão");
-      }
     }
 
     return new Response(
       JSON.stringify(workoutPlan),
       { 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200 
       }
     );
@@ -137,11 +132,8 @@ serve(async (req) => {
         error: error instanceof Error ? error.message : "Erro interno ao gerar plano de treino"
       }),
       { 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        },
-        status: 400
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500
       }
     );
   }
