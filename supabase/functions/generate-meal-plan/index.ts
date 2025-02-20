@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { validateMealPlan, standardizeUnits } from "./validator.ts";
@@ -133,14 +134,16 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4',
+        model: 'gpt-4o-mini',
         messages: [
-          { role: 'system', content: systemPrompt },
+          { 
+            role: 'system', 
+            content: 'You are a nutritionist AI that generates meal plans. Always respond with valid JSON following the exact schema required. The response should be a JSON object with dailyPlan, totalNutrition, and recommendations.' 
+          },
           { role: 'user', content: userPrompt }
         ],
         temperature: 0.3,
-        max_tokens: 3000,
-        response_format: { type: "json_object" }
+        max_tokens: 3000
       }),
     });
 
