@@ -16,63 +16,138 @@ serve(async (req) => {
     const { userData, selectedFoods, dietaryPreferences } = await req.json();
     console.log('Dados recebidos:', { userData, selectedFoods: selectedFoods.length });
 
-    // Montar resposta estática para depuração
+    // Criar porções e medidas mais precisas
+    const formatPortion = (food: any, baseAmount: number) => {
+      const units = {
+        arroz: "xícara(s)",
+        feijao: "concha(s)",
+        pao: "fatia(s)",
+        leite: "copo(s)",
+        aveia: "colher(es) de sopa",
+        fruta: "unidade(s)",
+        ovo: "unidade(s)",
+        carne: "gramas",
+        frango: "gramas",
+        peixe: "gramas",
+        verdura: "xícara(s)",
+        legume: "xícara(s)",
+      };
+
+      const defaultUnit = food.portionUnit || "gramas";
+      const amount = Math.round(baseAmount * (food.portion || 100) / 100);
+      
+      // Usar unidades específicas se disponíveis, caso contrário usar a unidade padrão
+      const unit = Object.entries(units).find(([key]) => 
+        food.name.toLowerCase().includes(key)
+      )?.[1] || defaultUnit;
+
+      return `${amount}${unit}`;
+    };
+
+    // Gerar descrições mais detalhadas
+    const generateDescription = (foods: any[], mealType: string) => {
+      const tips = {
+        breakfast: [
+          "Comece o dia com uma refeição nutritiva e equilibrada",
+          "Inclua proteínas para maior saciedade",
+          "Adicione frutas para vitaminas e minerais essenciais"
+        ],
+        morningSnack: [
+          "Mantenha a energia entre as refeições principais",
+          "Opte por opções leves e nutritivas",
+          "Combine carboidratos e proteínas"
+        ],
+        lunch: [
+          "Equilibre proteínas, carboidratos e vegetais",
+          "Mastige bem os alimentos",
+          "Faça um prato colorido"
+        ],
+        afternoonSnack: [
+          "Evite ficar muito tempo sem comer",
+          "Escolha opções que forneçam energia sustentável",
+          "Mantenha porções moderadas"
+        ],
+        dinner: [
+          "Opte por uma refeição mais leve",
+          "Evite alimentos muito pesados",
+          "Inclua vegetais e proteínas magras"
+        ]
+      };
+
+      const descriptions = foods.map(food => {
+        let prep = "";
+        if (food.name.toLowerCase().includes("carne") || food.name.toLowerCase().includes("frango")) {
+          prep = "grelhado(a)";
+        } else if (food.name.toLowerCase().includes("verdura") || food.name.toLowerCase().includes("legume")) {
+          prep = "cozido(a) al dente";
+        }
+        return `${food.name} ${prep}`.trim();
+      });
+
+      const mealTips = tips[mealType as keyof typeof tips] || [];
+      return {
+        foods: descriptions,
+        tips: mealTips[Math.floor(Math.random() * mealTips.length)]
+      };
+    };
+
+    // Gerar cardápio detalhado
     const mealPlan = {
       dailyPlan: {
         breakfast: {
-          description: "Café da manhã nutritivo e equilibrado",
           foods: selectedFoods.slice(0, 2).map(food => ({
-            name: food.name,
-            portion: food.portion,
-            unit: food.portionUnit,
-            details: "Consumir pela manhã"
+            ...food,
+            portion: formatPortion(food, 100),
+            preparation: generateDescription([food], "breakfast").foods[0],
+            details: "Consumir logo após acordar para um início de dia energético"
           })),
           calories: 400,
-          macros: { protein: 20, carbs: 40, fats: 15, fiber: 5 }
+          macros: { protein: 20, carbs: 40, fats: 15, fiber: 5 },
+          description: generateDescription(selectedFoods.slice(0, 2), "breakfast").tips
         },
         morningSnack: {
-          description: "Lanche da manhã leve",
           foods: selectedFoods.slice(2, 3).map(food => ({
-            name: food.name,
-            portion: food.portion,
-            unit: food.portionUnit,
-            details: "Consumir entre as refeições principais"
+            ...food,
+            portion: formatPortion(food, 75),
+            preparation: generateDescription([food], "morningSnack").foods[0],
+            details: "Lanche intermediário para manter os níveis de energia"
           })),
           calories: 200,
-          macros: { protein: 10, carbs: 25, fats: 8, fiber: 3 }
+          macros: { protein: 10, carbs: 25, fats: 8, fiber: 3 },
+          description: generateDescription(selectedFoods.slice(2, 3), "morningSnack").tips
         },
         lunch: {
-          description: "Almoço balanceado",
           foods: selectedFoods.slice(3, 5).map(food => ({
-            name: food.name,
-            portion: food.portion,
-            unit: food.portionUnit,
-            details: "Refeição principal do dia"
+            ...food,
+            portion: formatPortion(food, 150),
+            preparation: generateDescription([food], "lunch").foods[0],
+            details: "Refeição principal do dia, rica em nutrientes"
           })),
           calories: 600,
-          macros: { protein: 30, carbs: 60, fats: 20, fiber: 8 }
+          macros: { protein: 30, carbs: 60, fats: 20, fiber: 8 },
+          description: generateDescription(selectedFoods.slice(3, 5), "lunch").tips
         },
         afternoonSnack: {
-          description: "Lanche da tarde energético",
           foods: selectedFoods.slice(5, 6).map(food => ({
-            name: food.name,
-            portion: food.portion,
-            unit: food.portionUnit,
-            details: "Ideal para manter a energia"
+            ...food,
+            portion: formatPortion(food, 75),
+            preparation: generateDescription([food], "afternoonSnack").foods[0],
+            details: "Lanche estratégico para evitar fome excessiva no jantar"
           })),
           calories: 200,
-          macros: { protein: 10, carbs: 25, fats: 8, fiber: 3 }
+          macros: { protein: 10, carbs: 25, fats: 8, fiber: 3 },
+          description: generateDescription(selectedFoods.slice(5, 6), "afternoonSnack").tips
         },
         dinner: {
-          description: "Jantar leve e nutritivo",
           foods: selectedFoods.slice(6, 8).map(food => ({
-            name: food.name,
-            portion: food.portion,
-            unit: food.portionUnit,
-            details: "Última refeição do dia"
+            ...food,
+            portion: formatPortion(food, 125),
+            preparation: generateDescription([food], "dinner").foods[0],
+            details: "Última refeição do dia, mais leve para melhor digestão"
           })),
           calories: 500,
-          macros: { protein: 25, carbs: 45, fats: 18, fiber: 6 }
+          macros: { protein: 25, carbs: 45, fats: 18, fiber: 6 },
+          description: generateDescription(selectedFoods.slice(6, 8), "dinner").tips
         }
       },
       totalNutrition: {
@@ -83,42 +158,64 @@ serve(async (req) => {
         fiber: 25
       },
       recommendations: {
-        general: "Mantenha uma boa hidratação ao longo do dia e procure fazer as refeições em horários regulares.",
+        general: [
+          "Mantenha uma boa hidratação ao longo do dia",
+          "Faça as refeições em horários regulares",
+          "Evite distrações durante as refeições",
+          "Mastigue bem os alimentos",
+          "Priorize alimentos in natura"
+        ],
         timing: [
-          "Café da manhã: 7:00",
-          "Lanche da manhã: 10:00",
-          "Almoço: 12:30",
-          "Lanche da tarde: 15:30",
-          "Jantar: 19:00"
+          "Café da manhã: 7:00 - 8:00",
+          "Lanche da manhã: 10:00 - 10:30",
+          "Almoço: 12:30 - 13:30",
+          "Lanche da tarde: 15:30 - 16:00",
+          "Jantar: 19:00 - 20:00"
         ],
         preparation: [
           "Prepare as refeições com antecedência quando possível",
-          "Evite pular refeições",
-          "Mastigue bem os alimentos"
+          "Mantenha porções controladas usando medidores",
+          "Armazene os alimentos adequadamente",
+          "Prefira métodos de cocção saudáveis como grelhar e cozinhar",
+          "Tempere os alimentos com ervas e especiarias naturais"
         ],
         substitutions: [
-          "Em caso de necessidade, substitua alimentos por outros do mesmo grupo alimentar",
-          "Mantenha as proporções de macronutrientes ao fazer substituições"
+          {
+            group: "Proteínas",
+            options: "Troque entre carnes magras, peixes, ovos e proteínas vegetais"
+          },
+          {
+            group: "Carboidratos",
+            options: "Alterne entre arroz integral, quinoa, batata doce e mandioca"
+          },
+          {
+            group: "Vegetais",
+            options: "Varie as cores e tipos de vegetais para maior diversidade nutricional"
+          }
         ]
       }
     };
 
-    // Processar horários de treino
+    // Ajustar horários com base no treino
     if (dietaryPreferences.trainingTime) {
       const trainingTime = new Date(`1970-01-01T${dietaryPreferences.trainingTime}`);
       const hour = trainingTime.getHours();
       
       mealPlan.recommendations.timing = [
-        "Café da manhã: 7:00",
-        "Lanche da manhã: 10:00",
-        "Almoço: 12:00",
-        `Pré-treino: ${hour - 1}:00`,
-        `Pós-treino: ${hour + 1}:00`,
-        "Jantar: 20:00"
+        "Café da manhã: 7:00 - 8:00",
+        "Lanche da manhã: 10:00 - 10:30",
+        "Almoço: 12:00 - 13:00",
+        `Pré-treino: ${hour - 1}:00 - ${hour - 0.5}:00`,
+        `Pós-treino: ${hour + 0.5}:00 - ${hour + 1}:00`,
+        "Jantar: 20:00 - 21:00"
       ];
+
+      // Adicionar recomendações específicas para treino
+      mealPlan.recommendations.preworkout = "Consuma carboidratos de fácil digestão 1-2 horas antes do treino";
+      mealPlan.recommendations.postworkout = "Priorize proteínas e carboidratos até 1 hora após o treino";
     }
 
-    console.log('Plano alimentar gerado com sucesso');
+    console.log('Plano alimentar detalhado gerado com sucesso');
 
     return new Response(JSON.stringify(mealPlan), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
