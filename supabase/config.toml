@@ -6,6 +6,6 @@ enabled = true
 port = 54321
 schemas = ["public", "storage"]
 
+[functions]
 [functions.generate-meal-plan]
 verify_jwt = true
-imports = { xhr = "https://deno.land/x/xhr@0.1.0/mod.ts" }
