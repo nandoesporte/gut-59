@@ -1,7 +1,6 @@
 
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -94,32 +93,75 @@ serve(async (req) => {
 
     const macros = calculateTotalMacros();
 
-    // Add recommendations based on training time
-    const recommendations = {
-      general: [
-        `Distribuição calórica diária: ${userData.dailyCalories} kcal`,
-        `Consumo de água recomendado: ${Math.round(userData.weight * 35)}ml por dia`,
-        "Mantenha um intervalo de 2.5-3.5 horas entre as refeições"
-      ],
-      preworkout: dietaryPreferences.trainingTime 
-        ? [`Consuma uma refeição leve 2 horas antes do treino (${dietaryPreferences.trainingTime})`]
-        : [],
-      postworkout: [
-        "Consuma proteínas e carboidratos até 1 hora após o treino",
-        "Hidrate-se bem durante e após o exercício"
-      ]
+    // Format the response according to the expected MealPlan type
+    const formattedMealPlan = {
+      dailyPlan: {
+        breakfast: {
+          foods: mealPlan.breakfast,
+          calories: mealDistribution.breakfast,
+          macros: {
+            protein: mealPlan.breakfast.reduce((sum, food) => sum + (food.protein || 0), 0),
+            carbs: mealPlan.breakfast.reduce((sum, food) => sum + (food.carbs || 0), 0),
+            fats: mealPlan.breakfast.reduce((sum, food) => sum + (food.fats || 0), 0),
+            fiber: mealPlan.breakfast.reduce((sum, food) => sum + (food.fiber || 0), 0),
+          }
+        },
+        morningSnack: {
+          foods: mealPlan.morningSnack,
+          calories: mealDistribution.morningSnack,
+          macros: {
+            protein: mealPlan.morningSnack.reduce((sum, food) => sum + (food.protein || 0), 0),
+            carbs: mealPlan.morningSnack.reduce((sum, food) => sum + (food.carbs || 0), 0),
+            fats: mealPlan.morningSnack.reduce((sum, food) => sum + (food.fats || 0), 0),
+            fiber: mealPlan.morningSnack.reduce((sum, food) => sum + (food.fiber || 0), 0),
+          }
+        },
+        lunch: {
+          foods: mealPlan.lunch,
+          calories: mealDistribution.lunch,
+          macros: {
+            protein: mealPlan.lunch.reduce((sum, food) => sum + (food.protein || 0), 0),
+            carbs: mealPlan.lunch.reduce((sum, food) => sum + (food.carbs || 0), 0),
+            fats: mealPlan.lunch.reduce((sum, food) => sum + (food.fats || 0), 0),
+            fiber: mealPlan.lunch.reduce((sum, food) => sum + (food.fiber || 0), 0),
+          }
+        },
+        afternoonSnack: {
+          foods: mealPlan.afternoonSnack,
+          calories: mealDistribution.afternoonSnack,
+          macros: {
+            protein: mealPlan.afternoonSnack.reduce((sum, food) => sum + (food.protein || 0), 0),
+            carbs: mealPlan.afternoonSnack.reduce((sum, food) => sum + (food.carbs || 0), 0),
+            fats: mealPlan.afternoonSnack.reduce((sum, food) => sum + (food.fats || 0), 0),
+            fiber: mealPlan.afternoonSnack.reduce((sum, food) => sum + (food.fiber || 0), 0),
+          }
+        },
+        dinner: {
+          foods: mealPlan.dinner,
+          calories: mealDistribution.dinner,
+          macros: {
+            protein: mealPlan.dinner.reduce((sum, food) => sum + (food.protein || 0), 0),
+            carbs: mealPlan.dinner.reduce((sum, food) => sum + (food.carbs || 0), 0),
+            fats: mealPlan.dinner.reduce((sum, food) => sum + (food.fats || 0), 0),
+            fiber: mealPlan.dinner.reduce((sum, food) => sum + (food.fiber || 0), 0),
+          }
+        }
+      },
+      totalNutrition: macros,
+      recommendations: {
+        preworkout: dietaryPreferences.trainingTime 
+          ? `Consuma uma refeição leve 2 horas antes do treino (${dietaryPreferences.trainingTime})`
+          : "",
+        postworkout: "Consuma proteínas e carboidratos até 1 hora após o treino",
+        general: "Mantenha um intervalo de 2.5-3.5 horas entre as refeições",
+        timing: [
+          `Distribuição calórica diária: ${userData.dailyCalories} kcal`,
+          `Consumo de água recomendado: ${Math.round(userData.weight * 35)}ml por dia`
+        ]
+      }
     };
 
-    const response = {
-      dailyPlan: mealPlan,
-      macros,
-      recommendations,
-      mealDistribution
-    };
-
-    console.log('Generated meal plan:', response);
-
-    return new Response(JSON.stringify(response), {
+    return new Response(JSON.stringify(formattedMealPlan), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
