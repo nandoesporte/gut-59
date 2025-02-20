@@ -104,7 +104,7 @@ export const useMenuController = () => {
       }
 
       // Chamar a edge function para gerar o plano alimentar
-      const { data: responseData, error: generateError } = await supabase.functions.invoke(
+      const response = await supabase.functions.invoke(
         'generate-meal-plan',
         {
           body: {
@@ -138,12 +138,12 @@ export const useMenuController = () => {
         }
       );
 
-      if (generateError) {
-        console.error('Erro na edge function:', generateError);
-        throw new Error('Falha ao gerar cardápio');
+      if (response.error) {
+        console.error('Erro na edge function:', response.error);
+        throw new Error(response.error.message || 'Falha ao gerar cardápio');
       }
 
-      if (!responseData) {
+      if (!response.data) {
         throw new Error('Nenhum dado recebido do gerador de cardápio');
       }
 
@@ -152,7 +152,7 @@ export const useMenuController = () => {
         .from('meal_plans')
         .insert({
           user_id: userData.user.id,
-          plan_data: responseData,
+          plan_data: response.data,
           calories: calorieNeeds,
           active: true,
           dietary_preferences: dietaryPreference
@@ -163,7 +163,7 @@ export const useMenuController = () => {
         throw new Error('Falha ao salvar cardápio');
       }
 
-      setMealPlan(responseData);
+      setMealPlan(response.data);
       setCurrentStep(4);
       toast.dismiss(toastId);
       toast.success("Cardápio personalizado gerado com sucesso!");
@@ -171,7 +171,13 @@ export const useMenuController = () => {
     } catch (error) {
       console.error('Erro completo:', error);
       toast.dismiss(toastId);
-      toast.error(error instanceof Error ? error.message : "Erro ao gerar cardápio. Por favor, tente novamente.");
+      const errorMessage = error instanceof Error ? error.message : "Erro ao gerar cardápio";
+      toast.error(errorMessage);
+      
+      // Log detalhado do erro
+      if (error instanceof Error) {
+        console.error('Stack trace:', error.stack);
+      }
     }
   };
 
