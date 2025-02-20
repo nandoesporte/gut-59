@@ -8,24 +8,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface UserData {
-  weight: number;
-  height: number;
-  age: number;
-  gender: string;
-  activityLevel: string;
-  goal: string;
-  userId: string;
-  dailyCalories: number;
-}
-
-interface DietaryPreferences {
-  hasAllergies: boolean;
-  allergies: string[];
-  dietaryRestrictions: string[];
-  trainingTime: string | null;
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -33,6 +15,7 @@ serve(async (req) => {
 
   try {
     const { userData, selectedFoods, dietaryPreferences } = await req.json();
+    console.log('Received request data:', { userData, selectedFoods, dietaryPreferences });
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
@@ -44,7 +27,7 @@ serve(async (req) => {
       .from('nutrition_preferences')
       .select('health_condition')
       .eq('user_id', userData.userId)
-      .single();
+      .maybeSingle();
 
     if (prefsError) {
       console.error('Error fetching nutrition preferences:', prefsError);
@@ -58,19 +41,9 @@ serve(async (req) => {
     - Health Condition: ${nutritionPrefs?.health_condition || 'None'}
     - Daily Caloric Need: ${userData.dailyCalories} calories
     - Activity Level: ${userData.activityLevel}
-    - Allergies: ${dietaryPreferences.allergies.join(', ') || 'None'}
-    - Dietary Restrictions: ${dietaryPreferences.dietaryRestrictions.join(', ') || 'None'}
-    - Training Time: ${dietaryPreferences.trainingTime || 'Not specified'}
-
-    Create a meal plan that:
-    1. Distributes calories across 5 meals
-    2. Maintains proper macro distribution
-    3. Considers timing for pre/post workout nutrition
-    4. Avoids any allergens
-    5. Respects dietary restrictions
-    6. Uses only the provided food list
-    7. Provides specific portions in grams
-    8. Includes nutritional recommendations`;
+    - Allergies: ${dietaryPreferences.allergies?.join(', ') || 'None'}
+    - Dietary Restrictions: ${dietaryPreferences.dietaryRestrictions?.join(', ') || 'None'}
+    - Training Time: ${dietaryPreferences.trainingTime || 'Not specified'}`;
 
     // Prepare foods data for the prompt
     const foodsData = selectedFoods.map(food => ({
@@ -87,13 +60,19 @@ serve(async (req) => {
     Format the response as a JSON object with the following structure:
     {
       "dailyPlan": {
-        "breakfast": { "foods": [], "calories": 0, "macros": {} },
-        "morningSnack": { "foods": [], "calories": 0, "macros": {} },
-        "lunch": { "foods": [], "calories": 0, "macros": {} },
-        "afternoonSnack": { "foods": [], "calories": 0, "macros": {} },
-        "dinner": { "foods": [], "calories": 0, "macros": {} }
+        "breakfast": { "foods": [], "calories": 0, "macros": { "protein": 0, "carbs": 0, "fats": 0, "fiber": 0 } },
+        "morningSnack": { "foods": [], "calories": 0, "macros": { "protein": 0, "carbs": 0, "fats": 0, "fiber": 0 } },
+        "lunch": { "foods": [], "calories": 0, "macros": { "protein": 0, "carbs": 0, "fats": 0, "fiber": 0 } },
+        "afternoonSnack": { "foods": [], "calories": 0, "macros": { "protein": 0, "carbs": 0, "fats": 0, "fiber": 0 } },
+        "dinner": { "foods": [], "calories": 0, "macros": { "protein": 0, "carbs": 0, "fats": 0, "fiber": 0 } }
       },
-      "totalNutrition": { "calories": 0, "protein": 0, "carbs": 0, "fats": 0 },
+      "totalNutrition": {
+        "calories": 0,
+        "protein": 0,
+        "carbs": 0,
+        "fats": 0,
+        "fiber": 0
+      },
       "recommendations": {
         "general": "",
         "preworkout": "",
@@ -104,6 +83,8 @@ serve(async (req) => {
 
     // Call OpenAI API
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+    console.log('Calling OpenAI API...');
+    
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -122,6 +103,7 @@ serve(async (req) => {
     });
 
     const aiResponse = await response.json();
+    console.log('OpenAI API Response:', aiResponse);
     
     if (!aiResponse.choices || !aiResponse.choices[0]) {
       throw new Error('Invalid response from OpenAI');
@@ -133,24 +115,6 @@ serve(async (req) => {
     } catch (e) {
       console.error('Error parsing AI response:', e);
       throw new Error('Failed to parse meal plan data');
-    }
-
-    // Validate caloric distribution
-    const totalCalories = Object.values(mealPlan.dailyPlan).reduce(
-      (sum: number, meal: any) => sum + meal.calories,
-      0
-    );
-
-    if (Math.abs(totalCalories - userData.dailyCalories) > 200) {
-      console.warn('Caloric mismatch detected, adjusting portions...');
-      // Adjust portions to match target calories
-      const adjustmentFactor = userData.dailyCalories / totalCalories;
-      Object.values(mealPlan.dailyPlan).forEach((meal: any) => {
-        meal.calories = Math.round(meal.calories * adjustmentFactor);
-        meal.foods.forEach((food: any) => {
-          food.portion = Math.round(food.portion * adjustmentFactor);
-        });
-      });
     }
 
     // Add any health-specific recommendations
@@ -179,18 +143,19 @@ serve(async (req) => {
       const trainingTime = new Date(`1970-01-01T${dietaryPreferences.trainingTime}`);
       const hour = trainingTime.getHours();
 
-      // Add pre and post workout meal timing recommendations
       mealPlan.recommendations.timing.push(
         `Consuma sua refeição pré-treino 2-3 horas antes do treino (${hour - 2}:00)`,
         `Faça sua refeição pós-treino em até 1 hora após o treino (${hour + 1}:00)`
       );
     }
 
+    console.log('Generated meal plan:', mealPlan);
+
     return new Response(JSON.stringify(mealPlan), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error in generate-meal-plan:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

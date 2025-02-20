@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -50,22 +49,11 @@ export const useMenuController = () => {
         return;
       }
 
-      const { data: existingPrefs, error: prefsError } = await supabase
-        .from('dietary_preferences')
-        .select('*')
-        .eq('user_id', userData.user.id)
-        .maybeSingle();
-
-      if (prefsError) {
-        console.error('Error checking dietary preferences:', prefsError);
-        throw prefsError;
-      }
-
       const dietaryPreference = {
         user_id: userData.user.id,
         has_allergies: preferences.hasAllergies,
-        allergies: preferences.allergies,
-        dietary_restrictions: preferences.dietaryRestrictions,
+        allergies: preferences.allergies || [],
+        dietary_restrictions: preferences.dietaryRestrictions || [],
         training_time: preferences.trainingTime
       };
 
@@ -75,7 +63,8 @@ export const useMenuController = () => {
 
       if (dietaryError) {
         console.error('Error saving dietary preferences:', dietaryError);
-        throw dietaryError;
+        toast.error("Erro ao salvar preferências alimentares");
+        return;
       }
 
       if (!calorieNeeds) {
@@ -120,42 +109,44 @@ export const useMenuController = () => {
 
       const toastId = toast.loading("Gerando seu plano alimentar personalizado...");
 
-      const { data: responseData, error } = await supabase.functions.invoke('generate-meal-plan', {
-        body: requestData
-      });
-
-      if (error) {
-        console.error('Erro da função edge:', error);
-        toast.dismiss(toastId);
-        toast.error("Erro ao gerar cardápio. Por favor, tente novamente.");
-        return;
-      }
-
-      if (!responseData) {
-        toast.dismiss(toastId);
-        throw new Error('Nenhum dado recebido do gerador de cardápio');
-      }
-
-      const { error: saveError } = await supabase
-        .from('meal_plans')
-        .insert({
-          user_id: userData.user.id,
-          plan_data: responseData,
-          calories: calorieNeeds,
-          active: true,
-          dietary_preferences: JSON.stringify(preferences)
+      try {
+        const { data: responseData, error } = await supabase.functions.invoke('generate-meal-plan', {
+          body: requestData
         });
 
-      if (saveError) {
-        console.error('Erro ao salvar plano:', saveError);
-        toast.error("Erro ao salvar o plano alimentar");
-        return;
-      }
+        if (error) {
+          console.error('Erro da função edge:', error);
+          throw error;
+        }
 
-      setMealPlan(responseData);
-      setCurrentStep(4);
-      toast.dismiss(toastId);
-      toast.success("Cardápio personalizado gerado com sucesso!");
+        if (!responseData) {
+          throw new Error('Nenhum dado recebido do gerador de cardápio');
+        }
+
+        const { error: saveError } = await supabase
+          .from('meal_plans')
+          .insert({
+            user_id: userData.user.id,
+            plan_data: responseData,
+            calories: calorieNeeds,
+            active: true,
+            dietary_preferences: JSON.stringify(preferences)
+          });
+
+        if (saveError) {
+          console.error('Erro ao salvar plano:', saveError);
+          throw saveError;
+        }
+
+        setMealPlan(responseData);
+        setCurrentStep(4);
+        toast.dismiss(toastId);
+        toast.success("Cardápio personalizado gerado com sucesso!");
+      } catch (error) {
+        console.error('Erro ao processar plano alimentar:', error);
+        toast.dismiss(toastId);
+        toast.error("Erro ao gerar cardápio. Por favor, tente novamente.");
+      }
     } catch (error) {
       console.error('Erro ao gerar cardápio:', error);
       toast.error("Erro ao gerar cardápio personalizado. Por favor, tente novamente.");
