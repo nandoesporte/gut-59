@@ -7,6 +7,120 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+interface Food {
+  id: string;
+  name: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  portion?: number;
+  portionUnit?: string;
+}
+
+interface UserData {
+  weight: number;
+  height: number;
+  age: number;
+  gender: string;
+  activityLevel: string;
+  goal: string;
+  dailyCalories: number;
+}
+
+interface DietaryPreferences {
+  hasAllergies: boolean;
+  allergies: string[];
+  dietaryRestrictions: string[];
+  trainingTime: string | null;
+}
+
+const getMealDescription = (mealType: string, goal: string) => {
+  const descriptions = {
+    breakfast: {
+      'weight_loss': "Café da manhã rico em proteínas e fibras para promover saciedade e controle calórico.",
+      'muscle_gain': "Café da manhã rico em proteínas e carboidratos complexos para energia e construção muscular.",
+      'maintenance': "Café da manhã balanceado para fornecer energia sustentada ao longo da manhã."
+    },
+    morningSnack: {
+      'weight_loss': "Lanche leve e nutritivo para controlar a fome até o almoço.",
+      'muscle_gain': "Lanche proteico para manter o aporte nutricional entre refeições.",
+      'maintenance': "Lanche equilibrado para manter os níveis de energia."
+    },
+    lunch: {
+      'weight_loss': "Almoço rico em proteínas e vegetais, controlado em carboidratos.",
+      'muscle_gain': "Almoço rico em proteínas e carboidratos para maximizar os ganhos.",
+      'maintenance': "Almoço balanceado com todos os grupos alimentares."
+    },
+    afternoonSnack: {
+      'weight_loss': "Lanche proteico para evitar compulsão no jantar.",
+      'muscle_gain': "Lanche pré-treino rico em carboidratos e proteínas.",
+      'maintenance': "Lanche nutritivo para manter a energia."
+    },
+    dinner: {
+      'weight_loss': "Jantar leve com foco em proteínas magras e vegetais.",
+      'muscle_gain': "Jantar rico em proteínas para recuperação muscular.",
+      'maintenance': "Jantar balanceado para finalizar o dia."
+    }
+  };
+
+  return descriptions[mealType as keyof typeof descriptions][goal as keyof typeof descriptions['breakfast']] || 
+         "Refeição balanceada para atender suas necessidades nutricionais.";
+};
+
+const getPreparationDetails = (food: Food) => {
+  const details = {
+    'ovo': 'Preparar com pouco sal e azeite de oliva extra virgem.',
+    'pão': 'Preferir versões integrais, pode ser torrado.',
+    'arroz': 'Cozinhar al dente com temperos naturais.',
+    'feijão': 'Cozinhar com louro e temperos naturais, sem excesso de sal.',
+    'frango': 'Grelhar com ervas finas e limão.',
+    'peixe': 'Preparar no vapor ou grelhado com ervas.',
+    'carne': 'Grelhar ou assar, removendo gorduras visíveis.',
+    'batata': 'Cozinhar ou assar com ervas, evitando frituras.',
+    'legumes': 'Preparar no vapor para preservar nutrientes.',
+    'salada': 'Lavar bem e temperar com azeite e limão.',
+    'iogurte': 'Optar por versões sem açúcar, pode adicionar frutas.',
+    'aveia': 'Preparar com leite vegetal ou água.',
+    'quinoa': 'Cozinhar e temperar com ervas frescas.'
+  };
+
+  const defaultDetail = 'Preparar de forma simples, priorizando temperos naturais.';
+  
+  return Object.entries(details).find(([key]) => 
+    food.name.toLowerCase().includes(key)
+  )?.[1] || defaultDetail;
+};
+
+const formatPortion = (food: Food, baseAmount: number) => {
+  const measurementUnits = {
+    'arroz': { unit: 'xícara(s)', conversion: 0.5 },
+    'feijão': { unit: 'concha(s)', conversion: 0.6 },
+    'pão': { unit: 'fatia(s)', conversion: 1 },
+    'leite': { unit: 'copo(s)', conversion: 1 },
+    'aveia': { unit: 'colher(es) de sopa', conversion: 2 },
+    'ovo': { unit: 'unidade(s)', conversion: 1 },
+    'fruta': { unit: 'unidade(s)', conversion: 1 },
+    'iogurte': { unit: 'pote(s)', conversion: 1 },
+    'mel': { unit: 'colher(es) de chá', conversion: 3 },
+  };
+
+  const foodKey = Object.keys(measurementUnits).find(key => 
+    food.name.toLowerCase().includes(key)
+  );
+
+  if (foodKey) {
+    const { unit, conversion } = measurementUnits[foodKey as keyof typeof measurementUnits];
+    const amount = Math.round(baseAmount * conversion / 100);
+    return { amount, unit };
+  }
+
+  return { 
+    amount: baseAmount, 
+    unit: food.portionUnit || 'gramas'
+  };
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -16,203 +130,184 @@ serve(async (req) => {
     const { userData, selectedFoods, dietaryPreferences } = await req.json();
     console.log('Dados recebidos:', { userData, selectedFoods: selectedFoods.length });
 
-    // Criar porções e medidas mais precisas
-    const formatPortion = (food: any, baseAmount: number) => {
-      const units = {
-        arroz: "xícara(s)",
-        feijao: "concha(s)",
-        pao: "fatia(s)",
-        leite: "copo(s)",
-        aveia: "colher(es) de sopa",
-        fruta: "unidade(s)",
-        ovo: "unidade(s)",
-        carne: "gramas",
-        frango: "gramas",
-        peixe: "gramas",
-        verdura: "xícara(s)",
-        legume: "xícara(s)",
-      };
-
-      const defaultUnit = food.portionUnit || "gramas";
-      const amount = Math.round(baseAmount * (food.portion || 100) / 100);
-      
-      // Usar unidades específicas se disponíveis, caso contrário usar a unidade padrão
-      const unit = Object.entries(units).find(([key]) => 
-        food.name.toLowerCase().includes(key)
-      )?.[1] || defaultUnit;
-
-      return `${amount}${unit}`;
+    // Distribuir calorias entre as refeições
+    const totalCalories = userData.dailyCalories;
+    const mealDistribution = {
+      breakfast: 0.25,
+      morningSnack: 0.15,
+      lunch: 0.30,
+      afternoonSnack: 0.10,
+      dinner: 0.20
     };
 
-    // Gerar descrições mais detalhadas
-    const generateDescription = (foods: any[], mealType: string) => {
-      const tips = {
-        breakfast: [
-          "Comece o dia com uma refeição nutritiva e equilibrada",
-          "Inclua proteínas para maior saciedade",
-          "Adicione frutas para vitaminas e minerais essenciais"
-        ],
-        morningSnack: [
-          "Mantenha a energia entre as refeições principais",
-          "Opte por opções leves e nutritivas",
-          "Combine carboidratos e proteínas"
-        ],
-        lunch: [
-          "Equilibre proteínas, carboidratos e vegetais",
-          "Mastige bem os alimentos",
-          "Faça um prato colorido"
-        ],
-        afternoonSnack: [
-          "Evite ficar muito tempo sem comer",
-          "Escolha opções que forneçam energia sustentável",
-          "Mantenha porções moderadas"
-        ],
-        dinner: [
-          "Opte por uma refeição mais leve",
-          "Evite alimentos muito pesados",
-          "Inclua vegetais e proteínas magras"
-        ]
-      };
-
-      const descriptions = foods.map(food => {
-        let prep = "";
-        if (food.name.toLowerCase().includes("carne") || food.name.toLowerCase().includes("frango")) {
-          prep = "grelhado(a)";
-        } else if (food.name.toLowerCase().includes("verdura") || food.name.toLowerCase().includes("legume")) {
-          prep = "cozido(a) al dente";
-        }
-        return `${food.name} ${prep}`.trim();
-      });
-
-      const mealTips = tips[mealType as keyof typeof tips] || [];
-      return {
-        foods: descriptions,
-        tips: mealTips[Math.floor(Math.random() * mealTips.length)]
-      };
-    };
-
-    // Gerar cardápio detalhado
     const mealPlan = {
       dailyPlan: {
         breakfast: {
-          foods: selectedFoods.slice(0, 2).map(food => ({
-            ...food,
-            portion: formatPortion(food, 100),
-            preparation: generateDescription([food], "breakfast").foods[0],
-            details: "Consumir logo após acordar para um início de dia energético"
-          })),
-          calories: 400,
-          macros: { protein: 20, carbs: 40, fats: 15, fiber: 5 },
-          description: generateDescription(selectedFoods.slice(0, 2), "breakfast").tips
+          description: getMealDescription('breakfast', userData.goal),
+          foods: selectedFoods.slice(0, 3).map(food => {
+            const portion = formatPortion(food, 100);
+            return {
+              name: food.name,
+              portion: portion.amount,
+              unit: portion.unit,
+              details: getPreparationDetails(food),
+              calories: Math.round(food.calories * portion.amount / 100),
+              macros: {
+                protein: Math.round(food.protein * portion.amount / 100),
+                carbs: Math.round(food.carbs * portion.amount / 100),
+                fats: Math.round(food.fats * portion.amount / 100)
+              }
+            };
+          }),
+          calories: Math.round(totalCalories * mealDistribution.breakfast),
+          macros: {
+            protein: 25,
+            carbs: 45,
+            fats: 15
+          }
         },
         morningSnack: {
-          foods: selectedFoods.slice(2, 3).map(food => ({
-            ...food,
-            portion: formatPortion(food, 75),
-            preparation: generateDescription([food], "morningSnack").foods[0],
-            details: "Lanche intermediário para manter os níveis de energia"
-          })),
-          calories: 200,
-          macros: { protein: 10, carbs: 25, fats: 8, fiber: 3 },
-          description: generateDescription(selectedFoods.slice(2, 3), "morningSnack").tips
+          description: getMealDescription('morningSnack', userData.goal),
+          foods: selectedFoods.slice(3, 4).map(food => {
+            const portion = formatPortion(food, 75);
+            return {
+              name: food.name,
+              portion: portion.amount,
+              unit: portion.unit,
+              details: getPreparationDetails(food),
+              calories: Math.round(food.calories * portion.amount / 100),
+              macros: {
+                protein: Math.round(food.protein * portion.amount / 100),
+                carbs: Math.round(food.carbs * portion.amount / 100),
+                fats: Math.round(food.fats * portion.amount / 100)
+              }
+            };
+          }),
+          calories: Math.round(totalCalories * mealDistribution.morningSnack),
+          macros: {
+            protein: 15,
+            carbs: 25,
+            fats: 10
+          }
         },
         lunch: {
-          foods: selectedFoods.slice(3, 5).map(food => ({
-            ...food,
-            portion: formatPortion(food, 150),
-            preparation: generateDescription([food], "lunch").foods[0],
-            details: "Refeição principal do dia, rica em nutrientes"
-          })),
-          calories: 600,
-          macros: { protein: 30, carbs: 60, fats: 20, fiber: 8 },
-          description: generateDescription(selectedFoods.slice(3, 5), "lunch").tips
+          description: getMealDescription('lunch', userData.goal),
+          foods: selectedFoods.slice(4, 7).map(food => {
+            const portion = formatPortion(food, 150);
+            return {
+              name: food.name,
+              portion: portion.amount,
+              unit: portion.unit,
+              details: getPreparationDetails(food),
+              calories: Math.round(food.calories * portion.amount / 100),
+              macros: {
+                protein: Math.round(food.protein * portion.amount / 100),
+                carbs: Math.round(food.carbs * portion.amount / 100),
+                fats: Math.round(food.fats * portion.amount / 100)
+              }
+            };
+          }),
+          calories: Math.round(totalCalories * mealDistribution.lunch),
+          macros: {
+            protein: 40,
+            carbs: 50,
+            fats: 15
+          }
         },
         afternoonSnack: {
-          foods: selectedFoods.slice(5, 6).map(food => ({
-            ...food,
-            portion: formatPortion(food, 75),
-            preparation: generateDescription([food], "afternoonSnack").foods[0],
-            details: "Lanche estratégico para evitar fome excessiva no jantar"
-          })),
-          calories: 200,
-          macros: { protein: 10, carbs: 25, fats: 8, fiber: 3 },
-          description: generateDescription(selectedFoods.slice(5, 6), "afternoonSnack").tips
+          description: getMealDescription('afternoonSnack', userData.goal),
+          foods: selectedFoods.slice(7, 8).map(food => {
+            const portion = formatPortion(food, 75);
+            return {
+              name: food.name,
+              portion: portion.amount,
+              unit: portion.unit,
+              details: getPreparationDetails(food),
+              calories: Math.round(food.calories * portion.amount / 100),
+              macros: {
+                protein: Math.round(food.protein * portion.amount / 100),
+                carbs: Math.round(food.carbs * portion.amount / 100),
+                fats: Math.round(food.fats * portion.amount / 100)
+              }
+            };
+          }),
+          calories: Math.round(totalCalories * mealDistribution.afternoonSnack),
+          macros: {
+            protein: 15,
+            carbs: 20,
+            fats: 5
+          }
         },
         dinner: {
-          foods: selectedFoods.slice(6, 8).map(food => ({
-            ...food,
-            portion: formatPortion(food, 125),
-            preparation: generateDescription([food], "dinner").foods[0],
-            details: "Última refeição do dia, mais leve para melhor digestão"
-          })),
-          calories: 500,
-          macros: { protein: 25, carbs: 45, fats: 18, fiber: 6 },
-          description: generateDescription(selectedFoods.slice(6, 8), "dinner").tips
+          description: getMealDescription('dinner', userData.goal),
+          foods: selectedFoods.slice(8, 10).map(food => {
+            const portion = formatPortion(food, 125);
+            return {
+              name: food.name,
+              portion: portion.amount,
+              unit: portion.unit,
+              details: getPreparationDetails(food),
+              calories: Math.round(food.calories * portion.amount / 100),
+              macros: {
+                protein: Math.round(food.protein * portion.amount / 100),
+                carbs: Math.round(food.carbs * portion.amount / 100),
+                fats: Math.round(food.fats * portion.amount / 100)
+              }
+            };
+          }),
+          calories: Math.round(totalCalories * mealDistribution.dinner),
+          macros: {
+            protein: 35,
+            carbs: 30,
+            fats: 15
+          }
         }
       },
       totalNutrition: {
-        calories: userData.dailyCalories,
-        protein: 95,
-        carbs: 195,
-        fats: 69,
-        fiber: 25
+        calories: totalCalories,
+        protein: 130,
+        carbs: 170,
+        fats: 60
       },
       recommendations: {
-        general: [
-          "Mantenha uma boa hidratação ao longo do dia",
-          "Faça as refeições em horários regulares",
-          "Evite distrações durante as refeições",
-          "Mastigue bem os alimentos",
-          "Priorize alimentos in natura"
-        ],
+        general: `Este plano alimentar foi personalizado para seu objetivo de ${
+          userData.goal === 'weight_loss' ? 'perda de peso' :
+          userData.goal === 'muscle_gain' ? 'ganho de massa muscular' :
+          'manutenção do peso'
+        }. As refeições foram distribuídas de forma a otimizar seus resultados, mantendo um bom aporte de nutrientes ao longo do dia.`,
         timing: [
-          "Café da manhã: 7:00 - 8:00",
+          "Café da manhã: 7:00 - 8:30",
           "Lanche da manhã: 10:00 - 10:30",
           "Almoço: 12:30 - 13:30",
-          "Lanche da tarde: 15:30 - 16:00",
-          "Jantar: 19:00 - 20:00"
+          "Lanche da tarde: 15:30 - 16:30",
+          "Jantar: 19:00 - 20:30"
         ],
+        hydration: "Beba água regularmente entre as refeições. Meta diária: 35ml por kg de peso corporal.",
         preparation: [
-          "Prepare as refeições com antecedência quando possível",
-          "Mantenha porções controladas usando medidores",
-          "Armazene os alimentos adequadamente",
-          "Prefira métodos de cocção saudáveis como grelhar e cozinhar",
-          "Tempere os alimentos com ervas e especiarias naturais"
-        ],
-        substitutions: [
-          {
-            group: "Proteínas",
-            options: "Troque entre carnes magras, peixes, ovos e proteínas vegetais"
-          },
-          {
-            group: "Carboidratos",
-            options: "Alterne entre arroz integral, quinoa, batata doce e mandioca"
-          },
-          {
-            group: "Vegetais",
-            options: "Varie as cores e tipos de vegetais para maior diversidade nutricional"
-          }
+          "Prepare as refeições com antecedência para manter a consistência",
+          "Use temperos naturais e ervas frescas",
+          "Evite frituras, prefira preparações grelhadas, assadas ou cozidas",
+          "Mantenha os horários das refeições o mais regular possível"
         ]
       }
     };
 
-    // Ajustar horários com base no treino
+    // Ajustar recomendações com base no horário de treino
     if (dietaryPreferences.trainingTime) {
       const trainingTime = new Date(`1970-01-01T${dietaryPreferences.trainingTime}`);
       const hour = trainingTime.getHours();
       
       mealPlan.recommendations.timing = [
-        "Café da manhã: 7:00 - 8:00",
+        "Café da manhã: 7:00 - 8:30",
         "Lanche da manhã: 10:00 - 10:30",
         "Almoço: 12:00 - 13:00",
-        `Pré-treino: ${hour - 1}:00 - ${hour - 0.5}:00`,
+        `Pré-treino: ${hour - 1}:30 - ${hour - 0.5}:00`,
         `Pós-treino: ${hour + 0.5}:00 - ${hour + 1}:00`,
         "Jantar: 20:00 - 21:00"
       ];
 
-      // Adicionar recomendações específicas para treino
-      mealPlan.recommendations.preworkout = "Consuma carboidratos de fácil digestão 1-2 horas antes do treino";
-      mealPlan.recommendations.postworkout = "Priorize proteínas e carboidratos até 1 hora após o treino";
+      mealPlan.recommendations.preworkout = "Consuma carboidratos complexos e proteínas de fácil digestão 1.5-2 horas antes do treino. Evite alimentos muito gordurosos neste momento.";
+      mealPlan.recommendations.postworkout = "Priorize proteínas de alta qualidade e carboidratos de rápida absorção em até 1 hora após o treino para otimizar a recuperação muscular.";
     }
 
     console.log('Plano alimentar detalhado gerado com sucesso');
