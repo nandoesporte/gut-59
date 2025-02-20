@@ -3,14 +3,14 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { History, ChevronDown, Calendar, Target, Activity, Download, Trash2 } from "lucide-react";
-import type { WorkoutHistory } from "../types/workout-plan";
+import type { WorkoutPlan } from "../types/workout-plan";
 import { generateWorkoutPDF } from "../utils/pdf-generator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 interface WorkoutHistoryViewProps {
   isLoading: boolean;
-  historyPlans?: WorkoutHistory[];
+  historyPlans?: WorkoutPlan[];
   onRefresh?: () => void;
 }
 
@@ -31,7 +31,7 @@ export const WorkoutHistoryView = ({ isLoading, historyPlans, onRefresh }: Worko
     }
   };
 
-  const handleDownload = (plan: WorkoutHistory) => {
+  const handleDownload = (plan: WorkoutPlan) => {
     generateWorkoutPDF(plan);
   };
 
@@ -112,7 +112,7 @@ export const WorkoutHistoryView = ({ isLoading, historyPlans, onRefresh }: Worko
             <CollapsibleContent>
               <CardContent className="p-4 pt-0">
                 {plan.workout_sessions.map((session) => (
-                  <div key={session.id} className="border-t pt-4 mt-4 first:border-t-0 first:pt-0 first:mt-0">
+                  <div key={session.day_number} className="border-t pt-4 mt-4 first:border-t-0 first:pt-0 first:mt-0">
                     <div className="flex items-center gap-2 mb-3">
                       <Activity className="w-5 h-5 text-primary-500" />
                       <h4 className="font-medium">Dia {session.day_number}</h4>
@@ -121,7 +121,7 @@ export const WorkoutHistoryView = ({ isLoading, historyPlans, onRefresh }: Worko
                       <p className="text-sm text-gray-600">{session.warmup_description}</p>
                       <ul className="list-none space-y-6 my-4">
                         {session.exercises.map((exercise, idx) => (
-                          <li key={`${session.id}-${idx}`} className="text-sm">
+                          <li key={`${session.day_number}-${idx}`} className="text-sm">
                             <div className="flex flex-col md:flex-row gap-4 items-start">
                               {exercise.gifUrl && (
                                 <div className="w-full md:w-48 h-48 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
