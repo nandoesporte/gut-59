@@ -132,14 +132,11 @@ export const useMenuController = () => {
         }
       };
 
-      // Gerar cardápio usando a edge function
+      // Gerar cardápio usando a edge function - Removendo headers problemáticos
       const { data: responseData, error: generateError } = await supabase.functions.invoke(
         'generate-meal-plan',
         {
-          body: JSON.stringify(requestData),
-          headers: {
-            'Content-Type': 'application/json'
-          }
+          body: requestData
         }
       );
 
