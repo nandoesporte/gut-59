@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { ProtocolFood, DietaryPreferences, MealPlan } from "./types";
-import { CalorieCalculatorForm, activityLevels } from "./CalcalculateWorkoutPlanorieCalculator";
+import { CalorieCalculatorForm, activityLevels } from "./CalorieCalculator";
 import type { Database } from "@/integrations/supabase/types";
 
 type NutritionPreference = Database['public']['Tables']['nutrition_preferences']['Insert'];
