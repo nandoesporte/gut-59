@@ -55,11 +55,23 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Busca exercícios
-    const { data: exercises, error: exercisesError } = await supabase
+    let query = supabase
       .from('exercises')
-      .select('*')
-      .in('exercise_type', preferences.preferredExerciseTypes)
-      .in('equipment_needed', preferences.availableEquipment);
+      .select('*');
+
+    // Adiciona filtros apenas se os arrays não estiverem vazios
+    if (preferences.preferredExerciseTypes?.length > 0) {
+      query = query.in('exercise_type', preferences.preferredExerciseTypes);
+    }
+
+    if (preferences.availableEquipment?.length > 0) {
+      // Se 'all' estiver presente, não filtramos por equipamento
+      if (!preferences.availableEquipment.includes('all')) {
+        query = query.overlaps('equipment_needed', preferences.availableEquipment);
+      }
+    }
+
+    const { data: exercises, error: exercisesError } = await query;
 
     if (exercisesError) {
       console.error("Erro ao buscar exercícios:", exercisesError);
@@ -67,7 +79,17 @@ serve(async (req) => {
     }
 
     if (!exercises || exercises.length === 0) {
-      throw new Error("Nenhum exercício encontrado para as preferências selecionadas");
+      // Tenta buscar exercícios sem filtros se nenhum foi encontrado
+      const { data: fallbackExercises, error: fallbackError } = await supabase
+        .from('exercises')
+        .select('*')
+        .limit(20);
+
+      if (fallbackError || !fallbackExercises || fallbackExercises.length === 0) {
+        throw new Error("Nenhum exercício encontrado. Por favor, verifique a base de dados.");
+      }
+
+      exercises.push(...fallbackExercises);
     }
 
     console.log(`Encontrados ${exercises.length} exercícios compatíveis`);
@@ -85,15 +107,15 @@ serve(async (req) => {
     // Gera as sessões de treino
     const exercisesPerSession = Math.min(8, exercises.length);
     const sessions: WorkoutSession[] = Array.from(
-      { length: preferences.frequency }, 
+      { length: 3 }, // Definimos 3 sessões por semana como padrão
       (_, i) => {
         const sessionExercises = shuffleArray(exercises)
           .slice(0, exercisesPerSession)
           .map(exercise => ({
             name: exercise.name,
-            sets: preferences.experienceLevel === 'beginner' ? 3 : 4,
-            reps: preferences.goal === 'gain_mass' ? 8 : 12,
-            rest_time_seconds: preferences.goal === 'gain_mass' ? 90 : 60,
+            sets: 3, // Valores padrão
+            reps: 12,
+            rest_time_seconds: 60,
             gifUrl: exercise.gif_url || undefined
           }));
 
@@ -110,11 +132,13 @@ serve(async (req) => {
     const workoutPlan: WorkoutPlan = {
       id: crypto.randomUUID(),
       user_id: userId,
-      goal: preferences.goal,
+      goal: preferences.goal || 'general_fitness',
       start_date: new Date().toISOString(),
-      end_date: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString(),
+      end_date: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString(), // 28 dias
       workout_sessions: sessions
     };
+
+    console.log("Tentando salvar plano:", workoutPlan.id);
 
     // Salva o plano no banco
     const { error: planError } = await supabase
