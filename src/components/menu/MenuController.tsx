@@ -9,6 +9,16 @@ import type { Database } from "@/integrations/supabase/types";
 type NutritionPreference = Database['public']['Tables']['nutrition_preferences']['Insert'];
 type DietaryPreference = Database['public']['Tables']['dietary_preferences']['Insert'];
 
+// Helper function to map UI goals to database enum values
+const mapGoalToEnum = (goal: string): Database['public']['Enums']['nutritional_goal'] => {
+  const goalMap: Record<string, Database['public']['Enums']['nutritional_goal']> = {
+    'lose': 'weight_loss',
+    'maintain': 'maintenance',
+    'gain': 'muscle_gain'
+  };
+  return goalMap[goal] || 'maintenance';
+};
+
 export const useMenuController = () => {
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [calorieNeeds, setCalorieNeeds] = useState<number | null>(null);
@@ -87,13 +97,18 @@ export const useMenuController = () => {
         return;
       }
 
+      if (!formData.goal) {
+        toast.error("Por favor, selecione um objetivo");
+        return;
+      }
+
       const nutritionPreference: NutritionPreference = {
         weight: parseFloat(formData.weight),
         height: parseFloat(formData.height),
         age: parseFloat(formData.age),
         gender: formData.gender,
         activity_level: formData.activityLevel as Database['public']['Enums']['activity_level'],
-        goal: formData.goal as Database['public']['Enums']['nutritional_goal'],
+        goal: mapGoalToEnum(formData.goal),
         user_id: user.id
       };
 
@@ -261,4 +276,3 @@ export const useMenuController = () => {
     setFormData,
   };
 };
-
