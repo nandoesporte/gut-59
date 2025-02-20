@@ -1,166 +1,133 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-type MealPeriod = 'breakfast' | 'morningSnack' | 'lunch' | 'afternoonSnack' | 'dinner'
-
-interface MacroDistribution {
-  protein: number
-  carbs: number
-  fats: number
-  fiber: number
-}
+};
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { userData, selectedFoods, dietaryPreferences } = await req.json()
-    console.log('Received request data:', { userData, selectedFoods, dietaryPreferences })
+    const { userData, selectedFoods, dietaryPreferences } = await req.json();
+    console.log('Received request:', { userData, selectedFoods, dietaryPreferences });
 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
-
-    const { data: foods, error: foodsError } = await supabaseClient
-      .from('protocol_foods')
-      .select('*')
-      .in('id', selectedFoods)
-
-    if (foodsError) {
-      throw new Error(`Error fetching foods: ${foodsError.message}`)
+    // Validate input data
+    if (!userData || !selectedFoods || !dietaryPreferences) {
+      throw new Error('Missing required data');
     }
 
-    console.log('Fetched foods:', foods)
-
-    const getMacroDistribution = (goal: string): MacroDistribution => {
-      switch (goal) {
-        case 'weightLoss':
-          return { protein: 0.35, carbs: 0.40, fats: 0.25, fiber: 25 }
-        case 'weightGain':
-          return { protein: 0.30, carbs: 0.50, fats: 0.20, fiber: 30 }
-        case 'maintenance':
-        default:
-          return { protein: 0.30, carbs: 0.45, fats: 0.25, fiber: 25 }
-      }
-    }
-
-    const macroTargets = getMacroDistribution(userData.goal)
-    const dailyProteinTarget = (userData.dailyCalories * macroTargets.protein) / 4
-    const dailyCarbsTarget = (userData.dailyCalories * macroTargets.carbs) / 4
-    const dailyFatsTarget = (userData.dailyCalories * macroTargets.fats) / 9
-
+    // Calculate meal distribution based on caloric needs
     const mealDistribution = {
-      breakfast: 0.25,
-      morningSnack: 0.15,
-      lunch: 0.30,
-      afternoonSnack: 0.10,
-      dinner: 0.20
-    }
+      breakfast: Math.round(userData.dailyCalories * 0.25),
+      morningSnack: Math.round(userData.dailyCalories * 0.15),
+      lunch: Math.round(userData.dailyCalories * 0.30),
+      afternoonSnack: Math.round(userData.dailyCalories * 0.10),
+      dinner: Math.round(userData.dailyCalories * 0.20)
+    };
 
-    const generateMeal = (
-      availableFoods: any[],
-      targetCalories: number,
-      mealType: MealPeriod
-    ) => {
-      let meal = {
-        foods: [] as any[],
-        calories: 0,
-        macros: {
-          protein: 0,
-          carbs: 0,
-          fats: 0,
-          fiber: 0
+    // Group foods by meal type
+    const foodsByMealType = selectedFoods.reduce((acc, food) => {
+      const mealTypes = food.meal_type || ['any'];
+      mealTypes.forEach(type => {
+        if (!acc[type]) acc[type] = [];
+        acc[type].push(food);
+      });
+      return acc;
+    }, {});
+
+    // Helper function to select foods for a meal
+    const selectFoodsForMeal = (availableFoods, targetCalories) => {
+      let meal = [];
+      let currentCalories = 0;
+
+      // Sort foods by protein content for better nutrition
+      const sortedFoods = [...availableFoods].sort((a, b) => (b.protein || 0) - (a.protein || 0));
+
+      for (const food of sortedFoods) {
+        if (currentCalories + food.calories <= targetCalories * 1.1) {
+          meal.push(food);
+          currentCalories += food.calories;
         }
       }
 
-      const suitableFoods = availableFoods.filter(food => 
-        food.meal_type?.includes(mealType) || food.meal_type?.includes('any')
-      )
+      return meal;
+    };
 
-      suitableFoods.sort((a, b) => b.protein - a.protein)
-
-      for (const food of suitableFoods) {
-        if (meal.calories + food.calories <= targetCalories * 1.1) {
-          meal.foods.push(food)
-          meal.calories += food.calories
-          meal.macros.protein += food.protein || 0
-          meal.macros.carbs += food.carbs || 0
-          meal.macros.fats += food.fats || 0
-          meal.macros.fiber += food.fiber || 0
-        }
-      }
-
-      return meal
-    }
-
-    const dailyPlan = {
-      breakfast: generateMeal(foods, userData.dailyCalories * mealDistribution.breakfast, 'breakfast'),
-      morningSnack: generateMeal(foods, userData.dailyCalories * mealDistribution.morningSnack, 'morningSnack'),
-      lunch: generateMeal(foods, userData.dailyCalories * mealDistribution.lunch, 'lunch'),
-      afternoonSnack: generateMeal(foods, userData.dailyCalories * mealDistribution.afternoonSnack, 'afternoonSnack'),
-      dinner: generateMeal(foods, userData.dailyCalories * mealDistribution.dinner, 'dinner')
-    }
-
-    const totalNutrition = {
-      calories: Object.values(dailyPlan).reduce((sum, meal) => sum + meal.calories, 0),
-      protein: Object.values(dailyPlan).reduce((sum, meal) => sum + meal.macros.protein, 0),
-      carbs: Object.values(dailyPlan).reduce((sum, meal) => sum + meal.macros.carbs, 0),
-      fats: Object.values(dailyPlan).reduce((sum, meal) => sum + meal.macros.fats, 0),
-      fiber: Object.values(dailyPlan).reduce((sum, meal) => sum + meal.macros.fiber, 0)
-    }
-
-    const trainingTime = dietaryPreferences.trainingTime
-    const recommendations = {
-      preworkout: trainingTime 
-        ? "Consumir carboidratos complexos 2-3 horas antes do treino para energia sustentada"
-        : "Ajuste suas refeições de acordo com seu horário de treino quando definido",
-      postworkout: "Priorize proteínas e carboidratos após o treino para recuperação muscular",
-      general: `Mantenha-se hidratado consumindo água regularmente ao longo do dia. Meta diária: ${Math.round(userData.weight * 35)}ml`,
-      timing: [
-        "Café da manhã: Até 1 hora após acordar",
-        "Intervalos entre refeições: 2.5-3.5 horas",
-        "Última refeição: 2-3 horas antes de dormir"
-      ]
-    }
-
-    const nutritionalAnalysis = {
-      carbsPercentage: (totalNutrition.carbs * 4) / totalNutrition.calories,
-      proteinPercentage: (totalNutrition.protein * 4) / totalNutrition.calories,
-      fatsPercentage: (totalNutrition.fats * 9) / totalNutrition.calories,
-      fiberAdequate: totalNutrition.fiber >= macroTargets.fiber,
-    }
-
+    // Generate meal plan
     const mealPlan = {
-      dailyPlan,
-      totalNutrition,
+      breakfast: selectFoodsForMeal(foodsByMealType['breakfast'] || foodsByMealType['any'] || [], mealDistribution.breakfast),
+      morningSnack: selectFoodsForMeal(foodsByMealType['morning_snack'] || foodsByMealType['any'] || [], mealDistribution.morningSnack),
+      lunch: selectFoodsForMeal(foodsByMealType['lunch'] || foodsByMealType['any'] || [], mealDistribution.lunch),
+      afternoonSnack: selectFoodsForMeal(foodsByMealType['afternoon_snack'] || foodsByMealType['any'] || [], mealDistribution.afternoonSnack),
+      dinner: selectFoodsForMeal(foodsByMealType['dinner'] || foodsByMealType['any'] || [], mealDistribution.dinner)
+    };
+
+    // Calculate total macros
+    const calculateTotalMacros = () => {
+      const totals = {
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fats: 0,
+        fiber: 0
+      };
+
+      Object.values(mealPlan).forEach(meal => {
+        meal.forEach(food => {
+          totals.calories += food.calories || 0;
+          totals.protein += food.protein || 0;
+          totals.carbs += food.carbs || 0;
+          totals.fats += food.fats || 0;
+          totals.fiber += food.fiber || 0;
+        });
+      });
+
+      return totals;
+    };
+
+    const macros = calculateTotalMacros();
+
+    // Add recommendations based on training time
+    const recommendations = {
+      general: [
+        `Distribuição calórica diária: ${userData.dailyCalories} kcal`,
+        `Consumo de água recomendado: ${Math.round(userData.weight * 35)}ml por dia`,
+        "Mantenha um intervalo de 2.5-3.5 horas entre as refeições"
+      ],
+      preworkout: dietaryPreferences.trainingTime 
+        ? [`Consuma uma refeição leve 2 horas antes do treino (${dietaryPreferences.trainingTime})`]
+        : [],
+      postworkout: [
+        "Consuma proteínas e carboidratos até 1 hora após o treino",
+        "Hidrate-se bem durante e após o exercício"
+      ]
+    };
+
+    const response = {
+      dailyPlan: mealPlan,
+      macros,
       recommendations,
-      nutritionalAnalysis
-    }
+      mealDistribution
+    };
 
-    console.log('Generated meal plan:', mealPlan)
+    console.log('Generated meal plan:', response);
 
-    return new Response(
-      JSON.stringify(mealPlan),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    return new Response(JSON.stringify(response), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
 
   } catch (error) {
-    console.error('Error in generate-meal-plan function:', error)
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { 
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    )
+    console.error('Error in generate-meal-plan function:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
   }
-})
+});
