@@ -61,6 +61,7 @@ export interface MealPlan {
     protein: number;
     carbs: number;
     fats: number;
+    fiber: number;
   };
   recommendations: {
     general: string;

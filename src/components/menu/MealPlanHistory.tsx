@@ -152,9 +152,7 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
                         key={mealType}
                         title={getMealTitle(mealType)}
                         icon={getMealIcon(mealType)}
-                        foods={meal.foods}
-                        macros={meal.macros}
-                        calories={meal.calories}
+                        meal={meal}
                       />
                     ))}
                     
