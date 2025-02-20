@@ -7,31 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface Exercise {
-  name: string;
-  sets: number;
-  reps: number;
-  rest_time_seconds: number;
-  gifUrl?: string;
-}
-
-interface WorkoutSession {
-  id: string;
-  day_number: number;
-  warmup_description: string;
-  cooldown_description: string;
-  exercises: Exercise[];
-}
-
-interface WorkoutPlan {
-  id: string;
-  user_id: string;
-  goal: string;
-  start_date: string;
-  end_date: string;
-  workout_sessions: WorkoutSession[];
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -39,131 +14,116 @@ serve(async (req) => {
 
   try {
     const { preferences, userId } = await req.json();
-    console.log("Recebendo preferências:", preferences);
+    console.log("Recebendo preferências:", JSON.stringify(preferences, null, 2));
 
     if (!userId) {
-      throw new Error("User ID é obrigatório");
+      return new Response(
+        JSON.stringify({ error: "User ID é obrigatório" }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400
+        }
+      );
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
     if (!supabaseUrl || !supabaseKey) {
-      throw new Error("Credenciais do Supabase não configuradas");
+      return new Response(
+        JSON.stringify({ error: "Configuração do Supabase ausente" }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500
+        }
+      );
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Busca exercícios
-    let query = supabase
+    // Busca exercícios básicos primeiro
+    const { data: exercises, error: exercisesError } = await supabase
       .from('exercises')
-      .select('*');
-
-    // Adiciona filtros apenas se os arrays não estiverem vazios
-    if (preferences.preferredExerciseTypes?.length > 0) {
-      query = query.in('exercise_type', preferences.preferredExerciseTypes);
-    }
-
-    if (preferences.availableEquipment?.length > 0) {
-      // Se 'all' estiver presente, não filtramos por equipamento
-      if (!preferences.availableEquipment.includes('all')) {
-        query = query.overlaps('equipment_needed', preferences.availableEquipment);
-      }
-    }
-
-    const { data: exercises, error: exercisesError } = await query;
+      .select('*')
+      .limit(20);
 
     if (exercisesError) {
       console.error("Erro ao buscar exercícios:", exercisesError);
-      throw new Error("Erro ao buscar exercícios");
+      return new Response(
+        JSON.stringify({ error: "Erro ao buscar exercícios" }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500
+        }
+      );
     }
 
     if (!exercises || exercises.length === 0) {
-      // Tenta buscar exercícios sem filtros se nenhum foi encontrado
-      const { data: fallbackExercises, error: fallbackError } = await supabase
-        .from('exercises')
-        .select('*')
-        .limit(20);
-
-      if (fallbackError || !fallbackExercises || fallbackExercises.length === 0) {
-        throw new Error("Nenhum exercício encontrado. Por favor, verifique a base de dados.");
-      }
-
-      exercises.push(...fallbackExercises);
+      return new Response(
+        JSON.stringify({ error: "Nenhum exercício encontrado na base de dados" }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 404
+        }
+      );
     }
 
-    console.log(`Encontrados ${exercises.length} exercícios compatíveis`);
-
-    // Função para embaralhar array
-    const shuffleArray = <T>(array: T[]): T[] => {
-      const shuffled = [...array];
-      for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-      }
-      return shuffled;
-    };
+    console.log(`Encontrados ${exercises.length} exercícios`);
 
     // Gera as sessões de treino
-    const exercisesPerSession = Math.min(8, exercises.length);
-    const sessions: WorkoutSession[] = Array.from(
-      { length: 3 }, // Definimos 3 sessões por semana como padrão
-      (_, i) => {
-        const sessionExercises = shuffleArray(exercises)
-          .slice(0, exercisesPerSession)
-          .map(exercise => ({
-            name: exercise.name,
-            sets: 3, // Valores padrão
-            reps: 12,
-            rest_time_seconds: 60,
-            gifUrl: exercise.gif_url || undefined
-          }));
+    const workoutSessions = Array.from({ length: 3 }, (_, i) => ({
+      id: crypto.randomUUID(),
+      day_number: i + 1,
+      warmup_description: "Aquecimento dinâmico de 10 minutos incluindo mobilidade articular",
+      cooldown_description: "Alongamento estático de 10 minutos focando nos músculos trabalhados",
+      exercises: exercises
+        .slice(0, 6)
+        .map(exercise => ({
+          name: exercise.name,
+          sets: 3,
+          reps: 12,
+          rest_time_seconds: 60,
+          gifUrl: exercise.gif_url
+        }))
+    }));
 
-        return {
-          id: crypto.randomUUID(),
-          day_number: i + 1,
-          warmup_description: "Aquecimento dinâmico de 10 minutos incluindo mobilidade articular",
-          cooldown_description: "Alongamento estático de 10 minutos focando nos músculos trabalhados",
-          exercises: sessionExercises
-        };
-    });
-
-    // Cria o plano completo
-    const workoutPlan: WorkoutPlan = {
+    const workoutPlan = {
       id: crypto.randomUUID(),
       user_id: userId,
       goal: preferences.goal || 'general_fitness',
       start_date: new Date().toISOString(),
-      end_date: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString(), // 28 dias
-      workout_sessions: sessions
+      end_date: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString(),
+      workout_sessions: workoutSessions
     };
 
-    console.log("Tentando salvar plano:", workoutPlan.id);
-
-    // Salva o plano no banco
+    // Salva o plano
     const { error: planError } = await supabase
       .from('workout_plans')
       .insert({
         id: workoutPlan.id,
         user_id: userId,
         plan_data: workoutPlan,
+        goal: workoutPlan.goal,
+        start_date: workoutPlan.start_date,
+        end_date: workoutPlan.end_date,
         active: true
       });
 
     if (planError) {
       console.error("Erro ao salvar plano:", planError);
-      throw new Error("Erro ao salvar plano de treino");
+      return new Response(
+        JSON.stringify({ error: "Erro ao salvar plano de treino" }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500
+        }
+      );
     }
-
-    console.log("Plano de treino gerado com sucesso:", workoutPlan.id);
 
     return new Response(
       JSON.stringify(workoutPlan),
       { 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200 
       }
     );
@@ -176,10 +136,7 @@ serve(async (req) => {
         error: error instanceof Error ? error.message : "Erro interno ao gerar plano de treino"
       }),
       { 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500
       }
     );
