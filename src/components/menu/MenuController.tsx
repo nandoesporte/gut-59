@@ -155,10 +155,16 @@ export const useMenuController = () => {
         throw new Error('Nenhum dado recebido do gerador de cardápio');
       }
 
-      // Set the meal plan state before saving to the database
+      // Validate meal plan data structure
+      if (!mealPlanData.dailyPlan || !mealPlanData.totalNutrition || !mealPlanData.recommendations) {
+        console.error('Invalid meal plan structure:', mealPlanData);
+        throw new Error('Estrutura inválida do plano alimentar');
+      }
+
+      // Set the meal plan state first
       setMealPlan(mealPlanData);
 
-      // Salvar cardápio gerado
+      // Then save to the database
       const { error: saveError } = await supabase
         .from('meal_plans')
         .insert({
@@ -174,6 +180,7 @@ export const useMenuController = () => {
         throw new Error('Falha ao salvar cardápio');
       }
 
+      // Only change step after meal plan is set and saved
       setCurrentStep(4);
       toast.dismiss(toastId);
       toast.success("Cardápio personalizado gerado com sucesso!");
@@ -186,6 +193,11 @@ export const useMenuController = () => {
       
       if (error instanceof Error) {
         console.error('Stack trace:', error.stack);
+        console.error('Error details:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        });
       }
     }
   };
