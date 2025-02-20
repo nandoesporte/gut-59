@@ -1,7 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import "https://deno.land/x/xhr@0.1.0/mod.ts"
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,7 +17,6 @@ interface MacroDistribution {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -27,13 +25,11 @@ serve(async (req) => {
     const { userData, selectedFoods, dietaryPreferences } = await req.json()
     console.log('Received request data:', { userData, selectedFoods, dietaryPreferences })
 
-    // Initialize Supabase client
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Fetch selected foods details
     const { data: foods, error: foodsError } = await supabaseClient
       .from('protocol_foods')
       .select('*')
@@ -45,7 +41,6 @@ serve(async (req) => {
 
     console.log('Fetched foods:', foods)
 
-    // Calculate macro distributions based on goal
     const getMacroDistribution = (goal: string): MacroDistribution => {
       switch (goal) {
         case 'weightLoss':
@@ -63,7 +58,6 @@ serve(async (req) => {
     const dailyCarbsTarget = (userData.dailyCalories * macroTargets.carbs) / 4
     const dailyFatsTarget = (userData.dailyCalories * macroTargets.fats) / 9
 
-    // Distribute calories across meals
     const mealDistribution = {
       breakfast: 0.25,
       morningSnack: 0.15,
@@ -88,15 +82,12 @@ serve(async (req) => {
         }
       }
 
-      // Filter foods appropriate for meal type
       const suitableFoods = availableFoods.filter(food => 
-        food.meal_type.includes(mealType) || food.meal_type.includes('any')
+        food.meal_type?.includes(mealType) || food.meal_type?.includes('any')
       )
 
-      // Sort foods by protein content for better distribution
       suitableFoods.sort((a, b) => b.protein - a.protein)
 
-      // Add foods until we reach target calories
       for (const food of suitableFoods) {
         if (meal.calories + food.calories <= targetCalories * 1.1) {
           meal.foods.push(food)
@@ -111,7 +102,6 @@ serve(async (req) => {
       return meal
     }
 
-    // Generate daily plan
     const dailyPlan = {
       breakfast: generateMeal(foods, userData.dailyCalories * mealDistribution.breakfast, 'breakfast'),
       morningSnack: generateMeal(foods, userData.dailyCalories * mealDistribution.morningSnack, 'morningSnack'),
@@ -120,7 +110,6 @@ serve(async (req) => {
       dinner: generateMeal(foods, userData.dailyCalories * mealDistribution.dinner, 'dinner')
     }
 
-    // Calculate total nutrition
     const totalNutrition = {
       calories: Object.values(dailyPlan).reduce((sum, meal) => sum + meal.calories, 0),
       protein: Object.values(dailyPlan).reduce((sum, meal) => sum + meal.macros.protein, 0),
@@ -129,7 +118,6 @@ serve(async (req) => {
       fiber: Object.values(dailyPlan).reduce((sum, meal) => sum + meal.macros.fiber, 0)
     }
 
-    // Generate training-specific recommendations
     const trainingTime = dietaryPreferences.trainingTime
     const recommendations = {
       preworkout: trainingTime 
@@ -144,7 +132,6 @@ serve(async (req) => {
       ]
     }
 
-    // Include nutritional analysis
     const nutritionalAnalysis = {
       carbsPercentage: (totalNutrition.carbs * 4) / totalNutrition.calories,
       proteinPercentage: (totalNutrition.protein * 4) / totalNutrition.calories,
