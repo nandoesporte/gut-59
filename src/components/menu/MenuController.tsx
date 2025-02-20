@@ -53,7 +53,7 @@ export const useMenuController = () => {
         return;
       }
 
-      // Validações iniciais mais rigorosas
+      // Validações iniciais
       if (!calorieNeeds || calorieNeeds <= 0) {
         toast.dismiss(toastId);
         toast.error("Necessidade calórica inválida");
@@ -94,7 +94,7 @@ export const useMenuController = () => {
 
       setDietaryPreferences(preferences);
 
-      // Preparar e validar dados dos alimentos
+      // Preparar dados dos alimentos
       const selectedFoodsDetails = protocolFoods.filter(food => selectedFoods.includes(food.id));
       
       if (selectedFoodsDetails.length === 0) {
@@ -103,40 +103,38 @@ export const useMenuController = () => {
         return;
       }
 
-      const requestData = {
-        userData: {
-          weight: Number(formData.weight),
-          height: Number(formData.height),
-          age: Number(formData.age),
-          gender: formData.gender,
-          activityLevel: formData.activityLevel,
-          goal: formData.goal,
-          userId: userData.user.id,
-          dailyCalories: calorieNeeds
-        },
-        selectedFoods: selectedFoodsDetails.map(food => ({
-          id: food.id,
-          name: food.name,
-          calories: food.calories,
-          protein: food.protein || 0,
-          carbs: food.carbs || 0,
-          fats: food.fats || 0,
-          portion: food.portion || 100,
-          portionUnit: food.portionUnit || 'g'
-        })),
-        dietaryPreferences: {
-          hasAllergies: preferences.hasAllergies || false,
-          allergies: preferences.allergies || [],
-          dietaryRestrictions: preferences.dietaryRestrictions || [],
-          trainingTime: preferences.trainingTime || null
-        }
-      };
-
-      // Gerar cardápio usando a edge function - Removendo headers problemáticos
+      // Chamar a edge function para gerar o plano alimentar
       const { data: responseData, error: generateError } = await supabase.functions.invoke(
         'generate-meal-plan',
         {
-          body: requestData
+          body: {
+            userData: {
+              weight: Number(formData.weight),
+              height: Number(formData.height),
+              age: Number(formData.age),
+              gender: formData.gender,
+              activityLevel: formData.activityLevel,
+              goal: formData.goal,
+              userId: userData.user.id,
+              dailyCalories: calorieNeeds
+            },
+            selectedFoods: selectedFoodsDetails.map(food => ({
+              id: food.id,
+              name: food.name,
+              calories: food.calories,
+              protein: food.protein || 0,
+              carbs: food.carbs || 0,
+              fats: food.fats || 0,
+              portion: food.portion || 100,
+              portionUnit: food.portionUnit || 'g'
+            })),
+            dietaryPreferences: {
+              hasAllergies: preferences.hasAllergies || false,
+              allergies: preferences.allergies || [],
+              dietaryRestrictions: preferences.dietaryRestrictions || [],
+              trainingTime: preferences.trainingTime || null
+            }
+          }
         }
       );
 
