@@ -1,6 +1,6 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { validateMealPlan, standardizeUnits } from "./validator.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -133,12 +133,12 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-4',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        temperature: 0.3, // Reduzido para maior precisão técnica
+        temperature: 0.3,
         max_tokens: 3000,
         response_format: { type: "json_object" }
       }),
@@ -161,31 +161,21 @@ serve(async (req) => {
     try {
       mealPlan = JSON.parse(data.choices[0].message.content);
       
-      // Validações do plano
-      if (!mealPlan.dailyPlan || !mealPlan.recommendations || !mealPlan.totalNutrition) {
-        throw new Error('Estrutura do plano nutricional inválida');
-      }
-
-      // Validação das refeições
-      ['breakfast', 'morningSnack', 'lunch', 'afternoonSnack', 'dinner'].forEach(meal => {
-        const mealData = mealPlan.dailyPlan[meal];
-        if (!mealData || !mealData.description || !mealData.foods || !mealData.calories || !mealData.macros) {
-          throw new Error(`Dados incompletos para a refeição: ${meal}`);
-        }
-
-        // Validar alimentos
-        mealData.foods.forEach((food: any) => {
-          if (!food.name || !food.portion || !food.unit || !food.details) {
-            throw new Error(`Dados incompletos para alimento em ${meal}`);
-          }
+      // Padronizar unidades de medida
+      Object.values(mealPlan.dailyPlan).forEach((meal: any) => {
+        meal.foods.forEach((food: any) => {
+          food.unit = standardizeUnits(food.unit);
         });
       });
+
+      // Validar estrutura completa
+      mealPlan = validateMealPlan(mealPlan);
 
       console.log('Plano nutricional validado com sucesso');
 
     } catch (error) {
       console.error('Erro na validação nutricional:', error);
-      throw new Error('Erro na validação do plano nutricional');
+      throw new Error('Erro na validação do plano nutricional: ' + error.message);
     }
 
     return new Response(JSON.stringify(mealPlan), {
