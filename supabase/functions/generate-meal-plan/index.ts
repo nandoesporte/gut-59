@@ -9,6 +9,7 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -17,61 +18,76 @@ serve(async (req) => {
     const { userData, selectedFoods, dietaryPreferences } = await req.json();
     console.log('Received request data:', { userData, selectedFoods, dietaryPreferences });
 
+    // Validate input data
+    if (!userData || !selectedFoods || !dietaryPreferences) {
+      throw new Error('Dados incompletos recebidos');
+    }
+
+    if (selectedFoods.length === 0) {
+      throw new Error('Nenhum alimento selecionado');
+    }
+
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Fetch user's health condition
-    const { data: nutritionPrefs, error: prefsError } = await supabase
-      .from('nutrition_preferences')
-      .select('health_condition')
-      .eq('user_id', userData.userId)
-      .maybeSingle();
-
-    if (prefsError) {
-      console.error('Error fetching nutrition preferences:', prefsError);
-      throw prefsError;
-    }
-
     // Prepare system prompt
-    const systemPrompt = `You are a professional nutritionist AI that creates personalized meal plans. 
-    Consider the following parameters:
-    - Goal: ${userData.goal}
-    - Health Condition: ${nutritionPrefs?.health_condition || 'None'}
-    - Daily Caloric Need: ${userData.dailyCalories} calories
-    - Activity Level: ${userData.activityLevel}
-    - Allergies: ${dietaryPreferences.allergies?.join(', ') || 'None'}
-    - Dietary Restrictions: ${dietaryPreferences.dietaryRestrictions?.join(', ') || 'None'}
-    - Training Time: ${dietaryPreferences.trainingTime || 'Not specified'}`;
+    const systemPrompt = `Você é um nutricionista profissional criando um plano alimentar personalizado.
+    Considere os seguintes parâmetros:
+    - Objetivo: ${userData.goal}
+    - Calorias Diárias: ${userData.dailyCalories} calorias
+    - Nível de Atividade: ${userData.activityLevel}
+    - Alergias: ${dietaryPreferences.allergies?.join(', ') || 'Nenhuma'}
+    - Restrições Alimentares: ${dietaryPreferences.dietaryRestrictions?.join(', ') || 'Nenhuma'}
+    - Horário de Treino: ${dietaryPreferences.trainingTime || 'Não especificado'}`;
 
-    // Prepare foods data for the prompt
+    // Prepare foods data
     const foodsData = selectedFoods.map(food => ({
-      name: food.name,
-      calories: food.calories,
-      protein: food.protein,
-      carbs: food.carbs,
-      fats: food.fats,
-      portion: food.portion_size,
-      unit: food.portion_unit
+      nome: food.name,
+      calorias: food.calories,
+      proteina: food.protein,
+      carboidratos: food.carbs,
+      gorduras: food.fats,
+      porcao: food.portion,
+      unidade: food.portionUnit
     }));
 
-    const userPrompt = `Generate a detailed meal plan using only these foods: ${JSON.stringify(foodsData)}
-    Format the response as a JSON object with the following structure:
+    const userPrompt = `Gere um plano alimentar detalhado usando apenas estes alimentos: ${JSON.stringify(foodsData)}
+    Formate a resposta como um objeto JSON com a seguinte estrutura:
     {
       "dailyPlan": {
-        "breakfast": { "foods": [], "calories": 0, "macros": { "protein": 0, "carbs": 0, "fats": 0, "fiber": 0 } },
-        "morningSnack": { "foods": [], "calories": 0, "macros": { "protein": 0, "carbs": 0, "fats": 0, "fiber": 0 } },
-        "lunch": { "foods": [], "calories": 0, "macros": { "protein": 0, "carbs": 0, "fats": 0, "fiber": 0 } },
-        "afternoonSnack": { "foods": [], "calories": 0, "macros": { "protein": 0, "carbs": 0, "fats": 0, "fiber": 0 } },
-        "dinner": { "foods": [], "calories": 0, "macros": { "protein": 0, "carbs": 0, "fats": 0, "fiber": 0 } }
+        "breakfast": {
+          "foods": [{"name": "Nome do Alimento", "portion": 100, "unit": "g"}],
+          "calories": 0,
+          "macros": {"protein": 0, "carbs": 0, "fats": 0}
+        },
+        "morningSnack": {
+          "foods": [{"name": "Nome do Alimento", "portion": 100, "unit": "g"}],
+          "calories": 0,
+          "macros": {"protein": 0, "carbs": 0, "fats": 0}
+        },
+        "lunch": {
+          "foods": [{"name": "Nome do Alimento", "portion": 100, "unit": "g"}],
+          "calories": 0,
+          "macros": {"protein": 0, "carbs": 0, "fats": 0}
+        },
+        "afternoonSnack": {
+          "foods": [{"name": "Nome do Alimento", "portion": 100, "unit": "g"}],
+          "calories": 0,
+          "macros": {"protein": 0, "carbs": 0, "fats": 0}
+        },
+        "dinner": {
+          "foods": [{"name": "Nome do Alimento", "portion": 100, "unit": "g"}],
+          "calories": 0,
+          "macros": {"protein": 0, "carbs": 0, "fats": 0}
+        }
       },
       "totalNutrition": {
         "calories": 0,
         "protein": 0,
         "carbs": 0,
-        "fats": 0,
-        "fiber": 0
+        "fats": 0
       },
       "recommendations": {
         "general": "",
@@ -83,7 +99,11 @@ serve(async (req) => {
 
     // Call OpenAI API
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-    console.log('Calling OpenAI API...');
+    if (!openAIApiKey) {
+      throw new Error('OpenAI API key não configurada');
+    }
+
+    console.log('Chamando API do OpenAI...');
     
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -92,7 +112,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-4', // Corrigido o nome do modelo
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
@@ -102,63 +122,53 @@ serve(async (req) => {
       }),
     });
 
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Erro na resposta da OpenAI:', errorData);
+      throw new Error(`Erro na API do OpenAI: ${response.status}`);
+    }
+
     const aiResponse = await response.json();
-    console.log('OpenAI API Response:', aiResponse);
+    console.log('Resposta da OpenAI:', aiResponse);
     
     if (!aiResponse.choices || !aiResponse.choices[0]) {
-      throw new Error('Invalid response from OpenAI');
+      throw new Error('Resposta inválida da OpenAI');
     }
 
     let mealPlan;
     try {
       mealPlan = JSON.parse(aiResponse.choices[0].message.content);
     } catch (e) {
-      console.error('Error parsing AI response:', e);
-      throw new Error('Failed to parse meal plan data');
+      console.error('Erro ao processar resposta da IA:', e);
+      throw new Error('Falha ao processar dados do plano alimentar');
     }
 
-    // Add any health-specific recommendations
-    if (nutritionPrefs?.health_condition) {
-      const healthCondition = nutritionPrefs.health_condition;
-      mealPlan.recommendations.healthCondition = healthCondition;
-      
-      // Add specific recommendations based on health condition
-      if (healthCondition === 'diabetes') {
-        mealPlan.recommendations.timing.push(
-          "Mantenha intervalos regulares entre as refeições para controle glicêmico",
-          "Priorize alimentos com baixo índice glicêmico",
-          "Monitore sua glicemia antes e após as refeições"
-        );
-      } else if (healthCondition === 'hipertensao') {
-        mealPlan.recommendations.timing.push(
-          "Limite o consumo de sódio a 2000mg por dia",
-          "Priorize alimentos ricos em potássio",
-          "Mantenha uma boa hidratação"
-        );
-      }
-    }
-
-    // Add workout timing recommendations if training time is specified
+    // Adicionar recomendações de treino se houver horário especificado
     if (dietaryPreferences.trainingTime) {
       const trainingTime = new Date(`1970-01-01T${dietaryPreferences.trainingTime}`);
       const hour = trainingTime.getHours();
 
       mealPlan.recommendations.timing.push(
-        `Consuma sua refeição pré-treino 2-3 horas antes do treino (${hour - 2}:00)`,
-        `Faça sua refeição pós-treino em até 1 hora após o treino (${hour + 1}:00)`
+        `Refeição pré-treino: ${hour - 2}:00`,
+        `Refeição pós-treino: ${hour + 1}:00`
       );
     }
 
-    console.log('Generated meal plan:', mealPlan);
+    console.log('Plano alimentar gerado:', mealPlan);
 
     return new Response(JSON.stringify(mealPlan), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    console.error('Error in generate-meal-plan:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.error('Erro na função generate-meal-plan:', error);
+    return new Response(
+      JSON.stringify({ 
+        error: error instanceof Error ? error.message : 'Erro interno ao gerar plano alimentar'
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
   }
 });
