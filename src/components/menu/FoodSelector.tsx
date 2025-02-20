@@ -30,10 +30,6 @@ interface FoodSelectorProps {
 
 // Função para formatar a porção do alimento de forma profissional
 const formatPortion = (food: ProtocolFood): string => {
-  const size = food.serving_size || food.portion_size || 100;
-  const unit = food.serving_unit || food.portion_unit || 'g';
-  
-  // Mapeamento de medidas caseiras
   const householdMeasures: Record<string, (size: number) => string> = {
     'xícara': (size) => size === 0.5 ? '½ xícara' : `${size} xícara${size > 1 ? 's' : ''}`,
     'colher': (size) => `${size} colher${size > 1 ? 'es' : ''} de sopa`,
@@ -43,28 +39,15 @@ const formatPortion = (food: ProtocolFood): string => {
     'porção': (size) => `${size} porção${size > 1 ? 'ões' : ''}`,
   };
 
-  if (unit.toLowerCase().includes('xic')) return householdMeasures['xícara'](size);
-  if (unit.toLowerCase().includes('colh')) return householdMeasures['colher'](size);
-  if (unit.toLowerCase().includes('fat')) return householdMeasures['fatia'](size);
-  if (unit.toLowerCase().includes('unid')) return householdMeasures['unidade'](size);
-  if (unit.toLowerCase().includes('prat')) return householdMeasures['prato'](size);
-  if (unit.toLowerCase().includes('porc')) return householdMeasures['porção'](size);
+  if (food.portion_unit?.toLowerCase().includes('xic')) return householdMeasures['xícara'](food.serving_size || 1);
+  if (food.portion_unit?.toLowerCase().includes('colh')) return householdMeasures['colher'](food.serving_size || 1);
+  if (food.portion_unit?.toLowerCase().includes('fat')) return householdMeasures['fatia'](food.serving_size || 1);
+  if (food.portion_unit?.toLowerCase().includes('unid')) return householdMeasures['unidade'](food.serving_size || 1);
+  if (food.portion_unit?.toLowerCase().includes('prat')) return householdMeasures['prato'](food.serving_size || 1);
+  if (food.portion_unit?.toLowerCase().includes('porc')) return householdMeasures['porção'](food.serving_size || 1);
 
-  // Para medidas em gramas, formatar de maneira profissional
-  if (unit.toLowerCase() === 'g') {
-    if (size < 1) return `${size * 1000}mg`;
-    if (size >= 1000) return `${size / 1000}kg`;
-    return `${size}g`;
-  }
-
-  // Para medidas em mililitros
-  if (unit.toLowerCase() === 'ml') {
-    if (size >= 1000) return `${size / 1000}L`;
-    return `${size}ml`;
-  }
-
-  return `${size}${unit}`;
-};
+  return `1 porção`;
+}
 
 const MealSection = ({
   title,
@@ -132,7 +115,7 @@ export const FoodSelector = ({
       <div className="text-center mb-6">
         <h2 className="text-2xl font-semibold text-gray-900">Opções de Preferência dos Alimentos</h2>
         <p className="text-gray-600 mt-2">
-          Selecione suas preferências alimentares para cada refeição, as porções foram cuidadosamente estabelecidas por Dr. Michael Anderson, PhD em Nutrição Clínica
+          Selecione suas opções preferidas de alimentos para cada refeição. A IA utilizará suas escolhas para gerar um cardápio personalizado e balanceado, adaptando as porções e combinações de acordo com seus objetivos.
         </p>
       </div>
 

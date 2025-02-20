@@ -1,6 +1,5 @@
 
 import { useState, useEffect } from "react";
-import { toast } from "sonner";
 import type { ProtocolFood } from "../types";
 
 export const useFoodSelection = () => {
@@ -11,10 +10,6 @@ export const useFoodSelection = () => {
     setSelectedFoods(prev => {
       if (prev.includes(foodId)) {
         return prev.filter(id => id !== foodId);
-      }
-      if (prev.length >= 20) {
-        toast.error("Você já selecionou o máximo de 20 alimentos!");
-        return prev;
       }
       return [...prev, foodId];
     });
