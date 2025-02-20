@@ -12,11 +12,11 @@ type DietaryPreference = Database['public']['Tables']['dietary_preferences']['In
 // Helper function to map UI goals to database enum values
 const mapGoalToEnum = (goal: string): Database['public']['Enums']['nutritional_goal'] => {
   const goalMap: Record<string, Database['public']['Enums']['nutritional_goal']> = {
-    'lose': 'weight_loss',
-    'maintain': 'maintenance',
-    'gain': 'muscle_gain'
+    'lose': 'lose_weight',
+    'maintain': 'maintain',
+    'gain': 'gain_mass'
   };
-  return goalMap[goal] || 'maintenance';
+  return goalMap[goal] || 'maintain';
 };
 
 export const useMenuController = () => {
