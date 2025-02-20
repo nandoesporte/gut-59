@@ -143,8 +143,8 @@ export const useMenuController = () => {
         throw new Error('Falha ao gerar cardápio');
       }
 
-      if (!responseData || typeof responseData !== 'object') {
-        throw new Error('Dados inválidos recebidos do gerador de cardápio');
+      if (!responseData) {
+        throw new Error('Nenhum dado recebido do gerador de cardápio');
       }
 
       // Salvar cardápio gerado
@@ -155,7 +155,7 @@ export const useMenuController = () => {
           plan_data: responseData,
           calories: calorieNeeds,
           active: true,
-          dietary_preferences: JSON.stringify(preferences)
+          dietary_preferences: dietaryPreference
         });
 
       if (saveError) {
