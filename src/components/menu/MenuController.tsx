@@ -1,9 +1,9 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { ProtocolFood, DietaryPreferences, MealPlan } from "./types";
-import { CalorieCalculatorForm, activityLevels } from "./CalorieCalculator";
+import { CalorieCalculatorForm, activityLevels } from "./CalcalculateWorkoutPlanorieCalculator";
 import type { Database } from "@/integrations/supabase/types";
 
 type NutritionPreference = Database['public']['Tables']['nutrition_preferences']['Insert'];
@@ -29,17 +29,22 @@ export const useMenuController = () => {
 
   useEffect(() => {
     const fetchProtocolFoods = async () => {
-      const { data, error } = await supabase
-        .from('protocol_foods')
-        .select('*');
+      try {
+        const { data, error } = await supabase
+          .from('protocol_foods')
+          .select('*');
 
-      if (error) {
-        console.error('Error fetching foods:', error);
-        toast.error("Erro ao carregar lista de alimentos");
-        return;
+        if (error) {
+          console.error('Error fetching foods:', error);
+          toast.error("Erro ao carregar lista de alimentos");
+          return;
+        }
+
+        setProtocolFoods(data);
+      } catch (err) {
+        console.error('Error in fetchProtocolFoods:', err);
+        toast.error("Erro ao carregar alimentos");
       }
-
-      setProtocolFoods(data);
     };
 
     fetchProtocolFoods();
@@ -256,3 +261,4 @@ export const useMenuController = () => {
     setFormData,
   };
 };
+
