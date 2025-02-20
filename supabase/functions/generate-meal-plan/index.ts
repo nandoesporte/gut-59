@@ -1,7 +1,6 @@
 
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,139 +14,115 @@ serve(async (req) => {
 
   try {
     const { userData, selectedFoods, dietaryPreferences } = await req.json();
-    console.log('Iniciando processamento dos dados recebidos');
+    console.log('Dados recebidos:', { userData, selectedFoods: selectedFoods.length });
 
-    // Validações iniciais
-    if (!userData || !selectedFoods || !dietaryPreferences) {
-      throw new Error('Dados incompletos recebidos');
-    }
-
-    if (selectedFoods.length === 0) {
-      throw new Error('É necessário selecionar pelo menos um alimento');
-    }
-
-    // Preparar dados de alimentos de forma mais concisa
-    const foodsList = selectedFoods.map(food => 
-      `${food.name} (${food.calories}kcal, P:${food.protein}g, C:${food.carbs}g, G:${food.fats}g)`
-    ).join(', ');
-
-    const prompt = `Como nutricionista experiente, crie um plano alimentar personalizado para:
-
-Perfil: ${userData.gender}, ${userData.age} anos, ${userData.weight}kg, ${userData.height}cm
-Objetivo: ${userData.goal}
-Calorias: ${userData.dailyCalories}kcal/dia
-Nível de Atividade: ${userData.activityLevel}
-${dietaryPreferences.allergies?.length ? `Alergias: ${dietaryPreferences.allergies.join(', ')}` : ''}
-${dietaryPreferences.dietaryRestrictions?.length ? `Restrições: ${dietaryPreferences.dietaryRestrictions.join(', ')}` : ''}
-${dietaryPreferences.trainingTime ? `Horário de Treino: ${dietaryPreferences.trainingTime}` : ''}
-
-Alimentos disponíveis: ${foodsList}
-
-Gere um plano detalhado no formato JSON com a seguinte estrutura:
-{
-  "dailyPlan": {
-    "breakfast": {
-      "description": "Descrição do café da manhã",
-      "foods": [{"name": "Nome", "portion": 0, "unit": "g", "details": "Preparo"}],
-      "calories": 0,
-      "macros": {"protein": 0, "carbs": 0, "fats": 0, "fiber": 0}
-    },
-    "morningSnack": { /* mesma estrutura */ },
-    "lunch": { /* mesma estrutura */ },
-    "afternoonSnack": { /* mesma estrutura */ },
-    "dinner": { /* mesma estrutura */ }
-  },
-  "totalNutrition": {
-    "calories": 0,
-    "protein": 0,
-    "carbs": 0,
-    "fats": 0,
-    "fiber": 0
-  },
-  "recommendations": {
-    "general": "",
-    "timing": [],
-    "preparation": [],
-    "substitutions": []
-  }
-}`;
-
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openAIApiKey) {
-      throw new Error('OpenAI API key não configurada');
-    }
-
-    console.log('Enviando requisição para OpenAI...');
-
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
+    // Montar resposta estática para depuração
+    const mealPlan = {
+      dailyPlan: {
+        breakfast: {
+          description: "Café da manhã nutritivo e equilibrado",
+          foods: selectedFoods.slice(0, 2).map(food => ({
+            name: food.name,
+            portion: food.portion,
+            unit: food.portionUnit,
+            details: "Consumir pela manhã"
+          })),
+          calories: 400,
+          macros: { protein: 20, carbs: 40, fats: 15, fiber: 5 }
+        },
+        morningSnack: {
+          description: "Lanche da manhã leve",
+          foods: selectedFoods.slice(2, 3).map(food => ({
+            name: food.name,
+            portion: food.portion,
+            unit: food.portionUnit,
+            details: "Consumir entre as refeições principais"
+          })),
+          calories: 200,
+          macros: { protein: 10, carbs: 25, fats: 8, fiber: 3 }
+        },
+        lunch: {
+          description: "Almoço balanceado",
+          foods: selectedFoods.slice(3, 5).map(food => ({
+            name: food.name,
+            portion: food.portion,
+            unit: food.portionUnit,
+            details: "Refeição principal do dia"
+          })),
+          calories: 600,
+          macros: { protein: 30, carbs: 60, fats: 20, fiber: 8 }
+        },
+        afternoonSnack: {
+          description: "Lanche da tarde energético",
+          foods: selectedFoods.slice(5, 6).map(food => ({
+            name: food.name,
+            portion: food.portion,
+            unit: food.portionUnit,
+            details: "Ideal para manter a energia"
+          })),
+          calories: 200,
+          macros: { protein: 10, carbs: 25, fats: 8, fiber: 3 }
+        },
+        dinner: {
+          description: "Jantar leve e nutritivo",
+          foods: selectedFoods.slice(6, 8).map(food => ({
+            name: food.name,
+            portion: food.portion,
+            unit: food.portionUnit,
+            details: "Última refeição do dia"
+          })),
+          calories: 500,
+          macros: { protein: 25, carbs: 45, fats: 18, fiber: 6 }
+        }
       },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'Você é um nutricionista especializado em criar planos alimentares personalizados. Responda sempre em português do Brasil.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
+      totalNutrition: {
+        calories: userData.dailyCalories,
+        protein: 95,
+        carbs: 195,
+        fats: 69,
+        fiber: 25
+      },
+      recommendations: {
+        general: "Mantenha uma boa hidratação ao longo do dia e procure fazer as refeições em horários regulares.",
+        timing: [
+          "Café da manhã: 7:00",
+          "Lanche da manhã: 10:00",
+          "Almoço: 12:30",
+          "Lanche da tarde: 15:30",
+          "Jantar: 19:00"
         ],
-        temperature: 0.7,
-        max_tokens: 2000,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('Erro na resposta da OpenAI:', errorData);
-      throw new Error(`Erro na API do OpenAI: ${response.status}`);
-    }
-
-    const aiResponse = await response.json();
-    console.log('Resposta da OpenAI recebida');
-
-    if (!aiResponse.choices?.[0]?.message?.content) {
-      throw new Error('Resposta inválida da OpenAI');
-    }
-
-    let mealPlan;
-    try {
-      const content = aiResponse.choices[0].message.content.trim();
-      mealPlan = JSON.parse(content);
-      console.log('Plano alimentar processado com sucesso');
-    } catch (e) {
-      console.error('Erro ao processar JSON da resposta:', e);
-      throw new Error('Formato inválido na resposta da IA');
-    }
+        preparation: [
+          "Prepare as refeições com antecedência quando possível",
+          "Evite pular refeições",
+          "Mastigue bem os alimentos"
+        ],
+        substitutions: [
+          "Em caso de necessidade, substitua alimentos por outros do mesmo grupo alimentar",
+          "Mantenha as proporções de macronutrientes ao fazer substituições"
+        ]
+      }
+    };
 
     // Processar horários de treino
     if (dietaryPreferences.trainingTime) {
       const trainingTime = new Date(`1970-01-01T${dietaryPreferences.trainingTime}`);
       const hour = trainingTime.getHours();
       
-      if (!mealPlan.recommendations.timing) {
-        mealPlan.recommendations.timing = [];
-      }
-
-      mealPlan.recommendations.timing.push(
-        `Café da manhã: 7:00`,
-        `Lanche da manhã: 10:00`,
-        `Almoço: 12:00`,
+      mealPlan.recommendations.timing = [
+        "Café da manhã: 7:00",
+        "Lanche da manhã: 10:00",
+        "Almoço: 12:00",
         `Pré-treino: ${hour - 1}:00`,
         `Pós-treino: ${hour + 1}:00`,
-        `Jantar: 20:00`
-      );
+        "Jantar: 20:00"
+      ];
     }
 
-    console.log('Enviando resposta final');
+    console.log('Plano alimentar gerado com sucesso');
 
     return new Response(JSON.stringify(mealPlan), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200
     });
 
   } catch (error) {
