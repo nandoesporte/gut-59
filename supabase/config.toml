@@ -1,5 +1,13 @@
 
 project_id = "sxjafhzikftdenqnkcri"
 
-[functions.process-exercise-gifs]
-verify_jwt = false
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage"]
+
+[functions.generate-meal-plan]
+verify_jwt = true
+
+[[functions.import_map.imports]]
+xhr = "https://deno.land/x/xhr@0.1.0/mod.ts"
