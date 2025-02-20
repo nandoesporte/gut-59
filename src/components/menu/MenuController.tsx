@@ -53,22 +53,22 @@ export const useMenuController = () => {
         return;
       }
 
-      // Validações iniciais
-      if (!calorieNeeds) {
+      // Validações iniciais mais rigorosas
+      if (!calorieNeeds || calorieNeeds <= 0) {
         toast.dismiss(toastId);
-        toast.error("Necessidade calórica não calculada");
+        toast.error("Necessidade calórica inválida");
         return;
       }
 
-      if (selectedFoods.length === 0) {
+      if (!selectedFoods || selectedFoods.length === 0) {
         toast.dismiss(toastId);
-        toast.error("Nenhum alimento selecionado");
+        toast.error("Por favor, selecione pelo menos um alimento");
         return;
       }
 
-      if (!formData.goal) {
+      if (!formData.goal || !formData.weight || !formData.height || !formData.age) {
         toast.dismiss(toastId);
-        toast.error("Objetivo não selecionado");
+        toast.error("Por favor, preencha todos os dados do formulário");
         return;
       }
 
@@ -94,14 +94,20 @@ export const useMenuController = () => {
 
       setDietaryPreferences(preferences);
 
-      // Preparar dados para a geração do cardápio
+      // Preparar e validar dados dos alimentos
       const selectedFoodsDetails = protocolFoods.filter(food => selectedFoods.includes(food.id));
+      
+      if (selectedFoodsDetails.length === 0) {
+        toast.dismiss(toastId);
+        toast.error("Erro ao processar alimentos selecionados");
+        return;
+      }
 
       const requestData = {
         userData: {
-          weight: parseFloat(formData.weight),
-          height: parseFloat(formData.height),
-          age: parseFloat(formData.age),
+          weight: Number(formData.weight),
+          height: Number(formData.height),
+          age: Number(formData.age),
           gender: formData.gender,
           activityLevel: formData.activityLevel,
           goal: formData.goal,
@@ -126,50 +132,51 @@ export const useMenuController = () => {
         }
       };
 
-      try {
-        // Gerar cardápio usando a edge function
-        const { data: responseData, error: generateError } = await supabase.functions.invoke('generate-meal-plan', {
-          body: requestData
-        });
-
-        if (generateError) {
-          throw generateError;
+      // Gerar cardápio usando a edge function
+      const { data: responseData, error: generateError } = await supabase.functions.invoke(
+        'generate-meal-plan',
+        {
+          body: JSON.stringify(requestData),
+          headers: {
+            'Content-Type': 'application/json'
+          }
         }
+      );
 
-        if (!responseData) {
-          throw new Error("Nenhum dado recebido do gerador de cardápio");
-        }
-
-        // Salvar cardápio gerado
-        const { error: saveError } = await supabase
-          .from('meal_plans')
-          .insert({
-            user_id: userData.user.id,
-            plan_data: responseData,
-            calories: calorieNeeds,
-            active: true,
-            dietary_preferences: JSON.stringify(preferences)
-          });
-
-        if (saveError) {
-          throw saveError;
-        }
-
-        setMealPlan(responseData);
-        setCurrentStep(4);
-        toast.dismiss(toastId);
-        toast.success("Cardápio personalizado gerado com sucesso!");
-
-      } catch (error) {
-        console.error('Erro ao gerar/salvar cardápio:', error);
-        toast.dismiss(toastId);
-        toast.error("Erro ao gerar cardápio. Por favor, tente novamente.");
+      if (generateError) {
+        console.error('Erro na edge function:', generateError);
+        throw new Error('Falha ao gerar cardápio');
       }
 
-    } catch (error) {
-      console.error('Erro ao processar requisição:', error);
+      if (!responseData || typeof responseData !== 'object') {
+        throw new Error('Dados inválidos recebidos do gerador de cardápio');
+      }
+
+      // Salvar cardápio gerado
+      const { error: saveError } = await supabase
+        .from('meal_plans')
+        .insert({
+          user_id: userData.user.id,
+          plan_data: responseData,
+          calories: calorieNeeds,
+          active: true,
+          dietary_preferences: JSON.stringify(preferences)
+        });
+
+      if (saveError) {
+        console.error('Erro ao salvar cardápio:', saveError);
+        throw new Error('Falha ao salvar cardápio');
+      }
+
+      setMealPlan(responseData);
+      setCurrentStep(4);
       toast.dismiss(toastId);
-      toast.error("Erro ao gerar cardápio personalizado. Por favor, tente novamente.");
+      toast.success("Cardápio personalizado gerado com sucesso!");
+
+    } catch (error) {
+      console.error('Erro completo:', error);
+      toast.dismiss(toastId);
+      toast.error(error instanceof Error ? error.message : "Erro ao gerar cardápio. Por favor, tente novamente.");
     }
   };
 
