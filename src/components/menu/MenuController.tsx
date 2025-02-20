@@ -50,6 +50,17 @@ export const useMenuController = () => {
         return;
       }
 
+      const { data: existingPrefs, error: prefsError } = await supabase
+        .from('dietary_preferences')
+        .select('*')
+        .eq('user_id', userData.user.id)
+        .maybeSingle();
+
+      if (prefsError) {
+        console.error('Error checking dietary preferences:', prefsError);
+        throw prefsError;
+      }
+
       const dietaryPreference = {
         user_id: userData.user.id,
         has_allergies: preferences.hasAllergies,
