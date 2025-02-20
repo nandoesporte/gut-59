@@ -4,6 +4,10 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { ProtocolFood, DietaryPreferences, MealPlan } from "./types";
 import { CalorieCalculatorForm, activityLevels } from "./CalorieCalculator";
+import type { Database } from "@/integrations/supabase/types";
+
+type NutritionPreference = Database['public']['Tables']['nutrition_preferences']['Insert'];
+type DietaryPreference = Database['public']['Tables']['dietary_preferences']['Insert'];
 
 export const useMenuController = () => {
   const [currentStep, setCurrentStep] = useState<number>(1);
@@ -72,24 +76,25 @@ export const useMenuController = () => {
       const activityMultiplier = selectedLevel ? selectedLevel.multiplier : 1.2;
       const dailyCalories = Math.round(bmr * activityMultiplier);
 
-      // Salvar preferências nutricionais
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         toast.error("Usuário não autenticado");
         return;
       }
 
+      const nutritionPreference: NutritionPreference = {
+        weight: parseFloat(formData.weight),
+        height: parseFloat(formData.height),
+        age: parseFloat(formData.age),
+        gender: formData.gender,
+        activity_level: formData.activityLevel as Database['public']['Enums']['activity_level'],
+        goal: formData.goal as Database['public']['Enums']['nutritional_goal'],
+        user_id: user.id
+      };
+
       const { error: nutritionError } = await supabase
         .from('nutrition_preferences')
-        .upsert({
-          user_id: user.id,
-          weight: parseFloat(formData.weight),
-          height: parseFloat(formData.height),
-          age: parseFloat(formData.age),
-          gender: formData.gender,
-          activity_level: formData.activityLevel,
-          goal: formData.goal,
-        });
+        .upsert(nutritionPreference);
 
       if (nutritionError) {
         console.error('Error saving nutrition preferences:', nutritionError);
@@ -131,16 +136,17 @@ export const useMenuController = () => {
         return;
       }
 
-      // Salvar preferências alimentares
+      const dietaryPreference: DietaryPreference = {
+        user_id: userData.user.id,
+        has_allergies: preferences.hasAllergies,
+        allergies: preferences.allergies,
+        dietary_restrictions: preferences.dietaryRestrictions,
+        training_time: preferences.trainingTime
+      };
+
       const { error: dietaryError } = await supabase
         .from('dietary_preferences')
-        .upsert({
-          user_id: userData.user.id,
-          has_allergies: preferences.hasAllergies,
-          allergies: preferences.allergies,
-          dietary_restrictions: preferences.dietaryRestrictions,
-          training_time: preferences.trainingTime,
-        });
+        .upsert(dietaryPreference);
 
       if (dietaryError) {
         console.error('Error saving dietary preferences:', dietaryError);
@@ -212,7 +218,7 @@ export const useMenuController = () => {
           plan_data: responseData,
           calories: calorieNeeds,
           active: true,
-          dietary_preferences: preferences
+          dietary_preferences: JSON.stringify(preferences)
         });
 
       if (saveError) {
@@ -250,4 +256,3 @@ export const useMenuController = () => {
     setFormData,
   };
 };
-
