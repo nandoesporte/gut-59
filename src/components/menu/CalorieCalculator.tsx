@@ -18,13 +18,6 @@ export interface CalorieCalculatorForm {
   goal?: Goal;
 }
 
-interface CalorieCalculatorProps {
-  formData: CalorieCalculatorForm;
-  onInputChange: (field: keyof CalorieCalculatorForm, value: string) => void;
-  onCalculate: () => void;
-  calorieNeeds: number | null;
-}
-
 export const activityLevels = [
   {
     value: "sedentary",
@@ -34,27 +27,34 @@ export const activityLevels = [
     multiplier: 1.2
   },
   {
-    value: "lightlyActive",
+    value: "light",
     label: "Levemente Ativo",
     description: "Exercício leve ou caminhada (1-3 dias/semana)",
     icon: Activity,
     multiplier: 1.375
   },
   {
-    value: "moderatelyActive",
+    value: "moderate",
     label: "Moderadamente Ativo",
     description: "Exercício moderado (3-5 dias/semana)",
     icon: Footprints,
     multiplier: 1.55
   },
   {
-    value: "veryActive",
+    value: "intense",
     label: "Muito Ativo",
     description: "Exercício intenso (6-7 dias/semana)",
     icon: Dumbbell,
     multiplier: 1.725
   }
 ];
+
+interface CalorieCalculatorProps {
+  formData: CalorieCalculatorForm;
+  onInputChange: (field: keyof CalorieCalculatorForm, value: string) => void;
+  onCalculate: () => void;
+  calorieNeeds: number | null;
+}
 
 const CalorieCalculator = ({
   formData,
