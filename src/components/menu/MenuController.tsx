@@ -190,6 +190,9 @@ export const useMenuController = () => {
 
       setDietaryPreferences(preferences);
 
+      // Get selected foods details
+      const selectedFoodsDetails = protocolFoods.filter(food => selectedFoods.includes(food.id));
+
       const requestData = {
         userData: {
           weight: parseFloat(formData.weight),
@@ -201,7 +204,7 @@ export const useMenuController = () => {
           userId: userData.user.id,
           dailyCalories: calorieNeeds
         },
-        selectedFoods,
+        selectedFoods: selectedFoodsDetails,
         dietaryPreferences: {
           ...preferences,
           hasAllergies: preferences.hasAllergies || false,
@@ -231,6 +234,8 @@ export const useMenuController = () => {
         throw new Error('Nenhum dado recebido do gerador de cardápio');
       }
 
+      console.log('Cardápio recebido:', responseData);
+
       const { error: saveError } = await supabase
         .from('meal_plans')
         .insert({
@@ -247,7 +252,6 @@ export const useMenuController = () => {
         return;
       }
 
-      console.log('Cardápio recebido:', responseData);
       setMealPlan(responseData);
       setCurrentStep(4);
       toast.dismiss(toastId);
