@@ -15,42 +15,53 @@ serve(async (req) => {
   try {
     const { userData, selectedFoods, dietaryPreferences } = await req.json();
     
-    console.log('Iniciando geração do plano alimentar especializado...');
+    console.log('Iniciando geração do plano alimentar detalhado...');
 
     const openAIKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAIKey) {
       throw new Error('OpenAI API key não configurada');
     }
 
-    // Sistema: Instruções técnicas e específicas para nutrição
-    const systemPrompt = `Você é um nutricionista especializado em nutrição clínica e esportiva.
-    Regras técnicas para elaboração do plano:
-    1. Distribuição calórica:
-       - Café da manhã: 20-25% das calorias diárias
-       - Lanche da manhã: 10-15%
-       - Almoço: 30-35%
-       - Lanche da tarde: 10-15%
-       - Jantar: 20-25%
-    
-    2. Distribuição de macronutrientes:
-       - Proteínas: 1.6-2.2g/kg para praticantes de atividade física
-       - Carboidratos: 45-65% do VET
-       - Gorduras: 20-35% do VET
-       - Fibras: mínimo 25g/dia
-    
-    3. Timing nutricional:
-       - Refeições a cada 3-4 horas
-       - Pré-treino: priorizar carboidratos de fácil digestão
-       - Pós-treino: proporção 3:1 de carboidrato/proteína
+    const systemPrompt = `Você é um nutricionista especializado que deve criar um plano alimentar detalhado.
+    Regras essenciais:
 
-    4. Porções e medidas:
-       - Use medidas caseiras práticas
-       - Respeite as porções recomendadas pela OMS
-       - Mantenha a densidade nutricional adequada`;
+    1. Estrutura das refeições:
+       - Inclua descrição detalhada de cada refeição
+       - Especifique porções em medidas caseiras práticas
+       - Forneça detalhes de preparação para cada alimento
+       - Use apenas os alimentos fornecidos na lista
 
-    const userPrompt = `Elabore um plano alimentar técnico considerando:
+    2. Distribuição calórica:
+       - Café da manhã: 20-25% do VET
+       - Lanche manhã: 10-15% do VET
+       - Almoço: 30-35% do VET
+       - Lanche tarde: 10-15% do VET
+       - Jantar: 20-25% do VET
 
-    AVALIAÇÃO ANTROPOMÉTRICA E DADOS CLÍNICOS:
+    3. Macronutrientes (baseado no objetivo):
+       Perda de peso:
+       - Proteína: 2.0-2.2g/kg
+       - Carboidrato: 45-50% do VET
+       - Gordura: 25-30% do VET
+
+       Ganho de massa:
+       - Proteína: 1.8-2.0g/kg
+       - Carboidrato: 55-60% do VET
+       - Gordura: 25-30% do VET
+
+       Manutenção:
+       - Proteína: 1.6-1.8g/kg
+       - Carboidrato: 50-55% do VET
+       - Gordura: 25-30% do VET
+
+    4. Timing nutricional:
+       - Intervalo de 3-4h entre refeições
+       - Pré-treino: priorize carboidratos complexos
+       - Pós-treino: proporção 3:1 (CHO:PTN)`;
+
+    const userPrompt = `Elabore um plano alimentar detalhado considerando:
+
+    DADOS DO PACIENTE:
     - Peso: ${userData.weight}kg
     - Altura: ${userData.height}cm
     - IMC: ${(userData.weight / Math.pow(userData.height/100, 2)).toFixed(1)}
@@ -60,45 +71,56 @@ serve(async (req) => {
     - VET calculado: ${userData.dailyCalories} kcal
     - Objetivo: ${userData.goal}
 
-    ANAMNESE ALIMENTAR:
+    RESTRIÇÕES E PREFERÊNCIAS:
     - Alergias: ${dietaryPreferences.allergies?.join(', ') || 'Nenhuma'}
-    - Restrições alimentares: ${dietaryPreferences.dietaryRestrictions?.join(', ') || 'Nenhuma'}
+    - Restrições: ${dietaryPreferences.dietaryRestrictions?.join(', ') || 'Nenhuma'}
     - Horário de treino: ${dietaryPreferences.trainingTime || 'Não especificado'}
 
-    ALIMENTOS DISPONÍVEIS PARA O PLANO:
+    ALIMENTOS DISPONÍVEIS:
     ${selectedFoods.map(food => 
-      `- ${food.name} (Valor nutricional por 100g:
-         Energia: ${food.calories}kcal,
-         PTN: ${food.protein}g,
-         CHO: ${food.carbs}g,
-         LIP: ${food.fats}g)`
+      `- ${food.name} (por 100g):
+         Calorias: ${food.calories}kcal
+         Proteína: ${food.protein}g
+         Carboidratos: ${food.carbs}g
+         Gorduras: ${food.fats}g`
     ).join('\n')}
 
-    Retorne um plano alimentar técnico e personalizado no formato JSON especificado:
+    Retorne o plano no formato JSON:
     {
       "dailyPlan": {
         "breakfast": {
-          "foods": [{"name": string, "portion": number, "portionUnit": string}],
+          "description": string,
+          "foods": [
+            {
+              "name": string,
+              "portion": number,
+              "unit": string,
+              "details": string
+            }
+          ],
           "calories": number,
-          "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number}
+          "macros": {
+            "protein": number,
+            "carbs": number,
+            "fats": number
+          }
         },
         "morningSnack": { ... mesmo formato },
         "lunch": { ... mesmo formato },
         "afternoonSnack": { ... mesmo formato },
         "dinner": { ... mesmo formato }
       },
-      "recommendations": {
-        "preworkout": string,
-        "postworkout": string,
-        "general": string,
-        "timing": string[]
-      },
       "totalNutrition": {
         "calories": number,
         "protein": number,
         "carbs": number,
-        "fats": number,
-        "fiber": number
+        "fats": number
+      },
+      "recommendations": {
+        "general": string,
+        "preworkout": string,
+        "postworkout": string,
+        "timing": string[]
       }
     }`;
 
@@ -111,13 +133,13 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4o',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        temperature: 0.5, // Reduzido para maior consistência técnica
-        max_tokens: 2000,
+        temperature: 0.3, // Reduzido para maior precisão técnica
+        max_tokens: 3000,
         response_format: { type: "json_object" }
       }),
     });
@@ -139,28 +161,24 @@ serve(async (req) => {
     try {
       mealPlan = JSON.parse(data.choices[0].message.content);
       
-      // Validações técnicas do plano
+      // Validações do plano
       if (!mealPlan.dailyPlan || !mealPlan.recommendations || !mealPlan.totalNutrition) {
         throw new Error('Estrutura do plano nutricional inválida');
       }
 
-      // Validação das refeições e distribuição calórica
-      const totalCalories = mealPlan.totalNutrition.calories;
+      // Validação das refeições
       ['breakfast', 'morningSnack', 'lunch', 'afternoonSnack', 'dinner'].forEach(meal => {
         const mealData = mealPlan.dailyPlan[meal];
-        if (!mealData) {
-          throw new Error(`Refeição ${meal} não especificada`);
+        if (!mealData || !mealData.description || !mealData.foods || !mealData.calories || !mealData.macros) {
+          throw new Error(`Dados incompletos para a refeição: ${meal}`);
         }
 
-        // Verificar se as calorias da refeição estão dentro dos limites esperados
-        const mealCalories = mealData.calories;
-        const mealPercentage = (mealCalories / totalCalories) * 100;
-
-        // Validar macronutrientes
-        const { protein, carbs, fats } = mealData.macros;
-        if (!protein || !carbs || !fats) {
-          throw new Error(`Macronutrientes não especificados para ${meal}`);
-        }
+        // Validar alimentos
+        mealData.foods.forEach((food: any) => {
+          if (!food.name || !food.portion || !food.unit || !food.details) {
+            throw new Error(`Dados incompletos para alimento em ${meal}`);
+          }
+        });
       });
 
       console.log('Plano nutricional validado com sucesso');
