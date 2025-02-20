@@ -1,5 +1,5 @@
 
-export interface WorkoutExercise {
+export interface Exercise {
   name: string;
   sets: number;
   reps: number;
@@ -8,11 +8,10 @@ export interface WorkoutExercise {
 }
 
 export interface WorkoutSession {
-  id: string;
   day_number: number;
   warmup_description: string;
   cooldown_description: string;
-  exercises: WorkoutExercise[];
+  exercises: Exercise[];
 }
 
 export interface WorkoutPlan {
@@ -22,17 +21,4 @@ export interface WorkoutPlan {
   start_date: string;
   end_date: string;
   workout_sessions: WorkoutSession[];
-}
-
-export interface WorkoutHistory extends WorkoutPlan {
-  session_exercises?: Array<{
-    id: string;
-    exercises: {
-      name: string;
-      gif_url?: string;
-    };
-    sets: number;
-    reps: number;
-    rest_time_seconds: number;
-  }>;
 }

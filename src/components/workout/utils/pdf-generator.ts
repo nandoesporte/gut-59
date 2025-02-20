@@ -1,70 +1,71 @@
 
-import { WorkoutHistory } from "../types/workout-plan";
-import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
+import { toast } from "sonner";
+import { WorkoutPlan } from "../types/workout-plan";
 
-export const generateWorkoutPDF = (plan: WorkoutHistory) => {
-  const doc = new jsPDF();
-  
-  // Configuração do documento
-  doc.setFont("helvetica");
-  doc.setFontSize(16);
-  
-  // Título
-  doc.text("Plano de Treino", 20, 20);
-  
-  // Datas
-  doc.setFontSize(12);
-  doc.text(`Período: ${new Date(plan.start_date).toLocaleDateString()} até ${new Date(plan.end_date).toLocaleDateString()}`, 20, 30);
-  
-  let yPos = 40;
-  
-  // Para cada sessão de treino
-  plan.workout_sessions?.forEach((session) => {
-    // Título da sessão
-    doc.setFontSize(14);
-    doc.text(`Dia ${session.day_number}`, 20, yPos);
-    yPos += 10;
-    
-    // Aquecimento
-    doc.setFontSize(12);
-    doc.text("Aquecimento:", 20, yPos);
-    yPos += 7;
-    doc.setFontSize(10);
-    const warmupLines = doc.splitTextToSize(session.warmup_description, 170);
-    doc.text(warmupLines, 20, yPos);
-    yPos += warmupLines.length * 7;
-    
-    // Exercícios
-    doc.setFontSize(12);
-    doc.text("Exercícios:", 20, yPos);
-    yPos += 10;
-    
-    session.exercises.forEach((exercise) => {
-      doc.setFontSize(10);
-      doc.text(`• ${exercise.name}`, 25, yPos);
-      yPos += 5;
-      doc.text(`  ${exercise.sets} séries x ${exercise.reps} repetições`, 25, yPos);
-      yPos += 5;
-      doc.text(`  Descanso: ${exercise.rest_time_seconds} segundos`, 25, yPos);
-      yPos += 10;
+export const generateWorkoutPDF = async (plan: WorkoutPlan) => {
+  try {
+    const pdf = new jsPDF();
+    let yOffset = 20;
+
+    // Add title
+    pdf.setFontSize(20);
+    pdf.text('Plano de Treino Personalizado', 20, yOffset);
+    yOffset += 20;
+
+    // Add plan period
+    pdf.setFontSize(12);
+    pdf.text(`Período: ${new Date(plan.start_date).toLocaleDateString()} - ${new Date(plan.end_date).toLocaleDateString()}`, 20, yOffset);
+    yOffset += 20;
+
+    plan.workout_sessions.forEach((session) => {
+      // Add day header
+      pdf.setFontSize(16);
+      pdf.text(`Dia ${session.day_number}`, 20, yOffset);
+      yOffset += 10;
+
+      // Add warmup
+      pdf.setFontSize(12);
+      pdf.text('Aquecimento:', 20, yOffset);
+      yOffset += 7;
+      pdf.setFontSize(10);
+      const warmupLines = pdf.splitTextToSize(session.warmup_description, 170);
+      pdf.text(warmupLines, 20, yOffset);
+      yOffset += (warmupLines.length * 5) + 10;
+
+      // Add exercises
+      pdf.setFontSize(12);
+      pdf.text('Exercícios:', 20, yOffset);
+      yOffset += 10;
+
+      session.exercises.forEach((exercise) => {
+        pdf.setFontSize(10);
+        pdf.text(`• ${exercise.name}`, 25, yOffset);
+        pdf.text(`  ${exercise.sets} séries x ${exercise.reps} repetições (${exercise.rest_time_seconds}s descanso)`, 25, yOffset + 5);
+        yOffset += 15;
+      });
+
+      // Add cooldown
+      pdf.setFontSize(12);
+      pdf.text('Volta à calma:', 20, yOffset);
+      yOffset += 7;
+      pdf.setFontSize(10);
+      const cooldownLines = pdf.splitTextToSize(session.cooldown_description, 170);
+      pdf.text(cooldownLines, 20, yOffset);
+      yOffset += (cooldownLines.length * 5) + 20;
+
+      // Add new page if needed
+      if (yOffset > 250) {
+        pdf.addPage();
+        yOffset = 20;
+      }
     });
-    
-    // Volta à calma
-    doc.setFontSize(12);
-    doc.text("Volta à calma:", 20, yPos);
-    yPos += 7;
-    doc.setFontSize(10);
-    const cooldownLines = doc.splitTextToSize(session.cooldown_description, 170);
-    doc.text(cooldownLines, 20, yPos);
-    yPos += cooldownLines.length * 7 + 10;
-    
-    // Nova página se necessário
-    if (yPos > 270) {
-      doc.addPage();
-      yPos = 20;
-    }
-  });
-  
-  // Salvar o PDF
-  doc.save(`plano-treino-${new Date().toISOString().split('T')[0]}.pdf`);
+
+    pdf.save('plano-de-treino.pdf');
+    toast.success("PDF gerado com sucesso!");
+  } catch (error) {
+    console.error("Erro ao gerar PDF:", error);
+    toast.error("Erro ao gerar PDF");
+  }
 };
