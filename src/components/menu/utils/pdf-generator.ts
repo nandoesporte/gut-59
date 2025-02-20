@@ -4,22 +4,23 @@ import jsPDF from "jspdf";
 import { toast } from "sonner";
 
 export const generateMealPlanPDF = async (element: HTMLDivElement) => {
-  if (!element) return;
+  if (!element) {
+    toast.error("Erro ao gerar PDF: elemento não encontrado");
+    return;
+  }
 
   try {
-    toast.loading("Gerando PDF do seu plano alimentar...");
-
     // Configurações melhoradas para qualidade do PDF
     const canvas = await html2canvas(element, {
       scale: 2, // Aumenta a qualidade
       useCORS: true, // Permite carregar imagens de outros domínios
       logging: false,
       backgroundColor: "#ffffff",
-      windowWidth: 1200, // Largura fixa para melhor formatação
+      windowWidth: element.scrollWidth, // Usa a largura real do elemento
       onclone: (document) => {
         // Ajusta estilos específicos para o PDF
-        const element = document.body;
         const styles = `
+          * { font-family: Arial, sans-serif !important; }
           .text-primary-500 { color: #10B981 !important; }
           .text-primary-600 { color: #059669 !important; }
           .bg-primary-50 { background-color: #ECFDF5 !important; }
@@ -27,7 +28,7 @@ export const generateMealPlanPDF = async (element: HTMLDivElement) => {
         `;
         const styleElement = document.createElement('style');
         styleElement.innerHTML = styles;
-        element.appendChild(styleElement);
+        document.head.appendChild(styleElement);
       }
     });
 
@@ -44,7 +45,7 @@ export const generateMealPlanPDF = async (element: HTMLDivElement) => {
     const imgHeight = canvas.height;
     const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
     const imgX = (pdfWidth - imgWidth * ratio) / 2;
-    const imgY = 0;
+    const imgY = 10; // Adiciona uma margem superior
 
     pdf.addImage(
       imgData, 
@@ -58,11 +59,9 @@ export const generateMealPlanPDF = async (element: HTMLDivElement) => {
     );
     
     pdf.save('plano-alimentar.pdf');
-    toast.dismiss();
-    toast.success("PDF do plano alimentar baixado com sucesso!");
+
   } catch (error) {
     console.error('Erro ao gerar PDF:', error);
-    toast.dismiss();
-    toast.error("Erro ao gerar PDF do plano alimentar");
+    throw error;
   }
 };

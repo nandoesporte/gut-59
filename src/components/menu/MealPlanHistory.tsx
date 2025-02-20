@@ -44,6 +44,7 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
 
       if (error) {
         toast.dismiss(toastId);
+        toast.error("Erro ao excluir plano alimentar");
         throw error;
       }
 
@@ -60,8 +61,19 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
 
   const handleDownload = async (planId: string) => {
     const planRef = planRefs.current[planId];
-    if (planRef) {
+    if (!planRef) {
+      toast.error("Erro ao gerar PDF: referência não encontrada");
+      return;
+    }
+
+    try {
+      const toastId = toast.loading("Gerando PDF do plano alimentar...");
       await generateMealPlanPDF(planRef);
+      toast.dismiss(toastId);
+      toast.success("PDF do plano alimentar gerado com sucesso!");
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      toast.error("Erro ao gerar PDF do plano alimentar");
     }
   };
 
@@ -118,7 +130,6 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
                     variant="ghost"
                     size="icon"
                     onClick={(e) => {
-                      e.preventDefault();
                       e.stopPropagation();
                       handleDownload(plan.id);
                     }}
@@ -130,7 +141,6 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
                     variant="ghost"
                     size="icon"
                     onClick={(e) => {
-                      e.preventDefault();
                       e.stopPropagation();
                       handleDelete(plan.id);
                     }}
