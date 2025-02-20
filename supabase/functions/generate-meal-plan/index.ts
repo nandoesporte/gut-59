@@ -15,89 +15,129 @@ serve(async (req) => {
   try {
     const { userData, selectedFoods, dietaryPreferences } = await req.json();
     
-    console.log('Dados recebidos:', JSON.stringify({
-      userData: {
-        goal: userData.goal,
-        calories: userData.dailyCalories,
-      },
-      selectedFoodsCount: selectedFoods.length,
-      dietaryPreferences: {
-        hasAllergies: dietaryPreferences.hasAllergies,
-        trainingTime: dietaryPreferences.trainingTime,
-      }
-    }, null, 2));
+    console.log('Iniciando geração do plano alimentar...');
 
     const openAIKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAIKey) {
       throw new Error('OpenAI API key não configurada');
     }
 
-    const mealPlanExample = {
-      dailyPlan: {
-        breakfast: {
-          foods: selectedFoods.slice(0, 2).map(food => ({
-            name: food.name,
-            portion: 100,
-            portionUnit: 'g'
-          })),
-          calories: 400,
-          macros: { protein: 20, carbs: 40, fats: 15, fiber: 5 }
-        },
-        morningSnack: {
-          foods: selectedFoods.slice(2, 3).map(food => ({
-            name: food.name,
-            portion: 100,
-            portionUnit: 'g'
-          })),
-          calories: 200,
-          macros: { protein: 10, carbs: 25, fats: 8, fiber: 3 }
-        },
-        lunch: {
-          foods: selectedFoods.slice(3, 5).map(food => ({
-            name: food.name,
-            portion: 100,
-            portionUnit: 'g'
-          })),
-          calories: 600,
-          macros: { protein: 35, carbs: 65, fats: 20, fiber: 8 }
-        },
-        afternoonSnack: {
-          foods: selectedFoods.slice(5, 6).map(food => ({
-            name: food.name,
-            portion: 100,
-            portionUnit: 'g'
-          })),
-          calories: 200,
-          macros: { protein: 10, carbs: 25, fats: 8, fiber: 3 }
-        },
-        dinner: {
-          foods: selectedFoods.slice(6, 8).map(food => ({
-            name: food.name,
-            portion: 100,
-            portionUnit: 'g'
-          })),
-          calories: 500,
-          macros: { protein: 30, carbs: 50, fats: 17, fiber: 6 }
-        }
-      },
-      recommendations: {
-        preworkout: "Consuma sua refeição 2 horas antes do treino",
-        postworkout: "Faça sua refeição até 1 hora após o treino",
-        general: "Mantenha-se hidratado e siga os horários das refeições",
-        timing: ["Café da manhã: 7h", "Lanche: 10h", "Almoço: 13h", "Lanche: 16h", "Jantar: 19h"]
-      },
-      totalNutrition: {
-        calories: 1900,
-        protein: 105,
-        carbs: 205,
-        fats: 68,
-        fiber: 25
-      }
-    };
+    // Sistema: Instruções detalhadas para o assistente
+    const systemPrompt = `Você é um nutricionista especialista que deve criar um plano alimentar personalizado.
+    Regras importantes:
+    1. Use APENAS os alimentos fornecidos na lista
+    2. Distribua as calorias diárias entre 5 refeições
+    3. Mantenha a distribuição de macronutrientes adequada
+    4. Considere o horário de treino para o timing das refeições
+    5. Retorne APENAS o JSON, sem explicações adicionais`;
 
-    console.log('Plano alimentar gerado');
+    // Usuário: Dados específicos para geração do plano
+    const userPrompt = `Crie um plano alimentar com estas especificações:
+
+    PERFIL:
+    - Meta: ${userData.goal}
+    - Calorias diárias: ${userData.dailyCalories}
+    - Gênero: ${userData.gender}
+    - Peso: ${userData.weight}kg
+    - Altura: ${userData.height}cm
+    - Idade: ${userData.age} anos
+    - Nível de atividade: ${userData.activityLevel}
     
-    return new Response(JSON.stringify(mealPlanExample), {
+    PREFERÊNCIAS:
+    - Alergias: ${dietaryPreferences.allergies?.join(', ') || 'Nenhuma'}
+    - Restrições: ${dietaryPreferences.dietaryRestrictions?.join(', ') || 'Nenhuma'}
+    - Horário de treino: ${dietaryPreferences.trainingTime || 'Não especificado'}
+    
+    ALIMENTOS DISPONÍVEIS:
+    ${selectedFoods.map(food => 
+      `- ${food.name} (Calorias: ${food.calories}, Proteína: ${food.protein}g, Carboidratos: ${food.carbs}g, Gorduras: ${food.fats}g)`
+    ).join('\n')}
+
+    Forneça o plano no seguinte formato JSON:
+    {
+      "dailyPlan": {
+        "breakfast": {
+          "foods": [{"name": string, "portion": number, "portionUnit": string}],
+          "calories": number,
+          "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number}
+        },
+        "morningSnack": { ... mesmo formato do breakfast },
+        "lunch": { ... mesmo formato do breakfast },
+        "afternoonSnack": { ... mesmo formato do breakfast },
+        "dinner": { ... mesmo formato do breakfast }
+      },
+      "recommendations": {
+        "preworkout": string,
+        "postworkout": string,
+        "general": string,
+        "timing": string[]
+      },
+      "totalNutrition": {
+        "calories": number,
+        "protein": number,
+        "carbs": number,
+        "fats": number,
+        "fiber": number
+      }
+    }`;
+
+    console.log('Enviando requisição para OpenAI...');
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 2000,
+        response_format: { type: "json_object" }
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Erro na resposta da OpenAI:', errorText);
+      throw new Error('Falha na geração do plano alimentar');
+    }
+
+    const data = await response.json();
+    console.log('Resposta da OpenAI recebida');
+
+    if (!data.choices?.[0]?.message?.content) {
+      throw new Error('Resposta inválida da IA');
+    }
+
+    let mealPlan;
+    try {
+      mealPlan = JSON.parse(data.choices[0].message.content);
+      
+      // Validação da estrutura do plano
+      if (!mealPlan.dailyPlan || !mealPlan.recommendations || !mealPlan.totalNutrition) {
+        throw new Error('Estrutura do plano alimentar inválida');
+      }
+
+      // Validação das refeições
+      ['breakfast', 'morningSnack', 'lunch', 'afternoonSnack', 'dinner'].forEach(meal => {
+        if (!mealPlan.dailyPlan[meal]) {
+          throw new Error(`Refeição ${meal} não encontrada no plano`);
+        }
+      });
+
+      console.log('Plano alimentar validado com sucesso');
+
+    } catch (error) {
+      console.error('Erro ao processar resposta da IA:', error);
+      throw new Error('Erro ao processar o plano alimentar gerado');
+    }
+
+    return new Response(JSON.stringify(mealPlan), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
