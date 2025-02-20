@@ -108,10 +108,18 @@ const Menu = () => {
           />
         );
       case 4:
-        if (!mealPlan) return null;
+        console.log('Rendering step 4, mealPlan:', mealPlan); // Added logging
         return (
           <div className="space-y-8">
-            <MealPlanDisplay mealPlan={mealPlan} />
+            {mealPlan ? (
+              <MealPlanDisplay mealPlan={mealPlan} />
+            ) : (
+              <Card className="p-6">
+                <div className="text-center text-gray-500">
+                  Aguarde enquanto geramos seu plano alimentar...
+                </div>
+              </Card>
+            )}
             <MealPlanHistory 
               isLoading={isHistoryLoading}
               historyPlans={historyPlans}

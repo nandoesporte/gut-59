@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -102,6 +103,12 @@ export const useMenuController = () => {
         return;
       }
 
+      console.log('Calling edge function with:', {
+        userData,
+        selectedFoodsDetails,
+        dietaryPreference
+      });
+
       // Chamar a edge function para gerar o plano alimentar
       const { data: mealPlanData, error: generateError } = await supabase.functions.invoke(
         'generate-meal-plan',
@@ -137,6 +144,8 @@ export const useMenuController = () => {
         }
       );
 
+      console.log('Edge function response:', mealPlanData);
+
       if (generateError) {
         console.error('Erro na edge function:', generateError);
         throw new Error(generateError.message || 'Falha ao gerar cardápio');
@@ -145,6 +154,9 @@ export const useMenuController = () => {
       if (!mealPlanData) {
         throw new Error('Nenhum dado recebido do gerador de cardápio');
       }
+
+      // Set the meal plan state before saving to the database
+      setMealPlan(mealPlanData);
 
       // Salvar cardápio gerado
       const { error: saveError } = await supabase
@@ -162,7 +174,6 @@ export const useMenuController = () => {
         throw new Error('Falha ao salvar cardápio');
       }
 
-      setMealPlan(mealPlanData);
       setCurrentStep(4);
       toast.dismiss(toastId);
       toast.success("Cardápio personalizado gerado com sucesso!");
