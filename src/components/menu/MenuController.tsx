@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -63,19 +64,42 @@ export const useMenuController = () => {
     }
   };
 
-  const handleCalculateCalories = () => {
-    setLoading(true);
-    
+  const handleCalculateCalories = async () => {
     try {
+      setLoading(true);
       const bmr = calculateBMR(formData);
       const selectedLevel = activityLevels.find(level => level.value === formData.activityLevel);
       const activityMultiplier = selectedLevel ? selectedLevel.multiplier : 1.2;
       const dailyCalories = Math.round(bmr * activityMultiplier);
 
-      console.log('Calculated calories:', dailyCalories);
+      // Salvar preferências nutricionais
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Usuário não autenticado");
+        return;
+      }
 
+      const { error: nutritionError } = await supabase
+        .from('nutrition_preferences')
+        .upsert({
+          user_id: user.id,
+          weight: parseFloat(formData.weight),
+          height: parseFloat(formData.height),
+          age: parseFloat(formData.age),
+          gender: formData.gender,
+          activity_level: formData.activityLevel,
+          goal: formData.goal,
+        });
+
+      if (nutritionError) {
+        console.error('Error saving nutrition preferences:', nutritionError);
+        throw nutritionError;
+      }
+
+      console.log('Calculated calories:', dailyCalories);
       setCalorieNeeds(dailyCalories);
       setCurrentStep(2);
+      
     } catch (error) {
       console.error('Error calculating calories:', error);
       toast.error("Erro ao calcular necessidades calóricas");
@@ -105,6 +129,22 @@ export const useMenuController = () => {
       if (!userData.user) {
         toast.error("Usuário não autenticado");
         return;
+      }
+
+      // Salvar preferências alimentares
+      const { error: dietaryError } = await supabase
+        .from('dietary_preferences')
+        .upsert({
+          user_id: userData.user.id,
+          has_allergies: preferences.hasAllergies,
+          allergies: preferences.allergies,
+          dietary_restrictions: preferences.dietaryRestrictions,
+          training_time: preferences.trainingTime,
+        });
+
+      if (dietaryError) {
+        console.error('Error saving dietary preferences:', dietaryError);
+        throw dietaryError;
       }
 
       if (!calorieNeeds) {
@@ -147,7 +187,6 @@ export const useMenuController = () => {
 
       console.log('Enviando requisição:', JSON.stringify(requestData, null, 2));
 
-      // Show loading toast
       const toastId = toast.loading("Gerando seu plano alimentar personalizado...");
 
       const { data: responseData, error } = await supabase.functions.invoke('generate-meal-plan', {
@@ -166,14 +205,14 @@ export const useMenuController = () => {
         throw new Error('Nenhum dado recebido do gerador de cardápio');
       }
 
-      // Salvar o plano no banco de dados
       const { error: saveError } = await supabase
         .from('meal_plans')
         .insert({
           user_id: userData.user.id,
           plan_data: responseData,
           calories: calorieNeeds,
-          active: true
+          active: true,
+          dietary_preferences: preferences
         });
 
       if (saveError) {
@@ -211,3 +250,4 @@ export const useMenuController = () => {
     setFormData,
   };
 };
+
