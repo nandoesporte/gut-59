@@ -18,7 +18,7 @@ export const ActivityLevelField = ({ form }: ActivityLevelFieldProps) => {
   return (
     <FormField
       control={form.control}
-      name="activityLevel"
+      name="activity_level"
       render={({ field }) => (
         <FormItem>
           <FormLabel>Nível de Atividade Física</FormLabel>
@@ -29,7 +29,7 @@ export const ActivityLevelField = ({ form }: ActivityLevelFieldProps) => {
             >
               <div className="text-center">
                 <span className="text-lg">Sedentário</span>
-                <p className="text-sm text-gray-500">Pouco ou nenhum exercício</p>
+                <p className="text-sm text-muted-foreground">Pouco ou nenhum exercício</p>
               </div>
             </SelectCard>
             <SelectCard
@@ -38,7 +38,7 @@ export const ActivityLevelField = ({ form }: ActivityLevelFieldProps) => {
             >
               <div className="text-center">
                 <span className="text-lg">Leve</span>
-                <p className="text-sm text-gray-500">1-3 dias por semana</p>
+                <p className="text-sm text-muted-foreground">1-3 dias por semana</p>
               </div>
             </SelectCard>
             <SelectCard
@@ -47,7 +47,7 @@ export const ActivityLevelField = ({ form }: ActivityLevelFieldProps) => {
             >
               <div className="text-center">
                 <span className="text-lg">Moderado</span>
-                <p className="text-sm text-gray-500">3-5 dias por semana</p>
+                <p className="text-sm text-muted-foreground">3-5 dias por semana</p>
               </div>
             </SelectCard>
             <SelectCard
@@ -56,7 +56,7 @@ export const ActivityLevelField = ({ form }: ActivityLevelFieldProps) => {
             >
               <div className="text-center">
                 <span className="text-lg">Intenso</span>
-                <p className="text-sm text-gray-500">6-7 dias por semana</p>
+                <p className="text-sm text-muted-foreground">6-7 dias por semana</p>
               </div>
             </SelectCard>
           </div>

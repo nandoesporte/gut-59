@@ -18,6 +18,25 @@ interface BasicInfoFieldsProps {
 export const BasicInfoFields = ({ form }: BasicInfoFieldsProps) => {
   return (
     <>
+      <FormField
+        control={form.control}
+        name="age"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Idade</FormLabel>
+            <FormControl>
+              <Input
+                type="number"
+                placeholder="30"
+                {...field}
+                onChange={(e) => field.onChange(Number(e.target.value))}
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <FormField
           control={form.control}
@@ -58,55 +77,34 @@ export const BasicInfoFields = ({ form }: BasicInfoFieldsProps) => {
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <FormField
-          control={form.control}
-          name="age"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Idade</FormLabel>
-              <FormControl>
-                <Input
-                  type="number"
-                  placeholder="30"
-                  {...field}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="gender"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Sexo</FormLabel>
-              <div className="grid grid-cols-2 gap-4">
-                <SelectCard
-                  selected={field.value === "male"}
-                  onClick={() => field.onChange("male")}
-                >
-                  <div className="text-center">
-                    <span className="text-lg">Masculino</span>
-                  </div>
-                </SelectCard>
-                <SelectCard
-                  selected={field.value === "female"}
-                  onClick={() => field.onChange("female")}
-                >
-                  <div className="text-center">
-                    <span className="text-lg">Feminino</span>
-                  </div>
-                </SelectCard>
-              </div>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      </div>
+      <FormField
+        control={form.control}
+        name="gender"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Sexo</FormLabel>
+            <div className="grid grid-cols-2 gap-4">
+              <SelectCard
+                selected={field.value === "male"}
+                onClick={() => field.onChange("male")}
+              >
+                <div className="text-center">
+                  <span className="text-lg">Masculino</span>
+                </div>
+              </SelectCard>
+              <SelectCard
+                selected={field.value === "female"}
+                onClick={() => field.onChange("female")}
+              >
+                <div className="text-center">
+                  <span className="text-lg">Feminino</span>
+                </div>
+              </SelectCard>
+            </div>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
     </>
   );
 };

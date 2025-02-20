@@ -28,7 +28,7 @@ export const GoalField = ({ form }: GoalFieldProps) => {
             >
               <div className="text-center">
                 <span className="text-lg">Perder Peso</span>
-                <p className="text-sm text-gray-500">Foco em queima de gordura</p>
+                <p className="text-sm text-muted-foreground">Foco em queima de gordura</p>
               </div>
             </SelectCard>
             <SelectCard
@@ -37,7 +37,7 @@ export const GoalField = ({ form }: GoalFieldProps) => {
             >
               <div className="text-center">
                 <span className="text-lg">Manter Peso</span>
-                <p className="text-sm text-gray-500">Melhorar condicionamento</p>
+                <p className="text-sm text-muted-foreground">Melhorar condicionamento</p>
               </div>
             </SelectCard>
             <SelectCard
@@ -46,7 +46,7 @@ export const GoalField = ({ form }: GoalFieldProps) => {
             >
               <div className="text-center">
                 <span className="text-lg">Ganhar Massa</span>
-                <p className="text-sm text-gray-500">Foco em hipertrofia</p>
+                <p className="text-sm text-muted-foreground">Foco em hipertrofia</p>
               </div>
             </SelectCard>
           </div>
