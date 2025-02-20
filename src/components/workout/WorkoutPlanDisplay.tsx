@@ -34,10 +34,7 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
 
       const { data: response, error } = await supabase.functions.invoke('generate-workout-plan', {
         body: {
-          preferences: {
-            ...preferences,
-            muscleGroup: preferences.muscleGroup
-          },
+          preferences,
           userId: user.id
         }
       });

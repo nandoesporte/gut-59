@@ -21,9 +21,9 @@ const formSchema = z.object({
   height: z.number().min(100, "Altura mínima é 100cm").max(250, "Altura máxima é 250cm"),
   gender: z.enum(["male", "female"]),
   goal: z.enum(["lose_weight", "maintain", "gain_mass"]),
-  activityLevel: z.enum(["sedentary", "light", "moderate", "intense"]),
-  preferredExerciseTypes: z.array(z.enum(["strength", "cardio", "mobility"])).min(1, "Selecione pelo menos um tipo de exercício"),
-  trainingLocation: z.enum(["gym", "home", "outdoors", "no_equipment"]),
+  activity_level: z.enum(["sedentary", "light", "moderate", "intense"]),
+  preferred_exercise_types: z.array(z.enum(["strength", "cardio", "mobility"])).min(1, "Selecione pelo menos um tipo de exercício"),
+  training_location: z.enum(["gym", "home", "outdoors", "no_equipment"]),
 });
 
 type FormSchema = z.infer<typeof formSchema>;
@@ -41,9 +41,9 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
       height: 170,
       gender: "male",
       goal: "maintain",
-      activityLevel: "moderate",
-      preferredExerciseTypes: [],
-      trainingLocation: "gym",
+      activity_level: "moderate",
+      preferred_exercise_types: [],
+      training_location: "gym",
     },
   });
 
@@ -54,19 +54,13 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
       height: data.height,
       gender: data.gender,
       goal: data.goal,
-      activityLevel: data.activityLevel,
-      preferredExerciseTypes: data.preferredExerciseTypes,
-      trainingLocation: data.trainingLocation,
-      frequency: 3,
-      duration: 60,
-      muscleGroup: "full_body" as const,
-      experienceLevel: "beginner",
-      equipment: [],
-      availableEquipment: data.trainingLocation === "gym" 
+      activity_level: data.activity_level,
+      preferred_exercise_types: data.preferred_exercise_types,
+      available_equipment: data.training_location === "gym" 
         ? ["all"] 
-        : data.trainingLocation === "home"
+        : data.training_location === "home"
         ? ["bodyweight", "resistance-bands", "dumbbells"]
-        : data.trainingLocation === "outdoors"
+        : data.training_location === "outdoors"
         ? ["bodyweight", "resistance-bands"]
         : ["bodyweight"],
     };
