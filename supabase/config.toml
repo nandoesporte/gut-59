@@ -8,6 +8,4 @@ schemas = ["public", "storage"]
 
 [functions.generate-meal-plan]
 verify_jwt = true
-
-[import_map]
 imports = { xhr = "https://deno.land/x/xhr@0.1.0/mod.ts" }
