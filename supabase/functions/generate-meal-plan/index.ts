@@ -10,92 +10,28 @@ const corsHeaders = {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { 
+      status: 200,
+      headers: corsHeaders 
+    });
   }
 
   try {
     const { userData, selectedFoods, dietaryPreferences } = await req.json();
     
-    console.log('Iniciando geração do plano alimentar...');
+    console.log('Dados recebidos para geração do plano:', {
+      goal: userData.goal,
+      calories: userData.dailyCalories,
+      foodsCount: selectedFoods.length
+    });
 
     const openAIKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAIKey) {
-      throw new Error('OpenAI API key não configurada');
+      return new Response(
+        JSON.stringify({ error: 'OpenAI API key não configurada' }), 
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
-
-    const systemPrompt = `Como um nutricionista especializado, seu trabalho é criar um plano alimentar diário estruturado usando APENAS os alimentos fornecidos. 
-    Você deve retornar um objeto JSON com a seguinte estrutura, sem qualquer texto adicional:
-    {
-      "dailyPlan": {
-        "breakfast": {
-          "description": "string",
-          "foods": [{
-            "name": "string",
-            "portion": number,
-            "unit": "g ou ml",
-            "details": "string"
-          }],
-          "calories": number,
-          "macros": {
-            "protein": number,
-            "carbs": number,
-            "fats": number,
-            "fiber": number
-          }
-        },
-        "morningSnack": { <mesmo formato do breakfast> },
-        "lunch": { <mesmo formato do breakfast> },
-        "afternoonSnack": { <mesmo formato do breakfast> },
-        "dinner": { <mesmo formato do breakfast> }
-      },
-      "totalNutrition": {
-        "calories": number,
-        "protein": number,
-        "carbs": number,
-        "fats": number,
-        "fiber": number
-      },
-      "recommendations": {
-        "general": "string",
-        "preworkout": "string",
-        "postworkout": "string",
-        "timing": ["string", "string", "string"]
-      }
-    }`;
-
-    const userPrompt = `Crie um plano alimentar usando APENAS os seguintes alimentos e informações:
-
-    Meta Calórica: ${userData.dailyCalories} kcal/dia
-
-    Perfil:
-    - Peso: ${userData.weight}kg
-    - Altura: ${userData.height}cm
-    - Idade: ${userData.age}
-    - Gênero: ${userData.gender}
-    - Atividade: ${userData.activityLevel}
-    - Objetivo: ${userData.goal}
-
-    Alimentos Permitidos:
-    ${selectedFoods.map(food => 
-      `${food.name}:
-       - ${food.calories}kcal
-       - Proteína: ${food.protein}g
-       - Carboidratos: ${food.carbs}g
-       - Gorduras: ${food.fats}g
-       - Porção base: ${food.portion}${food.portionUnit}`
-    ).join('\n')}
-
-    Preferências:
-    - Alergias: ${dietaryPreferences.allergies?.length ? dietaryPreferences.allergies.join(', ') : 'Nenhuma'}
-    - Restrições: ${dietaryPreferences.dietaryRestrictions?.length ? dietaryPreferences.dietaryRestrictions.join(', ') : 'Nenhuma'}
-    - Treino: ${dietaryPreferences.trainingTime || 'Horário não especificado'}
-
-    Regras:
-    1. Use SOMENTE os alimentos listados acima
-    2. Siga estritamente a meta de ${userData.dailyCalories} calorias
-    3. Retorne apenas o JSON, sem texto adicional`;
-
-    console.log('Enviando requisição para OpenAI...');
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -106,64 +42,66 @@ serve(async (req) => {
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
+          { 
+            role: 'system', 
+            content: `Como nutricionista, crie um plano alimentar diário usando apenas os alimentos fornecidos.
+            Retorne apenas o JSON com a estrutura especificada, sem texto adicional.` 
+          },
+          { 
+            role: 'user', 
+            content: `Crie um plano usando:
+            - Calorias: ${userData.dailyCalories}kcal
+            - Perfil: ${userData.age} anos, ${userData.gender}, ${userData.weight}kg
+            - Objetivo: ${userData.goal}
+            - Alimentos: ${selectedFoods.map(f => f.name).join(', ')}
+            - Restrições: ${dietaryPreferences.dietaryRestrictions?.join(', ') || 'Nenhuma'}
+            - Alergias: ${dietaryPreferences.allergies?.join(', ') || 'Nenhuma'}`
+          }
         ],
-        temperature: 0.1,
+        temperature: 0.3,
         max_tokens: 2000
       }),
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Erro na resposta da OpenAI:', errorText);
-      throw new Error('Falha na comunicação com OpenAI');
+      console.error('Erro OpenAI:', await response.text());
+      return new Response(
+        JSON.stringify({ error: 'Erro ao gerar plano alimentar' }), 
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const data = await response.json();
     
     if (!data.choices?.[0]?.message?.content) {
-      console.error('Resposta inválida da OpenAI:', data);
-      throw new Error('Formato de resposta inválido');
+      return new Response(
+        JSON.stringify({ error: 'Resposta inválida do modelo' }), 
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    let mealPlan;
     try {
-      const content = data.choices[0].message.content;
-      console.log('Processando resposta...');
+      const mealPlan = JSON.parse(data.choices[0].message.content);
+      const validatedPlan = validateMealPlan(mealPlan);
       
-      mealPlan = JSON.parse(content);
-      
-      // Padronizar unidades
-      Object.values(mealPlan.dailyPlan).forEach((meal: any) => {
-        meal.foods.forEach((food: any) => {
-          food.unit = standardizeUnits(food.unit);
-        });
-      });
-
-      mealPlan = validateMealPlan(mealPlan);
-      console.log('Plano alimentar gerado com sucesso');
+      return new Response(
+        JSON.stringify(validatedPlan), 
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
 
     } catch (error) {
-      console.error('Erro no processamento do plano:', error);
-      throw new Error('Erro ao processar plano alimentar');
+      console.error('Erro ao processar plano:', error);
+      return new Response(
+        JSON.stringify({ error: 'Erro ao processar plano alimentar' }), 
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    return new Response(JSON.stringify(mealPlan), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-
   } catch (error) {
-    console.error('Erro na geração do plano:', error);
+    console.error('Erro na edge function:', error);
     return new Response(
-      JSON.stringify({ 
-        error: error.message || 'Erro interno',
-        details: error.stack
-      }),
-      { 
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      JSON.stringify({ error: 'Erro interno do servidor' }), 
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -104,7 +103,7 @@ export const useMenuController = () => {
       }
 
       // Chamar a edge function para gerar o plano alimentar
-      const response = await supabase.functions.invoke(
+      const { data: mealPlanData, error: generateError } = await supabase.functions.invoke(
         'generate-meal-plan',
         {
           body: {
@@ -138,12 +137,12 @@ export const useMenuController = () => {
         }
       );
 
-      if (response.error) {
-        console.error('Erro na edge function:', response.error);
-        throw new Error(response.error.message || 'Falha ao gerar cardápio');
+      if (generateError) {
+        console.error('Erro na edge function:', generateError);
+        throw new Error(generateError.message || 'Falha ao gerar cardápio');
       }
 
-      if (!response.data) {
+      if (!mealPlanData) {
         throw new Error('Nenhum dado recebido do gerador de cardápio');
       }
 
@@ -152,7 +151,7 @@ export const useMenuController = () => {
         .from('meal_plans')
         .insert({
           user_id: userData.user.id,
-          plan_data: response.data,
+          plan_data: mealPlanData,
           calories: calorieNeeds,
           active: true,
           dietary_preferences: dietaryPreference
@@ -163,7 +162,7 @@ export const useMenuController = () => {
         throw new Error('Falha ao salvar cardápio');
       }
 
-      setMealPlan(response.data);
+      setMealPlan(mealPlanData);
       setCurrentStep(4);
       toast.dismiss(toastId);
       toast.success("Cardápio personalizado gerado com sucesso!");
@@ -174,7 +173,6 @@ export const useMenuController = () => {
       const errorMessage = error instanceof Error ? error.message : "Erro ao gerar cardápio";
       toast.error(errorMessage);
       
-      // Log detalhado do erro
       if (error instanceof Error) {
         console.error('Stack trace:', error.stack);
       }
