@@ -1,9 +1,10 @@
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { corsHeaders } from '../_shared/cors.ts'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
 serve(async (req) => {
-  // This is needed if you're planning to invoke your function from a browser.
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -32,6 +33,8 @@ serve(async (req) => {
       console.error('Erro ao buscar exercícios:', exercisesError)
       throw new Error('Falha ao buscar exercícios disponíveis')
     }
+
+    console.log(`Found ${availableExercises.length} suitable exercises`)
 
     // Analisar as preferências do usuário usando IA
     const analysis = await analyzeUserPreferences(preferences, availableExercises)
