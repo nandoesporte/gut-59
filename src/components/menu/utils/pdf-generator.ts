@@ -16,6 +16,10 @@ export const generateMealPlanPDF = async (element: HTMLDivElement) => {
       useCORS: true,
       logging: false,
       backgroundColor: '#ffffff',
+      width: element.offsetWidth,
+      height: element.offsetHeight,
+      windowWidth: element.offsetWidth,
+      windowHeight: element.offsetHeight,
     });
 
     // Configura o PDF no formato A4
@@ -30,28 +34,45 @@ export const generateMealPlanPDF = async (element: HTMLDivElement) => {
     const pageHeight = pdf.internal.pageSize.getHeight();
 
     // Calcula as dimensões mantendo a proporção
-    const imgWidth = pageWidth;
-    const imgHeight = (canvas.height * pageWidth) / canvas.width;
+    const imgWidth = pageWidth - 20; // Margem de 10mm em cada lado
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-    let heightLeft = imgHeight;
-    let position = 0;
+    // Posição inicial (10mm das bordas)
+    let position = 10;
     let page = 1;
 
-    // Primeira página
-    pdf.addImage(canvas.toDataURL('image/png', 1.0), 'PNG', 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
+    // Adiciona a imagem na primeira página
+    pdf.addImage(
+      canvas.toDataURL('image/jpeg', 1.0),
+      'JPEG',
+      10,
+      position,
+      imgWidth,
+      imgHeight,
+      undefined,
+      'FAST'
+    );
 
-    // Adiciona páginas adicionais se necessário
-    while (heightLeft >= 0) {
+    // Se o conteúdo ultrapassar a altura da página, adiciona novas páginas
+    while (position + imgHeight > pageHeight) {
       pdf.addPage();
-      position = -(page * pageHeight);
-      pdf.addImage(canvas.toDataURL('image/png', 1.0), 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
+      position = position - pageHeight;
+      pdf.addImage(
+        canvas.toDataURL('image/jpeg', 1.0),
+        'JPEG',
+        10,
+        position,
+        imgWidth,
+        imgHeight,
+        undefined,
+        'FAST'
+      );
       page++;
     }
 
     // Salva o PDF
     pdf.save('plano-alimentar.pdf');
+    toast.success("PDF gerado com sucesso!");
 
   } catch (error) {
     console.error('Erro ao gerar PDF:', error);
