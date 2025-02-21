@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
@@ -16,25 +15,45 @@ serve(async (req) => {
     const { preferences, userId } = await req.json()
     console.log('Recebendo solicitação de plano de treino:', { preferences, userId })
 
-    // Configurar cliente Supabase
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Buscar exercícios disponíveis
-    const { data: exercises, error: exercisesError } = await supabaseClient
+    // Filtrar exercícios baseado no tipo selecionado pelo usuário
+    let query = supabaseClient
       .from('exercises')
       .select('*')
-    
+
+    // Aplicar filtros baseados nos tipos de exercício selecionados
+    const exerciseTypes = preferences.preferred_exercise_types
+    if (exerciseTypes && exerciseTypes.length > 0) {
+      query = query.in('exercise_type', exerciseTypes)
+    }
+
+    // Verificar localização do treino para filtrar exercícios adequadamente
+    if (preferences.training_location === 'gym') {
+      // Para academia, incluir apenas exercícios que requerem equipamentos
+      query = query.not('equipment_needed', 'eq', '{}')
+    } else if (preferences.training_location === 'home') {
+      // Para casa, incluir exercícios com equipamentos básicos ou sem equipamentos
+      query = query.or('equipment_needed.eq.{},equipment_needed.cs.{"dumbbells","resistance-bands"}')
+    } else if (preferences.training_location === 'outdoors' || preferences.training_location === 'no_equipment') {
+      // Para ar livre ou sem equipamentos, incluir apenas exercícios sem equipamentos
+      query = query.eq('equipment_needed', '{}')
+    }
+
+    const { data: exercises, error: exercisesError } = await query
+
     if (exercisesError) {
+      console.error('Erro ao buscar exercícios:', exercisesError)
       throw new Error(`Erro ao buscar exercícios: ${exercisesError.message}`)
     }
 
-    console.log(`Encontrados ${exercises.length} exercícios disponíveis`)
+    console.log(`Encontrados ${exercises.length} exercícios compatíveis`)
 
     // Analisar dados do usuário com IA
-    const analysis = await analyzeUserPreferences(preferences)
+    const analysis = await analyzeUserPreferences(preferences, exercises)
     console.log('Análise das preferências do usuário:', analysis)
 
     // Filtrar exercícios baseado na análise
@@ -52,7 +71,7 @@ serve(async (req) => {
         user_id: userId,
         goal: preferences.goal,
         start_date: new Date().toISOString(),
-        end_date: getEndDate(30), // Plano de 30 dias
+        end_date: getEndDate(30),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
@@ -63,7 +82,6 @@ serve(async (req) => {
       throw new Error(`Erro ao salvar plano: ${savePlanError.message}`)
     }
 
-    // Retornar o plano gerado
     return new Response(
       JSON.stringify(workoutPlan),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -81,7 +99,7 @@ serve(async (req) => {
   }
 })
 
-async function analyzeUserPreferences(preferences: any) {
+async function analyzeUserPreferences(preferences: any, availableExercises: any[]) {
   console.log('Iniciando análise das preferências do usuário')
   const openAIApiKey = Deno.env.get('OPENAI_API_KEY')
   
@@ -98,20 +116,25 @@ async function analyzeUserPreferences(preferences: any) {
           {
             role: 'system',
             content: `Você é um especialista em educação física e prescrição de exercícios.
-                     Analise os dados do usuário e forneça recomendações para um plano de treino seguro e efetivo.`
+                     Analise os dados do usuário e os exercícios disponíveis para criar um plano
+                     personalizado e seguro, considerando o local de treino e equipamentos disponíveis.`
           },
           {
             role: 'user',
-            content: `Analise os seguintes dados do usuário e forneça recomendações específicas para exercícios:
+            content: `Analise os seguintes dados e forneça recomendações específicas:
                      Idade: ${preferences.age}
                      Peso: ${preferences.weight}kg
                      Altura: ${preferences.height}cm
                      Gênero: ${preferences.gender}
                      Objetivo: ${preferences.goal}
                      Nível de atividade: ${preferences.activity_level}
+                     Local de treino: ${preferences.training_location}
                      Tipos de exercício preferidos: ${preferences.preferred_exercise_types.join(', ')}
                      Equipamentos disponíveis: ${preferences.available_equipment.join(', ')}
-                     ${preferences.health_conditions ? `Condições de saúde: ${preferences.health_conditions.join(', ')}` : 'Sem condições de saúde reportadas'}`
+                     ${preferences.health_conditions ? `Condições de saúde: ${preferences.health_conditions.join(', ')}` : 'Sem condições de saúde reportadas'}
+                     
+                     Número de exercícios disponíveis: ${availableExercises.length}
+                     Tipos de exercícios disponíveis: ${[...new Set(availableExercises.map(e => e.exercise_type))].join(', ')}`
           }
         ],
         temperature: 0.7,
@@ -129,24 +152,28 @@ async function analyzeUserPreferences(preferences: any) {
 }
 
 function filterExercisesByAnalysis(exercises: any[], analysis: string, preferences: any) {
-  console.log('Filtrando exercícios baseado na análise')
+  console.log('Filtrando exercícios baseado na análise e preferências')
   
   return exercises.filter(exercise => {
-    // Verificar equipamentos disponíveis
-    if (preferences.available_equipment.includes('all')) {
+    // Verificar se o tipo de exercício corresponde às preferências
+    const matchesType = preferences.preferred_exercise_types.includes(exercise.exercise_type)
+    if (!matchesType) return false
+
+    // Verificar equipamentos disponíveis baseado no local de treino
+    if (preferences.training_location === 'gym') {
+      // Para academia, permitir qualquer exercício
       return true
+    } else if (preferences.training_location === 'home') {
+      // Para casa, permitir exercícios sem equipamento ou com equipamentos básicos
+      return !exercise.equipment_needed || 
+             exercise.equipment_needed.length === 0 ||
+             exercise.equipment_needed.some((eq: string) => 
+               ['dumbbells', 'resistance-bands'].includes(eq)
+             )
+    } else {
+      // Para ar livre ou sem equipamentos, permitir apenas exercícios sem equipamento
+      return !exercise.equipment_needed || exercise.equipment_needed.length === 0
     }
-    
-    if (!exercise.equipment_needed) {
-      return true
-    }
-    
-    return exercise.equipment_needed.some((equipment: string) => 
-      preferences.available_equipment.includes(equipment)
-    )
-  }).filter(exercise => {
-    // Filtrar por tipo de exercício preferido
-    return preferences.preferred_exercise_types.includes(exercise.exercise_type)
   }).filter(exercise => {
     // Filtrar por nível de dificuldade baseado na experiência
     switch(preferences.activity_level) {
@@ -163,7 +190,7 @@ function filterExercisesByAnalysis(exercises: any[], analysis: string, preferenc
   })
 }
 
-async function generatePersonalizedPlan(exercises: any[], analysis: string, preferences: any) {
+function generatePersonalizedPlan(exercises: any[], analysis: string, preferences: any) {
   console.log('Gerando plano personalizado')
   
   // Determinar frequência de treino baseado no nível de atividade
