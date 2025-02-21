@@ -5,7 +5,6 @@ import SymptomTracker from "@/components/SymptomTracker";
 import Education from "@/components/Education";
 import ShoppingList from "@/components/ShoppingList";
 import { MenuHeader } from "./MenuHeader";
-import { MealPlanHistory } from "./MealPlanHistory";
 
 interface InitialMenuContentProps {
   onStartDiet: () => void;
@@ -16,12 +15,6 @@ export const InitialMenuContent = ({ onStartDiet }: InitialMenuContentProps) => 
     <>
       <MenuHeader onStart={onStartDiet} />
       <div className="space-y-8 mt-8">
-        <MealPlanHistory 
-          isLoading={false}
-          historyPlans={[]}
-          onRefresh={() => {}}
-        />
-
         <div className="bg-[#F2FCE2] rounded-lg shadow-sm p-6 border border-green-100">
           <p className="text-lg text-gray-700 leading-relaxed">
             Descubra o Protocolo de Modulação Intestinal, desenvolvido pelas nossas nutricionistas especialistas, para ajudar você a alcançar um equilíbrio digestivo e melhorar sua saúde intestinal.

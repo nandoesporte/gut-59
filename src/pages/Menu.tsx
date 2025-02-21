@@ -77,12 +77,12 @@ const Menu = () => {
       case 1:
         return (
           <div className="space-y-8">
-            <InitialMenuContent onStartDiet={() => setCurrentStep(1.5)} />
             <MealPlanHistory 
               isLoading={isHistoryLoading}
               historyPlans={historyPlans}
               onRefresh={fetchMealPlans}
             />
+            <InitialMenuContent onStartDiet={() => setCurrentStep(1.5)} />
           </div>
         );
       case 1.5:
@@ -113,7 +113,6 @@ const Menu = () => {
           />
         );
       case 4:
-        console.log('Rendering step 4, mealPlan:', mealPlan);
         return (
           <div className="space-y-8">
             {mealPlan ? (
