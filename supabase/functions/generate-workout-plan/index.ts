@@ -32,6 +32,8 @@ serve(async (req) => {
       throw new Error('Missing required parameters')
     }
 
+    console.log('Creating workout plan for user:', userId, 'with preferences:', preferences)
+
     // Fetch available exercises
     const { data: exercises, error: exercisesError } = await supabaseAdmin
       .from('exercises')
@@ -46,15 +48,20 @@ serve(async (req) => {
       throw new Error('No exercises found')
     }
 
-    console.log(`Found ${exercises.length} exercises`)
+    // Validate goal from preferences
+    if (!preferences.goal) {
+      throw new Error('Missing workout goal')
+    }
 
-    // First, create the workout plan
+    // First, create the workout plan with proper date formatting
     const workoutPlan = {
       user_id: userId,
       goal: preferences.goal,
-      start_date: new Date().toISOString(),
-      end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+      start_date: new Date().toISOString().split('T')[0], // Format as YYYY-MM-DD
+      end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // 30 days from now
     }
+
+    console.log('Attempting to save workout plan:', workoutPlan)
 
     // Save workout plan
     const { data: savedPlan, error: planError } = await supabaseAdmin
@@ -65,14 +72,18 @@ serve(async (req) => {
 
     if (planError) {
       console.error('Error saving workout plan:', planError)
-      throw new Error('Failed to save workout plan')
+      throw new Error(`Failed to save workout plan: ${planError.message}`)
     }
+
+    console.log('Successfully saved workout plan:', savedPlan)
 
     // Generate and save workout sessions
     const sessions = generateWorkoutSessions(exercises, preferences)
     const workoutSessions = sessions.map(session => ({
-      ...session,
-      plan_id: savedPlan.id
+      plan_id: savedPlan.id,
+      day_number: session.day_number,
+      warmup_description: session.warmup_description,
+      cooldown_description: session.cooldown_description
     }))
 
     // Save workout sessions
@@ -83,7 +94,6 @@ serve(async (req) => {
 
     if (sessionsError) {
       console.error('Error saving workout sessions:', sessionsError)
-      // Cleanup the workout plan if sessions fail to save
       await supabaseAdmin
         .from('workout_plans')
         .delete()
@@ -91,27 +101,37 @@ serve(async (req) => {
       throw new Error('Failed to save workout sessions')
     }
 
+    console.log('Successfully saved workout sessions:', savedSessions)
+
     // Save session exercises for each session
     for (const session of savedSessions) {
-      const sessionExercises = sessions
-        .find(s => s.day_number === session.day_number)
-        ?.exercises.map((exercise, index) => ({
+      const originalSession = sessions.find(s => s.day_number === session.day_number)
+      if (!originalSession) continue
+
+      const sessionExercises = originalSession.exercises.map((exercise, index) => {
+        const exerciseRecord = exercises.find(e => e.name === exercise.name)
+        if (!exerciseRecord) {
+          console.warn(`Exercise not found: ${exercise.name}`)
+          return null
+        }
+
+        return {
           session_id: session.id,
-          exercise_id: exercises.find(e => e.name === exercise.name)?.id,
+          exercise_id: exerciseRecord.id,
           sets: exercise.sets,
           reps: exercise.reps,
           rest_time_seconds: exercise.rest_time_seconds,
           order_in_session: index + 1
-        }))
+        }
+      }).filter(Boolean)
 
-      if (sessionExercises) {
+      if (sessionExercises.length > 0) {
         const { error: exercisesError } = await supabaseAdmin
           .from('session_exercises')
           .insert(sessionExercises)
 
         if (exercisesError) {
           console.error('Error saving session exercises:', exercisesError)
-          // Cleanup if exercises fail to save
           await supabaseAdmin.from('workout_sessions').delete().eq('plan_id', savedPlan.id)
           await supabaseAdmin.from('workout_plans').delete().eq('id', savedPlan.id)
           throw new Error('Failed to save session exercises')
@@ -128,7 +148,7 @@ serve(async (req) => {
           *,
           session_exercises (
             *,
-            exercises (*)
+            exercise:exercises (*)
           )
         )
       `)
@@ -148,17 +168,17 @@ serve(async (req) => {
         warmup_description: session.warmup_description,
         cooldown_description: session.cooldown_description,
         exercises: session.session_exercises.map(se => ({
-          name: se.exercises.name,
+          name: se.exercise.name,
           sets: se.sets,
           reps: se.reps,
           rest_time_seconds: se.rest_time_seconds,
-          gifUrl: se.exercises.gif_url,
+          gifUrl: se.exercise.gif_url,
           weight_recommendation: {
-            beginner: se.exercises.difficulty === 'beginner' ? '8-12kg' : '12-15kg',
-            intermediate: se.exercises.difficulty === 'beginner' ? '12-15kg' : '15-20kg',
-            advanced: se.exercises.difficulty === 'beginner' ? '15-20kg' : '20-25kg'
+            beginner: '8-12kg',
+            intermediate: '12-15kg',
+            advanced: '15-20kg'
           },
-          notes: se.exercises.description
+          notes: se.exercise.description
         }))
       }))
     }
