@@ -61,10 +61,21 @@ serve(async (req) => {
 
     console.log('Generating workout plan with preferences:', preferences);
 
-    // Fetch exercises
-    const { data: exercises, error: exercisesError } = await supabaseAdmin
+    // Fetch exercises with fixed filter syntax
+    let query = supabaseAdmin
       .from('exercises')
       .select('*');
+
+    // Apply filters only if the arrays are not empty
+    if (preferences.available_equipment && preferences.available_equipment.length > 0 && !preferences.available_equipment.includes('all')) {
+      query = query.contains('equipment_needed', preferences.available_equipment);
+    }
+
+    if (preferences.preferred_exercise_types && preferences.preferred_exercise_types.length > 0) {
+      query = query.in('exercise_type', preferences.preferred_exercise_types);
+    }
+
+    const { data: exercises, error: exercisesError } = await query;
 
     if (exercisesError) {
       throw new Error(`Failed to fetch exercises: ${exercisesError.message}`);
