@@ -32,8 +32,9 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
         .eq('user_id', userData.user.id);
 
       if (error) {
+        console.error('Erro ao excluir plano:', error);
         toast.error("Erro ao excluir plano alimentar");
-        throw error;
+        return;
       }
 
       await onRefresh();

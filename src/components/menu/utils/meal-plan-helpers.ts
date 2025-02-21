@@ -23,36 +23,46 @@ export const createPDFContent = (plan: any) => {
       </div>
 
       ${Object.entries(plan.plan_data.dailyPlan).map(([meal, data]: [string, any]) => `
-        <div class="mb-6">
+        <div class="mb-6 bg-white rounded-lg shadow-sm p-6">
           <h2 class="text-xl font-semibold mb-2">${formatMealTitle(meal)}</h2>
           <div class="space-y-2">
             ${data.foods.map((food: any) => `
               <div class="ml-4">
-                <p>• ${food.name.replace(/carboidrato/gi, "carbo")} - ${food.portion} ${food.unit}</p>
-                ${food.details ? `<p class="text-sm text-gray-600 ml-4">${food.details.replace(/carboidrato/gi, "carbo")}</p>` : ''}
+                <div class="flex items-baseline gap-1">
+                  <span class="font-medium">${food.portion} ${food.unit}</span>
+                  <span class="text-gray-600">de</span>
+                  <span>${food.name.replace(/carboidrato/gi, "carbo")}</span>
+                </div>
+                ${food.details ? `<p class="text-sm text-gray-500 ml-4 mt-1">${food.details.replace(/carboidrato/gi, "carbo")}</p>` : ''}
               </div>
             `).join('')}
           </div>
-          <div class="mt-2 text-sm text-gray-600">
+          <div class="mt-4 text-sm text-gray-600 border-t pt-4">
             <p>Calorias: ${data.calories} kcal</p>
           </div>
         </div>
       `).join('')}
 
-      <div class="mt-8">
+      <div class="mt-8 bg-white rounded-lg shadow-sm p-6">
         <h2 class="text-xl font-semibold mb-2">Recomendações</h2>
-        <div class="space-y-2">
+        <div class="space-y-4">
           ${plan.plan_data.recommendations.general ? 
-            `<p class="font-medium">Gerais:</p>
-            <p class="ml-4">${plan.plan_data.recommendations.general.replace(/carboidrato/gi, "carbo")}</p>` : ''}
+            `<div>
+              <p class="font-medium">Gerais:</p>
+              <p class="ml-4 text-gray-700">${plan.plan_data.recommendations.general.replace(/carboidrato/gi, "carbo")}</p>
+            </div>` : ''}
           
           ${plan.plan_data.recommendations.preworkout ? 
-            `<p class="font-medium">Pré-treino:</p>
-            <p class="ml-4">${plan.plan_data.recommendations.preworkout.replace(/carboidrato/gi, "carbo")}</p>` : ''}
+            `<div>
+              <p class="font-medium">Pré-treino:</p>
+              <p class="ml-4 text-gray-700">${plan.plan_data.recommendations.preworkout.replace(/carboidrato/gi, "carbo")}</p>
+            </div>` : ''}
           
           ${plan.plan_data.recommendations.postworkout ? 
-            `<p class="font-medium">Pós-treino:</p>
-            <p class="ml-4">${plan.plan_data.recommendations.postworkout.replace(/carboidrato/gi, "carbo")}</p>` : ''}
+            `<div>
+              <p class="font-medium">Pós-treino:</p>
+              <p class="ml-4 text-gray-700">${plan.plan_data.recommendations.postworkout.replace(/carboidrato/gi, "carbo")}</p>
+            </div>` : ''}
         </div>
       </div>
     </div>
