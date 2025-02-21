@@ -1,5 +1,5 @@
-
-import Ajv from "https://esm.sh/ajv@8.12.0";
+import type { MealPlan } from './types.ts';
+import Ajv from 'https://esm.sh/ajv@8.12.0';
 
 const ajv = new Ajv();
 
@@ -91,7 +91,7 @@ export const mealPlanSchema = {
   additionalProperties: false
 };
 
-export const validateMealPlan = (data: unknown) => {
+export const validateMealPlan = (data: unknown): data is MealPlan => {
   const validate = ajv.compile(mealPlanSchema);
   const isValid = validate(data);
   

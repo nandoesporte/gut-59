@@ -1,3 +1,4 @@
+import type { MacroTargets } from './types.ts';
 
 export function calculateHarrisBenedict(
   weight: number,

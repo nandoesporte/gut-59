@@ -1,3 +1,4 @@
+import type { MealPlan } from './types.ts';
 
 interface HealthRecommendations {
   [key: string]: {

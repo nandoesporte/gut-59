@@ -1,6 +1,5 @@
-
-import type { Food, MacroTargets, FoodWithPortion } from './types';
-import { calculatePortionSize } from './portion-calculator';
+import type { Food, MacroTargets, FoodWithPortion } from './types.ts';
+import { calculatePortionSize } from './portion-calculator.ts';
 
 interface MealGuideline {
   min_items: number;
