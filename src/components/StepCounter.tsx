@@ -4,6 +4,7 @@ import { Motion } from '@capacitor/motion';
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Activity, LineChart, User } from "lucide-react";
+import { toast } from "sonner";
 
 interface StepData {
   steps: number;
@@ -14,7 +15,7 @@ interface StepData {
 const STEPS_GOAL = 10000;
 const STEP_LENGTH = 0.762; // metros (média)
 const CALORIES_PER_STEP = 0.04;
-const ACCELERATION_THRESHOLD = 10; // Ajustado para ser mais sensível
+const ACCELERATION_THRESHOLD = 10;
 const MIN_TIME_BETWEEN_STEPS = 250; // Tempo mínimo entre passos em ms
 
 const StepCounter = () => {
@@ -23,6 +24,7 @@ const StepCounter = () => {
     distance: 0,
     calories: 0
   });
+  const [hasPermission, setHasPermission] = useState(false);
 
   const calculateMetrics = (steps: number) => {
     const distance = (steps * STEP_LENGTH) / 1000; // km
@@ -30,15 +32,48 @@ const StepCounter = () => {
     return { steps, distance, calories };
   };
 
+  const requestPermissions = async () => {
+    try {
+      // Verificar se o dispositivo suporta acelerômetro
+      const isAvailable = await Motion.isAvailable();
+      
+      if (!isAvailable) {
+        toast.error("Seu dispositivo não suporta contagem de passos");
+        return false;
+      }
+
+      // Solicitar permissão para usar o acelerômetro
+      const permissionResult = await Motion.requestPermission();
+      
+      if (permissionResult.granted) {
+        toast.success("Permissão concedida para contagem de passos");
+        setHasPermission(true);
+        return true;
+      } else {
+        toast.error("Permissão negada para contagem de passos");
+        return false;
+      }
+    } catch (error) {
+      console.error('Erro ao solicitar permissões:', error);
+      toast.error("Erro ao solicitar permissões");
+      return false;
+    }
+  };
+
   useEffect(() => {
     let lastStepTime = 0;
     let lastMagnitude = 0;
     let steps = 0;
     let isInitialized = false;
+    let listener: any = null;
 
     const startStepCounting = async () => {
       try {
-        await Motion.addListener('accel', (event) => {
+        const hasPermissions = await requestPermissions();
+        if (!hasPermissions) return;
+
+        // Configurar o listener do acelerômetro
+        listener = await Motion.addListener('accel', (event) => {
           const { x, y, z } = event.acceleration;
           
           // Ignora leituras iniciais para estabilização
@@ -76,13 +111,17 @@ const StepCounter = () => {
         
       } catch (error) {
         console.error('Erro ao acessar sensores de movimento:', error);
+        toast.error("Erro ao iniciar contador de passos");
       }
     };
 
     startStepCounting();
 
+    // Cleanup function
     return () => {
-      Motion.removeAllListeners();
+      if (listener) {
+        Motion.removeAllListeners();
+      }
     };
   }, []);
 
@@ -96,6 +135,15 @@ const StepCounter = () => {
             <h2 className="text-2xl font-bold text-gray-800">Atividade Diária</h2>
             <User className="w-8 h-8 text-primary-500" />
           </div>
+          
+          {!hasPermission && (
+            <button
+              onClick={requestPermissions}
+              className="w-full py-2 px-4 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
+            >
+              Permitir contagem de passos
+            </button>
+          )}
           
           <div className="space-y-4">
             <div className="flex justify-between items-center">
