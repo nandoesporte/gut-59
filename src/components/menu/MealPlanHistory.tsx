@@ -16,13 +16,6 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
 
   const handleDelete = async (planId: string) => {
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      
-      if (!userData.user) {
-        toast.error("Usuário não autenticado");
-        return;
-      }
-
       setDeletingIds(prev => new Set([...prev, planId]));
 
       const { error } = await supabase
@@ -37,7 +30,9 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
       }
 
       toast.success("Plano alimentar excluído com sucesso");
-      await onRefresh();
+      if (onRefresh) {
+        await onRefresh();
+      }
       
     } catch (error) {
       console.error('Erro ao excluir plano:', error);
@@ -63,7 +58,6 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
       document.body.appendChild(tempDiv);
       await generateMealPlanPDF(tempDiv);
       document.body.removeChild(tempDiv);
-      toast.success("PDF gerado com sucesso!");
       
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
