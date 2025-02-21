@@ -27,13 +27,11 @@ serve(async (req) => {
 
     console.log('Buscando exercícios com preferências:', preferences);
 
-    // Modificada a query para usar contains e o campo correto equipment_needed
     let query = supabase
       .from('exercises')
       .select('*')
       .in('exercise_type', preferences.preferred_exercise_types);
 
-    // Se o equipamento disponível não for "all", filtramos por equipamento
     if (!preferences.available_equipment.includes('all')) {
       query = query.contains('equipment_needed', preferences.available_equipment);
     }
@@ -52,25 +50,74 @@ serve(async (req) => {
 
     console.log(`Encontrados ${exercises.length} exercícios compatíveis`);
 
-    const workoutPlan = {
-      id: crypto.randomUUID(),
-      user_id: userId,
-      goal: preferences.goal,
-      start_date: new Date().toISOString(),
-      end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      workout_sessions: generateWorkoutSessions(exercises, preferences),
-    };
-
-    const { error: saveError } = await supabase
+    // Primeiro, criar o plano de treino
+    const { data: workoutPlan, error: planError } = await supabase
       .from('workout_plans')
-      .insert([workoutPlan]);
+      .insert({
+        user_id: userId,
+        goal: preferences.goal,
+        start_date: new Date().toISOString().split('T')[0], // Formato YYYY-MM-DD
+        end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      })
+      .select()
+      .single();
 
-    if (saveError) {
-      console.error('Erro ao salvar plano:', saveError);
-      throw new Error('Erro ao salvar plano de treino');
+    if (planError) {
+      console.error('Erro ao criar plano:', planError);
+      throw new Error('Erro ao criar plano de treino');
     }
 
-    return new Response(JSON.stringify(workoutPlan), {
+    console.log('Plano criado:', workoutPlan);
+
+    // Depois, criar as sessões de treino
+    const sessions = generateWorkoutSessions(exercises, preferences);
+    const sessionsToInsert = sessions.map(session => ({
+      plan_id: workoutPlan.id,
+      day_number: session.day_number,
+      warmup_description: session.warmup_description,
+      cooldown_description: session.cooldown_description
+    }));
+
+    const { data: workoutSessions, error: sessionsError } = await supabase
+      .from('workout_sessions')
+      .insert(sessionsToInsert)
+      .select();
+
+    if (sessionsError) {
+      console.error('Erro ao criar sessões:', sessionsError);
+      throw new Error('Erro ao criar sessões de treino');
+    }
+
+    console.log('Sessões criadas:', workoutSessions);
+
+    // Criar os exercícios para cada sessão
+    for (let i = 0; i < workoutSessions.length; i++) {
+      const sessionExercises = sessions[i].exercises.map(exercise => ({
+        session_id: workoutSessions[i].id,
+        exercise_id: exercise.id,
+        sets: exercise.sets,
+        reps: exercise.reps,
+        rest_time_seconds: exercise.rest_time_seconds,
+        order_in_session: 1
+      }));
+
+      const { error: exercisesInsertError } = await supabase
+        .from('session_exercises')
+        .insert(sessionExercises);
+
+      if (exercisesInsertError) {
+        console.error('Erro ao inserir exercícios da sessão:', exercisesInsertError);
+        throw new Error('Erro ao inserir exercícios da sessão');
+      }
+    }
+
+    // Montar o objeto de resposta completo
+    const completePlan = {
+      ...workoutPlan,
+      workout_sessions: sessions
+    };
+
+    return new Response(JSON.stringify(completePlan), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
@@ -125,12 +172,12 @@ function generateCooldown() {
 function selectExercisesForSession(exercises: any[], preferences: any) {
   const exercisesPerSession = 6;
   const selectedExercises = [];
-
   const shuffledExercises = [...exercises].sort(() => Math.random() - 0.5);
 
   for (let i = 0; i < exercisesPerSession && i < shuffledExercises.length; i++) {
     const exercise = shuffledExercises[i];
     selectedExercises.push({
+      id: exercise.id,
       name: exercise.name,
       sets: getSetsBasedOnGoal(preferences.goal),
       reps: getRepsBasedOnGoal(preferences.goal),
