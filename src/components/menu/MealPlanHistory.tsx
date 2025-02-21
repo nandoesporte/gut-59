@@ -22,6 +22,12 @@ interface MealPlanHistoryProps {
 export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlanHistoryProps) => {
   const planRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  const [localPlans, setLocalPlans] = useState(historyPlans || []);
+
+  // Atualiza o estado local quando historyPlans muda
+  useState(() => {
+    setLocalPlans(historyPlans || []);
+  }, [historyPlans]);
 
   const handleDelete = async (planId: string) => {
     try {
@@ -46,8 +52,13 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
         throw error;
       }
 
+      // Atualiza o estado local imediatamente
+      setLocalPlans(prev => prev.filter(plan => plan.id !== planId));
+      
       toast.dismiss(toastId);
       toast.success("Plano alimentar excluído com sucesso");
+      
+      // Atualiza os dados do servidor em segundo plano
       await onRefresh();
       
     } catch (error) {
@@ -88,7 +99,7 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
     );
   }
 
-  if (!historyPlans || historyPlans.length === 0) {
+  if (!localPlans || localPlans.length === 0) {
     return null;
   }
 
@@ -105,7 +116,7 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
       </div>
 
       <div className="grid gap-4">
-        {historyPlans.map((plan) => (
+        {localPlans.map((plan) => (
           <Card key={plan.id} className="p-4">
             <div 
               ref={el => planRefs.current[plan.id] = el}
