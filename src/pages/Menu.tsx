@@ -117,7 +117,12 @@ const Menu = () => {
         return (
           <div className="space-y-8">
             {mealPlan ? (
-              <MealPlanDisplay mealPlan={mealPlan} onRefresh={fetchMealPlans} />
+              <div>
+                <MealPlanDisplay 
+                  mealPlan={mealPlan} 
+                  onRefresh={fetchMealPlans} 
+                />
+              </div>
             ) : (
               <Card className="p-6">
                 <div className="text-center text-gray-500">
