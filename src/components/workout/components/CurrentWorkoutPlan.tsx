@@ -92,6 +92,30 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
                             </span>
                           </div>
                         </div>
+                        
+                        {exercise.weight_recommendation && (
+                          <div className="mt-4 bg-primary-50/50 p-4 rounded-lg">
+                            <h6 className="font-medium text-primary-700 mb-2">Recomendação de Peso/Carga</h6>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div className="bg-white p-3 rounded-lg">
+                                <span className="text-sm text-gray-500">Iniciante</span>
+                                <p className="font-medium text-primary-600">{exercise.weight_recommendation.beginner}</p>
+                              </div>
+                              <div className="bg-white p-3 rounded-lg">
+                                <span className="text-sm text-gray-500">Intermediário</span>
+                                <p className="font-medium text-primary-600">{exercise.weight_recommendation.intermediate}</p>
+                              </div>
+                              <div className="bg-white p-3 rounded-lg">
+                                <span className="text-sm text-gray-500">Avançado</span>
+                                <p className="font-medium text-primary-600">{exercise.weight_recommendation.advanced}</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {exercise.notes && (
+                          <p className="text-sm text-gray-500 mt-4">{exercise.notes}</p>
+                        )}
                       </div>
                     </div>
                   </div>

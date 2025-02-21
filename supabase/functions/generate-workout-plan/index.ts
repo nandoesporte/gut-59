@@ -1,101 +1,73 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { corsHeaders } from '../_shared/cors.ts'
+import { createClient } from '@supabase/supabase-js'
 
 serve(async (req) => {
+  // This is needed if you're planning to invoke your function from a browser.
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')
+
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Missing Supabase credentials')
+    }
+
+    const supabaseClient = createClient(supabaseUrl, supabaseKey)
+
     const { preferences, userId } = await req.json()
-    console.log('Recebendo solicitação de plano de treino:', { preferences, userId })
 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    console.log('Preferências recebidas:', preferences)
+    console.log('ID do usuário:', userId)
 
-    // Filtrar exercícios baseado no tipo selecionado pelo usuário
-    let query = supabaseClient
+    // Buscar exercícios disponíveis no Supabase
+    const { data: availableExercises, error: exercisesError } = await supabaseClient
       .from('exercises')
       .select('*')
 
-    // Aplicar filtros baseados nos tipos de exercício selecionados
-    const exerciseTypes = preferences.preferred_exercise_types
-    if (exerciseTypes && exerciseTypes.length > 0) {
-      query = query.in('exercise_type', exerciseTypes)
-    }
-
-    // Verificar localização do treino para filtrar exercícios adequadamente
-    if (preferences.training_location === 'gym') {
-      // Para academia, incluir apenas exercícios que requerem equipamentos
-      query = query.not('equipment_needed', 'eq', '{}')
-    } else if (preferences.training_location === 'home') {
-      // Para casa, incluir exercícios com equipamentos básicos ou sem equipamentos
-      query = query.or('equipment_needed.eq.{},equipment_needed.cs.{"dumbbells","resistance-bands"}')
-    } else if (preferences.training_location === 'outdoors' || preferences.training_location === 'no_equipment') {
-      // Para ar livre ou sem equipamentos, incluir apenas exercícios sem equipamentos
-      query = query.eq('equipment_needed', '{}')
-    }
-
-    const { data: exercises, error: exercisesError } = await query
-
     if (exercisesError) {
       console.error('Erro ao buscar exercícios:', exercisesError)
-      throw new Error(`Erro ao buscar exercícios: ${exercisesError.message}`)
+      throw new Error('Falha ao buscar exercícios disponíveis')
     }
 
-    console.log(`Encontrados ${exercises.length} exercícios compatíveis`)
-
-    // Analisar dados do usuário com IA
-    const analysis = await analyzeUserPreferences(preferences, exercises)
+    // Analisar as preferências do usuário usando IA
+    const analysis = await analyzeUserPreferences(preferences, availableExercises)
     console.log('Análise das preferências do usuário:', analysis)
 
-    // Filtrar exercícios baseado na análise
-    const filteredExercises = filterExercisesByAnalysis(exercises, analysis, preferences)
-    console.log(`Selecionados ${filteredExercises.length} exercícios após filtro`)
-
-    // Gerar plano personalizado
-    const workoutPlan = await generatePersonalizedPlan(filteredExercises, analysis, preferences)
+    // Gerar plano de treino personalizado
+    const workoutPlan = await generatePersonalizedPlan(availableExercises, analysis, preferences)
     console.log('Plano de treino gerado:', workoutPlan)
 
-    // Salvar o plano no banco de dados
-    const { error: savePlanError } = await supabaseClient
+    // Salvar o plano de treino no Supabase
+    const { data: savedPlan, error: saveError } = await supabaseClient
       .from('workout_plans')
       .insert({
-        user_id: userId,
-        goal: preferences.goal,
-        start_date: new Date().toISOString(),
-        end_date: getEndDate(30),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        ...workoutPlan,
+        user_id: userId
       })
       .select()
       .single()
 
-    if (savePlanError) {
-      throw new Error(`Erro ao salvar plano: ${savePlanError.message}`)
+    if (saveError) {
+      console.error('Erro ao salvar plano de treino:', saveError)
+      throw new Error('Falha ao salvar plano de treino')
     }
 
-    return new Response(
-      JSON.stringify(workoutPlan),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    console.log('Plano de treino salvo:', savedPlan)
 
+    return new Response(JSON.stringify(savedPlan), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    })
   } catch (error) {
-    console.error('Erro ao gerar plano:', error)
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { 
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    )
+    console.error('Erro na função Edge:', error)
+    return new Response(JSON.stringify({ error: error.message }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 400,
+    })
   }
 })
 
@@ -111,17 +83,20 @@ async function analyzeUserPreferences(preferences: any, availableExercises: any[
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4',
         messages: [
           {
             role: 'system',
             content: `Você é um especialista em educação física e prescrição de exercícios.
-                     Analise os dados do usuário e os exercícios disponíveis para criar um plano
-                     personalizado e seguro, considerando o local de treino e equipamentos disponíveis.`
+                     Para cada exercício, você deve fornecer recomendações de peso/carga adequadas 
+                     para diferentes níveis (iniciante, intermediário e avançado), levando em consideração
+                     o perfil do usuário, objetivo e tipo de exercício.`
           },
           {
             role: 'user',
-            content: `Analise os seguintes dados e forneça recomendações específicas:
+            content: `Analise os seguintes dados e forneça recomendações específicas
+                     incluindo sugestões de peso/carga para cada nível:
+                     
                      Idade: ${preferences.age}
                      Peso: ${preferences.weight}kg
                      Altura: ${preferences.height}cm
@@ -133,17 +108,15 @@ async function analyzeUserPreferences(preferences: any, availableExercises: any[
                      Equipamentos disponíveis: ${preferences.available_equipment.join(', ')}
                      ${preferences.health_conditions ? `Condições de saúde: ${preferences.health_conditions.join(', ')}` : 'Sem condições de saúde reportadas'}
                      
-                     Número de exercícios disponíveis: ${availableExercises.length}
-                     Tipos de exercícios disponíveis: ${[...new Set(availableExercises.map(e => e.exercise_type))].join(', ')}`
+                     Exercícios disponíveis: ${availableExercises.map(e => e.name).join(', ')}`
           }
         ],
         temperature: 0.7,
-        max_tokens: 1000
+        max_tokens: 1500
       })
     })
 
     const data = await response.json()
-    console.log('Resposta da análise de IA:', data)
     return data.choices[0].message.content
   } catch (error) {
     console.error('Erro na análise de IA:', error)
@@ -151,183 +124,172 @@ async function analyzeUserPreferences(preferences: any, availableExercises: any[
   }
 }
 
-function filterExercisesByAnalysis(exercises: any[], analysis: string, preferences: any) {
-  console.log('Filtrando exercícios baseado na análise e preferências')
+async function generatePersonalizedPlan(exercises: any[], analysis: string, preferences: any) {
+  // Determinar nível do usuário baseado na atividade
+  const userLevel = determineUserLevel(preferences.activity_level);
   
-  return exercises.filter(exercise => {
-    // Verificar se o tipo de exercício corresponde às preferências
-    const matchesType = preferences.preferred_exercise_types.includes(exercise.exercise_type)
-    if (!matchesType) return false
-
-    // Verificar equipamentos disponíveis baseado no local de treino
-    if (preferences.training_location === 'gym') {
-      // Para academia, permitir qualquer exercício
-      return true
-    } else if (preferences.training_location === 'home') {
-      // Para casa, permitir exercícios sem equipamento ou com equipamentos básicos
-      return !exercise.equipment_needed || 
-             exercise.equipment_needed.length === 0 ||
-             exercise.equipment_needed.some((eq: string) => 
-               ['dumbbells', 'resistance-bands'].includes(eq)
-             )
-    } else {
-      // Para ar livre ou sem equipamentos, permitir apenas exercícios sem equipamento
-      return !exercise.equipment_needed || exercise.equipment_needed.length === 0
-    }
-  }).filter(exercise => {
-    // Filtrar por nível de dificuldade baseado na experiência
-    switch(preferences.activity_level) {
-      case 'sedentary':
-      case 'light':
-        return exercise.difficulty === 'beginner'
-      case 'moderate':
-        return ['beginner', 'intermediate'].includes(exercise.difficulty)
-      case 'intense':
-        return true
-      default:
-        return true
-    }
-  })
-}
-
-function generatePersonalizedPlan(exercises: any[], analysis: string, preferences: any) {
-  console.log('Gerando plano personalizado')
-  
-  // Determinar frequência de treino baseado no nível de atividade
-  const sessionsPerWeek = getSessionsPerWeek(preferences.activity_level)
-  
-  // Criar sessões de treino
-  const workoutSessions = []
-  for (let day = 1; day <= sessionsPerWeek; day++) {
-    const session = {
-      day_number: day,
-      warmup_description: generateWarmupDescription(preferences),
-      cooldown_description: generateCooldownDescription(),
-      exercises: selectExercisesForSession(exercises, day, preferences)
-    }
-    workoutSessions.push(session)
-  }
-
-  return {
-    id: crypto.randomUUID(),
-    user_id: preferences.userId,
+  // Gerar plano base
+  const workoutPlan = {
+    user_fitness_level: userLevel,
     goal: preferences.goal,
     start_date: new Date().toISOString(),
     end_date: getEndDate(30),
-    workout_sessions: workoutSessions,
-    user_fitness_level: getUserFitnessLevel(preferences.activity_level)
-  }
+    workout_sessions: []
+  };
+
+  // Gerar recomendações de peso para cada exercício
+  const weightRecommendations = await generateWeightRecommendations(exercises, preferences);
+
+  // Gerar sessões de treino
+  const sessions = generateWorkoutSessions(exercises, preferences);
+  
+  // Adicionar recomendações de peso aos exercícios
+  workoutPlan.workout_sessions = sessions.map(session => ({
+    ...session,
+    exercises: session.exercises.map(exercise => ({
+      ...exercise,
+      weight_recommendation: weightRecommendations[exercise.name] || {
+        beginner: "Peso corporal ou carga leve",
+        intermediate: "Carga moderada",
+        advanced: "Carga pesada"
+      }
+    }))
+  }));
+
+  return workoutPlan;
 }
 
-function getSessionsPerWeek(activityLevel: string): number {
-  switch(activityLevel) {
-    case 'sedentary': return 3
-    case 'light': return 4
-    case 'moderate': return 5
-    case 'intense': return 6
-    default: return 3
-  }
-}
-
-function generateWarmupDescription(preferences: any): string {
-  const baseWarmup = "5-10 minutos de:\n- Alongamento dinâmico\n- Mobilidade articular"
+async function generateWeightRecommendations(exercises: any[], preferences: any) {
+  const openAIApiKey = Deno.env.get('OPENAI_API_KEY')
   
-  if (preferences.activity_level === 'sedentary') {
-    return `${baseWarmup}\n- Caminhada leve`
-  }
-  
-  return `${baseWarmup}\n- Exercício cardiovascular leve\n- Exercícios de mobilidade específicos`
-}
-
-function generateCooldownDescription(): string {
-  return "5-10 minutos de:\n- Alongamento estático\n- Exercícios de respiração\n- Relaxamento muscular"
-}
-
-function selectExercisesForSession(exercises: any[], dayNumber: number, preferences: any) {
-  const exercisesPerSession = Math.min(8, Math.max(5, Math.floor(exercises.length / 3)))
-  
-  // Dividir exercícios por grupo muscular para garantir distribuição adequada
-  const groupedExercises = exercises.reduce((acc: any, exercise: any) => {
-    if (!acc[exercise.muscle_group]) {
-      acc[exercise.muscle_group] = []
-    }
-    acc[exercise.muscle_group].push(exercise)
-    return acc
-  }, {})
-
-  const selectedExercises = []
-  const muscleGroups = Object.keys(groupedExercises)
-  
-  // Selecionar exercícios alternando grupos musculares
-  for (let i = 0; i < exercisesPerSession; i++) {
-    const groupIndex = (i + dayNumber) % muscleGroups.length
-    const group = muscleGroups[groupIndex]
-    const exercisesInGroup = groupedExercises[group]
-    
-    if (exercisesInGroup && exercisesInGroup.length > 0) {
-      const exercise = exercisesInGroup[Math.floor(Math.random() * exercisesInGroup.length)]
-      selectedExercises.push({
-        name: exercise.name,
-        sets: getSetRange(preferences.activity_level),
-        reps: getRepsRange(preferences.goal, exercise.exercise_type),
-        rest_time_seconds: getRestTime(preferences.goal, exercise.exercise_type),
-        gifUrl: exercise.gif_url,
-        notes: exercise.description
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4',
+        messages: [
+          {
+            role: 'system',
+            content: `Como especialista em educação física, forneça recomendações detalhadas 
+                     de peso/carga para cada exercício, considerando diferentes níveis de experiência.
+                     Forneça valores específicos quando possível (ex: "15-20kg") ou descrições claras
+                     (ex: "40-50% do peso corporal").`
+          },
+          {
+            role: 'user',
+            content: `Forneça recomendações de peso/carga para os seguintes exercícios,
+                     considerando o perfil do usuário:
+                     
+                     Perfil:
+                     Idade: ${preferences.age}
+                     Peso: ${preferences.weight}kg
+                     Gênero: ${preferences.gender}
+                     Nível: ${preferences.activity_level}
+                     
+                     Exercícios:
+                     ${exercises.map(e => e.name).join('\n')}
+                     
+                     Para cada exercício, forneça recomendações para:
+                     - Iniciante
+                     - Intermediário
+                     - Avançado`
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 1500
       })
+    });
+
+    const data = await response.json();
+    const recommendations = parseWeightRecommendations(data.choices[0].message.content);
+    return recommendations;
+  } catch (error) {
+    console.error('Erro ao gerar recomendações de peso:', error);
+    return {};
+  }
+}
+
+function parseWeightRecommendations(content: string) {
+  // Implementação básica do parser - pode ser melhorada para uma análise mais robusta
+  const recommendations: Record<string, any> = {};
+  const exercises = content.split('\n\n');
+  
+  exercises.forEach(block => {
+    const lines = block.split('\n');
+    const exerciseName = lines[0].replace(':', '').trim();
+    
+    if (exerciseName) {
+      recommendations[exerciseName] = {
+        beginner: lines.find(l => l.toLowerCase().includes('iniciante'))?.split(':')[1]?.trim() || 'Peso corporal',
+        intermediate: lines.find(l => l.toLowerCase().includes('intermediário'))?.split(':')[1]?.trim() || 'Carga moderada',
+        advanced: lines.find(l => l.toLowerCase().includes('avançado'))?.split(':')[1]?.trim() || 'Carga pesada'
+      };
     }
-  }
-
-  return selectedExercises
+  });
+  
+  return recommendations;
 }
 
-function getSetRange(activityLevel: string): number {
-  switch(activityLevel) {
-    case 'sedentary': return 2
-    case 'light': return 3
-    case 'moderate': return 4
-    case 'intense': return 5
-    default: return 3
-  }
-}
-
-function getRepsRange(goal: string, exerciseType: string): number {
-  if (exerciseType === 'cardio') return 0 // Para exercícios de cardio, não usamos repetições
-
-  switch(goal) {
-    case 'lose_weight': return 15
-    case 'gain_mass': return 8
-    case 'maintain': return 12
-    default: return 10
-  }
-}
-
-function getRestTime(goal: string, exerciseType: string): number {
-  if (exerciseType === 'cardio') return 30
-
-  switch(goal) {
-    case 'lose_weight': return 30
-    case 'gain_mass': return 90
-    case 'maintain': return 60
-    default: return 60
-  }
-}
-
-function getUserFitnessLevel(activityLevel: string): "beginner" | "intermediate" | "advanced" {
-  switch(activityLevel) {
+function determineUserLevel(activityLevel: string) {
+  switch (activityLevel.toLowerCase()) {
     case 'sedentary':
     case 'light':
-      return 'beginner'
+      return 'beginner';
     case 'moderate':
-      return 'intermediate'
+      return 'intermediate';
     case 'intense':
-      return 'advanced'
+      return 'advanced';
     default:
-      return 'beginner'
+      return 'beginner';
   }
 }
 
-function getEndDate(days: number): string {
-  const date = new Date()
-  date.setDate(date.getDate() + days)
-  return date.toISOString().split('T')[0]
+function generateWorkoutSessions(exercises: any[], preferences: any) {
+  const numberOfDays = 3 // Definir para 3 dias por semana
+  const sessions = []
+
+  for (let day = 1; day <= numberOfDays; day++) {
+    // Filtrar exercícios com base no tipo preferido
+    const preferredExercises = exercises.filter(exercise =>
+      preferences.preferred_exercise_types.includes(exercise.type)
+    )
+
+    // Selecionar aleatoriamente 3-4 exercícios para cada sessão
+    const selectedExercises = []
+    const numberOfExercises = Math.floor(Math.random() * 2) + 3 // 3 ou 4 exercícios
+    for (let i = 0; i < numberOfExercises; i++) {
+      if (preferredExercises.length > 0) {
+        const randomIndex = Math.floor(Math.random() * preferredExercises.length)
+        selectedExercises.push(preferredExercises[randomIndex])
+        preferredExercises.splice(randomIndex, 1) // Remover para evitar duplicação
+      }
+    }
+
+    // Criar detalhes da sessão
+    sessions.push({
+      day_number: day,
+      warmup_description: '5 minutos de aquecimento leve, como polichinelos e alongamentos dinâmicos',
+      cooldown_description: '5 minutos de alongamentos estáticos, focando nos músculos trabalhados',
+      exercises: selectedExercises.map(exercise => ({
+        name: exercise.name,
+        sets: 3,
+        reps: 10,
+        rest_time_seconds: 60,
+        gifUrl: exercise.gif_url,
+        notes: exercise.description
+      }))
+    })
+  }
+
+  return sessions
+}
+
+function getEndDate(days: number) {
+  const today = new Date()
+  const endDate = new Date(today.setDate(today.getDate() + days))
+  return endDate.toISOString()
 }
