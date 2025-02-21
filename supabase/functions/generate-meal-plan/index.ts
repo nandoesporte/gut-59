@@ -1,149 +1,176 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
-import { analyzeMealPlan } from './meal-analyzer.ts';
-import { optimizeMeal } from './meal-optimizer.ts';
-import { generateRecommendations } from './recommendations.ts';
-import { calculateDailyMacros } from './calculators.ts';
-import { validatePlanData } from './validator.ts';
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Content-Type': 'application/json'
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { 
+      status: 204,
+      headers: corsHeaders 
+    });
   }
 
   try {
     const { userData, selectedFoods, dietaryPreferences } = await req.json();
+    
+    console.log('Starting meal plan generation with input:', {
+      userData,
+      selectedFoods: selectedFoods.length,
+      dietaryPreferences
+    });
 
-    // Validação inicial dos dados recebidos
-    if (!userData || !selectedFoods || !dietaryPreferences) {
-      console.error('Dados inválidos recebidos:', { userData, selectedFoods, dietaryPreferences });
-      return new Response(
-        JSON.stringify({ error: 'Dados inválidos ou incompletos' }),
-        { 
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
+    const openAIKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openAIKey) {
+      throw new Error('OpenAI API key not configured');
     }
 
-    const mealPlans = [];
+    const systemPrompt = `You are a nutrition expert. Create a daily meal plan in Portuguese using ONLY the provided foods.
+    Return ONLY a valid JSON object with this exact structure, no markdown or extra text:
+    {
+      "dailyPlan": {
+        "breakfast": {
+          "description": "string",
+          "foods": [{"name": "string", "portion": number, "unit": "string", "details": "string"}],
+          "calories": number,
+          "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number}
+        },
+        "morningSnack": {
+          "description": "string",
+          "foods": [{"name": "string", "portion": number, "unit": "string", "details": "string"}],
+          "calories": number,
+          "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number}
+        },
+        "lunch": {
+          "description": "string",
+          "foods": [{"name": "string", "portion": number, "unit": "string", "details": "string"}],
+          "calories": number,
+          "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number}
+        },
+        "afternoonSnack": {
+          "description": "string",
+          "foods": [{"name": "string", "portion": number, "unit": "string", "details": "string"}],
+          "calories": number,
+          "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number}
+        },
+        "dinner": {
+          "description": "string",
+          "foods": [{"name": "string", "portion": number, "unit": "string", "details": "string"}],
+          "calories": number,
+          "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number}
+        }
+      },
+      "totalNutrition": {
+        "calories": number,
+        "protein": number,
+        "carbs": number,
+        "fats": number,
+        "fiber": number
+      },
+      "recommendations": {
+        "general": "string",
+        "preworkout": "string",
+        "postworkout": "string",
+        "timing": ["string"]
+      }
+    }`;
 
-    // Gerar 3 planos diferentes
-    for (let i = 0; i < 3; i++) {
-      console.log(`Gerando plano ${i + 1}...`);
+    const userPrompt = `Create a meal plan with:
+    Target Calories: ${userData.dailyCalories}kcal
+    Profile: ${userData.age} years, ${userData.gender}, ${userData.weight}kg
+    Goal: ${userData.goal}
+    Available Foods: ${selectedFoods.map(f => `${f.name} (${f.calories}kcal/100g, P:${f.protein}g, C:${f.carbs}g, F:${f.fats}g)`).join(', ')}
+    Dietary Restrictions: ${dietaryPreferences.dietaryRestrictions?.join(', ') || 'None'}
+    Allergies: ${dietaryPreferences.allergies?.join(', ') || 'None'}
+    Training Time: ${dietaryPreferences.trainingTime || 'Not specified'}
+
+    Important: Return ONLY the JSON object, no additional text or markdown formatting.`;
+
+    console.log('Sending request to OpenAI...');
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 2000
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('OpenAI Error:', errorText);
+      throw new Error('Failed to generate meal plan');
+    }
+
+    const data = await response.json();
+    console.log('Received response from OpenAI');
+
+    if (!data.choices?.[0]?.message?.content) {
+      console.error('Invalid OpenAI response:', data);
+      throw new Error('Invalid model response');
+    }
+
+    try {
+      // Remove any potential markdown formatting
+      const content = data.choices[0].message.content.replace(/```json\n?|\n?```/g, '').trim();
+      console.log('Parsing content:', content);
       
-      const dailyCalories = userData.dailyCalories;
-      const { protein, carbs, fats } = calculateDailyMacros(dailyCalories, userData.goal);
+      const mealPlan = JSON.parse(content);
+      console.log('Successfully parsed meal plan');
 
-      try {
-        const dailyPlan = await optimizeMeal({
-          selectedFoods,
-          dailyCalories,
-          targetMacros: { protein, carbs, fats },
-          preferences: dietaryPreferences,
-          trainingTime: dietaryPreferences.trainingTime,
-          variation: i
-        });
+      // Validate structure
+      const requiredMeals = ['breakfast', 'morningSnack', 'lunch', 'afternoonSnack', 'dinner'];
+      const hasDailyPlan = mealPlan.dailyPlan && typeof mealPlan.dailyPlan === 'object';
+      const hasAllMeals = requiredMeals.every(meal => 
+        mealPlan.dailyPlan[meal] && 
+        Array.isArray(mealPlan.dailyPlan[meal].foods) &&
+        typeof mealPlan.dailyPlan[meal].calories === 'number' &&
+        typeof mealPlan.dailyPlan[meal].macros === 'object'
+      );
+      const hasTotalNutrition = mealPlan.totalNutrition && typeof mealPlan.totalNutrition === 'object';
+      const hasRecommendations = mealPlan.recommendations && typeof mealPlan.recommendations === 'object';
 
-        const mealPlanAnalysis = analyzeMealPlan(dailyPlan);
-        const recommendations = generateRecommendations({
-          mealPlan: { dailyPlan, totalNutrition: { calories: 0, protein: 0, carbs: 0, fats: 0 }, recommendations: [] },
-          userGoal: userData.goal,
-          trainingTime: dietaryPreferences.trainingTime,
-          analysis: mealPlanAnalysis
-        });
-
-        const totalNutrition = {
-          calories: Object.values(dailyPlan).reduce((total, meal) => total + (meal?.calories || 0), 0),
-          protein: Object.values(dailyPlan).reduce((total, meal) => total + (meal?.macros.protein || 0), 0),
-          carbs: Object.values(dailyPlan).reduce((total, meal) => total + (meal?.macros.carbs || 0), 0),
-          fats: Object.values(dailyPlan).reduce((total, meal) => total + (meal?.macros.fats || 0), 0),
-          fiber: Object.values(dailyPlan).reduce((total, meal) => total + (meal?.macros.fiber || 0), 0)
-        };
-
-        const planData = {
-          dailyPlan,
-          totalNutrition,
-          recommendations
-        };
-
-        // Validar o plano gerado
-        const validationError = validatePlanData(planData);
-        if (validationError) {
-          console.error(`Erro na validação do plano ${i + 1}:`, validationError);
-          continue;
-        }
-
-        console.log(`Plano ${i + 1} gerado com sucesso`);
-
-        // Salvar o plano no banco de dados
-        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-        const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-        const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
-
-        const { data, error } = await supabase
-          .from('meal_plans')
-          .insert({
-            user_id: userData.userId,
-            plan_data: planData,
-            calories: dailyCalories,
-            dietary_preferences: dietaryPreferences,
-            active: false
-          })
-          .select()
-          .single();
-
-        if (error) {
-          console.error(`Erro ao salvar plano ${i + 1}:`, error);
-          continue;
-        }
-
-        mealPlans.push(data);
-
-      } catch (planError) {
-        console.error(`Erro ao gerar plano ${i + 1}:`, planError);
-        continue;
+      if (!hasDailyPlan || !hasAllMeals || !hasTotalNutrition || !hasRecommendations) {
+        console.error('Validation failed:', { hasDailyPlan, hasAllMeals, hasTotalNutrition, hasRecommendations });
+        throw new Error('Invalid meal plan structure');
       }
-    }
 
-    if (mealPlans.length === 0) {
       return new Response(
-        JSON.stringify({ error: 'Não foi possível gerar nenhum plano alimentar válido' }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        JSON.stringify(mealPlan),
+        { 
+          status: 200, 
+          headers: corsHeaders 
         }
       );
+
+    } catch (error) {
+      console.error('Error processing meal plan:', error);
+      throw new Error(`Failed to process meal plan: ${error.message}`);
     }
-
-    console.log(`${mealPlans.length} planos gerados com sucesso`);
-
-    return new Response(
-      JSON.stringify(mealPlans),
-      {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    );
 
   } catch (error) {
-    console.error('Erro ao gerar planos:', error);
+    console.error('Edge function error:', error);
     return new Response(
       JSON.stringify({ 
-        error: error.message || 'Erro interno ao gerar planos alimentares',
-        details: error
-      }),
-      {
+        error: error.message || 'Internal server error'
+      }), 
+      { 
         status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: corsHeaders 
       }
     );
   }

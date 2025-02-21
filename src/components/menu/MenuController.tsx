@@ -103,7 +103,7 @@ export const useMenuController = () => {
         return;
       }
 
-      console.log('Chamando edge function com:', {
+      console.log('Calling edge function with:', {
         userData,
         selectedFoodsDetails,
         dietaryPreference
@@ -151,21 +151,39 @@ export const useMenuController = () => {
         throw new Error(generateError.message || 'Falha ao gerar cardápio');
       }
 
-      if (!mealPlanData || !Array.isArray(mealPlanData) || mealPlanData.length === 0) {
-        throw new Error('Nenhum plano alimentar válido foi gerado');
+      if (!mealPlanData) {
+        throw new Error('Nenhum dado recebido do gerador de cardápio');
       }
 
-      // Validate meal plan data structure for each plan
-      for (const plan of mealPlanData) {
-        if (!plan.plan_data?.dailyPlan || !plan.plan_data?.totalNutrition || !plan.plan_data?.recommendations) {
-          console.error('Invalid meal plan structure:', plan);
-          throw new Error('Estrutura inválida do plano alimentar');
-        }
+      // Validate meal plan data structure
+      if (!mealPlanData.dailyPlan || !mealPlanData.totalNutrition || !mealPlanData.recommendations) {
+        console.error('Invalid meal plan structure:', mealPlanData);
+        throw new Error('Estrutura inválida do plano alimentar');
       }
 
+      // Set the meal plan state first
+      setMealPlan(mealPlanData);
+
+      // Then save to the database
+      const { error: saveError } = await supabase
+        .from('meal_plans')
+        .insert({
+          user_id: userData.user.id,
+          plan_data: mealPlanData,
+          calories: calorieNeeds,
+          active: true,
+          dietary_preferences: dietaryPreference
+        });
+
+      if (saveError) {
+        console.error('Erro ao salvar cardápio:', saveError);
+        throw new Error('Falha ao salvar cardápio');
+      }
+
+      // Only change step after meal plan is set and saved
       setCurrentStep(4);
       toast.dismiss(toastId);
-      toast.success("Cardápios personalizados gerados com sucesso!");
+      toast.success("Cardápio personalizado gerado com sucesso!");
 
     } catch (error) {
       console.error('Erro completo:', error);

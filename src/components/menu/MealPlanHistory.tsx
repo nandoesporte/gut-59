@@ -19,7 +19,6 @@ interface MealPlanHistoryProps {
     created_at: string;
     plan_data: MealPlan;
     calories: number;
-    active: boolean;
   }>;
   onRefresh: () => Promise<void> | void;
 }
@@ -69,9 +68,7 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
         return;
       }
 
-      const toastId = toast.loading("Selecionando plano alimentar...");
-
-      // Primeiro, desativa todos os planos do usuário
+      // Primeiro, desativa todos os planos
       await supabase
         .from('meal_plans')
         .update({ active: false })
@@ -84,14 +81,10 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
         .eq('id', planId);
 
       if (error) {
-        toast.dismiss(toastId);
-        toast.error("Erro ao selecionar plano alimentar");
         throw error;
       }
 
-      toast.dismiss(toastId);
       toast.success("Plano alimentar selecionado com sucesso!");
-      
       await onRefresh();
       
     } catch (error) {
@@ -150,54 +143,21 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
     }
   };
 
-  // Filtra para mostrar apenas os 3 planos mais recentes se estiverem todos com active = false
-  // Ou mostra o plano ativo + histórico se houver um plano ativo
-  const plansToShow = historyPlans?.reduce((acc, plan) => {
-    if (!plan.plan_data?.dailyPlan || !plan.plan_data?.totalNutrition || !plan.plan_data?.recommendations) {
-      console.warn('Plano com estrutura inválida:', plan);
-      return acc;
-    }
-
-    if (plan.active) {
-      // Se houver um plano ativo, ele vai primeiro
-      return [plan, ...acc];
-    } else if (acc.length < 3) {
-      // Se não tivermos 3 planos ainda e o plano não for ativo, adiciona
-      return [...acc, plan];
-    }
-    return acc;
-  }, [] as typeof historyPlans extends undefined ? undefined : NonNullable<typeof historyPlans>) || [];
-
-  if (plansToShow.length === 0) {
-    return (
-      <Card className="p-4 text-center text-gray-500">
-        Nenhum plano alimentar válido encontrado.
-      </Card>
-    );
-  }
+  // Filtra apenas os planos mais recentes (últimos 3)
+  const recentPlans = historyPlans?.slice(0, 3);
 
   return (
     <div className="space-y-4">
-      <h2 className="text-2xl font-semibold mb-4">
-        {plansToShow.some(p => p.active) ? 'Plano Atual e Histórico' : 'Opções de Planos Alimentares'}
-      </h2>
-      
+      <h2 className="text-2xl font-semibold mb-4">Opções de Planos Alimentares</h2>
       <div className="grid gap-4 md:grid-cols-3">
-        {plansToShow.map((plan, index) => (
+        {recentPlans?.map((plan, index) => (
           <Collapsible key={plan.id} className="w-full">
-            <Card className={`h-full ${plan.active ? 'ring-2 ring-green-500' : ''}`}>
+            <Card className="h-full">
               <CollapsibleTrigger className="w-full">
                 <CardHeader className="p-4 md:p-6">
                   <div>
-                    <h4 className="text-md font-medium flex items-center gap-2">
-                      {plan.active ? (
-                        <>
-                          <ThumbsUp className="w-4 h-4 text-green-500" />
-                          Plano Atual
-                        </>
-                      ) : (
-                        `Opção ${index + 1}`
-                      )}
+                    <h4 className="text-md font-medium">
+                      Opção {index + 1}
                     </h4>
                     <p className="text-sm text-gray-500">
                       {plan.calories} kcal/dia
@@ -226,19 +186,17 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
-                    {!plan.active && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSelect(plan.id);
-                        }}
-                        className="h-8 w-8 text-green-600 hover:text-green-700"
-                      >
-                        <ThumbsUp className="h-4 w-4" />
-                      </Button>
-                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelect(plan.id);
+                      }}
+                      className="h-8 w-8 text-green-600 hover:text-green-700"
+                    >
+                      <ThumbsUp className="h-4 w-4" />
+                    </Button>
                     <ChevronDown className="h-5 w-5 text-gray-500 transition-transform duration-200 ease-in-out group-data-[state=open]:rotate-180" />
                   </div>
                 </CardHeader>
@@ -248,10 +206,7 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
                 <CardContent className="p-4 md:p-6 pt-0">
                   <div ref={el => planRefs.current[plan.id] = el} className="space-y-6">
                     {plan.plan_data && plan.plan_data.dailyPlan && Object.entries(plan.plan_data.dailyPlan).map(([mealType, meal]) => {
-                      if (!meal || !meal.foods || !meal.macros) {
-                        console.warn(`Refeição inválida no plano ${plan.id}, tipo: ${mealType}`, meal);
-                        return null;
-                      }
+                      if (!meal) return null;
                       return (
                         <MealSection
                           key={mealType}
@@ -276,6 +231,12 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
           </Collapsible>
         ))}
       </div>
+      
+      {(!historyPlans || historyPlans.length === 0) && (
+        <Card className="p-4 text-center text-gray-500">
+          Nenhum plano alimentar gerado ainda.
+        </Card>
+      )}
     </div>
   );
 };

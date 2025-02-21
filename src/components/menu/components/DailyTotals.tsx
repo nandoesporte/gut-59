@@ -7,7 +7,7 @@ interface DailyTotalsProps {
     protein: number;
     carbs: number;
     fats: number;
-    fiber?: number;
+    fiber: number;
   };
 }
 
@@ -21,7 +21,7 @@ export const DailyTotals = ({ totalNutrition }: DailyTotalsProps) => {
             <div>Proteínas: {totalNutrition.protein}g</div>
             <div>Carboidratos: {totalNutrition.carbs}g</div>
             <div>Gorduras: {totalNutrition.fats}g</div>
-            <div>Fibras: {totalNutrition.fiber || 0}g</div>
+            <div>Fibras: {totalNutrition.fiber}g</div>
           </div>
           <div className="mt-4">
             <MacroDistributionBar

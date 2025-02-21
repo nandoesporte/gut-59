@@ -1,82 +1,128 @@
 
-import type { MealPlan } from './types.ts';
-import Ajv from 'https://esm.sh/ajv@8.12.0';
+import Ajv from "https://esm.sh/ajv@8.12.0";
 
 const ajv = new Ajv();
 
-const mealSchema = {
-  type: 'object',
-  properties: {
-    foods: {
-      type: 'array',
-      items: {
-        type: 'object',
-        required: ['id', 'name', 'calories', 'protein', 'carbs', 'fats', 'portion', 'portionUnit'],
-        properties: {
-          id: { type: 'string' },
-          name: { type: 'string' },
-          calories: { type: 'number' },
-          protein: { type: 'number' },
-          carbs: { type: 'number' },
-          fats: { type: 'number' },
-          portion: { type: 'number' },
-          portionUnit: { type: 'string' }
-        }
-      }
-    },
-    calories: { type: 'number' },
-    macros: {
-      type: 'object',
-      required: ['protein', 'carbs', 'fats'],
-      properties: {
-        protein: { type: 'number' },
-        carbs: { type: 'number' },
-        fats: { type: 'number' },
-        fiber: { type: 'number' }
-      }
-    }
-  },
-  required: ['foods', 'calories', 'macros'],
-  additionalProperties: false
-};
-
-const mealPlanSchema = {
-  type: 'object',
+export const mealPlanSchema = {
+  type: "object",
+  required: ["dailyPlan", "totalNutrition", "recommendations"],
   properties: {
     dailyPlan: {
-      type: 'object',
+      type: "object",
+      required: ["breakfast", "morningSnack", "lunch", "afternoonSnack", "dinner"],
       properties: {
-        breakfast: mealSchema,
-        morningSnack: mealSchema,
-        lunch: mealSchema,
-        afternoonSnack: mealSchema,
-        dinner: mealSchema
-      }
+        breakfast: { $ref: "#/definitions/meal" },
+        morningSnack: { $ref: "#/definitions/meal" },
+        lunch: { $ref: "#/definitions/meal" },
+        afternoonSnack: { $ref: "#/definitions/meal" },
+        dinner: { $ref: "#/definitions/meal" }
+      },
+      additionalProperties: false
     },
     totalNutrition: {
-      type: 'object',
-      required: ['calories', 'protein', 'carbs', 'fats'],
+      type: "object",
+      required: ["calories", "protein", "carbs", "fats", "fiber"],
       properties: {
-        calories: { type: 'number' },
-        protein: { type: 'number' },
-        carbs: { type: 'number' },
-        fats: { type: 'number' },
-        fiber: { type: 'number' }
-      }
+        calories: { type: "number", minimum: 0 },
+        protein: { type: "number", minimum: 0 },
+        carbs: { type: "number", minimum: 0 },
+        fats: { type: "number", minimum: 0 },
+        fiber: { type: "number", minimum: 0 }
+      },
+      additionalProperties: false
     },
     recommendations: {
-      type: 'array',
-      items: { type: 'string' }
+      type: "object",
+      required: ["general", "preworkout", "postworkout", "timing"],
+      properties: {
+        general: { type: "string", minLength: 1 },
+        preworkout: { type: "string", minLength: 1 },
+        postworkout: { type: "string", minLength: 1 },
+        timing: {
+          type: "array",
+          items: { type: "string" },
+          minItems: 5,
+          maxItems: 5
+        }
+      },
+      additionalProperties: false
     }
   },
-  required: ['dailyPlan', 'totalNutrition', 'recommendations'],
+  definitions: {
+    meal: {
+      type: "object",
+      required: ["description", "foods", "calories", "macros"],
+      properties: {
+        description: { type: "string", minLength: 1 },
+        foods: {
+          type: "array",
+          items: {
+            type: "object",
+            required: ["name", "portion", "unit", "details"],
+            properties: {
+              name: { type: "string", minLength: 1 },
+              portion: { type: "number", minimum: 0 },
+              unit: { 
+                type: "string",
+                enum: ["g", "ml", "unidade", "unidades", "xícara", "xícaras", "colher", "colheres", "fatia", "fatias"]
+              },
+              details: { type: "string", minLength: 1 }
+            },
+            additionalProperties: false
+          },
+          minItems: 1
+        },
+        calories: { type: "number", minimum: 0 },
+        macros: {
+          type: "object",
+          required: ["protein", "carbs", "fats", "fiber"],
+          properties: {
+            protein: { type: "number", minimum: 0 },
+            carbs: { type: "number", minimum: 0 },
+            fats: { type: "number", minimum: 0 },
+            fiber: { type: "number", minimum: 0 }
+          },
+          additionalProperties: false
+        }
+      },
+      additionalProperties: false
+    }
+  },
   additionalProperties: false
 };
 
-export function validatePlanData(data: unknown): string | null {
+export const validateMealPlan = (data: unknown) => {
   const validate = ajv.compile(mealPlanSchema);
-  if (!validate(data)) {
-    return validate.errors?.[0]?.message || 'Erro de validação desconhecido';
+  const isValid = validate(data);
+  
+  if (!isValid) {
+    const errors = validate.errors?.map(err => ({
+      path: err.instancePath,
+      message: err.message
+    }));
+    throw new Error(`Validação falhou: ${JSON.stringify(errors, null, 2)}`);
   }
-  return null;
-}
+  
+  return data;
+};
+
+export const standardizeUnits = (unit: string): string => {
+  const unitMap: Record<string, string> = {
+    'grama': 'g',
+    'gramas': 'g',
+    'mililitro': 'ml',
+    'mililitros': 'ml',
+    'un': 'unidade',
+    'uns': 'unidades',
+    'und': 'unidade',
+    'unds': 'unidades',
+    'xic': 'xícara',
+    'xics': 'xícaras',
+    'col': 'colher',
+    'cols': 'colheres',
+    'ft': 'fatia',
+    'fts': 'fatias'
+  };
+
+  return unitMap[unit.toLowerCase()] || unit;
+};

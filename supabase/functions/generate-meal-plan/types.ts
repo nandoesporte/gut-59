@@ -1,4 +1,11 @@
 
+export interface MacroTargets {
+  protein: number;
+  carbs: number;
+  fats: number;
+  fiber: number;
+}
+
 export interface Food {
   id: string;
   name: string;
@@ -6,47 +13,39 @@ export interface Food {
   protein: number;
   carbs: number;
   fats: number;
-  portion?: number;
-  portionUnit?: string;
-  food_group_id?: number;
+  fiber: number;
+  food_group_id: number;
+  serving_size: number;
+  serving_unit: string;
+  meal_type?: string[];
+  nutritional_category?: string[];
 }
 
 export interface FoodWithPortion extends Food {
   portion: number;
   portionUnit: string;
-}
-
-export interface MacroTargets {
-  protein: number;
-  carbs: number;
-  fats: number;
-}
-
-export interface Meal {
-  foods: FoodWithPortion[];
-  calories: number;
-  macros: {
-    protein: number;
-    carbs: number;
-    fats: number;
-    fiber?: number;
-  };
-}
-
-export interface MealPlan {
-  dailyPlan: {
-    breakfast?: Meal;
-    morningSnack?: Meal;
-    lunch?: Meal;
-    afternoonSnack?: Meal;
-    dinner?: Meal;
-  };
-  totalNutrition: {
+  calculatedNutrients: {
     calories: number;
     protein: number;
     carbs: number;
     fats: number;
-    fiber?: number;
+    fiber: number;
   };
-  recommendations: string[];
+}
+
+export interface MealPlanResult {
+  breakfast: FoodWithPortion[];
+  morning_snack: FoodWithPortion[];
+  lunch: FoodWithPortion[];
+  afternoon_snack: FoodWithPortion[];
+  dinner: FoodWithPortion[];
+  nutritionalAnalysis: {
+    totalCalories: number;
+    macroDistribution: {
+      protein: number;
+      carbs: number;
+      fats: number;
+      fiber: number;
+    };
+  };
 }

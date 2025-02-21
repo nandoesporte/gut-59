@@ -30,15 +30,15 @@ export interface MealFood {
 }
 
 export interface Meal {
+  description: string;
   foods: MealFood[];
   calories: number;
   macros: {
     protein: number;
     carbs: number;
     fats: number;
-    fiber?: number;
+    fiber: number;
   };
-  description?: string;
 }
 
 export interface DietaryPreferences {
@@ -50,23 +50,23 @@ export interface DietaryPreferences {
 
 export interface MealPlan {
   dailyPlan: {
-    breakfast?: Meal;
-    morningSnack?: Meal;
-    lunch?: Meal;
-    afternoonSnack?: Meal;
-    dinner?: Meal;
+    breakfast: Meal;
+    morningSnack: Meal;
+    lunch: Meal;
+    afternoonSnack: Meal;
+    dinner: Meal;
   };
   totalNutrition: {
     calories: number;
     protein: number;
     carbs: number;
     fats: number;
-    fiber?: number;
+    fiber: number;
   };
   recommendations: {
-    general?: string;
-    preworkout?: string;
-    postworkout?: string;
-    timing?: string[];
+    general: string;
+    preworkout: string;
+    postworkout: string;
+    timing: string[];
   };
 }

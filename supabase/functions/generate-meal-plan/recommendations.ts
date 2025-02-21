@@ -1,86 +1,105 @@
-import type { MealPlan } from './types.ts';
 
 interface HealthRecommendations {
   [key: string]: {
-    conditions: (plan: MealPlan) => boolean;
-    message: string;
+    avoid: string[];
+    prefer: string[];
+    timing: string[];
+    general: string;
   };
 }
 
-const HEALTH_RECOMMENDATIONS: HealthRecommendations = {
-  highProtein: {
-    conditions: (plan) => {
-      const totalCals = plan.totalNutrition.calories;
-      const proteinCals = plan.totalNutrition.protein * 4;
-      return (proteinCals / totalCals) > 0.35;
-    },
-    message: "Seu plano tem alto teor de proteína. Certifique-se de manter-se bem hidratado."
+const healthConditionRecommendations: HealthRecommendations = {
+  hipertensao: {
+    avoid: ["alimentos ricos em sódio", "alimentos processados", "embutidos"],
+    prefer: ["vegetais folhosos", "frutas", "grãos integrais", "proteínas magras"],
+    timing: [
+      "Distribua as refeições em 5-6 vezes ao dia",
+      "Evite grandes refeições à noite"
+    ],
+    general: "Mantenha uma dieta baixa em sódio e rica em potássio, magnésio e cálcio. Priorize alimentos naturais e evite processados."
   },
-  excessiveFat: {
-    conditions: (plan) => {
-      const totalCals = plan.totalNutrition.calories;
-      const fatCals = plan.totalNutrition.fats * 9;
-      return (fatCals / totalCals) > 0.35;
-    },
-    message: "Seu plano tem alto teor de gordura. Considere ajustar as fontes de gordura para opções mais saudáveis."
+  diabetes: {
+    avoid: ["açúcares simples", "carboidratos refinados", "bebidas açucaradas"],
+    prefer: ["proteínas magras", "gorduras boas", "fibras", "vegetais"],
+    timing: [
+      "Mantenha horários regulares para as refeições",
+      "Não pule refeições para evitar picos de glicose"
+    ],
+    general: "Foque em alimentos com baixo índice glicêmico e ricos em fibras. Monitore a ingestão de carboidratos ao longo do dia."
   },
-  lowCarb: {
-    conditions: (plan) => {
-      const totalCals = plan.totalNutrition.calories;
-      const carbCals = plan.totalNutrition.carbs * 4;
-      return (carbCals / totalCals) < 0.3;
-    },
-    message: "Seu plano tem baixo teor de carboidratos. Avalie se isso está alinhado com suas necessidades energéticas e nível de atividade."
-  },
-  fiberIntake: {
-    conditions: (plan) => plan.totalNutrition.fiber !== undefined && plan.totalNutrition.fiber < 25,
-    message: "Aumente o consumo de fibras para melhorar a digestão e a saciedade. Inclua mais vegetais, frutas e grãos integrais."
+  depressao_ansiedade: {
+    avoid: ["cafeína em excesso", "álcool", "açúcares refinados"],
+    prefer: ["alimentos ricos em triptofano", "ômega-3", "vitaminas do complexo B"],
+    timing: [
+      "Mantenha refeições regulares",
+      "Evite longos períodos sem se alimentar"
+    ],
+    general: "Priorize alimentos que contribuem para a produção de serotonina e outros neurotransmissores. Mantenha uma alimentação regular e equilibrada."
   }
 };
 
-export function generateRecommendations({
-  mealPlan,
-  userGoal,
-  trainingTime,
-  analysis
-}: {
-  mealPlan: MealPlan;
-  userGoal: string;
-  trainingTime: string | null;
-  analysis: string[];
-}): string[] {
-  const recommendations: string[] = [];
+export const generateTimingRecommendations = (
+  trainingTime: string | null,
+  goal: string,
+  healthCondition: string | null = null
+) => {
+  let recommendations = {
+    preworkout: "",
+    postworkout: "",
+    general: "",
+    timing: [] as string[]
+  };
 
-  // Verificar cada recomendação de saúde
-  Object.entries(HEALTH_RECOMMENDATIONS).forEach(([key, rec]) => {
-    if (rec.conditions(mealPlan)) {
-      recommendations.push(rec.message);
-    }
-  });
-
-  // Adicionar recomendações específicas do objetivo
-  switch (userGoal) {
-    case 'lose_weight':
-      recommendations.push("Mantenha um déficit calórico controlado e foque em alimentos ricos em proteína para preservar a massa muscular.");
+  // Recomendações baseadas no objetivo
+  switch (goal) {
+    case "lose":
+      recommendations.general = "Distribua as refeições em intervalos regulares para controlar o apetite e mantenha um déficit calórico moderado. Priorize alimentos ricos em proteínas e fibras para maior saciedade.";
+      recommendations.timing.push(
+        "Faça refeições a cada 3-4 horas",
+        "Evite refeições pesadas próximo ao horário de dormir"
+      );
       break;
-    case 'gain_muscle':
-      recommendations.push("Priorize refeições ricas em proteína próximas ao treino para otimizar o ganho muscular.");
+    case "maintain":
+      recommendations.general = "Mantenha uma distribuição equilibrada de macronutrientes e horários regulares de refeições para estabilizar o metabolismo.";
+      recommendations.timing.push(
+        "Distribua as calorias uniformemente ao longo do dia",
+        "Mantenha horários regulares para as refeições"
+      );
       break;
-    case 'maintain':
-      recommendations.push("Mantenha uma dieta equilibrada e ajuste as calorias conforme necessário para manter seu peso.");
+    case "gain":
+      recommendations.general = "Aumente gradualmente a ingestão calórica com foco em proteínas de qualidade e carboidratos complexos. Distribua as calorias em várias refeições ao longo do dia.";
+      recommendations.timing.push(
+        "Faça refeições a cada 2-3 horas",
+        "Inclua um lanche proteico antes de dormir"
+      );
       break;
   }
 
-  // Adicionar recomendações baseadas no horário de treino
+  // Adiciona recomendações específicas para condição de saúde
+  if (healthCondition && healthConditionRecommendations[healthCondition]) {
+    const healthRecs = healthConditionRecommendations[healthCondition];
+    recommendations.general += `\n\nConsiderando sua condição de saúde: ${healthRecs.general}`;
+    recommendations.timing = [...recommendations.timing, ...healthRecs.timing];
+  }
+
+  // Recomendações pré e pós-treino baseadas no horário de treino
   if (trainingTime) {
-    recommendations.push(`Para otimizar seu treino às ${trainingTime}, procure consumir carboidratos complexos 2-3 horas antes.`);
-  }
-
-  // Adicionar insights da análise
-  if (analysis.length > 0) {
-    recommendations.push("Sugestões de ajuste baseadas na análise do plano:");
-    recommendations.push(...analysis.map(item => `- ${item}`));
+    const trainingHour = new Date(`1970-01-01T${trainingTime}`).getHours();
+    
+    recommendations.preworkout = `Para seu treino às ${trainingTime}, consuma uma refeição leve 1-2 horas antes, ` +
+      "priorizando carboidratos de fácil digestão e proteínas magras. " +
+      "Evite alimentos muito gordurosos ou ricos em fibras próximo ao treino.";
+    
+    recommendations.postworkout = "Após o treino, consuma uma refeição com proteínas de alta qualidade e " +
+      "carboidratos para recuperação muscular e reposição de glicogênio. " +
+      "Hidrate-se bem durante todo o processo.";
+    
+    // Ajusta o timing das refeições com base no horário do treino
+    recommendations.timing.push(
+      `Faça uma refeição leve 1-2 horas antes do treino (${trainingTime})`,
+      `Consuma proteínas e carboidratos em até 1 hora após o treino`
+    );
   }
 
   return recommendations;
-}
+};
