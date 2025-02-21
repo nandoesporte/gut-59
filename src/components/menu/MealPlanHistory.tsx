@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useRef } from "react";
 import { toast } from "sonner";
 import type { MealPlan } from "./types";
+import { generateMealPlanPDF } from "./utils/pdf-generator";
 
 interface MealPlanHistoryProps {
   isLoading: boolean;
@@ -53,6 +54,22 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
     }
   };
 
+  const handleDownloadPDF = async (plan: { plan_data: MealPlan }) => {
+    const containerRef = planRefs.current[plan.id];
+    if (!containerRef) {
+      toast.error("Erro ao gerar PDF");
+      return;
+    }
+    
+    try {
+      await generateMealPlanPDF(containerRef);
+      toast.success("PDF gerado com sucesso!");
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      toast.error("Erro ao gerar PDF do plano alimentar");
+    }
+  };
+
   if (isLoading) {
     return (
       <Card className="p-6">
@@ -82,7 +99,10 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
       <div className="grid gap-4">
         {historyPlans.map((plan) => (
           <Card key={plan.id} className="p-4">
-            <div className="flex justify-between items-center">
+            <div 
+              ref={el => planRefs.current[plan.id] = el}
+              className="flex justify-between items-center"
+            >
               <div>
                 <p className="font-medium">
                   Plano Alimentar - {new Date(plan.created_at).toLocaleDateString()}
@@ -99,7 +119,11 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
                 >
                   <Trash2 className="w-4 h-4" />
                 </Button>
-                <Button variant="outline" size="sm">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => handleDownloadPDF(plan)}
+                >
                   <FileText className="w-4 h-4" />
                 </Button>
               </div>
