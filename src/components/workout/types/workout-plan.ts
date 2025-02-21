@@ -5,6 +5,12 @@ export interface Exercise {
   reps: number;
   rest_time_seconds: number;
   gifUrl?: string;
+  weight_recommendation?: {
+    beginner: string;
+    intermediate: string;
+    advanced: string;
+  };
+  notes?: string;
 }
 
 export interface WorkoutSession {
@@ -21,4 +27,5 @@ export interface WorkoutPlan {
   start_date: string;
   end_date: string;
   workout_sessions: WorkoutSession[];
+  user_fitness_level: "beginner" | "intermediate" | "advanced";
 }

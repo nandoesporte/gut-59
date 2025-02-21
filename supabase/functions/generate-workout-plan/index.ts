@@ -1,217 +1,187 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { corsHeaders } from '../_shared/cors.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+interface WorkoutPreferences {
+  age: number;
+  weight: number;
+  height: number;
+  gender: "male" | "female";
+  goal: "lose_weight" | "maintain" | "gain_mass";
+  activity_level: "sedentary" | "light" | "moderate" | "intense";
+  preferred_exercise_types: string[];
+  available_equipment: string[];
+  health_conditions?: string[];
+}
+
+const calculateFitnessLevel = (preferences: WorkoutPreferences): "beginner" | "intermediate" | "advanced" => {
+  const { activity_level } = preferences;
+  
+  switch (activity_level) {
+    case "intense":
+      return "advanced";
+    case "moderate":
+      return "intermediate";
+    default:
+      return "beginner";
+  }
 };
 
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const determineWeightRecommendation = (
+  exercise: any, 
+  userWeight: number, 
+  gender: string,
+  fitnessLevel: string
+) => {
+  // Base multipliers for different fitness levels
+  const levelMultipliers = {
+    beginner: 0.4,
+    intermediate: 0.6,
+    advanced: 0.8
+  };
 
-const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+  // Gender adjustment factor
+  const genderFactor = gender === 'female' ? 0.8 : 1;
+
+  // Exercise type specific base weights (as percentage of body weight)
+  const exerciseBaseWeights: { [key: string]: number } = {
+    "squat": 1,
+    "deadlift": 1.2,
+    "bench_press": 0.8,
+    "shoulder_press": 0.4,
+    "row": 0.6,
+    "lunges": 0.3,
+    // Add more exercises as needed
+  };
+
+  const baseWeight = exerciseBaseWeights[exercise.name.toLowerCase()] || 0.3;
+  const multiplier = levelMultipliers[fitnessLevel as keyof typeof levelMultipliers];
+
+  const recommendedWeight = Math.round(userWeight * baseWeight * multiplier * genderFactor);
+
+  // Format weight recommendations based on fitness level
+  return {
+    beginner: `${Math.round(recommendedWeight * 0.7)}kg - ${recommendedWeight}kg`,
+    intermediate: `${recommendedWeight}kg - ${Math.round(recommendedWeight * 1.2)}kg`,
+    advanced: `${Math.round(recommendedWeight * 1.2)}kg - ${Math.round(recommendedWeight * 1.5)}kg`
+  };
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const { preferences, userId } = await req.json();
+    const { preferences, userId } = await req.json()
 
     if (!preferences || !userId) {
-      throw new Error('Preferências ou ID do usuário não fornecidos');
+      throw new Error('Missing required parameters')
     }
 
-    console.log('Buscando exercícios com preferências:', preferences);
+    console.log("Received preferences:", preferences)
 
-    let query = supabase
+    // Initialize Supabase client
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+
+    // Fetch user data to get their current fitness profile
+    const { data: userPreferences, error: userError } = await supabaseClient
+      .from('user_workout_preferences')
+      .select('*')
+      .eq('user_id', userId)
+      .single()
+
+    if (userError) {
+      throw new Error(`Error fetching user preferences: ${userError.message}`)
+    }
+
+    // Determine user's fitness level
+    const fitnessLevel = calculateFitnessLevel(preferences)
+    console.log("Calculated fitness level:", fitnessLevel)
+
+    // Fetch appropriate exercises based on preferences and equipment
+    const { data: exercises, error: exercisesError } = await supabaseClient
       .from('exercises')
       .select('*')
-      .in('exercise_type', preferences.preferred_exercise_types);
-
-    if (!preferences.available_equipment.includes('all')) {
-      query = query.contains('equipment_needed', preferences.available_equipment);
-    }
-
-    const { data: exercises, error: exercisesError } = await query;
+      .in('exercise_type', preferences.preferred_exercise_types)
+      .order('created_at')
 
     if (exercisesError) {
-      console.error('Erro ao buscar exercícios:', exercisesError);
-      throw new Error('Erro ao buscar exercícios');
+      throw new Error(`Error fetching exercises: ${exercisesError.message}`)
     }
 
-    if (!exercises || exercises.length === 0) {
-      console.error('Nenhum exercício encontrado para as preferências:', preferences);
-      throw new Error('Nenhum exercício encontrado para as preferências selecionadas');
-    }
+    console.log(`Found ${exercises.length} suitable exercises`)
 
-    console.log(`Encontrados ${exercises.length} exercícios compatíveis`);
+    // Create workout sessions
+    const workoutSessions = Array.from({ length: 3 }, (_, i) => {
+      const dayExercises = exercises
+        .filter(ex => preferences.available_equipment.includes('all') || 
+                     !ex.equipment_needed || 
+                     ex.equipment_needed.some((eq: string) => preferences.available_equipment.includes(eq)))
+        .slice(i * 4, (i + 1) * 4)
+        .map(exercise => ({
+          name: exercise.name,
+          sets: Math.min(Math.max(3, exercise.min_sets), exercise.max_sets),
+          reps: Math.min(Math.max(8, exercise.min_reps), exercise.max_reps),
+          rest_time_seconds: exercise.rest_time_seconds,
+          gifUrl: exercise.gif_url,
+          weight_recommendation: determineWeightRecommendation(
+            exercise,
+            preferences.weight,
+            preferences.gender,
+            fitnessLevel
+          ),
+          notes: exercise.description
+        }));
 
-    // Primeiro, criar o plano de treino
-    const { data: workoutPlan, error: planError } = await supabase
-      .from('workout_plans')
-      .insert({
-        user_id: userId,
-        goal: preferences.goal,
-        start_date: new Date().toISOString().split('T')[0], // Formato YYYY-MM-DD
-        end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-      })
-      .select()
-      .single();
-
-    if (planError) {
-      console.error('Erro ao criar plano:', planError);
-      throw new Error('Erro ao criar plano de treino');
-    }
-
-    console.log('Plano criado:', workoutPlan);
-
-    // Depois, criar as sessões de treino
-    const sessions = generateWorkoutSessions(exercises, preferences);
-    const sessionsToInsert = sessions.map(session => ({
-      plan_id: workoutPlan.id,
-      day_number: session.day_number,
-      warmup_description: session.warmup_description,
-      cooldown_description: session.cooldown_description
-    }));
-
-    const { data: workoutSessions, error: sessionsError } = await supabase
-      .from('workout_sessions')
-      .insert(sessionsToInsert)
-      .select();
-
-    if (sessionsError) {
-      console.error('Erro ao criar sessões:', sessionsError);
-      throw new Error('Erro ao criar sessões de treino');
-    }
-
-    console.log('Sessões criadas:', workoutSessions);
-
-    // Criar os exercícios para cada sessão
-    for (let i = 0; i < workoutSessions.length; i++) {
-      const sessionExercises = sessions[i].exercises.map(exercise => ({
-        session_id: workoutSessions[i].id,
-        exercise_id: exercise.id,
-        sets: exercise.sets,
-        reps: exercise.reps,
-        rest_time_seconds: exercise.rest_time_seconds,
-        order_in_session: 1
-      }));
-
-      const { error: exercisesInsertError } = await supabase
-        .from('session_exercises')
-        .insert(sessionExercises);
-
-      if (exercisesInsertError) {
-        console.error('Erro ao inserir exercícios da sessão:', exercisesInsertError);
-        throw new Error('Erro ao inserir exercícios da sessão');
-      }
-    }
-
-    // Montar o objeto de resposta completo
-    const completePlan = {
-      ...workoutPlan,
-      workout_sessions: sessions
-    };
-
-    return new Response(JSON.stringify(completePlan), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
+      return {
+        day_number: i + 1,
+        warmup_description: "5-10 minutos de aquecimento cardio leve seguido por exercícios de mobilidade",
+        cooldown_description: "5 minutos de alongamento para os grupos musculares trabalhados",
+        exercises: dayExercises
+      };
     });
 
-  } catch (error) {
-    console.error('Erro na edge function:', error);
+    // Create the workout plan
+    const workoutPlan = {
+      id: crypto.randomUUID(),
+      user_id: userId,
+      goal: preferences.goal,
+      start_date: new Date().toISOString(),
+      end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      workout_sessions: workoutSessions,
+      user_fitness_level: fitnessLevel
+    };
+
+    // Save the workout plan
+    const { error: saveError } = await supabaseClient
+      .from('workout_plans')
+      .insert([workoutPlan]);
+
+    if (saveError) {
+      throw new Error(`Error saving workout plan: ${saveError.message}`);
+    }
+
     return new Response(
-      JSON.stringify({ error: error.message || 'Erro interno ao gerar plano de treino' }),
+      JSON.stringify(workoutPlan),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      },
+    )
+
+  } catch (error) {
+    console.error('Error:', error.message)
+    return new Response(
+      JSON.stringify({ error: error.message }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
-      }
-    );
+      },
+    )
   }
-});
-
-function generateWorkoutSessions(exercises: any[], preferences: any) {
-  const sessionsPerWeek = getSessionsPerWeek(preferences.activity_level);
-  const sessions = [];
-
-  for (let day = 1; day <= sessionsPerWeek; day++) {
-    const session = {
-      day_number: day,
-      warmup_description: generateWarmup(),
-      cooldown_description: generateCooldown(),
-      exercises: selectExercisesForSession(exercises, preferences),
-    };
-    sessions.push(session);
-  }
-
-  return sessions;
-}
-
-function getSessionsPerWeek(activityLevel: string) {
-  switch (activityLevel) {
-    case 'sedentary': return 3;
-    case 'light': return 4;
-    case 'moderate': return 5;
-    case 'intense': return 6;
-    default: return 3;
-  }
-}
-
-function generateWarmup() {
-  return `5-10 minutos de aquecimento cardiovascular leve seguido por mobilidade articular`;
-}
-
-function generateCooldown() {
-  return `5-10 minutos de alongamento dos principais grupos musculares trabalhados`;
-}
-
-function selectExercisesForSession(exercises: any[], preferences: any) {
-  const exercisesPerSession = 6;
-  const selectedExercises = [];
-  const shuffledExercises = [...exercises].sort(() => Math.random() - 0.5);
-
-  for (let i = 0; i < exercisesPerSession && i < shuffledExercises.length; i++) {
-    const exercise = shuffledExercises[i];
-    selectedExercises.push({
-      id: exercise.id,
-      name: exercise.name,
-      sets: getSetsBasedOnGoal(preferences.goal),
-      reps: getRepsBasedOnGoal(preferences.goal),
-      rest_time_seconds: getRestTimeBasedOnGoal(preferences.goal),
-      gifUrl: exercise.gif_url,
-    });
-  }
-
-  return selectedExercises;
-}
-
-function getSetsBasedOnGoal(goal: string) {
-  switch (goal) {
-    case 'lose_weight': return 3;
-    case 'gain_mass': return 4;
-    case 'maintain': return 3;
-    default: return 3;
-  }
-}
-
-function getRepsBasedOnGoal(goal: string) {
-  switch (goal) {
-    case 'lose_weight': return 15;
-    case 'gain_mass': return 8;
-    case 'maintain': return 12;
-    default: return 12;
-  }
-}
-
-function getRestTimeBasedOnGoal(goal: string) {
-  switch (goal) {
-    case 'lose_weight': return 30;
-    case 'gain_mass': return 90;
-    case 'maintain': return 60;
-    default: return 60;
-  }
-}
+})
