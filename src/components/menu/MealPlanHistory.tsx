@@ -54,7 +54,7 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
     }
   };
 
-  const handleDownloadPDF = async (plan: { plan_data: MealPlan }) => {
+  const handleDownloadPDF = async (plan: { id: string; plan_data: MealPlan }) => {
     const containerRef = planRefs.current[plan.id];
     if (!containerRef) {
       toast.error("Erro ao gerar PDF");
