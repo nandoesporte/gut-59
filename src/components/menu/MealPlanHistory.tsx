@@ -28,8 +28,7 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
       const { error } = await supabase
         .from('meal_plans')
         .delete()
-        .eq('id', planId)
-        .eq('user_id', userData.user.id);
+        .eq('id', planId);
 
       if (error) {
         console.error('Erro ao excluir plano:', error);
@@ -37,8 +36,8 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
         return;
       }
 
-      await onRefresh();
       toast.success("Plano alimentar excluído com sucesso");
+      await onRefresh();
       
     } catch (error) {
       console.error('Erro ao excluir plano:', error);
@@ -56,10 +55,15 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
     try {
       setGeneratingPDF(prev => new Set([...prev, plan.id]));
       
+      if (!plan.plan_data) {
+        throw new Error('Dados do plano não encontrados');
+      }
+
       const tempDiv = createPDFContent(plan);
       document.body.appendChild(tempDiv);
       await generateMealPlanPDF(tempDiv);
       document.body.removeChild(tempDiv);
+      toast.success("PDF gerado com sucesso!");
       
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
