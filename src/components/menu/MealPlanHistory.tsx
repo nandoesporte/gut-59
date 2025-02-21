@@ -16,12 +16,12 @@ interface MealPlanHistoryProps {
     plan_data: MealPlan;
     calories: number;
   }>;
-  onRefresh: () => Promise<void> | void;
+  onRefresh: () => Promise<void>;
 }
 
 export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlanHistoryProps) => {
-  const planRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  const [generatingPDF, setGeneratingPDF] = useState<Set<string>>(new Set());
 
   const handleDelete = async (planId: string) => {
     try {
@@ -33,25 +33,21 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
       }
 
       setDeletingIds(prev => new Set([...prev, planId]));
-      const toastId = toast.loading("Excluindo plano alimentar...");
 
       const { error } = await supabase
         .from('meal_plans')
         .delete()
         .eq('id', planId)
-        .eq('user_id', userData.user.id); // Garante que só exclui planos do usuário atual
+        .eq('user_id', userData.user.id);
 
       if (error) {
-        toast.dismiss(toastId);
         toast.error("Erro ao excluir plano alimentar");
         throw error;
       }
 
-      toast.dismiss(toastId);
-      toast.success("Plano alimentar excluído com sucesso");
-      
-      // Atualiza a lista após exclusão bem-sucedida
+      // Aguarda a atualização da lista
       await onRefresh();
+      toast.success("Plano alimentar excluído com sucesso");
       
     } catch (error) {
       console.error('Erro ao excluir plano:', error);
@@ -65,20 +61,90 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
     }
   };
 
-  const handleDownloadPDF = async (plan: { id: string; plan_data: MealPlan }) => {
-    const containerRef = planRefs.current[plan.id];
-    if (!containerRef) {
-      toast.error("Erro ao gerar PDF");
-      return;
-    }
-    
+  const handleDownloadPDF = async (plan: { id: string; plan_data: MealPlan; calories: number }) => {
     try {
-      await generateMealPlanPDF(containerRef);
+      setGeneratingPDF(prev => new Set([...prev, plan.id]));
+      
+      // Criar um elemento temporário para o conteúdo do PDF
+      const tempDiv = document.createElement('div');
+      tempDiv.className = 'pdf-content bg-white p-8';
+      
+      // Adicionar o conteúdo do plano ao elemento
+      tempDiv.innerHTML = `
+        <div class="space-y-6">
+          <div class="text-center">
+            <h1 class="text-2xl font-bold mb-2">Plano Alimentar</h1>
+            <p class="text-gray-600">Data: ${new Date(plan.created_at).toLocaleDateString()}</p>
+            <p class="text-gray-600">Meta Calórica: ${plan.calories} kcal</p>
+          </div>
+
+          ${Object.entries(plan.plan_data.dailyPlan).map(([meal, data]) => `
+            <div class="mb-6">
+              <h2 class="text-xl font-semibold mb-2">${formatMealTitle(meal)}</h2>
+              <div class="space-y-2">
+                ${data.foods.map(food => `
+                  <div class="ml-4">
+                    <p>• ${food.name} - ${food.portion} ${food.unit}</p>
+                    ${food.details ? `<p class="text-sm text-gray-600 ml-4">${food.details}</p>` : ''}
+                  </div>
+                `).join('')}
+              </div>
+              <div class="mt-2 text-sm text-gray-600">
+                <p>Calorias: ${data.calories} kcal</p>
+              </div>
+            </div>
+          `).join('')}
+
+          <div class="mt-8">
+            <h2 class="text-xl font-semibold mb-2">Recomendações</h2>
+            <div class="space-y-2">
+              ${plan.plan_data.recommendations.general ? 
+                `<p class="font-medium">Gerais:</p>
+                <p class="ml-4">${plan.plan_data.recommendations.general}</p>` : ''}
+              
+              ${plan.plan_data.recommendations.preworkout ? 
+                `<p class="font-medium">Pré-treino:</p>
+                <p class="ml-4">${plan.plan_data.recommendations.preworkout}</p>` : ''}
+              
+              ${plan.plan_data.recommendations.postworkout ? 
+                `<p class="font-medium">Pós-treino:</p>
+                <p class="ml-4">${plan.plan_data.recommendations.postworkout}</p>` : ''}
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Adicionar o elemento temporário ao documento
+      document.body.appendChild(tempDiv);
+
+      // Gerar e baixar o PDF
+      await generateMealPlanPDF(tempDiv);
+
+      // Remover o elemento temporário
+      document.body.removeChild(tempDiv);
+      
       toast.success("PDF gerado com sucesso!");
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
       toast.error("Erro ao gerar PDF do plano alimentar");
+    } finally {
+      setGeneratingPDF(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(plan.id);
+        return newSet;
+      });
     }
+  };
+
+  const formatMealTitle = (meal: string): string => {
+    const titles: Record<string, string> = {
+      breakfast: "Café da Manhã",
+      morningSnack: "Lanche da Manhã",
+      lunch: "Almoço",
+      afternoonSnack: "Lanche da Tarde",
+      dinner: "Jantar"
+    };
+    return titles[meal] || meal;
   };
 
   if (isLoading) {
@@ -110,10 +176,7 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
       <div className="grid gap-4">
         {historyPlans.map((plan) => (
           <Card key={plan.id} className="p-4">
-            <div 
-              ref={el => planRefs.current[plan.id] = el}
-              className="flex justify-between items-center"
-            >
+            <div className="flex justify-between items-center">
               <div>
                 <p className="font-medium">
                   Plano Alimentar - {new Date(plan.created_at).toLocaleDateString()}
@@ -139,8 +202,13 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
                   variant="outline" 
                   size="sm"
                   onClick={() => handleDownloadPDF(plan)}
+                  disabled={generatingPDF.has(plan.id)}
                 >
-                  <FileText className="w-4 h-4" />
+                  {generatingPDF.has(plan.id) ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <FileText className="w-4 h-4" />
+                  )}
                 </Button>
               </div>
             </div>
