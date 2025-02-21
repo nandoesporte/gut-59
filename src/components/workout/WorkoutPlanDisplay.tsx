@@ -76,26 +76,28 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
         return;
       }
 
+      console.log("Chamando edge function com:", { preferences, userId: user.id });
+
       const { data: response, error } = await supabase.functions.invoke('generate-workout-plan', {
         body: { preferences, userId: user.id }
       });
 
       if (error) {
-        console.error("Erro ao gerar plano:", error);
-        throw error;
+        console.error("Erro da edge function:", error);
+        throw new Error(error.message || "Erro ao gerar plano de treino");
       }
-
-      console.log("Plano gerado:", response);
 
       if (!response) {
         throw new Error("Nenhum plano foi gerado");
       }
 
+      console.log("Plano gerado:", response);
       setWorkoutPlan(response);
       toast.success("Plano de treino gerado com sucesso!");
     } catch (error: any) {
       console.error("Erro ao gerar plano:", error);
       toast.error(error.message || "Erro ao gerar plano de treino. Por favor, tente novamente.");
+      setWorkoutPlan(null);
     } finally {
       setLoading(false);
     }
