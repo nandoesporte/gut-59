@@ -19,7 +19,7 @@ serve(async (req) => {
   try {
     const { userData, selectedFoods, dietaryPreferences } = await req.json();
     
-    console.log('Starting meal plan generation with input:', {
+    console.log('Starting weekly meal plan generation with input:', {
       userData,
       selectedFoods: selectedFoods.length,
       dietaryPreferences
@@ -30,48 +30,28 @@ serve(async (req) => {
       throw new Error('OpenAI API key not configured');
     }
 
-    const systemPrompt = `You are a nutrition expert. Create a daily meal plan in Portuguese using ONLY the provided foods.
+    const weekDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
+    const systemPrompt = `You are a nutrition expert. Create a WEEKLY meal plan in Portuguese using ONLY the provided foods.
+    Generate 7 different daily plans (one for each day of the week) while maintaining nutritional balance.
     Return ONLY a valid JSON object with this exact structure, no markdown or extra text:
     {
-      "dailyPlan": {
-        "breakfast": {
-          "description": "string",
-          "foods": [{"name": "string", "portion": number, "unit": "string", "details": "string"}],
-          "calories": number,
-          "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number}
+      "monday": {
+        "dailyPlan": {
+          "breakfast": { "description": "string", "foods": [{"name": "string", "portion": number, "unit": "string", "details": "string"}], "calories": number, "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number} },
+          "morningSnack": { "description": "string", "foods": [{"name": "string", "portion": number, "unit": "string", "details": "string"}], "calories": number, "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number} },
+          "lunch": { "description": "string", "foods": [{"name": "string", "portion": number, "unit": "string", "details": "string"}], "calories": number, "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number} },
+          "afternoonSnack": { "description": "string", "foods": [{"name": "string", "portion": number, "unit": "string", "details": "string"}], "calories": number, "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number} },
+          "dinner": { "description": "string", "foods": [{"name": "string", "portion": number, "unit": "string", "details": "string"}], "calories": number, "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number} }
         },
-        "morningSnack": {
-          "description": "string",
-          "foods": [{"name": "string", "portion": number, "unit": "string", "details": "string"}],
-          "calories": number,
-          "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number}
-        },
-        "lunch": {
-          "description": "string",
-          "foods": [{"name": "string", "portion": number, "unit": "string", "details": "string"}],
-          "calories": number,
-          "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number}
-        },
-        "afternoonSnack": {
-          "description": "string",
-          "foods": [{"name": "string", "portion": number, "unit": "string", "details": "string"}],
-          "calories": number,
-          "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number}
-        },
-        "dinner": {
-          "description": "string",
-          "foods": [{"name": "string", "portion": number, "unit": "string", "details": "string"}],
-          "calories": number,
-          "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number}
-        }
+        "totalNutrition": { "calories": number, "protein": number, "carbs": number, "fats": number, "fiber": number }
       },
-      "totalNutrition": {
-        "calories": number,
-        "protein": number,
-        "carbs": number,
-        "fats": number,
-        "fiber": number
-      },
+      "tuesday": { /* Same structure as monday */ },
+      "wednesday": { /* Same structure as monday */ },
+      "thursday": { /* Same structure as monday */ },
+      "friday": { /* Same structure as monday */ },
+      "saturday": { /* Same structure as monday */ },
+      "sunday": { /* Same structure as monday */ },
       "recommendations": {
         "general": "string",
         "preworkout": "string",
@@ -80,8 +60,8 @@ serve(async (req) => {
       }
     }`;
 
-    const userPrompt = `Create a meal plan with:
-    Target Calories: ${userData.dailyCalories}kcal
+    const userPrompt = `Create a weekly meal plan with:
+    Target Daily Calories: ${userData.dailyCalories}kcal
     Profile: ${userData.age} years, ${userData.gender}, ${userData.weight}kg
     Goal: ${userData.goal}
     Available Foods: ${selectedFoods.map(f => `${f.name} (${f.calories}kcal/100g, P:${f.protein}g, C:${f.carbs}g, F:${f.fats}g)`).join(', ')}
@@ -89,9 +69,14 @@ serve(async (req) => {
     Allergies: ${dietaryPreferences.allergies?.join(', ') || 'None'}
     Training Time: ${dietaryPreferences.trainingTime || 'Not specified'}
 
-    Important: Return ONLY the JSON object, no additional text or markdown formatting.`;
+    Important guidelines:
+    1. Create different meal combinations for each day while maintaining similar caloric and macro distributions
+    2. Consider meal timing and portion sizes throughout the week
+    3. Include variety in food choices to prevent monotony
+    4. Maintain consistent meal structure (breakfast, snacks, lunch, dinner) but vary the specific foods
+    5. Return ONLY the JSON object, no additional text or markdown formatting.`;
 
-    console.log('Sending request to OpenAI...');
+    console.log('Sending request to OpenAI for weekly plan...');
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -106,7 +91,7 @@ serve(async (req) => {
           { role: 'user', content: userPrompt }
         ],
         temperature: 0.7,
-        max_tokens: 2000
+        max_tokens: 4000
       }),
     });
 
@@ -125,32 +110,40 @@ serve(async (req) => {
     }
 
     try {
-      // Remove any potential markdown formatting
       const content = data.choices[0].message.content.replace(/```json\n?|\n?```/g, '').trim();
-      console.log('Parsing content:', content);
+      console.log('Parsing weekly plan content:', content);
       
-      const mealPlan = JSON.parse(content);
-      console.log('Successfully parsed meal plan');
+      const weeklyPlan = JSON.parse(content);
+      console.log('Successfully parsed weekly meal plan');
 
-      // Validate structure
-      const requiredMeals = ['breakfast', 'morningSnack', 'lunch', 'afternoonSnack', 'dinner'];
-      const hasDailyPlan = mealPlan.dailyPlan && typeof mealPlan.dailyPlan === 'object';
-      const hasAllMeals = requiredMeals.every(meal => 
-        mealPlan.dailyPlan[meal] && 
-        Array.isArray(mealPlan.dailyPlan[meal].foods) &&
-        typeof mealPlan.dailyPlan[meal].calories === 'number' &&
-        typeof mealPlan.dailyPlan[meal].macros === 'object'
-      );
-      const hasTotalNutrition = mealPlan.totalNutrition && typeof mealPlan.totalNutrition === 'object';
-      const hasRecommendations = mealPlan.recommendations && typeof mealPlan.recommendations === 'object';
+      // Validate weekly plan structure
+      const validateDayPlan = (day: string) => {
+        const plan = weeklyPlan[day];
+        const requiredMeals = ['breakfast', 'morningSnack', 'lunch', 'afternoonSnack', 'dinner'];
+        
+        const hasDailyPlan = plan.dailyPlan && typeof plan.dailyPlan === 'object';
+        const hasAllMeals = requiredMeals.every(meal => 
+          plan.dailyPlan[meal] && 
+          Array.isArray(plan.dailyPlan[meal].foods) &&
+          typeof plan.dailyPlan[meal].calories === 'number' &&
+          typeof plan.dailyPlan[meal].macros === 'object'
+        );
+        const hasTotalNutrition = plan.totalNutrition && typeof plan.totalNutrition === 'object';
+        
+        return hasDailyPlan && hasAllMeals && hasTotalNutrition;
+      };
 
-      if (!hasDailyPlan || !hasAllMeals || !hasTotalNutrition || !hasRecommendations) {
-        console.error('Validation failed:', { hasDailyPlan, hasAllMeals, hasTotalNutrition, hasRecommendations });
-        throw new Error('Invalid meal plan structure');
+      const isValid = weekDays.every(day => validateDayPlan(day)) &&
+                     weeklyPlan.recommendations &&
+                     typeof weeklyPlan.recommendations === 'object';
+
+      if (!isValid) {
+        console.error('Weekly plan validation failed');
+        throw new Error('Invalid weekly meal plan structure');
       }
 
       return new Response(
-        JSON.stringify(mealPlan),
+        JSON.stringify(weeklyPlan),
         { 
           status: 200, 
           headers: corsHeaders 
@@ -158,8 +151,8 @@ serve(async (req) => {
       );
 
     } catch (error) {
-      console.error('Error processing meal plan:', error);
-      throw new Error(`Failed to process meal plan: ${error.message}`);
+      console.error('Error processing weekly meal plan:', error);
+      throw new Error(`Failed to process weekly meal plan: ${error.message}`);
     }
 
   } catch (error) {
