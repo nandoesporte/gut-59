@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FileText, Loader2, RefreshCcw, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import type { MealPlan } from "./types";
 import { generateMealPlanPDF } from "./utils/pdf-generator";
@@ -21,6 +21,7 @@ interface MealPlanHistoryProps {
 
 export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlanHistoryProps) => {
   const planRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
 
   const handleDelete = async (planId: string) => {
     try {
@@ -31,6 +32,7 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
         return;
       }
 
+      setDeletingIds(prev => new Set([...prev, planId]));
       const toastId = toast.loading("Excluindo plano alimentar...");
 
       const { error } = await supabase
@@ -51,6 +53,12 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
     } catch (error) {
       console.error('Erro ao excluir plano:', error);
       toast.error("Erro ao excluir plano alimentar");
+    } finally {
+      setDeletingIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(planId);
+        return newSet;
+      });
     }
   };
 
@@ -116,8 +124,13 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
                   variant="outline"
                   size="sm"
                   onClick={() => handleDelete(plan.id)}
+                  disabled={deletingIds.has(plan.id)}
                 >
-                  <Trash2 className="w-4 h-4" />
+                  {deletingIds.has(plan.id) ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
                 </Button>
                 <Button 
                   variant="outline" 
