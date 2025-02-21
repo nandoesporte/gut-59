@@ -69,7 +69,6 @@ const determineWeightRecommendation = (
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -181,21 +180,19 @@ serve(async (req) => {
       };
     });
 
-    // Create the workout plan
-    const workoutPlan = {
+    // Create the workout plan with fields that match the database schema
+    const workoutPlanForDB = {
       id: crypto.randomUUID(),
       user_id: userId,
       goal: preferences.goal,
       start_date: new Date().toISOString(),
-      end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      workout_sessions: workoutSessions,
-      user_fitness_level: fitnessLevel
+      end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
     };
 
     // Save the workout plan
     const { error: saveError } = await supabaseClient
       .from('workout_plans')
-      .insert([workoutPlan]);
+      .insert([workoutPlanForDB]);
 
     if (saveError) {
       console.error("Error saving workout plan:", saveError);
@@ -208,9 +205,41 @@ serve(async (req) => {
       )
     }
 
+    // Now save the workout sessions
+    const { error: sessionsError } = await supabaseClient
+      .from('workout_sessions')
+      .insert(workoutSessions.map(session => ({
+        ...session,
+        plan_id: workoutPlanForDB.id
+      })));
+
+    if (sessionsError) {
+      console.error("Error saving workout sessions:", sessionsError);
+      // Try to clean up the workout plan if sessions fail
+      await supabaseClient
+        .from('workout_plans')
+        .delete()
+        .eq('id', workoutPlanForDB.id);
+
+      return new Response(
+        JSON.stringify({ error: 'Error saving workout sessions' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      )
+    }
+
+    // Return the complete workout plan for the frontend
+    const completePlan = {
+      ...workoutPlanForDB,
+      workout_sessions: workoutSessions,
+      user_fitness_level: fitnessLevel
+    };
+
     console.log("Successfully created workout plan");
     return new Response(
-      JSON.stringify(workoutPlan),
+      JSON.stringify(completePlan),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
