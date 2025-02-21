@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { corsHeaders } from '../_shared/cors.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
@@ -61,31 +60,60 @@ serve(async (req) => {
 
     console.log('Generating workout plan with preferences:', preferences);
 
-    // Fetch exercises with fixed filter syntax
+    // Fetch exercises with simpler query first
     let query = supabaseAdmin
       .from('exercises')
       .select('*');
 
-    // Apply filters only if the arrays are not empty
-    if (preferences.available_equipment && preferences.available_equipment.length > 0 && !preferences.available_equipment.includes('all')) {
-      query = query.contains('equipment_needed', preferences.available_equipment);
-    }
+    // Add filters one by one with proper error handling
+    try {
+      if (preferences.available_equipment?.length > 0 && !preferences.available_equipment.includes('all')) {
+        // Convert array to proper format for contains
+        const equipmentFilter = preferences.available_equipment.filter(Boolean);
+        if (equipmentFilter.length > 0) {
+          query = query.contains('equipment_needed', equipmentFilter);
+        }
+      }
 
-    if (preferences.preferred_exercise_types && preferences.preferred_exercise_types.length > 0) {
-      query = query.in('exercise_type', preferences.preferred_exercise_types);
+      if (preferences.preferred_exercise_types?.length > 0) {
+        // Make sure we have valid exercise types
+        const validTypes = preferences.preferred_exercise_types.filter(Boolean);
+        if (validTypes.length > 0) {
+          query = query.in('exercise_type', validTypes);
+        }
+      }
+    } catch (filterError) {
+      console.error('Error applying filters:', filterError);
+      // If filters fail, fallback to getting all exercises
+      query = supabaseAdmin.from('exercises').select('*');
     }
 
     const { data: exercises, error: exercisesError } = await query;
 
     if (exercisesError) {
+      console.error('Database error fetching exercises:', exercisesError);
       throw new Error(`Failed to fetch exercises: ${exercisesError.message}`);
     }
 
     if (!exercises?.length) {
-      throw new Error('No exercises found in database');
-    }
+      console.log('No exercises found with filters, fetching all exercises as fallback');
+      const { data: allExercises, error: allExercisesError } = await supabaseAdmin
+        .from('exercises')
+        .select('*');
 
-    console.log(`Found ${exercises.length} exercises`);
+      if (allExercisesError) {
+        throw new Error('Could not fetch any exercises');
+      }
+
+      if (!allExercises?.length) {
+        throw new Error('No exercises found in database');
+      }
+
+      console.log(`Found ${allExercises.length} exercises in total`);
+      exercises = allExercises;
+    } else {
+      console.log(`Found ${exercises.length} exercises matching preferences`);
+    }
 
     // Create the workout plan
     const plan = {
@@ -213,7 +241,10 @@ serve(async (req) => {
     console.error('Edge function error:', error);
     
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        details: error.stack
+      }),
       {
         headers: {
           ...corsHeaders,
