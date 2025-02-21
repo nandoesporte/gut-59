@@ -153,6 +153,11 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
   // Filtra para mostrar apenas os 3 planos mais recentes se estiverem todos com active = false
   // Ou mostra o plano ativo + histórico se houver um plano ativo
   const plansToShow = historyPlans?.reduce((acc, plan) => {
+    if (!plan.plan_data?.dailyPlan || !plan.plan_data?.totalNutrition || !plan.plan_data?.recommendations) {
+      console.warn('Plano com estrutura inválida:', plan);
+      return acc;
+    }
+
     if (plan.active) {
       // Se houver um plano ativo, ele vai primeiro
       return [plan, ...acc];
@@ -162,6 +167,14 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
     }
     return acc;
   }, [] as typeof historyPlans extends undefined ? undefined : NonNullable<typeof historyPlans>) || [];
+
+  if (plansToShow.length === 0) {
+    return (
+      <Card className="p-4 text-center text-gray-500">
+        Nenhum plano alimentar válido encontrado.
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -235,7 +248,10 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
                 <CardContent className="p-4 md:p-6 pt-0">
                   <div ref={el => planRefs.current[plan.id] = el} className="space-y-6">
                     {plan.plan_data && plan.plan_data.dailyPlan && Object.entries(plan.plan_data.dailyPlan).map(([mealType, meal]) => {
-                      if (!meal) return null;
+                      if (!meal || !meal.foods || !meal.macros) {
+                        console.warn(`Refeição inválida no plano ${plan.id}, tipo: ${mealType}`, meal);
+                        return null;
+                      }
                       return (
                         <MealSection
                           key={mealType}
@@ -260,12 +276,6 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
           </Collapsible>
         ))}
       </div>
-      
-      {(!historyPlans || historyPlans.length === 0) && (
-        <Card className="p-4 text-center text-gray-500">
-          Nenhum plano alimentar gerado ainda.
-        </Card>
-      )}
     </div>
   );
 };
