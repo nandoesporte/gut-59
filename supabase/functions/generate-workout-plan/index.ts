@@ -169,7 +169,8 @@ serve(async (req) => {
             preferences.gender,
             fitnessLevel
           ),
-          notes: exercise.description
+          notes: exercise.description,
+          exercise_id: exercise.id
         }));
 
       return {
@@ -180,7 +181,7 @@ serve(async (req) => {
       };
     });
 
-    // Create the workout plan with fields that match the database schema
+    // Create the workout plan
     const workoutPlanForDB = {
       id: crypto.randomUUID(),
       user_id: userId,
@@ -205,29 +206,67 @@ serve(async (req) => {
       )
     }
 
-    // Now save the workout sessions
-    const { error: sessionsError } = await supabaseClient
-      .from('workout_sessions')
-      .insert(workoutSessions.map(session => ({
-        ...session,
-        plan_id: workoutPlanForDB.id
-      })));
+    // Save workout sessions and their exercises
+    for (const session of workoutSessions) {
+      // First save the session
+      const { data: savedSession, error: sessionError } = await supabaseClient
+        .from('workout_sessions')
+        .insert({
+          plan_id: workoutPlanForDB.id,
+          day_number: session.day_number,
+          warmup_description: session.warmup_description,
+          cooldown_description: session.cooldown_description
+        })
+        .select()
+        .single();
 
-    if (sessionsError) {
-      console.error("Error saving workout sessions:", sessionsError);
-      // Try to clean up the workout plan if sessions fail
-      await supabaseClient
-        .from('workout_plans')
-        .delete()
-        .eq('id', workoutPlanForDB.id);
+      if (sessionError) {
+        console.error("Error saving workout session:", sessionError);
+        // Clean up the workout plan
+        await supabaseClient
+          .from('workout_plans')
+          .delete()
+          .eq('id', workoutPlanForDB.id);
 
-      return new Response(
-        JSON.stringify({ error: 'Error saving workout sessions' }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500,
-        }
-      )
+        return new Response(
+          JSON.stringify({ error: 'Error saving workout sessions' }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500,
+          }
+        )
+      }
+
+      // Then save all exercises for this session
+      const sessionExercises = session.exercises.map((exercise, index) => ({
+        session_id: savedSession.id,
+        exercise_id: exercise.exercise_id,
+        sets: exercise.sets,
+        reps: exercise.reps,
+        rest_time_seconds: exercise.rest_time_seconds,
+        order_in_session: index + 1
+      }));
+
+      const { error: exercisesError } = await supabaseClient
+        .from('session_exercises')
+        .insert(sessionExercises);
+
+      if (exercisesError) {
+        console.error("Error saving session exercises:", exercisesError);
+        // Clean up the workout plan and sessions
+        await supabaseClient
+          .from('workout_plans')
+          .delete()
+          .eq('id', workoutPlanForDB.id);
+
+        return new Response(
+          JSON.stringify({ error: 'Error saving session exercises' }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500,
+          }
+        )
+      }
     }
 
     // Return the complete workout plan for the frontend
