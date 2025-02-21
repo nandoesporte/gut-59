@@ -35,7 +35,7 @@ export const MealPlanCard = ({
             variant="outline"
             size="sm"
             onClick={() => onDelete(plan.id)}
-            disabled={isDeleting}
+            disabled={isDeleting || isGeneratingPDF}
           >
             {isDeleting ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -47,7 +47,7 @@ export const MealPlanCard = ({
             variant="outline" 
             size="sm"
             onClick={() => onDownload(plan)}
-            disabled={isGeneratingPDF}
+            disabled={isDeleting || isGeneratingPDF}
           >
             {isGeneratingPDF ? (
               <Loader2 className="w-4 h-4 animate-spin" />

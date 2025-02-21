@@ -5,9 +5,9 @@ import { Loader2, RefreshCcw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
 import { toast } from "sonner";
-import { generateMealPlanPDF } from "./utils/pdf-generator";
 import { MealPlanCard } from "./components/MealPlanCard";
 import { createPDFContent } from "./utils/meal-plan-helpers";
+import { generateMealPlanPDF } from "./utils/pdf-generator";
 import type { MealPlanHistoryProps, MealPlanItem } from "./types/meal-plan-history";
 
 export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlanHistoryProps) => {
@@ -61,7 +61,6 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
       await generateMealPlanPDF(tempDiv);
       document.body.removeChild(tempDiv);
       
-      toast.success("PDF gerado com sucesso!");
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
       toast.error("Erro ao gerar PDF do plano alimentar");
