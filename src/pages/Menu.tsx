@@ -78,6 +78,11 @@ const Menu = () => {
         return (
           <div className="space-y-8">
             <InitialMenuContent onStartDiet={() => setCurrentStep(1.5)} />
+            <MealPlanHistory 
+              isLoading={isHistoryLoading}
+              historyPlans={historyPlans}
+              onRefresh={fetchMealPlans}
+            />
           </div>
         );
       case 1.5:
@@ -108,11 +113,11 @@ const Menu = () => {
           />
         );
       case 4:
-        console.log('Rendering step 4, mealPlan:', mealPlan); // Added logging
+        console.log('Rendering step 4, mealPlan:', mealPlan);
         return (
           <div className="space-y-8">
             {mealPlan ? (
-              <MealPlanDisplay mealPlan={mealPlan} />
+              <MealPlanDisplay mealPlan={mealPlan} onRefresh={fetchMealPlans} />
             ) : (
               <Card className="p-6">
                 <div className="text-center text-gray-500">
@@ -120,11 +125,6 @@ const Menu = () => {
                 </div>
               </Card>
             )}
-            <MealPlanHistory 
-              isLoading={isHistoryLoading}
-              historyPlans={historyPlans}
-              onRefresh={fetchMealPlans}
-            />
           </div>
         );
       default:

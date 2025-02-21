@@ -51,6 +51,7 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
       toast.dismiss(toastId);
       toast.success("Plano alimentar excluído com sucesso");
       
+      // Atualiza a lista após excluir
       await onRefresh();
       
     } catch (error) {
