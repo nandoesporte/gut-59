@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FileText, Loader2, RefreshCcw, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { toast } from "sonner";
 import type { MealPlan } from "./types";
 import { generateMealPlanPDF } from "./utils/pdf-generator";
@@ -25,7 +25,7 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
   const [localPlans, setLocalPlans] = useState(historyPlans || []);
 
   // Atualiza o estado local quando historyPlans muda
-  useState(() => {
+  useEffect(() => {
     setLocalPlans(historyPlans || []);
   }, [historyPlans]);
 
