@@ -21,15 +21,48 @@ const Workout = () => {
       
       if (!user) return;
 
+      // Fetch workout plans with their sessions and exercises
       const { data: plans, error } = await supabase
         .from('workout_plans')
-        .select('*')
+        .select(`
+          *,
+          workout_sessions (
+            *,
+            session_exercises (
+              *,
+              exercise:exercises (*)
+            )
+          )
+        `)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       
-      setHistoryPlans(plans || []);
+      // Transform the data to match WorkoutPlan type
+      const transformedPlans: WorkoutPlan[] = plans?.map(plan => ({
+        id: plan.id,
+        user_id: plan.user_id,
+        goal: plan.goal,
+        start_date: plan.start_date,
+        end_date: plan.end_date,
+        workout_sessions: plan.workout_sessions.map((session: any) => ({
+          day_number: session.day_number,
+          warmup_description: session.warmup_description,
+          cooldown_description: session.cooldown_description,
+          exercises: session.session_exercises.map((exerciseSession: any) => ({
+            name: exerciseSession.exercise.name,
+            sets: exerciseSession.sets,
+            reps: exerciseSession.reps,
+            rest_time_seconds: exerciseSession.rest_time_seconds,
+            gifUrl: exerciseSession.exercise.gif_url,
+            notes: exerciseSession.exercise.description
+          }))
+        })),
+        user_fitness_level: 'beginner' // Default value, adjust based on your needs
+      })) || [];
+
+      setHistoryPlans(transformedPlans);
     } catch (error) {
       console.error('Error fetching workout history:', error);
     } finally {
