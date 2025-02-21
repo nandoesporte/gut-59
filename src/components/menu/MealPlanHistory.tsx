@@ -3,19 +3,21 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FileText, Loader2, RefreshCcw, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import type { MealPlan } from "./types";
 import { generateMealPlanPDF } from "./utils/pdf-generator";
 
+interface MealPlanItem {
+  id: string;
+  created_at: string;
+  plan_data: MealPlan;
+  calories: number;
+}
+
 interface MealPlanHistoryProps {
   isLoading: boolean;
-  historyPlans?: Array<{
-    id: string;
-    created_at: string;
-    plan_data: MealPlan;
-    calories: number;
-  }>;
+  historyPlans?: MealPlanItem[];
   onRefresh: () => Promise<void>;
 }
 
@@ -45,7 +47,6 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
         throw error;
       }
 
-      // Aguarda a atualização da lista
       await onRefresh();
       toast.success("Plano alimentar excluído com sucesso");
       
@@ -61,15 +62,13 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
     }
   };
 
-  const handleDownloadPDF = async (plan: { id: string; plan_data: MealPlan; calories: number }) => {
+  const handleDownloadPDF = async (plan: MealPlanItem) => {
     try {
       setGeneratingPDF(prev => new Set([...prev, plan.id]));
       
-      // Criar um elemento temporário para o conteúdo do PDF
       const tempDiv = document.createElement('div');
       tempDiv.className = 'pdf-content bg-white p-8';
       
-      // Adicionar o conteúdo do plano ao elemento
       tempDiv.innerHTML = `
         <div class="space-y-6">
           <div class="text-center">
@@ -114,13 +113,8 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
         </div>
       `;
 
-      // Adicionar o elemento temporário ao documento
       document.body.appendChild(tempDiv);
-
-      // Gerar e baixar o PDF
       await generateMealPlanPDF(tempDiv);
-
-      // Remover o elemento temporário
       document.body.removeChild(tempDiv);
       
       toast.success("PDF gerado com sucesso!");
