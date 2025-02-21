@@ -1,4 +1,4 @@
-import type { Food, MacroTargets, FoodWithPortion } from './types.ts';
+import type { Food, MacroTargets, FoodWithPortion, Meal } from './types.ts';
 import { calculatePortionSize } from './portion-calculator.ts';
 
 const DEFAULT_MEAL_STRUCTURE = {
@@ -148,4 +148,76 @@ export function optimizeMealCombinations(
 
   // Flatten all meals into a single array
   return Object.values(mealPlan).flat();
+}
+
+export async function optimizeMeal({
+  selectedFoods,
+  dailyCalories,
+  targetMacros,
+  preferences,
+  trainingTime,
+  variation = 0
+}: {
+  selectedFoods: Food[];
+  dailyCalories: number;
+  targetMacros: MacroTargets;
+  preferences: any;
+  trainingTime: string | null;
+  variation?: number;
+}): Promise<{ [key: string]: Meal }> {
+  const optimizedMeals: { [key: string]: Meal } = {};
+  
+  const distributions = [
+    { breakfast: 0.25, morningSnack: 0.15, lunch: 0.3, afternoonSnack: 0.1, dinner: 0.2 },
+    { breakfast: 0.2, morningSnack: 0.1, lunch: 0.35, afternoonSnack: 0.15, dinner: 0.2 },
+    { breakfast: 0.3, morningSnack: 0.1, lunch: 0.25, afternoonSnack: 0.15, dinner: 0.2 }
+  ];
+
+  const distribution = distributions[variation % distributions.length];
+
+  for (const [mealType, ratio] of Object.entries(distribution)) {
+    const mealCalories = dailyCalories * ratio;
+    const mealMacros = {
+      protein: targetMacros.protein * ratio,
+      carbs: targetMacros.carbs * ratio,
+      fats: targetMacros.fats * ratio
+    };
+
+    const appropriateFoods = selectedFoods.filter(food => {
+      return true;
+    });
+
+    if (appropriateFoods.length === 0) continue;
+
+    const selectedMealFoods: FoodWithPortion[] = appropriateFoods.map(food => ({
+      ...food,
+      portion: calculatePortionSize(food, mealMacros, mealType),
+      portionUnit: 'g'
+    }));
+
+    const mealTotal = selectedMealFoods.reduce(
+      (acc, food) => {
+        const ratio = food.portion / 100;
+        return {
+          calories: acc.calories + food.calories * ratio,
+          protein: acc.protein + food.protein * ratio,
+          carbs: acc.carbs + food.carbs * ratio,
+          fats: acc.fats + food.fats * ratio
+        };
+      },
+      { calories: 0, protein: 0, carbs: 0, fats: 0 }
+    );
+
+    optimizedMeals[mealType] = {
+      foods: selectedMealFoods,
+      calories: mealTotal.calories,
+      macros: {
+        protein: mealTotal.protein,
+        carbs: mealTotal.carbs,
+        fats: mealTotal.fats
+      }
+    };
+  }
+
+  return optimizedMeals;
 }
