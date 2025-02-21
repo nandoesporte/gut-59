@@ -20,10 +20,10 @@ export const MealPlanCard = ({
   isGeneratingPDF,
 }: MealPlanCardProps) => {
   return (
-    <Card className="p-4">
+    <Card className="bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex justify-between items-center">
         <div>
-          <p className="font-medium">
+          <p className="font-medium text-gray-900">
             Plano Alimentar - {new Date(plan.created_at).toLocaleDateString()}
           </p>
           <p className="text-sm text-gray-500">

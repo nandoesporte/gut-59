@@ -12,7 +12,7 @@ export const formatMealTitle = (meal: string): string => {
 
 export const createPDFContent = (plan: any) => {
   const tempDiv = document.createElement('div');
-  tempDiv.className = 'pdf-content bg-white p-8';
+  tempDiv.className = 'pdf-content p-8';
   
   tempDiv.innerHTML = `
     <div class="space-y-6">
@@ -28,8 +28,8 @@ export const createPDFContent = (plan: any) => {
           <div class="space-y-2">
             ${data.foods.map((food: any) => `
               <div class="ml-4">
-                <p>• ${food.name} - ${food.portion} ${food.unit}</p>
-                ${food.details ? `<p class="text-sm text-gray-600 ml-4">${food.details}</p>` : ''}
+                <p>• ${food.name.replace(/carboidrato/gi, "carbo")} - ${food.portion} ${food.unit}</p>
+                ${food.details ? `<p class="text-sm text-gray-600 ml-4">${food.details.replace(/carboidrato/gi, "carbo")}</p>` : ''}
               </div>
             `).join('')}
           </div>
@@ -44,15 +44,15 @@ export const createPDFContent = (plan: any) => {
         <div class="space-y-2">
           ${plan.plan_data.recommendations.general ? 
             `<p class="font-medium">Gerais:</p>
-            <p class="ml-4">${plan.plan_data.recommendations.general}</p>` : ''}
+            <p class="ml-4">${plan.plan_data.recommendations.general.replace(/carboidrato/gi, "carbo")}</p>` : ''}
           
           ${plan.plan_data.recommendations.preworkout ? 
             `<p class="font-medium">Pré-treino:</p>
-            <p class="ml-4">${plan.plan_data.recommendations.preworkout}</p>` : ''}
+            <p class="ml-4">${plan.plan_data.recommendations.preworkout.replace(/carboidrato/gi, "carbo")}</p>` : ''}
           
           ${plan.plan_data.recommendations.postworkout ? 
             `<p class="font-medium">Pós-treino:</p>
-            <p class="ml-4">${plan.plan_data.recommendations.postworkout}</p>` : ''}
+            <p class="ml-4">${plan.plan_data.recommendations.postworkout.replace(/carboidrato/gi, "carbo")}</p>` : ''}
         </div>
       </div>
     </div>

@@ -19,13 +19,13 @@ export const MealSection = ({
 }: MealSectionProps) => {
   return (
     <div className="bg-white rounded-lg shadow-sm p-6">
-      <h2 className="text-lg font-semibold flex items-center gap-2 text-green-700 mb-4">
+      <h2 className="text-lg font-semibold flex items-center gap-2 text-gray-900 mb-4">
         {icon}
         {title} ({meal.calories} kcal)
       </h2>
 
       <div className="mb-4">
-        <p className="text-gray-600 italic">{meal.description}</p>
+        <p className="text-gray-600 italic">{meal.description?.replace(/carboidrato/gi, "carbo")}</p>
       </div>
 
       <div className="space-y-4">
@@ -36,11 +36,11 @@ export const MealSection = ({
                 <div className="flex items-baseline gap-1">
                   <span className="font-medium">{food.portion} {food.unit}</span>
                   <span className="text-gray-600">de</span>
-                  <span>{food.name}</span>
+                  <span>{food.name.replace(/carboidrato/gi, "carbo")}</span>
                 </div>
                 {food.details && (
                   <span className="text-gray-500 text-sm block mt-1 ml-4">
-                    {food.details}
+                    {food.details.replace(/carboidrato/gi, "carbo")}
                   </span>
                 )}
               </div>
@@ -53,7 +53,7 @@ export const MealSection = ({
       <div className="mt-6 text-sm text-gray-600 border-t pt-4">
         <div className="grid grid-cols-4 gap-2 mt-2">
           <div className="font-medium">Proteínas: {meal.macros.protein}g</div>
-          <div className="font-medium">Carboidratos: {meal.macros.carbs}g</div>
+          <div className="font-medium">Carbos: {meal.macros.carbs}g</div>
           <div className="font-medium">Gorduras: {meal.macros.fats}g</div>
           <div className="font-medium">Fibras: {meal.macros.fiber}g</div>
         </div>

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Meal } from '@/types/education';
 import { Card } from "@/components/ui/card";
@@ -40,7 +39,6 @@ const MealsList = ({ meals }: MealsListProps) => {
   };
 
   const renderMealContent = (meal: string[]) => {
-    // Handle food groups table
     if (meal.some(item => item.includes("Carboidratos:") || item.includes("Proteínas:"))) {
       const sections: { [key: string]: string[] } = {
         carboidratos: [],
@@ -79,11 +77,11 @@ const MealsList = ({ meals }: MealsListProps) => {
               <div key={key} className="border rounded-lg overflow-hidden">
                 <Button
                   variant="ghost"
-                  className="w-full flex justify-between items-center p-4 hover:bg-primary-50"
+                  className="w-full flex justify-between items-center p-4 hover:bg-gray-50"
                   onClick={() => toggleSection(key)}
                 >
-                  <span className="font-semibold text-primary-700">
-                    {sectionTitles[key as keyof typeof sectionTitles]}
+                  <span className="font-semibold text-gray-900">
+                    {key === 'carboidratos' ? 'Carbos' : sectionTitles[key as keyof typeof sectionTitles]}
                   </span>
                   {visibleSections.includes(key) ? (
                     <ChevronUp className="h-5 w-5" />
@@ -97,7 +95,7 @@ const MealsList = ({ meals }: MealsListProps) => {
                       {items.map((item, index) => (
                         <li key={index} className="text-gray-700 flex items-center">
                           <div className="w-2 h-2 rounded-full bg-primary-300 mr-3" />
-                          {item}
+                          {item.replace(/carboidrato/gi, "carbo")}
                         </li>
                       ))}
                     </ul>
@@ -114,7 +112,7 @@ const MealsList = ({ meals }: MealsListProps) => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-1/4">Carboidratos</TableHead>
+                <TableHead className="w-1/4">Carbos</TableHead>
                 <TableHead className="w-1/4">Proteínas</TableHead>
                 <TableHead className="w-1/4">Gorduras</TableHead>
                 <TableHead className="w-1/4">Frutas</TableHead>
@@ -129,7 +127,7 @@ const MealsList = ({ meals }: MealsListProps) => {
               ) }).map((_, index) => (
                 <TableRow key={index}>
                   <TableCell className="font-medium">
-                    {sections.carboidratos[index] || ''}
+                    {sections.carboidratos[index]?.replace(/carboidrato/gi, "carbo") || ''}
                   </TableCell>
                   <TableCell>{sections.proteinas[index] || ''}</TableCell>
                   <TableCell>{sections.gorduras[index] || ''}</TableCell>
@@ -142,7 +140,6 @@ const MealsList = ({ meals }: MealsListProps) => {
       );
     }
 
-    // Handle combinations section
     if (meal.some(item => item.startsWith("Opção"))) {
       const combinations: { [key: string]: string[] } = {};
       let currentOption = '';
@@ -212,7 +209,6 @@ const MealsList = ({ meals }: MealsListProps) => {
       );
     }
 
-    // For regular meal content, render as before
     return (
       <table className="w-full">
         <tbody>
@@ -248,4 +244,3 @@ const MealsList = ({ meals }: MealsListProps) => {
 };
 
 export default MealsList;
-
