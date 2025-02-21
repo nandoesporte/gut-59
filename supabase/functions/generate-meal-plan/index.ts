@@ -33,8 +33,9 @@ serve(async (req) => {
       );
     }
 
-    const systemPrompt = `You are a nutrition expert. Create a weekly meal plan in Portuguese using ONLY the provided foods.
-    Return a JSON object with this exact structure for each day:
+    const systemPrompt = `You are a nutrition expert API that returns ONLY raw JSON, no markdown formatting or explanation text.
+    Create a weekly meal plan in Portuguese using ONLY the provided foods.
+    The response must be a valid JSON object with this exact structure:
 
     {
       "monday": {
@@ -50,22 +51,24 @@ serve(async (req) => {
             ],
             "calories": number
           },
-          "morningSnack": { /* same as breakfast */ },
-          "lunch": { /* same as breakfast */ },
-          "afternoonSnack": { /* same as breakfast */ },
-          "dinner": { /* same as breakfast */ }
+          "morningSnack": { same as breakfast },
+          "lunch": { same as breakfast },
+          "afternoonSnack": { same as breakfast },
+          "dinner": { same as breakfast }
         },
         "totalNutrition": {
           "calories": number
         }
       },
-      /* same structure for tuesday through sunday */,
+      [same structure for tuesday through sunday],
       "recommendations": {
         "general": "string",
         "preworkout": "string",
         "postworkout": "string"
       }
-    }`;
+    }
+
+    Return ONLY the JSON object, with no markdown formatting, no \`\`\`json tags, and no explanation text.`;
 
     const userPrompt = `Create a weekly meal plan with:
     Target Daily Calories: ${userData.dailyCalories}kcal
@@ -80,9 +83,10 @@ serve(async (req) => {
     1. Use ONLY the provided foods
     2. Keep daily calories close to the target
     3. Create varied meals across the week
-    4. Include ALL required fields in the JSON structure
-    5. All numeric values must be numbers (not strings)
-    6. Return ONLY the JSON object, no additional text`;
+    4. All numeric values must be numbers, not strings
+    5. Return ONLY the raw JSON object, no markdown or explanation
+    6. Do not include \`\`\`json tags or any other formatting
+    7. Response must be valid JSON that can be parsed with JSON.parse()`;
 
     console.log('Sending request to OpenAI...');
 
@@ -122,9 +126,15 @@ serve(async (req) => {
 
     try {
       const content = data.choices[0].message.content.trim();
-      console.log('Parsing response...');
       
-      const weeklyPlan = JSON.parse(content);
+      // Remove any markdown formatting if present
+      const cleanContent = content
+        .replace(/```json\n?/g, '')
+        .replace(/```\n?/g, '')
+        .trim();
+      
+      console.log('Attempting to parse cleaned content');
+      const weeklyPlan = JSON.parse(cleanContent);
       console.log('Successfully parsed JSON');
 
       const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
