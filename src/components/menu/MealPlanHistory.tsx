@@ -52,7 +52,7 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
         throw error;
       }
 
-      // Atualiza o estado local imediatamente
+      // Remove o plano da lista local imediatamente
       setLocalPlans(prev => prev.filter(plan => plan.id !== planId));
       
       toast.dismiss(toastId);
