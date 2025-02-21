@@ -41,6 +41,7 @@ serve(async (req) => {
       "monday": {
         "dailyPlan": {
           "breakfast": {
+            "description": "string",
             "foods": [
               {
                 "name": "string",
@@ -49,32 +50,43 @@ serve(async (req) => {
                 "details": "string"
               }
             ],
-            "calories": number
+            "calories": number,
+            "macros": {
+              "protein": number,
+              "carbs": number,
+              "fats": number,
+              "fiber": number
+            }
           },
-          "morningSnack": { same as breakfast },
-          "lunch": { same as breakfast },
-          "afternoonSnack": { same as breakfast },
-          "dinner": { same as breakfast }
+          "morningSnack": { same structure as breakfast },
+          "lunch": { same structure as breakfast },
+          "afternoonSnack": { same structure as breakfast },
+          "dinner": { same structure as breakfast }
         },
         "totalNutrition": {
-          "calories": number
+          "calories": number,
+          "protein": number,
+          "carbs": number,
+          "fats": number,
+          "fiber": number
         }
       },
       [same structure for tuesday through sunday],
       "recommendations": {
         "general": "string",
         "preworkout": "string",
-        "postworkout": "string"
+        "postworkout": "string",
+        "timing": ["string"]
       }
     }
 
-    Return ONLY the JSON object, with no markdown formatting, no \`\`\`json tags, and no explanation text.`;
+    Return ONLY the JSON object, with no markdown formatting or explanation text.`;
 
     const userPrompt = `Create a weekly meal plan with:
     Target Daily Calories: ${userData.dailyCalories}kcal
     Profile: ${userData.age} years, ${userData.gender}, ${userData.weight}kg
     Goal: ${userData.goal}
-    Available Foods: ${selectedFoods.map(f => `${f.name} (${f.calories}kcal/100g)`).join(', ')}
+    Available Foods: ${selectedFoods.map(f => `${f.name} (${f.calories}kcal/100g, P:${f.protein}g, C:${f.carbs}g, F:${f.fats}g)`).join(', ')}
     Dietary Restrictions: ${dietaryPreferences.dietaryRestrictions?.join(', ') || 'None'}
     Allergies: ${dietaryPreferences.allergies?.join(', ') || 'None'}
     Training Time: ${dietaryPreferences.trainingTime || 'Not specified'}
@@ -83,10 +95,10 @@ serve(async (req) => {
     1. Use ONLY the provided foods
     2. Keep daily calories close to the target
     3. Create varied meals across the week
-    4. All numeric values must be numbers, not strings
-    5. Return ONLY the raw JSON object, no markdown or explanation
-    6. Do not include \`\`\`json tags or any other formatting
-    7. Response must be valid JSON that can be parsed with JSON.parse()`;
+    4. Include description and macros for each meal
+    5. All numeric values must be numbers, not strings
+    6. Return ONLY the raw JSON object
+    7. Include timing array in recommendations`;
 
     console.log('Sending request to OpenAI...');
 
@@ -125,22 +137,19 @@ serve(async (req) => {
     }
 
     try {
-      const content = data.choices[0].message.content.trim();
-      
-      // Remove any markdown formatting if present
-      const cleanContent = content
+      const content = data.choices[0].message.content.trim()
         .replace(/```json\n?/g, '')
         .replace(/```\n?/g, '')
         .trim();
       
-      console.log('Attempting to parse cleaned content');
-      const weeklyPlan = JSON.parse(cleanContent);
+      console.log('Raw content:', content);
+      const weeklyPlan = JSON.parse(content);
       console.log('Successfully parsed JSON');
 
       const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
       const meals = ['breakfast', 'morningSnack', 'lunch', 'afternoonSnack', 'dinner'];
 
-      // Validate the structure
+      // Validate each day's plan
       for (const day of days) {
         if (!weeklyPlan[day]) {
           throw new Error(`Missing day: ${day}`);
@@ -157,12 +166,16 @@ serve(async (req) => {
             throw new Error(`Missing ${meal} for ${day}`);
           }
 
+          if (typeof mealPlan.description !== 'string') {
+            throw new Error(`Missing description for ${day} ${meal}`);
+          }
+
           if (!Array.isArray(mealPlan.foods)) {
             throw new Error(`Invalid foods array for ${day} ${meal}`);
           }
 
           for (const food of mealPlan.foods) {
-            if (!food.name || !food.portion || !food.unit || !food.details) {
+            if (!food.name || typeof food.portion !== 'number' || !food.unit || !food.details) {
               throw new Error(`Invalid food structure in ${day} ${meal}`);
             }
           }
@@ -170,9 +183,24 @@ serve(async (req) => {
           if (typeof mealPlan.calories !== 'number') {
             throw new Error(`Invalid calories for ${day} ${meal}`);
           }
+
+          const macros = mealPlan.macros;
+          if (!macros || 
+              typeof macros.protein !== 'number' ||
+              typeof macros.carbs !== 'number' ||
+              typeof macros.fats !== 'number' ||
+              typeof macros.fiber !== 'number') {
+            throw new Error(`Invalid macros for ${day} ${meal}`);
+          }
         }
 
-        if (!dayPlan.totalNutrition || typeof dayPlan.totalNutrition.calories !== 'number') {
+        const nutrition = dayPlan.totalNutrition;
+        if (!nutrition || 
+            typeof nutrition.calories !== 'number' ||
+            typeof nutrition.protein !== 'number' ||
+            typeof nutrition.carbs !== 'number' ||
+            typeof nutrition.fats !== 'number' ||
+            typeof nutrition.fiber !== 'number') {
           throw new Error(`Invalid totalNutrition for ${day}`);
         }
       }
@@ -180,7 +208,8 @@ serve(async (req) => {
       if (!weeklyPlan.recommendations ||
           typeof weeklyPlan.recommendations.general !== 'string' ||
           typeof weeklyPlan.recommendations.preworkout !== 'string' ||
-          typeof weeklyPlan.recommendations.postworkout !== 'string') {
+          typeof weeklyPlan.recommendations.postworkout !== 'string' ||
+          !Array.isArray(weeklyPlan.recommendations.timing)) {
         throw new Error('Invalid recommendations structure');
       }
 
