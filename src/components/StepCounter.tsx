@@ -34,28 +34,20 @@ const StepCounter = () => {
 
   const requestPermissions = async () => {
     try {
-      // Verificar se o dispositivo suporta acelerômetro
-      const isAvailable = await Motion.isAvailable();
-      
-      if (!isAvailable) {
-        toast.error("Seu dispositivo não suporta contagem de passos");
-        return false;
-      }
+      // According to Capacitor Motion API, we start listening directly
+      // If the device doesn't support it, it will throw an error
+      await Motion.addListener('accel', () => {
+        // Test listener to check if accelerometer is available
+        console.log('Accelerometer is available');
+      });
 
-      // Solicitar permissão para usar o acelerômetro
-      const permissionResult = await Motion.requestPermission();
-      
-      if (permissionResult.granted) {
-        toast.success("Permissão concedida para contagem de passos");
-        setHasPermission(true);
-        return true;
-      } else {
-        toast.error("Permissão negada para contagem de passos");
-        return false;
-      }
+      // If we reach here, the accelerometer is available
+      setHasPermission(true);
+      toast.success("Permissão concedida para contagem de passos");
+      return true;
     } catch (error) {
-      console.error('Erro ao solicitar permissões:', error);
-      toast.error("Erro ao solicitar permissões");
+      console.error('Erro ao acessar sensores de movimento:', error);
+      toast.error("Seu dispositivo não suporta contagem de passos");
       return false;
     }
   };
