@@ -69,6 +69,7 @@ const determineWeightRecommendation = (
 };
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -76,11 +77,18 @@ serve(async (req) => {
   try {
     const { preferences, userId } = await req.json()
 
-    if (!preferences || !userId) {
-      throw new Error('Missing required parameters')
-    }
+    console.log("Received request with:", { preferences, userId });
 
-    console.log("Received preferences:", preferences)
+    if (!preferences || !userId) {
+      console.error("Missing required parameters");
+      return new Response(
+        JSON.stringify({ error: 'Missing required parameters' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        }
+      )
+    }
 
     // Initialize Supabase client
     const supabaseClient = createClient(
@@ -88,46 +96,73 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Fetch user data to get their current fitness profile
-    const { data: userPreferences, error: userError } = await supabaseClient
-      .from('user_workout_preferences')
+    // Fetch appropriate exercises based on preferences and equipment
+    const { data: exercises, error: exercisesError } = await supabaseClient
+      .from('exercises')
       .select('*')
-      .eq('user_id', userId)
-      .single()
+      .order('created_at')
 
-    if (userError) {
-      throw new Error(`Error fetching user preferences: ${userError.message}`)
+    if (exercisesError) {
+      console.error("Error fetching exercises:", exercisesError);
+      return new Response(
+        JSON.stringify({ error: 'Error fetching exercises' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      )
     }
+
+    if (!exercises || exercises.length === 0) {
+      console.error("No exercises found in database");
+      return new Response(
+        JSON.stringify({ error: 'No exercises available' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 404,
+        }
+      )
+    }
+
+    console.log(`Found ${exercises.length} exercises`);
 
     // Determine user's fitness level
     const fitnessLevel = calculateFitnessLevel(preferences)
     console.log("Calculated fitness level:", fitnessLevel)
 
-    // Fetch appropriate exercises based on preferences and equipment
-    const { data: exercises, error: exercisesError } = await supabaseClient
-      .from('exercises')
-      .select('*')
-      .in('exercise_type', preferences.preferred_exercise_types)
-      .order('created_at')
+    // Filter exercises based on user preferences
+    const filteredExercises = exercises.filter(ex => {
+      // Check if exercise type matches preferences
+      const matchesType = preferences.preferred_exercise_types.includes(ex.exercise_type);
+      
+      // Check if required equipment is available
+      const hasEquipment = preferences.available_equipment.includes('all') || 
+                          !ex.equipment_needed || 
+                          ex.equipment_needed.some((eq: string) => preferences.available_equipment.includes(eq));
+      
+      return matchesType && hasEquipment;
+    });
 
-    if (exercisesError) {
-      throw new Error(`Error fetching exercises: ${exercisesError.message}`)
+    if (filteredExercises.length === 0) {
+      console.error("No suitable exercises found after filtering");
+      return new Response(
+        JSON.stringify({ error: 'No suitable exercises found for your preferences' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 404,
+        }
+      )
     }
-
-    console.log(`Found ${exercises.length} suitable exercises`)
 
     // Create workout sessions
     const workoutSessions = Array.from({ length: 3 }, (_, i) => {
-      const dayExercises = exercises
-        .filter(ex => preferences.available_equipment.includes('all') || 
-                     !ex.equipment_needed || 
-                     ex.equipment_needed.some((eq: string) => preferences.available_equipment.includes(eq)))
+      const dayExercises = filteredExercises
         .slice(i * 4, (i + 1) * 4)
         .map(exercise => ({
           name: exercise.name,
-          sets: Math.min(Math.max(3, exercise.min_sets), exercise.max_sets),
-          reps: Math.min(Math.max(8, exercise.min_reps), exercise.max_reps),
-          rest_time_seconds: exercise.rest_time_seconds,
+          sets: Math.min(Math.max(3, exercise.min_sets || 3), exercise.max_sets || 5),
+          reps: Math.min(Math.max(8, exercise.min_reps || 8), exercise.max_reps || 12),
+          rest_time_seconds: exercise.rest_time_seconds || 60,
           gifUrl: exercise.gif_url,
           weight_recommendation: determineWeightRecommendation(
             exercise,
@@ -163,9 +198,17 @@ serve(async (req) => {
       .insert([workoutPlan]);
 
     if (saveError) {
-      throw new Error(`Error saving workout plan: ${saveError.message}`);
+      console.error("Error saving workout plan:", saveError);
+      return new Response(
+        JSON.stringify({ error: 'Error saving workout plan' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      )
     }
 
+    console.log("Successfully created workout plan");
     return new Response(
       JSON.stringify(workoutPlan),
       {
@@ -175,12 +218,12 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Error:', error.message)
+    console.error('Error in generate-workout-plan:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message || 'Internal server error' }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
+        status: 500,
       },
     )
   }
