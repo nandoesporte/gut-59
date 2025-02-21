@@ -43,9 +43,10 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
       gender: "male",
       goal: "maintain",
       activity_level: "moderate",
-      preferred_exercise_types: [],
+      preferred_exercise_types: ["strength"],
       training_location: "gym",
     },
+    mode: "onChange"  // Adiciona validação em tempo real
   });
 
   const handleSubmit = async (data: FormSchema) => {
@@ -74,7 +75,6 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
           : ["bodyweight"],
       };
 
-      // Save preferences to database
       const { error: upsertError } = await supabase
         .from('user_workout_preferences')
         .upsert({
@@ -100,6 +100,9 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
       toast.error(error.message || "Erro ao salvar preferências. Por favor, tente novamente.");
     }
   };
+
+  // Verificar se o formulário está válido
+  const isValid = form.formState.isValid;
 
   return (
     <Form {...form}>
@@ -129,7 +132,7 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
             <Button 
               type="submit" 
               className="w-full"
-              disabled={!form.formState.isValid}
+              disabled={!isValid}
               size="lg"
             >
               Gerar Plano de Treino
