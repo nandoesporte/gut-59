@@ -3,6 +3,55 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { corsHeaders } from '../_shared/cors.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
+interface UserPreferences {
+  age: number;
+  weight: number;
+  height: number;
+  gender: 'male' | 'female';
+  goal: string;
+  activity_level: string;
+  preferred_exercise_types: string[];
+  available_equipment: string[];
+}
+
+function calculateBaseWeight(exercise: any, preferences: UserPreferences): {
+  beginner: string;
+  intermediate: string;
+  advanced: string;
+} {
+  // Fator base dependendo do sexo
+  const genderFactor = preferences.gender === 'male' ? 1 : 0.8;
+  
+  // Fator de peso corporal (pessoas mais pesadas podem geralmente levantar mais peso)
+  const weightFactor = preferences.weight / 70; // 70kg como referência
+  
+  // Fator de experiência baseado no nível de atividade
+  const experienceFactor = {
+    sedentary: 0.6,
+    light: 0.8,
+    moderate: 1,
+    intense: 1.2
+  }[preferences.activity_level] || 1;
+
+  // Fator de idade (força tende a diminuir após certa idade)
+  const ageFactor = preferences.age > 50 ? 0.8 : 1;
+
+  // Base weight calculation
+  let baseWeight = 10 * genderFactor * weightFactor * experienceFactor * ageFactor;
+
+  // Ajuste baseado no tipo de exercício
+  if (exercise.exercise_type === 'compound') {
+    baseWeight *= 1.5; // Exercícios compostos permitem mais peso
+  }
+
+  // Definir ranges para cada nível
+  return {
+    beginner: `${Math.round(baseWeight * 0.6)}-${Math.round(baseWeight * 0.8)}kg`,
+    intermediate: `${Math.round(baseWeight * 0.8)}-${Math.round(baseWeight * 1.0)}kg`,
+    advanced: `${Math.round(baseWeight * 1.0)}-${Math.round(baseWeight * 1.3)}kg`
+  };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -32,12 +81,12 @@ serve(async (req) => {
       throw new Error('Missing required parameters')
     }
 
-    console.log('Creating workout plan for user:', userId, 'with preferences:', preferences)
-
-    // Fetch available exercises
+    // Fetch exercises based on preferences
     const { data: exercises, error: exercisesError } = await supabaseAdmin
       .from('exercises')
       .select('*')
+      .filter('equipment_needed', 'overlaps', preferences.available_equipment)
+      .filter('exercise_type', 'in', `(${preferences.preferred_exercise_types.join(',')})`)
 
     if (exercisesError) {
       console.error('Error fetching exercises:', exercisesError)
@@ -45,25 +94,19 @@ serve(async (req) => {
     }
 
     if (!exercises || exercises.length === 0) {
-      throw new Error('No exercises found')
+      throw new Error('No suitable exercises found for the given preferences')
     }
 
-    // Validate goal from preferences
-    if (!preferences.goal) {
-      throw new Error('Missing workout goal')
-    }
+    console.log(`Found ${exercises.length} suitable exercises`)
 
-    // First, create the workout plan with proper date formatting
+    // Create workout plan
     const workoutPlan = {
       user_id: userId,
       goal: preferences.goal,
-      start_date: new Date().toISOString().split('T')[0], // Format as YYYY-MM-DD
-      end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // 30 days from now
+      start_date: new Date().toISOString().split('T')[0],
+      end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     }
 
-    console.log('Attempting to save workout plan:', workoutPlan)
-
-    // Save workout plan
     const { data: savedPlan, error: planError } = await supabaseAdmin
       .from('workout_plans')
       .insert(workoutPlan)
@@ -75,71 +118,72 @@ serve(async (req) => {
       throw new Error(`Failed to save workout plan: ${planError.message}`)
     }
 
-    console.log('Successfully saved workout plan:', savedPlan)
+    // Generate sessions based on preferences
+    const sessionsPerWeek = preferences.activity_level === 'intense' ? 5 :
+                           preferences.activity_level === 'moderate' ? 4 :
+                           preferences.activity_level === 'light' ? 3 : 2;
 
-    // Generate and save workout sessions
-    const sessions = generateWorkoutSessions(exercises, preferences)
-    const workoutSessions = sessions.map(session => ({
-      plan_id: savedPlan.id,
-      day_number: session.day_number,
-      warmup_description: session.warmup_description,
-      cooldown_description: session.cooldown_description
-    }))
+    const sessions = [];
+    for (let i = 0; i < sessionsPerWeek; i++) {
+      // Selecionar exercícios baseados no objetivo
+      const exercisesCount = preferences.goal === 'gain_mass' ? 6 :
+                            preferences.goal === 'lose_weight' ? 8 : 5;
 
-    // Save workout sessions
+      const selectedExercises = exercises
+        .sort(() => Math.random() - 0.5)
+        .slice(0, exercisesCount);
+
+      sessions.push({
+        plan_id: savedPlan.id,
+        day_number: i + 1,
+        warmup_description: "5-10 minutos de aquecimento geral, incluindo alongamentos dinâmicos",
+        cooldown_description: "5 minutos de alongamentos e exercícios de relaxamento"
+      });
+    }
+
+    // Save sessions
     const { data: savedSessions, error: sessionsError } = await supabaseAdmin
       .from('workout_sessions')
-      .insert(workoutSessions)
+      .insert(sessions)
       .select()
 
     if (sessionsError) {
-      console.error('Error saving workout sessions:', sessionsError)
-      await supabaseAdmin
-        .from('workout_plans')
-        .delete()
-        .eq('id', savedPlan.id)
+      console.error('Error saving sessions:', sessionsError)
+      await supabaseAdmin.from('workout_plans').delete().eq('id', savedPlan.id)
       throw new Error('Failed to save workout sessions')
     }
 
-    console.log('Successfully saved workout sessions:', savedSessions)
-
-    // Save session exercises for each session
+    // Generate exercises for each session with appropriate weights
     for (const session of savedSessions) {
-      const originalSession = sessions.find(s => s.day_number === session.day_number)
-      if (!originalSession) continue
+      const exercisesForSession = exercises
+        .sort(() => Math.random() - 0.5)
+        .slice(0, preferences.goal === 'gain_mass' ? 6 : 8)
+        .map((exercise, index) => {
+          const weights = calculateBaseWeight(exercise, preferences);
+          
+          return {
+            session_id: session.id,
+            exercise_id: exercise.id,
+            sets: preferences.goal === 'gain_mass' ? 4 : 3,
+            reps: preferences.goal === 'gain_mass' ? 8 : 12,
+            rest_time_seconds: preferences.goal === 'gain_mass' ? 90 : 60,
+            order_in_session: index + 1
+          };
+        });
 
-      const sessionExercises = originalSession.exercises.map((exercise, index) => {
-        const exerciseRecord = exercises.find(e => e.name === exercise.name)
-        if (!exerciseRecord) {
-          console.warn(`Exercise not found: ${exercise.name}`)
-          return null
-        }
+      const { error: exercisesError } = await supabaseAdmin
+        .from('session_exercises')
+        .insert(exercisesForSession)
 
-        return {
-          session_id: session.id,
-          exercise_id: exerciseRecord.id,
-          sets: exercise.sets,
-          reps: exercise.reps,
-          rest_time_seconds: exercise.rest_time_seconds,
-          order_in_session: index + 1
-        }
-      }).filter(Boolean)
-
-      if (sessionExercises.length > 0) {
-        const { error: exercisesError } = await supabaseAdmin
-          .from('session_exercises')
-          .insert(sessionExercises)
-
-        if (exercisesError) {
-          console.error('Error saving session exercises:', exercisesError)
-          await supabaseAdmin.from('workout_sessions').delete().eq('plan_id', savedPlan.id)
-          await supabaseAdmin.from('workout_plans').delete().eq('id', savedPlan.id)
-          throw new Error('Failed to save session exercises')
-        }
+      if (exercisesError) {
+        console.error('Error saving session exercises:', exercisesError)
+        await supabaseAdmin.from('workout_sessions').delete().eq('plan_id', savedPlan.id)
+        await supabaseAdmin.from('workout_plans').delete().eq('id', savedPlan.id)
+        throw new Error('Failed to save session exercises')
       }
     }
 
-    // Fetch the complete workout plan with all related data
+    // Fetch complete plan with all related data
     const { data: completePlan, error: fetchError } = await supabaseAdmin
       .from('workout_plans')
       .select(`
@@ -160,26 +204,28 @@ serve(async (req) => {
       throw new Error('Failed to fetch complete workout plan')
     }
 
-    // Transform the data to match the expected format
+    // Transform data with proper weight recommendations
     const transformedPlan = {
       ...completePlan,
       workout_sessions: completePlan.workout_sessions.map(session => ({
         day_number: session.day_number,
         warmup_description: session.warmup_description,
         cooldown_description: session.cooldown_description,
-        exercises: session.session_exercises.map(se => ({
-          name: se.exercise.name,
-          sets: se.sets,
-          reps: se.reps,
-          rest_time_seconds: se.rest_time_seconds,
-          gifUrl: se.exercise.gif_url,
-          weight_recommendation: {
-            beginner: '8-12kg',
-            intermediate: '12-15kg',
-            advanced: '15-20kg'
-          },
-          notes: se.exercise.description
-        }))
+        exercises: session.session_exercises.map(se => {
+          const weights = calculateBaseWeight(se.exercise, preferences);
+          return {
+            name: se.exercise.name,
+            sets: se.sets,
+            reps: se.reps,
+            rest_time_seconds: se.rest_time_seconds,
+            gifUrl: se.exercise.gif_url,
+            weight_recommendation: weights,
+            notes: `${se.exercise.description || ''}
+                   \nTipo: ${se.exercise.exercise_type}
+                   \nGrupo Muscular: ${se.exercise.muscle_group}
+                   \nEquipamento: ${se.exercise.equipment_needed?.join(', ') || 'Nenhum'}`
+          };
+        })
       }))
     }
 
@@ -196,11 +242,8 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in edge function:', error)
-    
     return new Response(
-      JSON.stringify({
-        error: error.message || 'Internal server error',
-      }),
+      JSON.stringify({ error: error.message || 'Internal server error' }),
       {
         headers: {
           ...corsHeaders,
@@ -211,32 +254,3 @@ serve(async (req) => {
     )
   }
 })
-
-function generateWorkoutSessions(exercises: any[], preferences: any) {
-  const sessions = []
-  const sessionsPerWeek = 3
-  
-  for (let i = 0; i < sessionsPerWeek; i++) {
-    const dayNumber = i + 1
-    const selectedExercises = exercises
-      .sort(() => Math.random() - 0.5)
-      .slice(0, 4)
-      .map(exercise => ({
-        name: exercise.name,
-        sets: 3,
-        reps: 12,
-        rest_time_seconds: 60,
-        gifUrl: exercise.gif_url,
-        notes: exercise.description || undefined
-      }))
-
-    sessions.push({
-      day_number: dayNumber,
-      warmup_description: "5-10 minutos de aquecimento geral, incluindo alongamentos dinâmicos",
-      cooldown_description: "5 minutos de alongamentos e exercícios de relaxamento",
-      exercises: selectedExercises
-    })
-  }
-
-  return sessions
-}
