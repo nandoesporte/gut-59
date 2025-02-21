@@ -1,25 +1,14 @@
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { FileText, Loader2, RefreshCcw, Trash2 } from "lucide-react";
+import { Loader2, RefreshCcw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
 import { toast } from "sonner";
-import type { MealPlan } from "./types";
 import { generateMealPlanPDF } from "./utils/pdf-generator";
-
-interface MealPlanItem {
-  id: string;
-  created_at: string;
-  plan_data: MealPlan;
-  calories: number;
-}
-
-interface MealPlanHistoryProps {
-  isLoading: boolean;
-  historyPlans?: MealPlanItem[];
-  onRefresh: () => Promise<void>;
-}
+import { MealPlanCard } from "./components/MealPlanCard";
+import { createPDFContent } from "./utils/meal-plan-helpers";
+import type { MealPlanHistoryProps, MealPlanItem } from "./types/meal-plan-history";
 
 export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlanHistoryProps) => {
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
@@ -66,53 +55,7 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
     try {
       setGeneratingPDF(prev => new Set([...prev, plan.id]));
       
-      const tempDiv = document.createElement('div');
-      tempDiv.className = 'pdf-content bg-white p-8';
-      
-      tempDiv.innerHTML = `
-        <div class="space-y-6">
-          <div class="text-center">
-            <h1 class="text-2xl font-bold mb-2">Plano Alimentar</h1>
-            <p class="text-gray-600">Data: ${new Date(plan.created_at).toLocaleDateString()}</p>
-            <p class="text-gray-600">Meta Calórica: ${plan.calories} kcal</p>
-          </div>
-
-          ${Object.entries(plan.plan_data.dailyPlan).map(([meal, data]) => `
-            <div class="mb-6">
-              <h2 class="text-xl font-semibold mb-2">${formatMealTitle(meal)}</h2>
-              <div class="space-y-2">
-                ${data.foods.map(food => `
-                  <div class="ml-4">
-                    <p>• ${food.name} - ${food.portion} ${food.unit}</p>
-                    ${food.details ? `<p class="text-sm text-gray-600 ml-4">${food.details}</p>` : ''}
-                  </div>
-                `).join('')}
-              </div>
-              <div class="mt-2 text-sm text-gray-600">
-                <p>Calorias: ${data.calories} kcal</p>
-              </div>
-            </div>
-          `).join('')}
-
-          <div class="mt-8">
-            <h2 class="text-xl font-semibold mb-2">Recomendações</h2>
-            <div class="space-y-2">
-              ${plan.plan_data.recommendations.general ? 
-                `<p class="font-medium">Gerais:</p>
-                <p class="ml-4">${plan.plan_data.recommendations.general}</p>` : ''}
-              
-              ${plan.plan_data.recommendations.preworkout ? 
-                `<p class="font-medium">Pré-treino:</p>
-                <p class="ml-4">${plan.plan_data.recommendations.preworkout}</p>` : ''}
-              
-              ${plan.plan_data.recommendations.postworkout ? 
-                `<p class="font-medium">Pós-treino:</p>
-                <p class="ml-4">${plan.plan_data.recommendations.postworkout}</p>` : ''}
-            </div>
-          </div>
-        </div>
-      `;
-
+      const tempDiv = createPDFContent(plan);
       document.body.appendChild(tempDiv);
       await generateMealPlanPDF(tempDiv);
       document.body.removeChild(tempDiv);
@@ -128,17 +71,6 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
         return newSet;
       });
     }
-  };
-
-  const formatMealTitle = (meal: string): string => {
-    const titles: Record<string, string> = {
-      breakfast: "Café da Manhã",
-      morningSnack: "Lanche da Manhã",
-      lunch: "Almoço",
-      afternoonSnack: "Lanche da Tarde",
-      dinner: "Jantar"
-    };
-    return titles[meal] || meal;
   };
 
   if (isLoading) {
@@ -169,44 +101,14 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
 
       <div className="grid gap-4">
         {historyPlans.map((plan) => (
-          <Card key={plan.id} className="p-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="font-medium">
-                  Plano Alimentar - {new Date(plan.created_at).toLocaleDateString()}
-                </p>
-                <p className="text-sm text-gray-500">
-                  Calorias: {plan.calories} kcal
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDelete(plan.id)}
-                  disabled={deletingIds.has(plan.id)}
-                >
-                  {deletingIds.has(plan.id) ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="w-4 h-4" />
-                  )}
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => handleDownloadPDF(plan)}
-                  disabled={generatingPDF.has(plan.id)}
-                >
-                  {generatingPDF.has(plan.id) ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <FileText className="w-4 h-4" />
-                  )}
-                </Button>
-              </div>
-            </div>
-          </Card>
+          <MealPlanCard
+            key={plan.id}
+            plan={plan}
+            onDelete={handleDelete}
+            onDownload={handleDownloadPDF}
+            isDeleting={deletingIds.has(plan.id)}
+            isGeneratingPDF={generatingPDF.has(plan.id)}
+          />
         ))}
       </div>
     </div>
