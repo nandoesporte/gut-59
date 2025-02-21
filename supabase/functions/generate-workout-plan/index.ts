@@ -14,7 +14,6 @@ const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -26,34 +25,42 @@ serve(async (req) => {
       throw new Error('Preferências ou ID do usuário não fornecidos');
     }
 
-    console.log('Gerando plano de treino para:', { preferences, userId });
+    console.log('Buscando exercícios com preferências:', preferences);
 
-    // Buscar exercícios disponíveis baseado nas preferências
-    const { data: exercises, error: exercisesError } = await supabase
+    // Modificada a query para usar contains e o campo correto equipment_needed
+    let query = supabase
       .from('exercises')
       .select('*')
-      .eq('equipment', preferences.available_equipment)
-      .in('type', preferences.preferred_exercise_types);
+      .in('exercise_type', preferences.preferred_exercise_types);
+
+    // Se o equipamento disponível não for "all", filtramos por equipamento
+    if (!preferences.available_equipment.includes('all')) {
+      query = query.contains('equipment_needed', preferences.available_equipment);
+    }
+
+    const { data: exercises, error: exercisesError } = await query;
 
     if (exercisesError) {
+      console.error('Erro ao buscar exercícios:', exercisesError);
       throw new Error('Erro ao buscar exercícios');
     }
 
     if (!exercises || exercises.length === 0) {
+      console.error('Nenhum exercício encontrado para as preferências:', preferences);
       throw new Error('Nenhum exercício encontrado para as preferências selecionadas');
     }
 
-    // Gerar plano de treino
+    console.log(`Encontrados ${exercises.length} exercícios compatíveis`);
+
     const workoutPlan = {
       id: crypto.randomUUID(),
       user_id: userId,
       goal: preferences.goal,
       start_date: new Date().toISOString(),
-      end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 dias
+      end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       workout_sessions: generateWorkoutSessions(exercises, preferences),
     };
 
-    // Salvar o plano no banco
     const { error: saveError } = await supabase
       .from('workout_plans')
       .insert([workoutPlan]);
@@ -119,7 +126,6 @@ function selectExercisesForSession(exercises: any[], preferences: any) {
   const exercisesPerSession = 6;
   const selectedExercises = [];
 
-  // Embaralhar exercícios
   const shuffledExercises = [...exercises].sort(() => Math.random() - 0.5);
 
   for (let i = 0; i < exercisesPerSession && i < shuffledExercises.length; i++) {
