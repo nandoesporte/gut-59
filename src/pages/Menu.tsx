@@ -77,6 +77,7 @@ const Menu = () => {
       case 1:
         return (
           <div className="space-y-8">
+            <MenuHeader onStart={() => setCurrentStep(1.5)} />
             <MealPlanHistory 
               isLoading={isHistoryLoading}
               historyPlans={historyPlans}
