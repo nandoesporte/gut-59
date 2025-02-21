@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FileText, Loader2, RefreshCcw, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import type { MealPlan } from "./types";
 import { generateMealPlanPDF } from "./utils/pdf-generator";
@@ -22,12 +22,6 @@ interface MealPlanHistoryProps {
 export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlanHistoryProps) => {
   const planRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
-  const [localPlans, setLocalPlans] = useState(historyPlans || []);
-
-  // Atualiza o estado local quando historyPlans muda
-  useEffect(() => {
-    setLocalPlans(historyPlans || []);
-  }, [historyPlans]);
 
   const handleDelete = async (planId: string) => {
     try {
@@ -44,7 +38,8 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
       const { error } = await supabase
         .from('meal_plans')
         .delete()
-        .eq('id', planId);
+        .eq('id', planId)
+        .eq('user_id', userData.user.id); // Garante que só exclui planos do usuário atual
 
       if (error) {
         toast.dismiss(toastId);
@@ -52,13 +47,10 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
         throw error;
       }
 
-      // Remove o plano da lista local imediatamente
-      setLocalPlans(prev => prev.filter(plan => plan.id !== planId));
-      
       toast.dismiss(toastId);
       toast.success("Plano alimentar excluído com sucesso");
       
-      // Atualiza os dados do servidor em segundo plano
+      // Atualiza a lista após exclusão bem-sucedida
       await onRefresh();
       
     } catch (error) {
@@ -99,7 +91,7 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
     );
   }
 
-  if (!localPlans || localPlans.length === 0) {
+  if (!historyPlans || historyPlans.length === 0) {
     return null;
   }
 
@@ -116,7 +108,7 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
       </div>
 
       <div className="grid gap-4">
-        {localPlans.map((plan) => (
+        {historyPlans.map((plan) => (
           <Card key={plan.id} className="p-4">
             <div 
               ref={el => planRefs.current[plan.id] = el}

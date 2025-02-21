@@ -10,67 +10,94 @@ export const generateMealPlanPDF = async (element: HTMLDivElement) => {
   }
 
   try {
-    // Configurações melhoradas para qualidade do PDF em formato A4
-    const canvas = await html2canvas(element, {
-      scale: 2, // Aumenta a qualidade
-      useCORS: true, // Permite carregar imagens de outros domínios
+    // Clone o elemento para poder modificá-lo sem afetar a UI
+    const clonedElement = element.cloneNode(true) as HTMLDivElement;
+    const container = document.createElement('div');
+    container.appendChild(clonedElement);
+    
+    // Aplica estilos específicos para o PDF
+    container.style.width = '595px'; // Largura do A4 em pixels
+    container.style.padding = '40px';
+    container.style.backgroundColor = '#ffffff';
+    container.style.color = '#000000';
+    container.style.fontSize = '12px';
+    
+    // Ajusta os estilos do clone para melhor visualização no PDF
+    const styles = `
+      .pdf-content {
+        font-family: Arial, sans-serif;
+        line-height: 1.5;
+        color: #000;
+      }
+      .pdf-content h1, .pdf-content h2, .pdf-content h3 {
+        margin: 10px 0;
+        color: #000;
+      }
+      .pdf-content p {
+        margin: 5px 0;
+        color: #000;
+      }
+    `;
+    
+    const styleElement = document.createElement('style');
+    styleElement.textContent = styles;
+    container.appendChild(styleElement);
+    
+    // Adiciona classe para estilização
+    clonedElement.classList.add('pdf-content');
+    
+    // Configurações do html2canvas para melhor qualidade
+    const canvas = await html2canvas(container, {
+      scale: 2,
+      useCORS: true,
       logging: false,
-      backgroundColor: "#ffffff",
+      backgroundColor: '#ffffff',
+      windowWidth: 595, // Largura do A4
     });
 
-    // Dimensões do A4 em pontos (72 pontos = 1 polegada)
-    const a4Width = 595.28; // 210mm em pontos
-    const a4Height = 841.89; // 297mm em pontos
-
-    // Cria o PDF em formato A4
+    // Configura o PDF no formato A4
+    const imgData = canvas.toDataURL('image/jpeg', 1.0);
     const pdf = new jsPDF({
       orientation: 'portrait',
-      unit: 'pt', // Usa pontos como unidade
+      unit: 'pt',
       format: 'a4'
     });
 
-    // Calcula a proporção para ajustar a imagem à largura do A4
-    const imgWidth = canvas.width;
-    const imgHeight = canvas.height;
-    const ratio = a4Width / imgWidth;
+    // Dimensões do A4 em pontos
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
     
-    // Calcula a altura proporcional
-    const fitHeight = imgHeight * ratio;
-    
-    // Adiciona a imagem ao PDF
-    pdf.addImage(
-      canvas.toDataURL('image/jpeg', 1.0),
-      'JPEG',
-      0, // x = 0 para alinhar à esquerda
-      0, // y = 0 para começar no topo
-      a4Width, // largura ajustada ao A4
-      fitHeight, // altura proporcional
-      undefined,
-      'FAST'
-    );
+    // Calcula as dimensões mantendo a proporção
+    const ratio = pageWidth / canvas.width;
+    const imgWidth = pageWidth;
+    const imgHeight = canvas.height * ratio;
 
-    // Se o conteúdo for maior que uma página A4, adiciona mais páginas
-    if (fitHeight > a4Height) {
-      const totalPages = Math.ceil(fitHeight / a4Height);
-      for (let page = 1; page < totalPages; page++) {
-        pdf.addPage();
-        pdf.addImage(
-          canvas.toDataURL('image/jpeg', 1.0),
-          'JPEG',
-          0,
-          -(page * a4Height), // Move o conteúdo para cima
-          a4Width,
-          fitHeight,
-          undefined,
-          'FAST'
-        );
-      }
+    // Adiciona a imagem ao PDF
+    let heightLeft = imgHeight;
+    let position = 0;
+    let page = 1;
+
+    // Primeira página
+    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+
+    // Adiciona páginas adicionais se necessário
+    while (heightLeft >= 0) {
+      pdf.addPage();
+      position = -(page * pageHeight);
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      page++;
     }
-    
+
+    // Salva o PDF
     pdf.save('plano-alimentar.pdf');
+    
+    // Remove o elemento temporário
+    container.remove();
 
   } catch (error) {
     console.error('Erro ao gerar PDF:', error);
-    throw error;
+    toast.error("Erro ao gerar PDF do plano alimentar");
   }
 };
