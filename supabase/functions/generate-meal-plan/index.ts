@@ -14,12 +14,26 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const { userData, selectedFoods, dietaryPreferences } = await req.json();
+
+    // Validação inicial dos dados recebidos
+    if (!userData || !selectedFoods || !dietaryPreferences) {
+      console.error('Dados inválidos recebidos:', { userData, selectedFoods, dietaryPreferences });
+      return new Response(
+        JSON.stringify({ error: 'Dados inválidos ou incompletos' }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
     const mealPlans = [];
 
     // Gerar 3 planos diferentes
@@ -29,82 +43,107 @@ serve(async (req) => {
       const dailyCalories = userData.dailyCalories;
       const { protein, carbs, fats } = calculateDailyMacros(dailyCalories, userData.goal);
 
-      const dailyPlan = await optimizeMeal({
-        selectedFoods,
-        dailyCalories,
-        targetMacros: { protein, carbs, fats },
-        preferences: dietaryPreferences,
-        trainingTime: dietaryPreferences.trainingTime,
-        variation: i // Passando o índice para gerar variações diferentes
-      });
+      try {
+        const dailyPlan = await optimizeMeal({
+          selectedFoods,
+          dailyCalories,
+          targetMacros: { protein, carbs, fats },
+          preferences: dietaryPreferences,
+          trainingTime: dietaryPreferences.trainingTime,
+          variation: i
+        });
 
-      const mealPlanAnalysis = analyzeMealPlan(dailyPlan);
-      const recommendations = generateRecommendations({
-        mealPlan: dailyPlan,
-        userGoal: userData.goal,
-        trainingTime: dietaryPreferences.trainingTime,
-        analysis: mealPlanAnalysis
-      });
+        const mealPlanAnalysis = analyzeMealPlan(dailyPlan);
+        const recommendations = generateRecommendations({
+          mealPlan: { dailyPlan, totalNutrition: { calories: 0, protein: 0, carbs: 0, fats: 0 }, recommendations: [] },
+          userGoal: userData.goal,
+          trainingTime: dietaryPreferences.trainingTime,
+          analysis: mealPlanAnalysis
+        });
 
-      const totalNutrition = {
-        calories: Object.values(dailyPlan).reduce((total, meal) => total + (meal?.calories || 0), 0),
-        protein: Object.values(dailyPlan).reduce((total, meal) => total + (meal?.macros.protein || 0), 0),
-        carbs: Object.values(dailyPlan).reduce((total, meal) => total + (meal?.macros.carbs || 0), 0),
-        fats: Object.values(dailyPlan).reduce((total, meal) => total + (meal?.macros.fats || 0), 0),
-        fiber: Object.values(dailyPlan).reduce((total, meal) => total + (meal?.macros.fiber || 0), 0)
-      };
+        const totalNutrition = {
+          calories: Object.values(dailyPlan).reduce((total, meal) => total + (meal?.calories || 0), 0),
+          protein: Object.values(dailyPlan).reduce((total, meal) => total + (meal?.macros.protein || 0), 0),
+          carbs: Object.values(dailyPlan).reduce((total, meal) => total + (meal?.macros.carbs || 0), 0),
+          fats: Object.values(dailyPlan).reduce((total, meal) => total + (meal?.macros.fats || 0), 0),
+          fiber: Object.values(dailyPlan).reduce((total, meal) => total + (meal?.macros.fiber || 0), 0)
+        };
 
-      const planData = {
-        dailyPlan,
-        totalNutrition,
-        recommendations
-      };
+        const planData = {
+          dailyPlan,
+          totalNutrition,
+          recommendations
+        };
 
-      // Validar o plano gerado
-      const validationError = validatePlanData(planData);
-      if (validationError) {
-        throw new Error(`Erro na validação do plano ${i + 1}: ${validationError}`);
+        // Validar o plano gerado
+        const validationError = validatePlanData(planData);
+        if (validationError) {
+          console.error(`Erro na validação do plano ${i + 1}:`, validationError);
+          continue;
+        }
+
+        console.log(`Plano ${i + 1} gerado com sucesso`);
+
+        // Salvar o plano no banco de dados
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+        const { data, error } = await supabase
+          .from('meal_plans')
+          .insert({
+            user_id: userData.userId,
+            plan_data: planData,
+            calories: dailyCalories,
+            dietary_preferences: dietaryPreferences,
+            active: false
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error(`Erro ao salvar plano ${i + 1}:`, error);
+          continue;
+        }
+
+        mealPlans.push(data);
+
+      } catch (planError) {
+        console.error(`Erro ao gerar plano ${i + 1}:`, planError);
+        continue;
       }
-
-      console.log(`Plano ${i + 1} gerado com sucesso`);
-
-      // Salvar o plano no banco de dados
-      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-      const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-      const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
-
-      const { data, error } = await supabase
-        .from('meal_plans')
-        .insert({
-          user_id: userData.userId,
-          plan_data: planData,
-          calories: dailyCalories,
-          dietary_preferences: dietaryPreferences,
-          active: false, // Começa como inativo até o usuário selecionar
-        })
-        .select()
-        .single();
-
-      if (error) {
-        throw new Error(`Erro ao salvar plano ${i + 1}: ${error.message}`);
-      }
-
-      mealPlans.push(data);
     }
 
-    console.log('Todos os planos gerados com sucesso');
+    if (mealPlans.length === 0) {
+      return new Response(
+        JSON.stringify({ error: 'Não foi possível gerar nenhum plano alimentar válido' }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
 
-    return new Response(JSON.stringify(mealPlans), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.log(`${mealPlans.length} planos gerados com sucesso`);
+
+    return new Response(
+      JSON.stringify(mealPlans),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
 
   } catch (error) {
     console.error('Erro ao gerar planos:', error);
     return new Response(
-      JSON.stringify({ error: error.message || 'Erro interno ao gerar planos alimentares' }),
+      JSON.stringify({ 
+        error: error.message || 'Erro interno ao gerar planos alimentares',
+        details: error
+      }),
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   }
