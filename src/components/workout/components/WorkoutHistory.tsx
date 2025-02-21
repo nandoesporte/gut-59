@@ -2,11 +2,12 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
-import { History, ChevronDown, Calendar, Target, Activity, Download, Trash2 } from "lucide-react";
+import { History, ChevronDown, Calendar, Target, Activity, Download, Trash2, Loader2 } from "lucide-react";
 import type { WorkoutPlan } from "../types/workout-plan";
 import { generateWorkoutPDF } from "../utils/pdf-generator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useState } from "react";
 
 interface WorkoutHistoryViewProps {
   isLoading: boolean;
@@ -15,8 +16,13 @@ interface WorkoutHistoryViewProps {
 }
 
 export const WorkoutHistoryView = ({ isLoading, historyPlans, onRefresh }: WorkoutHistoryViewProps) => {
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  const [generatingPDF, setGeneratingPDF] = useState<Set<string>>(new Set());
+
   const handleDelete = async (planId: string) => {
     try {
+      setDeletingIds(prev => new Set([...prev, planId]));
+
       const { error } = await supabase
         .from('workout_plans')
         .delete()
@@ -24,22 +30,43 @@ export const WorkoutHistoryView = ({ isLoading, historyPlans, onRefresh }: Worko
 
       if (error) throw error;
       toast.success("Plano excluído com sucesso");
-      onRefresh?.();
+      if (onRefresh) {
+        await onRefresh();
+      }
     } catch (error) {
       console.error('Error deleting plan:', error);
       toast.error("Erro ao excluir plano");
+    } finally {
+      setDeletingIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(planId);
+        return newSet;
+      });
     }
   };
 
-  const handleDownload = (plan: WorkoutPlan) => {
-    generateWorkoutPDF(plan);
+  const handleDownload = async (plan: WorkoutPlan) => {
+    try {
+      setGeneratingPDF(prev => new Set([...prev, plan.id]));
+      await generateWorkoutPDF(plan);
+      toast.success("PDF gerado com sucesso");
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast.error("Erro ao gerar PDF");
+    } finally {
+      setGeneratingPDF(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(plan.id);
+        return newSet;
+      });
+    }
   };
 
   if (isLoading) {
     return (
       <Card className="p-4">
         <div className="flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500" />
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
       </Card>
     );
@@ -58,8 +85,8 @@ export const WorkoutHistoryView = ({ isLoading, historyPlans, onRefresh }: Worko
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-semibold flex items-center gap-2">
-        <History className="w-6 h-6 text-primary-500" />
+      <h2 className="text-xl font-semibold flex items-center gap-2 text-gray-900">
+        <History className="w-6 h-6 text-primary" />
         Histórico de Treinos
       </h2>
       
@@ -69,16 +96,15 @@ export const WorkoutHistoryView = ({ isLoading, historyPlans, onRefresh }: Worko
             <CollapsibleTrigger className="w-full">
               <CardHeader className="flex flex-row items-center justify-between p-4">
                 <div className="flex items-start gap-4">
-                  <Target className="w-5 h-5 text-primary-500 mt-1" />
+                  <Target className="w-5 h-5 text-primary mt-1" />
                   <div>
-                    <h3 className="font-medium">
-                      Plano {plan.id}
+                    <h3 className="font-medium text-left">
+                      Plano de Treino - {new Date(plan.start_date).toLocaleDateString()}
                     </h3>
                     <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
                       <Calendar className="w-4 h-4" />
                       <span>
-                        {new Date(plan.start_date).toLocaleDateString()} até{' '}
-                        {new Date(plan.end_date).toLocaleDateString()}
+                        Validade: {new Date(plan.end_date).toLocaleDateString()}
                       </span>
                     </div>
                   </div>
@@ -91,8 +117,13 @@ export const WorkoutHistoryView = ({ isLoading, historyPlans, onRefresh }: Worko
                       e.stopPropagation();
                       handleDownload(plan);
                     }}
+                    disabled={generatingPDF.has(plan.id)}
                   >
-                    <Download className="w-4 h-4" />
+                    {generatingPDF.has(plan.id) ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4" />
+                    )}
                   </Button>
                   <Button
                     variant="ghost"
@@ -101,8 +132,13 @@ export const WorkoutHistoryView = ({ isLoading, historyPlans, onRefresh }: Worko
                       e.stopPropagation();
                       handleDelete(plan.id);
                     }}
+                    disabled={deletingIds.has(plan.id)}
                   >
-                    <Trash2 className="w-4 h-4 text-destructive" />
+                    {deletingIds.has(plan.id) ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    )}
                   </Button>
                   <ChevronDown className="w-5 h-5 text-gray-500" />
                 </div>
@@ -114,7 +150,7 @@ export const WorkoutHistoryView = ({ isLoading, historyPlans, onRefresh }: Worko
                 {plan.workout_sessions.map((session) => (
                   <div key={session.day_number} className="border-t pt-4 mt-4 first:border-t-0 first:pt-0 first:mt-0">
                     <div className="flex items-center gap-2 mb-3">
-                      <Activity className="w-5 h-5 text-primary-500" />
+                      <Activity className="w-5 h-5 text-primary" />
                       <h4 className="font-medium">Dia {session.day_number}</h4>
                     </div>
                     <div className="ml-2 md:ml-4">
@@ -141,6 +177,9 @@ export const WorkoutHistoryView = ({ isLoading, historyPlans, onRefresh }: Worko
                                     Descanso: {exercise.rest_time_seconds} segundos
                                   </span>
                                 </div>
+                                {exercise.notes && (
+                                  <p className="text-sm text-gray-500 mt-2">{exercise.notes}</p>
+                                )}
                               </div>
                             </div>
                           </li>
