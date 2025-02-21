@@ -155,28 +155,26 @@ export const MealPlanHistory = ({ isLoading, historyPlans, onRefresh }: MealPlan
             
             <CollapsibleContent>
               <CardContent className="p-4 md:p-6 pt-0">
-                <div ref={el => planRefs.current[plan.id] = el}>
-                  <div className="space-y-6">
-                    {plan.plan_data && plan.plan_data.dailyPlan && Object.entries(plan.plan_data.dailyPlan).map(([mealType, meal]) => {
-                      if (!meal) return null;
-                      return (
-                        <MealSection
-                          key={mealType}
-                          title={getMealTitle(mealType)}
-                          icon={getMealIcon(mealType)}
-                          meal={meal}
-                        />
-                      );
-                    })}
-                    
-                    {plan.plan_data?.totalNutrition && (
-                      <DailyTotals totalNutrition={plan.plan_data.totalNutrition} />
-                    )}
-                    
-                    {plan.plan_data?.recommendations && (
-                      <Recommendations recommendations={plan.plan_data.recommendations} />
-                    )}
-                  </div>
+                <div ref={el => planRefs.current[plan.id] = el} className="space-y-6">
+                  {plan.plan_data && plan.plan_data.dailyPlan && Object.entries(plan.plan_data.dailyPlan).map(([mealType, meal]) => {
+                    if (!meal) return null;
+                    return (
+                      <MealSection
+                        key={mealType}
+                        title={getMealTitle(mealType)}
+                        icon={getMealIcon(mealType)}
+                        meal={meal}
+                      />
+                    );
+                  })}
+                  
+                  {plan.plan_data?.totalNutrition && (
+                    <DailyTotals totalNutrition={plan.plan_data.totalNutrition} />
+                  )}
+                  
+                  {plan.plan_data?.recommendations && (
+                    <Recommendations recommendations={plan.plan_data.recommendations} />
+                  )}
                 </div>
               </CardContent>
             </CollapsibleContent>
