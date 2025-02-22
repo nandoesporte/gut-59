@@ -25,5 +25,12 @@ export interface Exercise {
   muscle_group: MuscleGroup;
   exercise_type: ExerciseType;
   difficulty: Difficulty;
+  equipment_needed?: string[];
+  alternative_exercises?: string[];
+  max_reps?: number;
+  min_reps?: number;
+  max_sets?: number;
+  min_sets?: number;
+  rest_time_seconds?: number;
+  goals?: string[];
 }
-

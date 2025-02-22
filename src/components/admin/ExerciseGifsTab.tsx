@@ -39,12 +39,14 @@ export const ExerciseGifsTab = () => {
         .from('exercise-gifs')
         .getPublicUrl(uploadData.path);
 
-      // Create the exercise record
+      // Create the exercise record with the additional fields
       const { error: insertError } = await supabase
         .from('exercises')
         .insert({
           ...exerciseData,
-          gif_url: publicUrl
+          gif_url: publicUrl,
+          goals: exerciseData.goals || [], // Ensure goals field is included
+          equipment_needed: exerciseData.equipment_needed || [] // Ensure equipment_needed field is included
         });
 
       if (insertError) throw insertError;

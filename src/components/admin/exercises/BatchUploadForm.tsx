@@ -123,7 +123,8 @@ export const BatchUploadForm = ({
           min_reps: 8,
           max_sets: 4,
           min_sets: 3,
-          rest_time_seconds: 60
+          rest_time_seconds: 60,
+          goals: selectedGoals // Adiciona os objetivos selecionados
         };
         
         await onUpload(exerciseData, file);
