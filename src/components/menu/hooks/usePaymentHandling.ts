@@ -4,8 +4,8 @@ import { initMercadoPago } from "@mercadopago/sdk-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
-// Initialize MercadoPago with test public key
-initMercadoPago('TEST-5cc34aa1-d681-40a3-9b1a-5648d21af83b', {
+// Initialize MercadoPago with production public key
+initMercadoPago('APP_USR-64b85a56-267c-4056-9484-a2ff9e037db4', {
   locale: 'pt-BR'
 });
 
