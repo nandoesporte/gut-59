@@ -5,10 +5,11 @@ import { MercadoPagoConfig, Preference } from "https://esm.sh/mercadopago@2.0.6"
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Content-Type': 'application/json'
 };
 
-serve(async (req) => {
+serve(async (req: Request) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { 
@@ -17,8 +18,35 @@ serve(async (req) => {
     });
   }
 
+  // Validate request method
+  if (req.method !== 'POST') {
+    return new Response(
+      JSON.stringify({ 
+        error: 'Method not allowed',
+        allowedMethods: ['POST'] 
+      }),
+      { 
+        status: 405,
+        headers: corsHeaders
+      }
+    );
+  }
+
   try {
-    // Check content type
+    // Validate request has a body
+    if (!req.body) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Request body is required'
+        }),
+        { 
+          status: 400,
+          headers: corsHeaders
+        }
+      );
+    }
+
+    // Get and validate content type
     const contentType = req.headers.get('content-type');
     if (!contentType?.includes('application/json')) {
       return new Response(
@@ -33,8 +61,11 @@ serve(async (req) => {
       );
     }
 
-    // Get request body
-    const bodyText = await req.text();
+    // Clone the request and get the body text for logging
+    const clonedReq = req.clone();
+    const bodyText = await clonedReq.text();
+    console.log('Raw request body:', bodyText);
+
     if (!bodyText) {
       return new Response(
         JSON.stringify({ 
@@ -47,27 +78,8 @@ serve(async (req) => {
       );
     }
 
-    console.log('Raw request body:', bodyText);
-
-    // Parse JSON
-    let requestData;
-    try {
-      requestData = JSON.parse(bodyText);
-    } catch (e) {
-      console.error('JSON parsing error:', e);
-      return new Response(
-        JSON.stringify({ 
-          error: 'Invalid JSON format',
-          details: e.message,
-          receivedBody: bodyText
-        }),
-        { 
-          status: 400,
-          headers: corsHeaders
-        }
-      );
-    }
-
+    // Parse the original request as JSON
+    const requestData = await req.json();
     console.log('Parsed request data:', requestData);
 
     const accessToken = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN');
@@ -84,7 +96,7 @@ serve(async (req) => {
 
     const { userId, amount, description } = requestData;
     
-    if (!userId || !amount || !description) {
+    if (!userId || amount === undefined || !description) {
       return new Response(
         JSON.stringify({ 
           error: 'Missing required fields',
@@ -103,14 +115,21 @@ serve(async (req) => {
     const preferenceData = {
       items: [
         {
+          id: `plan-${Date.now()}`,
           title: description,
           unit_price: Number(amount),
           quantity: 1,
           currency_id: 'BRL',
         }
       ],
-      auto_return: 'approved',
-      external_reference: userId
+      back_urls: {
+        success: "https://seu-site.com/success",
+        failure: "https://seu-site.com/failure",
+        pending: "https://seu-site.com/pending"
+      },
+      auto_return: "approved",
+      external_reference: userId,
+      notification_url: "https://seu-site.com/webhook"
     };
 
     console.log('Creating preference with data:', preferenceData);
