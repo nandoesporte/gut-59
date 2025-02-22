@@ -1,4 +1,3 @@
-
 import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -113,7 +112,6 @@ export const FisioPreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
   });
 
   const handleSubmit = async (data: z.infer<typeof formSchema>) => {
-    // Ensure all required fields are present before submitting
     const preferences: FisioPreferences = {
       age: data.age,
       weight: data.weight,
@@ -207,7 +205,6 @@ export const FisioPreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
                         selected={field.value === value}
                         onClick={() => {
                           field.onChange(value);
-                          // Reset condition when joint area changes
                           form.setValue("condition", conditionsByArea[value as JointArea][0].value);
                         }}
                       >

@@ -28,7 +28,6 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
         return;
       }
 
-      // Placeholder for the edge function call
       const { data: response, error } = await supabase.functions.invoke('generate-rehab-plan', {
         body: { preferences, userId: user.id }
       });
