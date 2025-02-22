@@ -10,7 +10,6 @@ const corsHeaders = {
 
 serve(async (req) => {
   try {
-    // Handle CORS preflight requests
     if (req.method === 'OPTIONS') {
       return new Response(null, { 
         status: 200,
@@ -73,33 +72,27 @@ serve(async (req) => {
     const client = new MercadoPagoConfig({ accessToken });
     const preference = new Preference(client);
     
-    // Get origin URL
+    // Get origin URL and ensure it's properly formatted
     const origin = req.headers.get('origin') || 'http://localhost:5173';
     console.log('Origin URL:', origin);
 
-    // Create preference data
+    // Create preference data strictly following MercadoPago's schema
     const preferenceData = {
-      items: [{
-        id: '1',
-        title: description,
-        unit_price: Number(amount),
-        quantity: 1,
-        currency_id: 'BRL',
-        description: 'Nutrição Personalizada'
-      }],
+      items: [
+        {
+          title: description,
+          quantity: 1,
+          currency_id: 'BRL',
+          unit_price: Number(amount)
+        }
+      ],
       back_urls: {
         success: `${origin}/menu`,
         failure: `${origin}/menu`,
         pending: `${origin}/menu`
       },
       auto_return: 'approved',
-      external_reference: userId,
-      // Use the SUPABASE_URL environment variable for notification URL
-      notification_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/mercadopago-webhook`,
-      // Additional settings for better integration
-      expires: true,
-      expiration_date_to: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours from now
-      statement_descriptor: 'Nutrição Personalizada'
+      external_reference: userId
     };
 
     console.log('Creating MercadoPago preference with data:', preferenceData);
@@ -116,8 +109,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           preferenceId: result.id,
-          initPoint: result.init_point,
-          sandboxInitPoint: result.sandbox_init_point
+          initPoint: result.init_point
         }),
         { 
           status: 200,
