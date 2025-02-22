@@ -83,12 +83,6 @@ const Navigation = () => {
             <ShoppingBag className="w-6 h-6 md:w-7 md:h-7" />
             <span className="text-sm md:text-base font-medium">Produtos</span>
           </a>
-          <NavLink
-            to="/progress"
-            icon={<LineChart className="w-6 h-6 md:w-7 md:h-7" />}
-            text="Diário"
-            active={isActive("/progress")}
-          />
           {isAdmin && (
             <NavLink
               to="/admin"
