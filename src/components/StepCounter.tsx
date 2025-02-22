@@ -130,64 +130,55 @@ const StepCounter = () => {
       return true;
     }
 
-    return new Promise<boolean>((resolve) => {
-      let initTimeout: NodeJS.Timeout;
-      let initialized = false;
+    return new Promise<boolean>(async (resolve) => {
+      try {
+        console.log("Tentando iniciar o acelerômetro via Capacitor...");
+        
+        // Primeiro, remove todos os listeners existentes
+        await Motion.removeAllListeners();
+        
+        // Tenta obter dados do acelerômetro
+        const listener = await Motion.addListener('accel', (event) => {
+          if (event && event.acceleration) {
+            const { x, y, z } = event.acceleration;
+            console.log("Dados do acelerômetro recebidos:", { x, y, z });
+            
+            setHasPermission(true);
+            setIsInitialized(true);
+            setAccelerometerInitialized(true);
+            toast.success("Acelerômetro iniciado com sucesso!");
+            resolve(true);
+            return;
+          }
+        });
 
-      const cleanup = () => {
-        if (initTimeout) clearTimeout(initTimeout);
-        if (!initialized) {
-          Motion.removeAllListeners();
-          resolve(false);
-        }
-      };
+        // Se após 3 segundos não recebemos dados, consideramos que falhou
+        setTimeout(() => {
+          if (!hasPermission) {
+            console.log("Timeout na inicialização do acelerômetro Capacitor");
+            Motion.removeAllListeners();
+            resolve(false);
+          }
+        }, SENSOR_INIT_TIMEOUT);
 
-      const init = async () => {
-        try {
-          console.log("Tentando iniciar o acelerômetro via Capacitor...");
-          await Motion.removeAllListeners();
-          
-          const listener = await Motion.addListener('accel', (event) => {
-            if (!initialized && event && event.acceleration) {
-              const { x, y, z } = event.acceleration;
-              console.log("Acelerômetro Capacitor funcionando:", { x, y, z });
-              
-              initialized = true;
-              setHasPermission(true);
-              setIsInitialized(true);
-              setAccelerometerInitialized(true);
-              toast.success("Acelerômetro iniciado com sucesso!");
-              cleanup();
-              resolve(true);
-            }
-          });
-
-          initTimeout = setTimeout(() => {
-            if (!initialized) {
-              console.log("Timeout na inicialização do acelerômetro Capacitor");
-              cleanup();
-              resolve(false);
-            }
-          }, SENSOR_INIT_TIMEOUT);
-
-        } catch (error) {
-          console.error("Erro ao iniciar acelerômetro via Capacitor:", error);
-          setSensorSupported(false);
-          cleanup();
-          resolve(false);
-        }
-      };
-
-      init();
+      } catch (error) {
+        console.error("Erro ao iniciar acelerômetro via Capacitor:", error);
+        setSensorSupported(false);
+        resolve(false);
+      }
     });
-  }, [accelerometerInitialized]);
+  }, [accelerometerInitialized, hasPermission]);
 
   // Inicia automaticamente o acelerômetro quando o componente é montado
   useEffect(() => {
-    if (!accelerometerInitialized && !isLoading) {
-      requestPermissions();
-    }
-  }, [accelerometerInitialized]);
+    const initializeAccelerometer = async () => {
+      if (!accelerometerInitialized && !isLoading) {
+        await requestPermissions();
+      }
+    };
+
+    initializeAccelerometer();
+  }, [accelerometerInitialized, isLoading]);
 
   const requestPermissions = async () => {
     if (isLoading || accelerometerInitialized) {
@@ -198,24 +189,20 @@ const StepCounter = () => {
     console.log("Iniciando solicitação de permissões...");
 
     try {
-      let success = false;
+      // Tenta direto via Capacitor primeiro
+      console.log("Tentando Capacitor primeiro...");
+      const capacitorSuccess = await startCapacitorAccelerometer();
 
-      // Primeiro tenta via API tradicional se disponível
-      if ('Accelerometer' in window) {
-        console.log("Tentando API tradicional primeiro...");
-        success = await startTraditionalAccelerometer();
-      }
-
-      // Se falhou ou não está disponível, tenta via Capacitor
-      if (!success) {
-        console.log("API tradicional falhou ou não disponível, tentando Capacitor...");
-        success = await startCapacitorAccelerometer();
-      }
-
-      if (!success) {
-        console.log("Todas as tentativas de inicialização falharam");
-        setSensorSupported(false);
-        toast.error("Não foi possível inicializar o acelerômetro.");
+      // Se falhar, tenta via API tradicional
+      if (!capacitorSuccess && 'Accelerometer' in window) {
+        console.log("Capacitor falhou, tentando API tradicional...");
+        const traditionalSuccess = await startTraditionalAccelerometer();
+        
+        if (!traditionalSuccess) {
+          console.log("API tradicional também falhou");
+          setSensorSupported(false);
+          toast.error("Não foi possível inicializar o acelerômetro.");
+        }
       }
 
     } catch (error) {
@@ -230,7 +217,7 @@ const StepCounter = () => {
   useEffect(() => {
     let lastStepTime = Date.now();
     let lastMagnitude = 0;
-    let steps = stepData.steps; // Inicializa com os passos salvos
+    let steps = stepData.steps;
     let listener: any = null;
 
     const startStepCounting = async () => {
