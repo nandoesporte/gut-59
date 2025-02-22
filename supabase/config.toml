@@ -7,8 +7,9 @@ port = 54321
 schemas = ["public", "storage"]
 
 [functions]
-[functions.create-asaas-payment]
+[functions.create-mercadopago-preference]
 verify_jwt = true
 
-[functions.check-asaas-payment]
+[functions.check-mercadopago-payment]
 verify_jwt = true
+
