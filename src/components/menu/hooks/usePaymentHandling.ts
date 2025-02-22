@@ -20,22 +20,6 @@ export const usePaymentHandling = () => {
   const [preferenceId, setPreferenceId] = useState<string | null>(null);
   const [hasPaid, setHasPaid] = useState(false);
 
-  const validatePayload = (payload: PaymentPayload): boolean => {
-    if (!payload.userId || typeof payload.userId !== 'string') {
-      console.error('Invalid userId:', payload.userId);
-      return false;
-    }
-    if (!payload.amount || typeof payload.amount !== 'number') {
-      console.error('Invalid amount:', payload.amount);
-      return false;
-    }
-    if (!payload.description || typeof payload.description !== 'string') {
-      console.error('Invalid description:', payload.description);
-      return false;
-    }
-    return true;
-  };
-
   const handlePaymentAndContinue = async () => {
     try {
       setIsProcessingPayment(true);
@@ -50,30 +34,27 @@ export const usePaymentHandling = () => {
         throw new Error('Usuário não autenticado');
       }
 
-      // Prepare the request payload with strict typing
-      const payload: PaymentPayload = {
+      const payload = {
         userId: userData.user.id,
         amount: 19.90,
         description: "Plano Alimentar Personalizado"
       };
 
-      // Validate payload before sending
-      if (!validatePayload(payload)) {
-        throw new Error('Dados de pagamento inválidos');
-      }
+      console.log('Sending payment request with payload:', payload);
 
-      console.log('Sending payment request with validated payload:', payload);
-
-      const payloadString = JSON.stringify(payload);
-      console.log('Stringified payload:', payloadString);
-
-      const { data, error } = await supabase.functions.invoke('create-mercadopago-preference', {
-        body: payloadString
-      });
+      const { data, error } = await supabase.functions.invoke(
+        'create-mercadopago-preference',
+        {
+          body: JSON.stringify(payload),
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
 
       if (error) {
         console.error('Edge function error:', error);
-        throw new Error(`Falha ao criar pagamento: ${error.message}`);
+        throw new Error('Falha ao processar pagamento. Por favor, tente novamente.');
       }
 
       if (!data?.preferenceId || !data?.initPoint) {
@@ -92,13 +73,13 @@ export const usePaymentHandling = () => {
             return;
           }
 
-          const checkPayload = { preferenceId: data.preferenceId };
-          console.log('Checking payment status with payload:', checkPayload);
-
           const { data: statusData, error: statusError } = await supabase.functions.invoke(
             'check-mercadopago-payment',
             {
-              body: JSON.stringify(checkPayload)
+              body: JSON.stringify({ preferenceId: data.preferenceId }),
+              headers: {
+                'Content-Type': 'application/json'
+              }
             }
           );
 
@@ -138,3 +119,4 @@ export const usePaymentHandling = () => {
     handlePaymentAndContinue
   };
 };
+
