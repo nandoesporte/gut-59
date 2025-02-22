@@ -36,36 +36,46 @@ const StepCounter = () => {
 
   const requestPermissions = async () => {
     setIsLoading(true);
-    let hasAccelerometer = false;
 
     try {
       // Primeiro, removemos qualquer listener existente
       await Motion.removeAllListeners();
 
-      // Tentar adicionar o listener
-      await Motion.addListener('accel', async (event) => {
+      // Solicitar permissões explicitamente
+      const permResult = await Motion.requestPermissions();
+      console.log("Resultado da solicitação de permissões:", permResult);
+
+      if (permResult.accel !== 'granted') {
+        toast.error("Permissão negada para acessar o acelerômetro");
+        setIsLoading(false);
+        return;
+      }
+
+      // Tentar iniciar o monitoramento
+      let accelerometerWorking = false;
+      
+      const listener = await Motion.addListener('accel', (event) => {
         console.log("Evento do acelerômetro recebido:", event);
         
         if (event && event.acceleration) {
-          hasAccelerometer = true;
+          accelerometerWorking = true;
           setHasPermission(true);
           setIsInitialized(true);
           toast.success("Permissão concedida para contagem de passos");
         }
       });
 
-      // Aguardamos um tempo para ver se recebemos algum evento
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Aguardar um pouco para ver se recebemos eventos do acelerômetro
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // Se não detectamos o acelerômetro após o tempo de espera
-      if (!hasAccelerometer) {
-        toast.error("Seu dispositivo não suporta contagem de passos");
+      if (!accelerometerWorking) {
         await Motion.removeAllListeners();
+        toast.error("Não foi possível acessar o acelerômetro. Verifique as permissões do seu dispositivo.");
       }
 
     } catch (error) {
       console.error('Erro ao acessar sensores de movimento:', error);
-      toast.error("Erro ao acessar sensores de movimento");
+      toast.error("Erro ao acessar sensores de movimento. Verifique as permissões do seu dispositivo.");
     } finally {
       setIsLoading(false);
     }
