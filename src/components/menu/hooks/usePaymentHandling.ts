@@ -9,10 +9,32 @@ initMercadoPago('APP_USR-64b85a56-267c-4056-9484-a2ff9e037db4', {
   locale: 'pt-BR'
 });
 
+interface PaymentPayload {
+  userId: string;
+  amount: number;
+  description: string;
+}
+
 export const usePaymentHandling = () => {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [preferenceId, setPreferenceId] = useState<string | null>(null);
   const [hasPaid, setHasPaid] = useState(false);
+
+  const validatePayload = (payload: PaymentPayload): boolean => {
+    if (!payload.userId || typeof payload.userId !== 'string') {
+      console.error('Invalid userId:', payload.userId);
+      return false;
+    }
+    if (!payload.amount || typeof payload.amount !== 'number') {
+      console.error('Invalid amount:', payload.amount);
+      return false;
+    }
+    if (!payload.description || typeof payload.description !== 'string') {
+      console.error('Invalid description:', payload.description);
+      return false;
+    }
+    return true;
+  };
 
   const handlePaymentAndContinue = async () => {
     try {
@@ -29,16 +51,24 @@ export const usePaymentHandling = () => {
       }
 
       // Prepare the request payload with strict typing
-      const payload = {
+      const payload: PaymentPayload = {
         userId: userData.user.id,
         amount: 19.90,
         description: "Plano Alimentar Personalizado"
       };
 
-      console.log('Sending payment request with payload:', payload);
+      // Validate payload before sending
+      if (!validatePayload(payload)) {
+        throw new Error('Dados de pagamento inválidos');
+      }
+
+      console.log('Sending payment request with validated payload:', payload);
+
+      const payloadString = JSON.stringify(payload);
+      console.log('Stringified payload:', payloadString);
 
       const { data, error } = await supabase.functions.invoke('create-mercadopago-preference', {
-        body: JSON.stringify(payload)
+        body: payloadString
       });
 
       if (error) {
@@ -62,10 +92,13 @@ export const usePaymentHandling = () => {
             return;
           }
 
+          const checkPayload = { preferenceId: data.preferenceId };
+          console.log('Checking payment status with payload:', checkPayload);
+
           const { data: statusData, error: statusError } = await supabase.functions.invoke(
             'check-mercadopago-payment',
             {
-              body: JSON.stringify({ preferenceId: data.preferenceId })
+              body: JSON.stringify(checkPayload)
             }
           );
 
