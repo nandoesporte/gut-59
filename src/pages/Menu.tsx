@@ -67,8 +67,8 @@ const Menu = () => {
   const renderStep = () => {
     if (loading && currentStep !== 1.5) {
       return (
-        <div className="w-full flex justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-green-500" />
+        <div className="flex justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
       );
     }
@@ -76,7 +76,7 @@ const Menu = () => {
     switch (currentStep) {
       case 1:
         return (
-          <div className="space-y-8">
+          <div className="space-y-6">
             <MenuHeader onStart={() => setCurrentStep(1.5)} />
             <MealPlanHistory 
               isLoading={isHistoryLoading}
@@ -115,16 +115,14 @@ const Menu = () => {
         );
       case 4:
         return (
-          <div className="space-y-8">
+          <div className="space-y-6">
             {mealPlan ? (
-              <div>
-                <MealPlanDisplay 
-                  mealPlan={mealPlan} 
-                  onRefresh={fetchMealPlans} 
-                />
-              </div>
+              <MealPlanDisplay 
+                mealPlan={mealPlan} 
+                onRefresh={fetchMealPlans} 
+              />
             ) : (
-              <Card className="p-6">
+              <Card className="p-6 bg-white/50 backdrop-blur-sm border border-gray-100">
                 <div className="text-center text-gray-500">
                   Aguarde enquanto geramos seu plano alimentar...
                 </div>
@@ -138,10 +136,12 @@ const Menu = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
+      <div className="container mx-auto px-4 py-8 md:py-12">
         <div className="max-w-4xl mx-auto">
-          {renderStep()}
+          <div className="space-y-6">
+            {renderStep()}
+          </div>
         </div>
       </div>
     </div>
