@@ -19,14 +19,17 @@ serve(async (req) => {
 
   try {
     const { paymentId } = await req.json() as StatusRequest;
+    console.log('Checking payment status for:', paymentId);
 
     const asaasApiKey = Deno.env.get('ASAAS_API_KEY');
     if (!asaasApiKey) {
+      console.error('ASAAS_API_KEY not found');
       throw new Error('ASAAS_API_KEY não configurada');
     }
 
     // Verificar status do pagamento no ASAAS
-    const asaasResponse = await fetch(`https://api.asaas.com/v3/payments/${paymentId}`, {
+    const asaasBaseUrl = 'https://sandbox.asaas.com/api/v3';
+    const asaasResponse = await fetch(`${asaasBaseUrl}/payments/${paymentId}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -35,10 +38,13 @@ serve(async (req) => {
     });
 
     if (!asaasResponse.ok) {
-      throw new Error('Erro ao verificar pagamento no ASAAS');
+      const errorData = await asaasResponse.json();
+      console.error('ASAAS API error:', errorData);
+      throw new Error(`Erro ASAAS: ${JSON.stringify(errorData)}`);
     }
 
     const payment = await asaasResponse.json();
+    console.log('Payment status from ASAAS:', payment.status);
     
     // Atualizar status no banco de dados
     const supabase = createClient(
@@ -46,10 +52,15 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
     );
 
-    await supabase
+    const { error: updateError } = await supabase
       .from('payments')
       .update({ status: payment.status })
       .eq('payment_id', paymentId);
+
+    if (updateError) {
+      console.error('Error updating payment status:', updateError);
+      throw new Error('Erro ao atualizar status do pagamento');
+    }
 
     return new Response(
       JSON.stringify({ status: payment.status }),
@@ -57,10 +68,16 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Error checking payment status:', error);
+    console.error('Error in check-asaas-payment:', error);
     return new Response(
-      JSON.stringify({ error: 'Error checking payment status' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ 
+        error: error instanceof Error ? error.message : 'Erro desconhecido ao verificar pagamento',
+        details: error
+      }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
   }
 });

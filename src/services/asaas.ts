@@ -14,6 +14,8 @@ export const createPayment = async (): Promise<PaymentResponse> => {
       throw new Error('Usuário não autenticado');
     }
 
+    console.log('Creating payment for user:', userData.user.id);
+
     const { data, error } = await supabase.functions.invoke('create-asaas-payment', {
       body: {
         userId: userData.user.id,
@@ -22,7 +24,16 @@ export const createPayment = async (): Promise<PaymentResponse> => {
       }
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Edge function error:', error);
+      throw error;
+    }
+
+    if (!data || !data.id || !data.invoiceUrl) {
+      console.error('Invalid response from edge function:', data);
+      throw new Error('Resposta inválida do serviço de pagamento');
+    }
+
     return data;
   } catch (error) {
     console.error('Erro ao criar pagamento:', error);
@@ -32,12 +43,23 @@ export const createPayment = async (): Promise<PaymentResponse> => {
 
 export const checkPaymentStatus = async (paymentId: string): Promise<boolean> => {
   try {
+    console.log('Checking payment status:', paymentId);
+
     const { data, error } = await supabase.functions.invoke('check-asaas-payment', {
       body: { paymentId }
     });
 
-    if (error) throw error;
-    return data.status === 'CONFIRMED' || data.status === 'RECEIVED';
+    if (error) {
+      console.error('Edge function error:', error);
+      throw error;
+    }
+
+    if (!data || !data.status) {
+      console.error('Invalid response from edge function:', data);
+      throw new Error('Resposta inválida do serviço de pagamento');
+    }
+
+    return data.status === 'CONFIRMED' || data.status === 'RECEIVED' || data.status === 'APPROVED';
   } catch (error) {
     console.error('Erro ao verificar status do pagamento:', error);
     throw error;
