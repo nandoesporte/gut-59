@@ -1,6 +1,7 @@
+
 import { useEffect, useState } from 'react';
 import { Motion } from '@capacitor/motion';
-import { App } from '@capacitor/app';
+import { AppLauncher } from '@capacitor/app-launcher';
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Activity, LineChart, User, Loader } from "lucide-react";
@@ -36,7 +37,7 @@ const StepCounter = () => {
 
   const openAppSettings = async () => {
     try {
-      await App.openUrl({ url: 'app-settings:' });
+      await AppLauncher.openUrl({ url: 'app-settings:' });
     } catch (error) {
       console.error('Erro ao abrir configurações:', error);
       toast.error("Por favor, abra as configurações do dispositivo manualmente e conceda as permissões necessárias.");
