@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Coffee, Utensils, Apple, Moon } from "lucide-react";
 import { toast } from "sonner";
 import { initMercadoPago } from "@mercadopago/sdk-react";
-import { MealSection } from "./components/MealSection";
+import { FoodSelectionSection } from "./components/FoodSelectionSection";
 import { PaymentSection } from "./components/PaymentSection";
 import { usePaymentHandling } from "./hooks/usePaymentHandling";
 import type { FoodSelectorProps } from "./types/food";
@@ -66,7 +66,7 @@ export const FoodSelector = ({
       )}
 
       <div className="space-y-6">
-        <MealSection
+        <FoodSelectionSection
           title="Café da manhã"
           icon={<Coffee className="h-6 w-6 text-green-600" />}
           foods={breakfastFoods}
@@ -75,7 +75,7 @@ export const FoodSelector = ({
           disabled={!hasPaid}
         />
 
-        <MealSection
+        <FoodSelectionSection
           title="Almoço"
           icon={<Utensils className="h-6 w-6 text-green-600" />}
           foods={lunchFoods}
@@ -84,7 +84,7 @@ export const FoodSelector = ({
           disabled={!hasPaid}
         />
 
-        <MealSection
+        <FoodSelectionSection
           title="Lanche da Manhã e Tarde"
           icon={<Apple className="h-6 w-6 text-green-600" />}
           foods={snackFoods}
@@ -93,7 +93,7 @@ export const FoodSelector = ({
           disabled={!hasPaid}
         />
 
-        <MealSection
+        <FoodSelectionSection
           title="Jantar"
           icon={<Moon className="h-6 w-6 text-green-600" />}
           foods={dinnerFoods}
