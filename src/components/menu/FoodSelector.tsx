@@ -1,78 +1,17 @@
 
 import { Button } from "@/components/ui/button";
 import { Coffee, Utensils, Apple, Moon } from "lucide-react";
-import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { useState } from "react";
-import { createPayment, checkPaymentStatus } from "@/services/asaas";
-import { initMercadoPago, Wallet } from "@mercadopago/sdk-react";
+import { initMercadoPago } from "@mercadopago/sdk-react";
+import { MealSection } from "./components/MealSection";
+import { PaymentSection } from "./components/PaymentSection";
+import { usePaymentHandling } from "./hooks/usePaymentHandling";
+import type { FoodSelectorProps } from "./types/food";
 
 // Initialize MercadoPago
 initMercadoPago('TEST-5cc34aa1-d681-40a3-9b1a-5648d21af83b', {
   locale: 'pt-BR'
 });
-
-interface ProtocolFood {
-  id: string;
-  name: string;
-  calories: number;
-  protein: number;
-  carbs: number;
-  fats: number;
-  food_group_id: number;
-}
-
-interface FoodSelectorProps {
-  protocolFoods: ProtocolFood[];
-  selectedFoods: string[];
-  onFoodSelection: (foodId: string) => void;
-  totalCalories: number;
-  onBack: () => void;
-  onConfirm: () => void;
-}
-
-const MealSection = ({
-  title,
-  icon,
-  foods,
-  selectedFoods,
-  onFoodSelection,
-  disabled
-}: {
-  title: string;
-  icon: React.ReactNode;
-  foods: ProtocolFood[];
-  selectedFoods: string[];
-  onFoodSelection: (foodId: string) => void;
-  disabled?: boolean;
-}) => (
-  <Card className="p-6 space-y-4 shadow-lg hover:shadow-xl transition-shadow">
-    <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
-      <div className="bg-green-50 p-2 rounded-lg">
-        {icon}
-      </div>
-      <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-    </div>
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-      {foods.map((food) => (
-        <Button
-          key={food.id}
-          variant={selectedFoods.includes(food.id) ? "default" : "outline"}
-          onClick={() => onFoodSelection(food.id)}
-          disabled={disabled}
-          className={`
-            h-auto py-3 px-4 w-full text-left justify-start
-            ${selectedFoods.includes(food.id)
-              ? 'bg-green-100 border-green-500 text-green-700 hover:bg-green-200 hover:text-green-800'
-              : 'hover:bg-green-50 hover:border-green-200'}
-          `}
-        >
-          <span className="truncate">{food.name}</span>
-        </Button>
-      ))}
-    </div>
-  </Card>
-);
 
 export const FoodSelector = ({
   protocolFoods,
@@ -82,42 +21,12 @@ export const FoodSelector = ({
   onBack,
   onConfirm,
 }: FoodSelectorProps) => {
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [preferenceId, setPreferenceId] = useState<string | null>(null);
-  const [hasPaid, setHasPaid] = useState(false);
-
-  const handlePaymentAndContinue = async () => {
-    try {
-      setIsProcessingPayment(true);
-      const payment = await createPayment();
-      setPreferenceId(payment.preferenceId);
-      
-      // Start polling for payment status
-      const checkInterval = setInterval(async () => {
-        try {
-          const isPaid = await checkPaymentStatus(payment.id);
-          if (isPaid) {
-            clearInterval(checkInterval);
-            setHasPaid(true);
-            toast.success("Pagamento confirmado! Você já pode selecionar os alimentos.");
-          }
-        } catch (error) {
-          console.error('Erro ao verificar pagamento:', error);
-        }
-      }, 5000); // Check every 5 seconds
-
-      // Stop polling after 10 minutes
-      setTimeout(() => {
-        clearInterval(checkInterval);
-      }, 600000);
-
-    } catch (error) {
-      console.error('Erro ao processar pagamento:', error);
-      toast.error("Erro ao processar pagamento. Por favor, tente novamente.");
-    } finally {
-      setIsProcessingPayment(false);
-    }
-  };
+  const {
+    isProcessingPayment,
+    preferenceId,
+    hasPaid,
+    handlePaymentAndContinue
+  } = usePaymentHandling();
 
   const handleConfirm = async () => {
     if (!hasPaid) {
@@ -149,35 +58,11 @@ export const FoodSelector = ({
       </div>
 
       {!hasPaid && (
-        <Card className="p-6 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
-          <div className="text-center space-y-4">
-            <h3 className="text-xl font-semibold text-gray-800">
-              Desbloqueie seu Plano Alimentar Personalizado
-            </h3>
-            <p className="text-gray-600">
-              Por apenas R$ 19,90, tenha acesso ao seu plano alimentar personalizado com base nas suas preferências.
-            </p>
-            {preferenceId ? (
-              <div className="w-full flex justify-center">
-                <Wallet 
-                  initialization={{ preferenceId }}
-                  customization={{ texts: { valueProp: 'Pagamento Seguro' } }}
-                />
-              </div>
-            ) : (
-              <Button
-                onClick={handlePaymentAndContinue}
-                disabled={isProcessingPayment}
-                className="w-full max-w-md bg-green-500 hover:bg-green-600"
-              >
-                {isProcessingPayment ? 
-                  "Processando..." : 
-                  "Pagar R$ 19,90 e Continuar"
-                }
-              </Button>
-            )}
-          </div>
-        </Card>
+        <PaymentSection
+          isProcessing={isProcessingPayment}
+          preferenceId={preferenceId}
+          onPayment={handlePaymentAndContinue}
+        />
       )}
 
       <div className="space-y-6">

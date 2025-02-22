@@ -1,72 +1,49 @@
 
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { MacroDistributionBar } from "./MacroDistributionBar";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
-import type { Meal, MealFood } from "../types";
+import { Card } from "@/components/ui/card";
+import type { ProtocolFood } from "../types/food";
 
 interface MealSectionProps {
   title: string;
   icon: React.ReactNode;
-  meal: Meal;
+  foods: ProtocolFood[];
+  selectedFoods: string[];
+  onFoodSelection: (foodId: string) => void;
+  disabled?: boolean;
 }
 
-export const MealSection = ({ 
-  title, 
-  icon, 
-  meal,
-}: MealSectionProps) => {
-  return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
-      <h2 className="text-lg font-semibold flex items-center gap-2 text-gray-900 mb-4">
+export const MealSection = ({
+  title,
+  icon,
+  foods,
+  selectedFoods,
+  onFoodSelection,
+  disabled
+}: MealSectionProps) => (
+  <Card className="p-6 space-y-4 shadow-lg hover:shadow-xl transition-shadow">
+    <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
+      <div className="bg-green-50 p-2 rounded-lg">
         {icon}
-        {title} ({meal.calories} kcal)
-      </h2>
-
-      <div className="mb-4">
-        <p className="text-gray-600 italic">{meal.description?.replace(/carboidrato/gi, "carbo")}</p>
       </div>
-
-      <div className="space-y-4">
-        {meal.foods.map((food, index) => (
-          <div key={index} className="text-gray-700">
-            <div className="flex justify-between items-start">
-              <div className="flex-1">
-                <div className="flex items-baseline gap-1">
-                  <span className="font-medium">{food.portion} {food.unit}</span>
-                  <span className="text-gray-600">de</span>
-                  <span>{food.name.replace(/carboidrato/gi, "carbo")}</span>
-                </div>
-                {food.details && (
-                  <span className="text-gray-500 text-sm block mt-1 ml-4">
-                    {food.details.replace(/carboidrato/gi, "carbo")}
-                  </span>
-                )}
-              </div>
-            </div>
-            {index < meal.foods.length - 1 && <div className="border-b my-3 border-gray-100" />}
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-6 text-sm text-gray-600 border-t pt-4">
-        <div className="grid grid-cols-4 gap-2 mt-2">
-          <div className="font-medium">Proteínas: {meal.macros.protein}g</div>
-          <div className="font-medium">Carbos: {meal.macros.carbs}g</div>
-          <div className="font-medium">Gorduras: {meal.macros.fats}g</div>
-          <div className="font-medium">Fibras: {meal.macros.fiber}g</div>
-        </div>
-        <div className="mt-3">
-          <MacroDistributionBar 
-            macros={{
-              protein: meal.macros.protein,
-              carbs: meal.macros.carbs,
-              fats: meal.macros.fats
-            }}
-          />
-        </div>
-      </div>
+      <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
     </div>
-  );
-};
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+      {foods.map((food) => (
+        <Button
+          key={food.id}
+          variant={selectedFoods.includes(food.id) ? "default" : "outline"}
+          onClick={() => onFoodSelection(food.id)}
+          disabled={disabled}
+          className={`
+            h-auto py-3 px-4 w-full text-left justify-start
+            ${selectedFoods.includes(food.id)
+              ? 'bg-green-100 border-green-500 text-green-700 hover:bg-green-200 hover:text-green-800'
+              : 'hover:bg-green-50 hover:border-green-200'}
+          `}
+        >
+          <span className="truncate">{food.name}</span>
+        </Button>
+      ))}
+    </div>
+  </Card>
+);
