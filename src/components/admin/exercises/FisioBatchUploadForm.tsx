@@ -10,14 +10,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
-import { Exercise, MuscleGroup, ExerciseType, Difficulty } from "./types";
+import { Exercise, ExerciseType, Difficulty, PhysioJointArea, PhysioCondition, PhysioExercise } from "./types";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 
 interface FisioBatchUploadFormProps {
-  onUpload: (exerciseData: Omit<Exercise, 'id' | 'gif_url'>, file?: File) => Promise<void>;
+  onUpload: (exerciseData: PhysioExercise, file: File) => Promise<void>;
   uploading: boolean;
 }
 
@@ -85,8 +85,8 @@ export const FisioBatchUploadForm = ({
   uploading,
 }: FisioBatchUploadFormProps) => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [selectedJointArea, setSelectedJointArea] = useState<string>("knee");
-  const [selectedCondition, setSelectedCondition] = useState<string>("patellofemoral");
+  const [selectedJointArea, setSelectedJointArea] = useState<PhysioJointArea>("knee");
+  const [selectedCondition, setSelectedCondition] = useState<PhysioCondition>("patellofemoral");
   const [difficulty, setDifficulty] = useState<Difficulty>("beginner");
   const [exerciseType, setExerciseType] = useState<ExerciseType>("mobility");
   const [isCompoundMovement, setIsCompoundMovement] = useState(false);
@@ -126,20 +126,33 @@ export const FisioBatchUploadForm = ({
 
     try {
       for (const file of selectedFiles) {
-        const exerciseData = {
+        const exerciseData: PhysioExercise = {
           name: file.name.replace('.gif', ''),
           description: '',
+          joint_area: selectedJointArea,
+          condition: selectedCondition,
           exercise_type: exerciseType,
           difficulty: difficulty,
           is_compound_movement: isCompoundMovement,
-          equipment_needed: requiresEquipment ? ['basic'] : [],
+          required_equipment: requiresEquipment ? ['basic'] : [],
           balance_requirement: 'moderate',
           coordination_requirement: 'moderate',
           strength_requirement: 'moderate',
-          flexibility_requirement: 'moderate'
+          flexibility_requirement: 'moderate',
+          movement_speed: 'moderate',
+          resistance_level: 'bodyweight',
+          pain_level_threshold: 5,
+          progression_level: 1,
+          recommended_repetitions: 10,
+          recommended_sets: 3,
+          hold_time_seconds: 10,
+          rest_time_seconds: 30,
+          keywords: [file.name.replace('.gif', '').toLowerCase()],
+          primary_goals: ['rehabilitation'],
+          target_symptoms: [selectedCondition]
         };
         
-        await onUpload(exerciseData, file, selectedJointArea, selectedCondition);
+        await onUpload(exerciseData, file);
       }
       setSelectedFiles([]);
       toast.success('Todos os arquivos foram enviados com sucesso!');

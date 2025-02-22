@@ -1,4 +1,3 @@
-
 export type MuscleGroup = 
   | "weight_training"
   | "stretching"
@@ -59,4 +58,68 @@ export interface Exercise {
   coordination_requirement?: string;
   flexibility_requirement?: string;
   power_requirement?: string;
+}
+
+export type PhysioJointArea = 
+  | "ankle_foot"
+  | "leg"
+  | "knee"
+  | "hip"
+  | "spine"
+  | "shoulder"
+  | "elbow_hand";
+
+export type PhysioCondition =
+  | "plantar_fasciitis"
+  | "calcaneal_spur"
+  | "ankle_sprain"
+  | "anterior_compartment"
+  | "shin_splints"
+  | "achilles_tendinitis"
+  | "patellofemoral"
+  | "patellar_tendinitis"
+  | "acl_postop"
+  | "mcl_injury"
+  | "meniscus_injury"
+  | "knee_arthrosis"
+  | "trochanteric_bursitis"
+  | "piriformis_syndrome"
+  | "sports_hernia"
+  | "it_band_syndrome"
+  | "disc_protrusion"
+  | "herniated_disc"
+  | "cervical_lordosis"
+  | "frozen_shoulder"
+  | "shoulder_bursitis"
+  | "rotator_cuff"
+  | "impingement"
+  | "medial_epicondylitis"
+  | "lateral_epicondylitis"
+  | "carpal_tunnel";
+
+export interface PhysioExercise {
+  name: string;
+  description?: string;
+  gif_url?: string;
+  joint_area: PhysioJointArea;
+  condition: PhysioCondition;
+  exercise_type: ExerciseType;
+  difficulty: Difficulty;
+  is_compound_movement?: boolean;
+  required_equipment?: string[];
+  balance_requirement?: string;
+  coordination_requirement?: string;
+  strength_requirement?: string;
+  flexibility_requirement?: string;
+  movement_speed?: string;
+  resistance_level?: string;
+  pain_level_threshold?: number;
+  progression_level?: number;
+  recommended_repetitions?: number;
+  recommended_sets?: number;
+  hold_time_seconds?: number;
+  rest_time_seconds?: number;
+  keywords?: string[];
+  primary_goals?: string[];
+  target_symptoms?: string[];
 }
