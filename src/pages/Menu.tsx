@@ -61,7 +61,6 @@ const Menu = () => {
             totalCalories={totalCalories}
             onBack={() => setCurrentStep(1.5)}
             onConfirm={() => setCurrentStep(3)}
-            buttonText="Selecionar"
           />
         );
       case 3:
@@ -74,7 +73,12 @@ const Menu = () => {
       case 4:
         return (
           <div className="space-y-6">
-            {mealPlan && <MealPlanDisplay mealPlan={mealPlan} />}
+            {mealPlan && (
+              <MealPlanDisplay 
+                mealPlan={mealPlan} 
+                onRefresh={() => {}} // Adding required onRefresh prop
+              />
+            )}
           </div>
         );
       default:
