@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -186,14 +187,14 @@ export const BatchUploadForm = ({
             <Label>Nível de Atividade Física</Label>
             <Select
               value={activityLevel}
-              onValueChange={setActivityLevel}
+              onValueChange={(value: Difficulty) => setActivityLevel(value)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Selecione o nível" />
               </SelectTrigger>
               <SelectContent>
                 {activityLevels.map(level => (
-                  <SelectItem key={level.value} value={level.value}>
+                  <SelectItem key={level.value} value={level.value as Difficulty}>
                     {level.label}
                   </SelectItem>
                 ))}
