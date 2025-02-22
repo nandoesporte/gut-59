@@ -7,5 +7,8 @@ port = 54321
 schemas = ["public", "storage"]
 
 [functions]
-[functions.generate-meal-plan]
+[functions.create-asaas-payment]
+verify_jwt = true
+
+[functions.check-asaas-payment]
 verify_jwt = true
