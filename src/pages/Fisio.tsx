@@ -7,7 +7,7 @@ import { ExercisePlanDisplay } from '@/components/fisio/ExercisePlanDisplay';
 import { Stethoscope } from 'lucide-react';
 import { FisioHistoryView } from '@/components/fisio/components/FisioHistory';
 import { supabase } from '@/integrations/supabase/client';
-import type { RehabPlan } from '@/components/fisio/types/rehab-plan';
+import type { RehabPlan, RehabSession } from '@/components/fisio/types/rehab-plan';
 
 const Fisio = () => {
   const [preferences, setPreferences] = useState<FisioPreferences | null>(null);
@@ -25,9 +25,9 @@ const Fisio = () => {
         .from('rehab_plans')
         .select(`
           *,
-          rehab_sessions (
+          rehab_sessions:rehab_sessions (
             *,
-            session_exercises (
+            session_exercises:rehab_session_exercises (
               *,
               exercise:exercises (*)
             )
@@ -38,7 +38,29 @@ const Fisio = () => {
 
       if (error) throw error;
       
-      setHistoryPlans(plans || []);
+      // Transform the data to match RehabPlan type
+      const transformedPlans: RehabPlan[] = (plans || []).map(plan => ({
+        id: plan.id,
+        user_id: plan.user_id,
+        goal: plan.goal,
+        start_date: plan.start_date,
+        end_date: plan.end_date,
+        rehab_sessions: plan.rehab_sessions.map((session: any): RehabSession => ({
+          day_number: session.day_number,
+          warmup_description: session.warmup_description,
+          cooldown_description: session.cooldown_description,
+          exercises: session.session_exercises.map((se: any) => ({
+            name: se.exercise.name,
+            sets: se.sets,
+            reps: se.reps,
+            rest_time_seconds: se.rest_time_seconds,
+            gifUrl: se.exercise.gif_url,
+            notes: se.exercise.description
+          }))
+        }))
+      }));
+
+      setHistoryPlans(transformedPlans);
     } catch (error) {
       console.error('Error fetching rehab history:', error);
     } finally {

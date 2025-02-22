@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { FisioPreferences } from "./types";
 import { RehabPlan } from "./types/rehab-plan";
@@ -47,7 +47,7 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
     }
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     generatePlan();
   }, []);
 
@@ -74,12 +74,10 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
 
   return (
     <div className="space-y-8">
-      {/* Plan display will be implemented here */}
       <Card className="p-6">
         <h2 className="text-2xl font-semibold mb-4">
           Seu Plano de Reabilitação
         </h2>
-        {/* Temporary placeholder text */}
         <p className="text-gray-600">
           Plano gerado com sucesso! A visualização detalhada será implementada em breve.
         </p>

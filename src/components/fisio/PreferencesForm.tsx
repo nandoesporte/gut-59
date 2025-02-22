@@ -113,7 +113,20 @@ export const FisioPreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
   });
 
   const handleSubmit = async (data: z.infer<typeof formSchema>) => {
-    onSubmit(data);
+    // Ensure all required fields are present before submitting
+    const preferences: FisioPreferences = {
+      age: data.age,
+      weight: data.weight,
+      height: data.height,
+      gender: data.gender,
+      joint_area: data.joint_area,
+      condition: data.condition,
+      pain_level: data.pain_level,
+      mobility_level: data.mobility_level,
+      previous_treatment: data.previous_treatment,
+      activity_level: data.activity_level
+    };
+    onSubmit(preferences);
   };
 
   return (
