@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
-import { MuscleGroup } from "./types";
+import { Exercise, MuscleGroup, ExerciseType, Difficulty } from "./types";
 import { categories } from "./categoryOptions";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -19,8 +19,6 @@ import { Switch } from "@/components/ui/switch";
 
 interface BatchUploadFormProps {
   onUpload: (exerciseData: Omit<Exercise, 'id' | 'gif_url'>, file?: File) => Promise<void>;
-  selectedCategory: MuscleGroup;
-  onCategoryChange: (category: MuscleGroup) => void;
   uploading: boolean;
 }
 
@@ -53,13 +51,12 @@ const goals = [
 
 export const BatchUploadForm = ({
   onUpload,
-  selectedCategory,
-  onCategoryChange,
   uploading,
 }: BatchUploadFormProps) => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [exerciseType, setExerciseType] = useState("strength");
-  const [activityLevel, setActivityLevel] = useState("beginner");
+  const [exerciseType, setExerciseType] = useState<ExerciseType>("strength");
+  const [selectedCategory, setSelectedCategory] = useState<MuscleGroup>("chest");
+  const [activityLevel, setActivityLevel] = useState<Difficulty>("beginner");
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
   const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB por arquivo
@@ -116,9 +113,9 @@ export const BatchUploadForm = ({
         const exerciseData = {
           name: file.name.replace('.gif', ''),
           description: '',
-          muscle_group: selectedCategory as MuscleGroup,
-          exercise_type: exerciseType as ExerciseType,
-          difficulty: activityLevel as Difficulty,
+          muscle_group: selectedCategory,
+          exercise_type: exerciseType,
+          difficulty: activityLevel,
           equipment_needed: selectedLocations,
           alternative_exercises: [],
           max_reps: 12,
@@ -145,13 +142,12 @@ export const BatchUploadForm = ({
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
-          {/* Classificação dos Exercícios */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label>Tipo de Exercício</Label>
               <Select
                 value={exerciseType}
-                onValueChange={setExerciseType}
+                onValueChange={(value: ExerciseType) => setExerciseType(value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o tipo" />
@@ -170,7 +166,7 @@ export const BatchUploadForm = ({
               <Label>Grupo Muscular</Label>
               <Select
                 value={selectedCategory}
-                onValueChange={onCategoryChange}
+                onValueChange={(value: MuscleGroup) => setSelectedCategory(value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione a categoria" />
@@ -186,7 +182,6 @@ export const BatchUploadForm = ({
             </div>
           </div>
 
-          {/* Nível e Local */}
           <div>
             <Label>Nível de Atividade Física</Label>
             <Select
@@ -222,7 +217,6 @@ export const BatchUploadForm = ({
             </div>
           </div>
 
-          {/* Objetivos */}
           <div className="space-y-2">
             <Label>Objetivos dos Exercícios</Label>
             <div className="grid grid-cols-2 gap-4">
@@ -239,7 +233,6 @@ export const BatchUploadForm = ({
             </div>
           </div>
 
-          {/* Upload de Arquivos */}
           <div>
             <Label htmlFor="files">Selecionar GIFs</Label>
             <Input
