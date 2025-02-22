@@ -34,49 +34,57 @@ const validateAsaasResponse = async (response: Response) => {
 };
 
 const createOrGetCustomer = async (userId: string, asaasApiKey: string) => {
-  const asaasBaseUrl = 'https://www.asaas.com/api/v3';
+  const asaasBaseUrl = 'https://sandbox.asaas.com/api/v3';  // Using sandbox URL for testing
   
-  // First, try to get customer by externalReference
-  const searchResponse = await fetch(
-    `${asaasBaseUrl}/customers?externalReference=${userId}`,
-    {
+  try {
+    // First, try to get customer by externalReference
+    console.log('Searching for customer with userId:', userId);
+    const searchResponse = await fetch(
+      `${asaasBaseUrl}/customers?externalReference=${userId}`,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'access_token': asaasApiKey,
+        },
+      }
+    );
+
+    const searchResult = await validateAsaasResponse(searchResponse);
+    
+    if (searchResult.data && searchResult.data.length > 0) {
+      console.log('Customer found:', searchResult.data[0]);
+      return searchResult.data[0].id;
+    }
+
+    // If customer not found, create a new one
+    console.log('No customer found, creating new one for user:', userId);
+    
+    const customerData = {
+      name: `Cliente ${userId.slice(0, 8)}`,
+      externalReference: userId,
+      email: `cliente.${userId.slice(0, 8)}@example.com`,
+      mobilePhone: "11999999999",  // Changed from phone to mobilePhone
+      cpfCnpj: "12345678909"  // Valid CPF for testing
+    };
+
+    console.log('Creating customer with data:', customerData);
+
+    const createResponse = await fetch(`${asaasBaseUrl}/customers`, {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'access_token': asaasApiKey,
       },
-    }
-  );
+      body: JSON.stringify(customerData),
+    });
 
-  const searchResult = await validateAsaasResponse(searchResponse);
-  
-  if (searchResult.data && searchResult.data.length > 0) {
-    console.log('Customer found:', searchResult.data[0]);
-    return searchResult.data[0].id;
+    const newCustomer = await validateAsaasResponse(createResponse);
+    console.log('New customer created:', newCustomer);
+    return newCustomer.id;
+  } catch (error) {
+    console.error('Error in createOrGetCustomer:', error);
+    throw new Error(`Erro ao criar/buscar cliente: ${error.message}`);
   }
-
-  // If customer not found, create a new one
-  console.log('Creating new customer for user:', userId);
-  
-  const customerData = {
-    name: `Cliente ${userId.slice(0, 8)}`,
-    externalReference: userId,
-    email: `cliente.${userId.slice(0, 8)}@example.com`,
-    phone: "11999999999",
-    cpfCnpj: "01234567890"
-  };
-
-  const createResponse = await fetch(`${asaasBaseUrl}/customers`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'access_token': asaasApiKey,
-    },
-    body: JSON.stringify(customerData),
-  });
-
-  const newCustomer = await validateAsaasResponse(createResponse);
-  console.log('New customer created:', newCustomer);
-  return newCustomer.id;
 };
 
 serve(async (req) => {
@@ -110,8 +118,9 @@ serve(async (req) => {
 
     // Get or create customer
     const customerId = await createOrGetCustomer(userId, asaasApiKey);
+    console.log('Got customer ID:', customerId);
 
-    const asaasBaseUrl = 'https://www.asaas.com/api/v3';
+    const asaasBaseUrl = 'https://sandbox.asaas.com/api/v3';  // Using sandbox URL for testing
     const paymentData = {
       customer: customerId,
       billingType: "BOLETO",
