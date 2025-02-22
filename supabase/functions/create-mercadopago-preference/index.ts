@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { MercadoPagoConfig, Preference } from "https://esm.sh/mercadopago@2.0.6";
 
@@ -8,13 +9,66 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { 
+      status: 200,
+      headers: corsHeaders 
+    });
+  }
+
   try {
-    if (req.method === 'OPTIONS') {
-      return new Response(null, { 
-        status: 200,
-        headers: corsHeaders 
-      });
+    // Check content type
+    const contentType = req.headers.get('content-type');
+    if (!contentType?.includes('application/json')) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Content-Type must be application/json',
+          received: contentType 
+        }),
+        { 
+          status: 400,
+          headers: corsHeaders
+        }
+      );
     }
+
+    // Get request body
+    const bodyText = await req.text();
+    if (!bodyText) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Empty request body'
+        }),
+        { 
+          status: 400,
+          headers: corsHeaders
+        }
+      );
+    }
+
+    console.log('Raw request body:', bodyText);
+
+    // Parse JSON
+    let requestData;
+    try {
+      requestData = JSON.parse(bodyText);
+    } catch (e) {
+      console.error('JSON parsing error:', e);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid JSON format',
+          details: e.message,
+          receivedBody: bodyText
+        }),
+        { 
+          status: 400,
+          headers: corsHeaders
+        }
+      );
+    }
+
+    console.log('Parsed request data:', requestData);
 
     const accessToken = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN');
     if (!accessToken) {
@@ -28,31 +82,13 @@ serve(async (req) => {
       );
     }
 
-    let requestData;
-    try {
-      requestData = await req.json();
-      console.log('Parsed request data:', requestData);
-    } catch (e) {
-      console.error('JSON parsing error:', e);
-      return new Response(
-        JSON.stringify({ 
-          error: 'Invalid JSON format',
-          details: e.message 
-        }),
-        { 
-          status: 400,
-          headers: corsHeaders
-        }
-      );
-    }
-
     const { userId, amount, description } = requestData;
     
     if (!userId || !amount || !description) {
       return new Response(
         JSON.stringify({ 
           error: 'Missing required fields',
-          received: { userId, amount, description }
+          received: requestData
         }),
         { 
           status: 400,

@@ -34,23 +34,28 @@ export const usePaymentHandling = () => {
         throw new Error('Usuário não autenticado');
       }
 
-      const payload = {
+      // Ensure the payload is properly structured
+      const payload: PaymentPayload = {
         userId: userData.user.id,
         amount: 19.90,
         description: "Plano Alimentar Personalizado"
       };
 
-      console.log('Sending payment request with payload:', payload);
+      console.log('Payment payload:', payload);
 
+      // Call the edge function with explicit JSON stringification
       const { data, error } = await supabase.functions.invoke(
         'create-mercadopago-preference',
         {
+          method: 'POST',
           body: JSON.stringify(payload),
           headers: {
             'Content-Type': 'application/json'
           }
         }
       );
+
+      console.log('Edge function response:', { data, error });
 
       if (error) {
         console.error('Edge function error:', error);
@@ -62,6 +67,7 @@ export const usePaymentHandling = () => {
         throw new Error('Resposta inválida do serviço de pagamento');
       }
 
+      // Store the preference ID and open payment window
       setPreferenceId(data.preferenceId);
       window.open(data.initPoint, '_blank');
 
@@ -76,6 +82,7 @@ export const usePaymentHandling = () => {
           const { data: statusData, error: statusError } = await supabase.functions.invoke(
             'check-mercadopago-payment',
             {
+              method: 'POST',
               body: JSON.stringify({ preferenceId: data.preferenceId }),
               headers: {
                 'Content-Type': 'application/json'
@@ -94,7 +101,7 @@ export const usePaymentHandling = () => {
             toast.success("Pagamento confirmado! Você já pode selecionar os alimentos.");
           }
         } catch (error) {
-          console.error('Erro ao verificar pagamento:', error);
+          console.error('Error checking payment status:', error);
           clearInterval(checkInterval);
         }
       }, 5000);
@@ -105,7 +112,7 @@ export const usePaymentHandling = () => {
       }, 600000);
 
     } catch (error) {
-      console.error('Erro completo:', error);
+      console.error('Payment error:', error);
       toast.error(error instanceof Error ? error.message : "Erro ao processar pagamento. Por favor, tente novamente.");
     } finally {
       setIsProcessingPayment(false);
@@ -119,4 +126,3 @@ export const usePaymentHandling = () => {
     handlePaymentAndContinue
   };
 };
-
