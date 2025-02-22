@@ -1,12 +1,18 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { initMercadoPago } from "@mercadopago/sdk-react";
 
 export interface PaymentResponse {
   id: string;
   status: string;
-  invoiceUrl: string;
+  preferenceId: string;  // Added this property
 }
+
+// Initialize MercadoPago with the test public key
+initMercadoPago('TEST-5cc34aa1-d681-40a3-9b1a-5648d21af83b', {
+  locale: 'pt-BR'
+});
 
 export const createPayment = async (): Promise<PaymentResponse> => {
   try {
@@ -23,7 +29,7 @@ export const createPayment = async (): Promise<PaymentResponse> => {
 
     console.log('Iniciando criação de pagamento para usuário:', userData.user.id);
 
-    const { data, error } = await supabase.functions.invoke('create-asaas-payment', {
+    const { data, error } = await supabase.functions.invoke('create-mercadopago-payment', {
       body: {
         userId: userData.user.id,
         amount: 19.90,
@@ -44,7 +50,7 @@ export const createPayment = async (): Promise<PaymentResponse> => {
 
     console.log('Resposta do serviço de pagamento:', data);
 
-    if (!data.id || !data.invoiceUrl) {
+    if (!data.id || !data.preferenceId) {
       console.error('Invalid response structure:', data);
       throw new Error('Resposta inválida do serviço de pagamento');
     }
@@ -52,7 +58,7 @@ export const createPayment = async (): Promise<PaymentResponse> => {
     return {
       id: data.id,
       status: data.status,
-      invoiceUrl: data.invoiceUrl
+      preferenceId: data.preferenceId
     };
   } catch (error) {
     console.error('Erro detalhado ao criar pagamento:', error);
