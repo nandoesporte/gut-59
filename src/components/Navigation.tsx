@@ -46,31 +46,31 @@ const Navigation = () => {
         <div className="flex items-center justify-between">
           <NavLink
             to="/"
-            icon={<Home className="w-5 h-5 md:w-6 md:h-6" />}
+            icon={<Home className="w-6 h-6 md:w-7 md:h-7" />}
             text="Início"
             active={isActive("/")}
           />
           <NavLink
             to="/menu"
-            icon={<UtensilsCrossed className="w-5 h-5 md:w-6 md:h-6" />}
+            icon={<UtensilsCrossed className="w-6 h-6 md:w-7 md:h-7" />}
             text="Nutri"
             active={isActive("/menu")}
           />
           <NavLink
             to="/instructions"
-            icon={<Book className="w-5 h-5 md:w-6 md:h-6" />}
+            icon={<Book className="w-6 h-6 md:w-7 md:h-7" />}
             text="Instruções"
             active={isActive("/instructions")}
           />
           <NavLink
             to="/workout"
-            icon={<Dumbbell className="w-5 h-5 md:w-6 md:h-6" />}
+            icon={<Dumbbell className="w-6 h-6 md:w-7 md:h-7" />}
             text="Treino"
             active={isActive("/workout")}
           />
           <NavLink
             to="/fisio"
-            icon={<Stethoscope className="w-5 h-5 md:w-6 md:h-6" />}
+            icon={<Stethoscope className="w-6 h-6 md:w-7 md:h-7" />}
             text="Fisio"
             active={isActive("/fisio")}
           />
@@ -78,21 +78,21 @@ const Navigation = () => {
             href="https://katiasantin.com.br/loja"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex flex-col items-center space-y-1 px-2 py-1 rounded-lg transition-colors text-gray-400 hover:text-primary-500"
+            className="flex flex-col items-center space-y-1 px-2 py-1 rounded-lg transition-colors text-gray-700 hover:text-primary-500"
           >
-            <ShoppingBag className="w-5 h-5 md:w-6 md:h-6" />
-            <span className="text-xs font-medium">Produtos</span>
+            <ShoppingBag className="w-6 h-6 md:w-7 md:h-7" />
+            <span className="text-sm md:text-base font-medium">Produtos</span>
           </a>
           <NavLink
             to="/progress"
-            icon={<LineChart className="w-5 h-5 md:w-6 md:h-6" />}
+            icon={<LineChart className="w-6 h-6 md:w-7 md:h-7" />}
             text="Diário"
             active={isActive("/progress")}
           />
           {isAdmin && (
             <NavLink
               to="/admin"
-              icon={<Settings className="w-5 h-5 md:w-6 md:h-6" />}
+              icon={<Settings className="w-6 h-6 md:w-7 md:h-7" />}
               text="Admin"
               active={isActive("/admin")}
             />
@@ -115,11 +115,11 @@ const NavLink = ({ to, icon, text, active, showText = true }: NavLinkProps) => (
   <Link
     to={to}
     className={`flex flex-col items-center space-y-1 px-2 py-1 rounded-lg transition-colors ${
-      active ? "text-primary-500" : "text-gray-400 hover:text-primary-500"
+      active ? "text-primary-500" : "text-gray-700 hover:text-primary-500"
     }`}
   >
     {icon}
-    <span className="text-xs font-medium">{text}</span>
+    <span className="text-sm md:text-base font-medium">{text}</span>
   </Link>
 );
 
