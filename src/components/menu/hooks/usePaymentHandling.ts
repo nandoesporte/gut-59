@@ -34,41 +34,36 @@ export const usePaymentHandling = () => {
         throw new Error('Usuário não autenticado');
       }
 
-      const payload: PaymentPayload = {
+      // Create the payment payload
+      const payload = {
         userId: userData.user.id,
         amount: 19.90,
         description: "Plano Alimentar Personalizado"
       };
 
-      console.log('Initiating payment with payload:', payload);
+      console.log('Enviando payload:', payload);
 
-      const { data: responseData, error: functionError } = await supabase.functions.invoke(
+      // Call edge function with raw payload
+      const { data, error } = await supabase.functions.invoke(
         'create-mercadopago-preference',
         {
-          method: 'POST',
-          body: payload, // Supabase will handle JSON stringification
-          headers: {
-            'Content-Type': 'application/json'
-          }
+          body: payload
         }
       );
 
-      console.log('Payment function response:', { responseData, functionError });
+      console.log('Resposta da função:', { data, error });
 
-      if (functionError || !responseData) {
-        console.error('Payment creation error:', functionError);
+      if (error) {
+        console.error('Erro na função:', error);
         throw new Error('Falha ao criar pagamento. Por favor, tente novamente.');
       }
 
-      const { preferenceId: newPreferenceId, initPoint } = responseData;
-
-      if (!newPreferenceId || !initPoint) {
-        console.error('Invalid payment response:', responseData);
+      if (!data || !data.preferenceId || !data.initPoint) {
         throw new Error('Resposta inválida do serviço de pagamento');
       }
 
-      setPreferenceId(newPreferenceId);
-      window.open(initPoint, '_blank');
+      setPreferenceId(data.preferenceId);
+      window.open(data.initPoint, '_blank');
 
       // Start polling for payment status
       const checkInterval = setInterval(async () => {
@@ -76,16 +71,12 @@ export const usePaymentHandling = () => {
           const { data: statusData, error: statusError } = await supabase.functions.invoke(
             'check-mercadopago-payment',
             {
-              method: 'POST',
-              body: { preferenceId: newPreferenceId },
-              headers: {
-                'Content-Type': 'application/json'
-              }
+              body: { preferenceId: data.preferenceId }
             }
           );
 
           if (statusError) {
-            console.error('Payment status check error:', statusError);
+            console.error('Erro ao verificar status:', statusError);
             clearInterval(checkInterval);
             return;
           }
@@ -96,7 +87,7 @@ export const usePaymentHandling = () => {
             toast.success("Pagamento confirmado! Você já pode selecionar os alimentos.");
           }
         } catch (error) {
-          console.error('Error checking payment status:', error);
+          console.error('Erro ao verificar pagamento:', error);
           clearInterval(checkInterval);
         }
       }, 5000);
@@ -107,7 +98,7 @@ export const usePaymentHandling = () => {
       }, 600000);
 
     } catch (error) {
-      console.error('Payment processing error:', error);
+      console.error('Erro completo:', error);
       toast.error(error instanceof Error ? error.message : "Erro ao processar pagamento. Por favor, tente novamente.");
     } finally {
       setIsProcessingPayment(false);
