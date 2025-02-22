@@ -1,7 +1,6 @@
 
 import { useEffect, useState } from 'react';
 import { Motion } from '@capacitor/motion';
-import { AppLauncher } from '@capacitor/app-launcher';
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Activity, LineChart, User, Loader } from "lucide-react";
@@ -35,20 +34,9 @@ const StepCounter = () => {
     return { steps, distance, calories };
   };
 
-  const openAppSettings = async () => {
+  const startAccelerometer = async () => {
     try {
-      await AppLauncher.openUrl({ url: 'app-settings:' });
-    } catch (error) {
-      console.error('Erro ao abrir configurações:', error);
-      toast.error("Por favor, abra as configurações do dispositivo manualmente e conceda as permissões necessárias.");
-    }
-  };
-
-  const requestPermissions = async () => {
-    setIsLoading(true);
-
-    try {
-      console.log("Iniciando verificação do acelerômetro...");
+      console.log("Iniciando acelerômetro...");
       
       await Motion.removeAllListeners();
       console.log("Listeners anteriores removidos");
@@ -69,7 +57,32 @@ const StepCounter = () => {
         }
       });
 
-      console.log("Listener adicionado, aguardando eventos...");
+      console.log("Listener adicionado com sucesso");
+
+    } catch (error) {
+      console.error('Erro ao iniciar acelerômetro:', error);
+      toast.error("Erro ao iniciar o acelerômetro");
+    }
+  };
+
+  const requestPermissions = async () => {
+    setIsLoading(true);
+
+    try {
+      console.log("Verificando permissão do acelerômetro...");
+      
+      const permissionStatus = await navigator.permissions.query({ name: 'accelerometer' as PermissionName });
+      
+      if (permissionStatus.state === 'granted') {
+        console.log("Permissão para acessar o acelerômetro já foi concedida.");
+        await startAccelerometer();
+      } else if (permissionStatus.state === 'prompt') {
+        console.log("Solicitando permissão para acessar o acelerômetro...");
+        await startAccelerometer();
+      } else {
+        console.log("Permissão para acessar o acelerômetro foi negada.");
+        toast.error("Permissão para acessar o acelerômetro foi negada.");
+      }
 
       // Aguarda 3 segundos para ver se recebemos eventos do acelerômetro
       await new Promise(resolve => setTimeout(resolve, 3000));
@@ -77,26 +90,12 @@ const StepCounter = () => {
       if (!hasPermission) {
         console.log("Nenhum evento do acelerômetro recebido após espera");
         await Motion.removeAllListeners();
-        
-        const errorMessage = "Não foi possível acessar o acelerômetro. Clique aqui para abrir as configurações do dispositivo.";
-        toast.error(errorMessage, {
-          action: {
-            label: "Abrir Configurações",
-            onClick: openAppSettings
-          },
-          duration: 10000
-        });
+        toast.error("Não foi possível acessar o acelerômetro.");
       }
 
     } catch (error) {
-      console.error('Erro ao configurar acelerômetro:', error);
-      toast.error("Erro ao acessar o acelerômetro", {
-        action: {
-          label: "Abrir Configurações",
-          onClick: openAppSettings
-        },
-        duration: 10000
-      });
+      console.error('Erro ao solicitar permissão:', error);
+      toast.error("Erro ao solicitar permissão para o acelerômetro");
     } finally {
       setIsLoading(false);
     }
@@ -195,13 +194,6 @@ const StepCounter = () => {
                 ) : (
                   "Permitir contagem de passos"
                 )}
-              </button>
-              
-              <button
-                onClick={openAppSettings}
-                className="w-full py-2 px-4 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Abrir Configurações do App
               </button>
             </div>
           )}
