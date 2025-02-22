@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { Motion } from '@capacitor/motion';
 import { App } from '@capacitor/app';
@@ -37,9 +36,10 @@ const StepCounter = () => {
 
   const openAppSettings = async () => {
     try {
-      await App.openSystemSettings();
+      await App.openUrl({ url: 'app-settings:' });
     } catch (error) {
       console.error('Erro ao abrir configurações:', error);
+      toast.error("Por favor, abra as configurações do dispositivo manualmente e conceda as permissões necessárias.");
     }
   };
 
@@ -81,7 +81,7 @@ const StepCounter = () => {
             label: "Abrir Configurações",
             onClick: openAppSettings
           },
-          duration: 10000 // Mantém a notificação por mais tempo
+          duration: 10000
         });
       }
 
@@ -111,13 +111,11 @@ const StepCounter = () => {
       try {
         console.log("Iniciando contagem de passos...");
         
-        // Se já temos um listener ativo, não criar outro
         if (listener) {
           console.log("Listener já existe, ignorando...");
           return;
         }
 
-        // Configurar o listener do acelerômetro
         listener = await Motion.addListener('accel', (event) => {
           if (!event || !event.acceleration) {
             console.log("Evento inválido recebido");
@@ -126,11 +124,9 @@ const StepCounter = () => {
           
           const { x, y, z } = event.acceleration;
           
-          // Calcula a magnitude da aceleração
           const magnitude = Math.sqrt(x * x + y * y + z * z);
           const now = Date.now();
 
-          // Detecta pico de aceleração como passo
           if (magnitude > ACCELERATION_THRESHOLD && 
               magnitude > lastMagnitude && 
               (now - lastStepTime) > MIN_TIME_BETWEEN_STEPS) {
