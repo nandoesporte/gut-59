@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Motion } from '@capacitor/motion';
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -28,6 +28,7 @@ const StepCounter = () => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [sensorSupported, setSensorSupported] = useState(true);
+  const [accelerometerInitialized, setAccelerometerInitialized] = useState(false);
 
   const calculateMetrics = (steps: number) => {
     const distance = (steps * STEP_LENGTH) / 1000;
@@ -35,7 +36,11 @@ const StepCounter = () => {
     return { steps, distance, calories };
   };
 
-  const startTraditionalAccelerometer = async () => {
+  const startTraditionalAccelerometer = useCallback(async () => {
+    if (accelerometerInitialized) {
+      return true;
+    }
+
     try {
       if (!('Accelerometer' in window)) {
         console.log("Acelerômetro não suportado pelo navegador.");
@@ -47,23 +52,29 @@ const StepCounter = () => {
       // @ts-ignore - TypeScript não reconhece a API de Sensores Genéricos
       const accelerometer = new Accelerometer({ frequency: 60 });
 
+      let initialized = false;
       accelerometer.addEventListener('reading', () => {
-        console.log(`Aceleração X: ${accelerometer.x}`);
-        console.log(`Aceleração Y: ${accelerometer.y}`);
-        console.log(`Aceleração Z: ${accelerometer.z}`);
-        setHasPermission(true);
-        setIsInitialized(true);
-        toast.success("Acelerômetro iniciado com sucesso!");
+        if (!initialized) {
+          console.log("Acelerômetro iniciado com sucesso");
+          setHasPermission(true);
+          setIsInitialized(true);
+          setAccelerometerInitialized(true);
+          initialized = true;
+          toast.success("Acelerômetro iniciado com sucesso!");
+        }
       });
 
       accelerometer.addEventListener('error', (error: Error) => {
-        console.error("Erro no acelerômetro:", error);
-        if (error.name === 'NotAllowedError') {
-          toast.error("Permissão para acessar o acelerômetro foi negada. Por favor, habilite a permissão nas configurações do navegador.");
-        } else if (error.name === 'NotReadableError') {
-          toast.error("Não foi possível acessar o acelerômetro. Verifique se o dispositivo possui esse sensor.");
+        if (!initialized) {
+          console.error("Erro no acelerômetro:", error);
+          if (error.name === 'NotAllowedError') {
+            toast.error("Permissão para acessar o acelerômetro foi negada. Por favor, habilite a permissão nas configurações do navegador.");
+          } else if (error.name === 'NotReadableError') {
+            toast.error("Não foi possível acessar o acelerômetro. Verifique se o dispositivo possui esse sensor.");
+          }
+          setSensorSupported(false);
+          initialized = true;
         }
-        setSensorSupported(false);
       });
 
       accelerometer.start();
@@ -73,22 +84,29 @@ const StepCounter = () => {
       setSensorSupported(false);
       return false;
     }
-  };
+  }, [accelerometerInitialized]);
 
-  const startCapacitorAccelerometer = async () => {
+  const startCapacitorAccelerometer = useCallback(async () => {
+    if (accelerometerInitialized) {
+      return true;
+    }
+
     try {
       console.log("Tentando iniciar o acelerômetro via Capacitor...");
 
       await Motion.removeAllListeners();
       console.log("Listeners anteriores removidos");
 
+      let initialized = false;
       const listener = await Motion.addListener('accel', (event) => {
-        if (event && event.acceleration) {
+        if (!initialized && event && event.acceleration) {
           const { x, y, z } = event.acceleration;
           console.log("Acelerômetro funcionando:", { x, y, z });
           
           setHasPermission(true);
           setIsInitialized(true);
+          setAccelerometerInitialized(true);
+          initialized = true;
           toast.success("Acelerômetro iniciado com sucesso!");
         }
       });
@@ -99,13 +117,16 @@ const StepCounter = () => {
       setSensorSupported(false);
       return false;
     }
-  };
+  }, [accelerometerInitialized]);
 
   const requestPermissions = async () => {
+    if (isLoading || accelerometerInitialized) {
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      // Primeiro verifica se o navegador suporta a API de Sensores Genéricos
       if (!('Accelerometer' in window)) {
         console.log("API de Sensores Genéricos não suportada, tentando Capacitor...");
         const capacitorSuccess = await startCapacitorAccelerometer();
@@ -116,7 +137,6 @@ const StepCounter = () => {
           return;
         }
       } else {
-        // Se suportar, tenta usar a API de Sensores Genéricos
         const traditionalSuccess = await startTraditionalAccelerometer();
         
         if (!traditionalSuccess) {
@@ -131,7 +151,6 @@ const StepCounter = () => {
         }
       }
 
-      // Aguarda um momento para ver se recebemos dados
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       if (!hasPermission) {
@@ -156,24 +175,17 @@ const StepCounter = () => {
     let listener: any = null;
 
     const startStepCounting = async () => {
-      if (!hasPermission || !isInitialized) return;
+      if (!hasPermission || !isInitialized || listener) return;
 
       try {
         console.log("Iniciando contagem de passos...");
-        
-        if (listener) {
-          console.log("Listener já existe, ignorando...");
-          return;
-        }
 
         listener = await Motion.addListener('accel', (event) => {
           if (!event || !event.acceleration) {
-            console.log("Evento inválido recebido");
             return;
           }
           
           const { x, y, z } = event.acceleration;
-          
           const magnitude = Math.sqrt(x * x + y * y + z * z);
           const now = Date.now();
 
@@ -238,7 +250,7 @@ const StepCounter = () => {
             <div className="space-y-4">
               <button
                 onClick={requestPermissions}
-                disabled={isLoading}
+                disabled={isLoading || accelerometerInitialized}
                 className="w-full py-2 px-4 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isLoading ? (
