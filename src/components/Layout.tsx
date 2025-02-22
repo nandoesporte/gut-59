@@ -2,6 +2,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import Navigation from "./Navigation";
 import { supabase } from "@/integrations/supabase/client";
+import { useLocation } from "react-router-dom";
 
 interface LayoutProps {
   children: ReactNode;
@@ -9,6 +10,7 @@ interface LayoutProps {
 
 const Layout = ({ children }: LayoutProps) => {
   const [hasNewMessage, setHasNewMessage] = useState(false);
+  const location = useLocation();
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -35,10 +37,14 @@ const Layout = ({ children }: LayoutProps) => {
     fetchUser();
   }, []);
 
-  // Efeito para garantir que a página sempre inicie no topo
+  // Reset scroll position when route changes or page loads
   useEffect(() => {
-    window.scrollTo(0, 0);
-  }, []);
+    window.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: 'instant'
+    });
+  }, [location.pathname]);
 
   return (
     <div className="min-h-screen bg-gray-50">
