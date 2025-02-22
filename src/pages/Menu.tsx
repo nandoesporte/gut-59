@@ -76,7 +76,7 @@ const Menu = () => {
             {mealPlan && (
               <MealPlanDisplay 
                 mealPlan={mealPlan} 
-                onRefresh={() => {}} // Adding required onRefresh prop
+                onRefresh={async () => Promise.resolve()} // Fixed: return a Promise
               />
             )}
           </div>
