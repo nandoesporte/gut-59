@@ -5,7 +5,7 @@ import { ExerciseCard } from "./ExerciseCard";
 
 interface ExerciseListProps {
   exercises: Exercise[];
-  onRemoveGif: (exerciseId: string, fileName: string) => Promise<void>;
+  onRemoveGif?: (exerciseId: string, fileName: string) => Promise<void>;
 }
 
 export const ExerciseList = ({ exercises, onRemoveGif }: ExerciseListProps) => {
@@ -20,7 +20,7 @@ export const ExerciseList = ({ exercises, onRemoveGif }: ExerciseListProps) => {
             <ExerciseCard
               key={exercise.id}
               exercise={exercise}
-              onRemoveGif={(fileName) => onRemoveGif(exercise.id, fileName)}
+              onRemoveGif={onRemoveGif ? (fileName) => onRemoveGif(exercise.id, fileName) : undefined}
             />
           ))}
         </div>
@@ -28,4 +28,3 @@ export const ExerciseList = ({ exercises, onRemoveGif }: ExerciseListProps) => {
     </Card>
   );
 };
-

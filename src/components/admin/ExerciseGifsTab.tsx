@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { ExerciseForm } from "./exercises/ExerciseForm";
 import { BatchUploadForm } from "./exercises/BatchUploadForm";
 import { ExerciseList } from "./exercises/ExerciseList";
-import { Exercise, MuscleGroup } from "./exercises/types";
+import { Exercise } from "./exercises/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -79,7 +79,7 @@ export const ExerciseGifsTab = () => {
       />
 
       <h2 className="text-2xl font-bold mt-12">Exercícios Cadastrados</h2>
-      <ExerciseList exercises={exercises || []} onUpdate={refetch} />
+      <ExerciseList exercises={exercises || []} />
     </div>
   );
 };

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -19,7 +18,7 @@ import { X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 
 interface BatchUploadFormProps {
-  onUpload: (file: File, category: MuscleGroup) => Promise<void>;
+  onUpload: (exerciseData: Omit<Exercise, 'id' | 'gif_url'>, file?: File) => Promise<void>;
   selectedCategory: MuscleGroup;
   onCategoryChange: (category: MuscleGroup) => void;
   uploading: boolean;
@@ -114,9 +113,24 @@ export const BatchUploadForm = ({
 
     try {
       for (const file of selectedFiles) {
-        await onUpload(file, selectedCategory);
+        const exerciseData = {
+          name: file.name.replace('.gif', ''),
+          description: '',
+          muscle_group: selectedCategory as MuscleGroup,
+          exercise_type: exerciseType as ExerciseType,
+          difficulty: activityLevel as Difficulty,
+          equipment_needed: selectedLocations,
+          alternative_exercises: [],
+          max_reps: 12,
+          min_reps: 8,
+          max_sets: 4,
+          min_sets: 3,
+          rest_time_seconds: 60
+        };
+        
+        await onUpload(exerciseData, file);
       }
-      setSelectedFiles([]); // Limpa a lista após upload bem sucedido
+      setSelectedFiles([]);
       toast.success('Todos os arquivos foram enviados com sucesso!');
     } catch (error) {
       console.error('Erro no upload:', error);
