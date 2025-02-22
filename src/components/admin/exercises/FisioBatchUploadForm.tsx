@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -21,7 +22,7 @@ interface FisioBatchUploadFormProps {
   uploading: boolean;
 }
 
-const jointAreaOptions = {
+const jointAreaOptions: Record<PhysioJointArea, string> = {
   ankle_foot: "Tornozelo e Pé",
   leg: "Perna",
   knee: "Joelho",
@@ -31,7 +32,7 @@ const jointAreaOptions = {
   elbow_hand: "Cotovelo e Mão"
 };
 
-const conditionsByArea = {
+const conditionsByArea: Record<PhysioJointArea, Array<{ value: PhysioCondition; label: string }>> = {
   ankle_foot: [
     { value: "plantar_fasciitis", label: "Fascite Plantar" },
     { value: "calcaneal_spur", label: "Esporão do Calcâneo" },
@@ -74,12 +75,6 @@ const conditionsByArea = {
   ]
 };
 
-const difficultyLevels = [
-  { value: "beginner", label: "Iniciante" },
-  { value: "intermediate", label: "Intermediário" },
-  { value: "advanced", label: "Avançado" }
-];
-
 export const FisioBatchUploadForm = ({
   onUpload,
   uploading,
@@ -91,7 +86,7 @@ export const FisioBatchUploadForm = ({
   const [exerciseType, setExerciseType] = useState<ExerciseType>("mobility");
   const [isCompoundMovement, setIsCompoundMovement] = useState(false);
   const [requiresEquipment, setRequiresEquipment] = useState(false);
-  const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB por arquivo
+  const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
   const validateFile = (file: File): boolean => {
     if (!file.type.includes('gif')) {
@@ -111,7 +106,7 @@ export const FisioBatchUploadForm = ({
     const files = Array.from(event.target.files || []);
     const validFiles = files.filter(validateFile);
     setSelectedFiles(prev => [...prev, ...validFiles]);
-    event.target.value = ''; // Reset input
+    event.target.value = '';
   };
 
   const removeFile = (index: number) => {
@@ -162,6 +157,18 @@ export const FisioBatchUploadForm = ({
     }
   };
 
+  const handleJointAreaChange = (value: string) => {
+    const jointArea = value as PhysioJointArea;
+    setSelectedJointArea(jointArea);
+    // Ao mudar a área, seleciona a primeira condição disponível para essa área
+    const firstCondition = conditionsByArea[jointArea][0].value;
+    setSelectedCondition(firstCondition);
+  };
+
+  const handleConditionChange = (value: string) => {
+    setSelectedCondition(value as PhysioCondition);
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -174,10 +181,7 @@ export const FisioBatchUploadForm = ({
               <Label>Articulação</Label>
               <Select
                 value={selectedJointArea}
-                onValueChange={(value) => {
-                  setSelectedJointArea(value);
-                  setSelectedCondition(conditionsByArea[value as keyof typeof conditionsByArea][0].value);
-                }}
+                onValueChange={handleJointAreaChange}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione a articulação" />
@@ -196,13 +200,13 @@ export const FisioBatchUploadForm = ({
               <Label>Condição</Label>
               <Select
                 value={selectedCondition}
-                onValueChange={setSelectedCondition}
+                onValueChange={handleConditionChange}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione a condição" />
                 </SelectTrigger>
                 <SelectContent>
-                  {conditionsByArea[selectedJointArea as keyof typeof conditionsByArea].map(({ value, label }) => (
+                  {conditionsByArea[selectedJointArea].map(({ value, label }) => (
                     <SelectItem key={value} value={value}>
                       {label}
                     </SelectItem>
@@ -223,11 +227,9 @@ export const FisioBatchUploadForm = ({
                   <SelectValue placeholder="Selecione o nível" />
                 </SelectTrigger>
                 <SelectContent>
-                  {difficultyLevels.map(level => (
-                    <SelectItem key={level.value} value={level.value as Difficulty}>
-                      {level.label}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="beginner">Iniciante</SelectItem>
+                  <SelectItem value="intermediate">Intermediário</SelectItem>
+                  <SelectItem value="advanced">Avançado</SelectItem>
                 </SelectContent>
               </Select>
             </div>
