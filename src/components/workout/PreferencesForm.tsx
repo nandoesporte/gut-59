@@ -15,6 +15,7 @@ import { WorkoutPreferences } from "./types";
 import { Clipboard, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { usePaymentHandling } from "@/components/menu/hooks/usePaymentHandling";
 
 const formSchema = z.object({
   age: z.number().min(16, "Idade mínima é 16 anos").max(100, "Idade máxima é 100 anos"),
@@ -46,11 +47,24 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
       preferred_exercise_types: ["strength"],
       training_location: "gym",
     },
-    mode: "onChange"  // Adiciona validação em tempo real
+    mode: "onChange"
   });
+
+  const {
+    isProcessingPayment,
+    hasPaid,
+    handlePaymentAndContinue
+  } = usePaymentHandling();
 
   const handleSubmit = async (data: FormSchema) => {
     try {
+      // Verifica se o usuário já pagou
+      if (!hasPaid) {
+        // Se não pagou, inicia o processo de pagamento
+        await handlePaymentAndContinue();
+        return;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
@@ -132,11 +146,14 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
             <Button 
               type="submit" 
               className="w-full"
-              disabled={!isValid}
+              disabled={!isValid || isProcessingPayment}
               size="lg"
             >
-              Gerar Plano de Treino
-              <ArrowRight className="w-5 h-5 ml-2" />
+              {hasPaid ? "Gerar Plano de Treino" : "Continuar para Pagamento"}
+              {!isProcessingPayment && <ArrowRight className="w-5 h-5 ml-2" />}
+              {isProcessingPayment && (
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white ml-2" />
+              )}
             </Button>
           </CardContent>
         </Card>
