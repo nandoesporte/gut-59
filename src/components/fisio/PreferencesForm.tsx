@@ -1,3 +1,4 @@
+
 import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -13,9 +14,9 @@ import { Stethoscope, ArrowRight } from "lucide-react";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 
 const formSchema = z.object({
-  age: z.number().min(16).max(100),
-  weight: z.number().min(30).max(200),
-  height: z.number().min(100).max(250),
+  age: z.number().min(16, "Idade mínima é 16 anos").max(100, "Idade máxima é 100 anos"),
+  weight: z.number().min(30, "Peso mínimo é 30kg").max(200, "Peso máximo é 200kg"),
+  height: z.number().min(100, "Altura mínima é 100cm").max(250, "Altura máxima é 250cm"),
   gender: z.enum(["male", "female"]),
   joint_area: z.enum([
     "ankle_foot", "leg", "knee", "hip", "spine", "shoulder", "elbow_hand"
@@ -35,7 +36,7 @@ const formSchema = z.object({
   mobility_level: z.enum(["limited", "moderate", "good"]),
   previous_treatment: z.boolean(),
   activity_level: z.enum(["sedentary", "light", "moderate", "active"])
-});
+}).required();
 
 type FormData = z.infer<typeof formSchema>;
 
@@ -114,7 +115,20 @@ export const FisioPreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
   });
 
   const handleSubmit = (data: FormData) => {
-    onSubmit(data);
+    // Explicitly create a FisioPreferences object with all required properties
+    const preferences: FisioPreferences = {
+      age: data.age,
+      weight: data.weight,
+      height: data.height,
+      gender: data.gender,
+      joint_area: data.joint_area,
+      condition: data.condition,
+      pain_level: data.pain_level,
+      mobility_level: data.mobility_level,
+      previous_treatment: data.previous_treatment,
+      activity_level: data.activity_level
+    };
+    onSubmit(preferences);
   };
 
   return (
