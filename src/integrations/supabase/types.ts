@@ -140,59 +140,134 @@ export type Database = {
       exercises: {
         Row: {
           alternative_exercises: string[] | null
+          balance_requirement: string | null
+          breathing_pattern: string | null
+          calories_burned_per_hour: number | null
+          common_mistakes: string[] | null
+          contraindicated_conditions: string[] | null
+          coordination_requirement: string | null
           created_at: string
           description: string | null
           difficulty: Database["public"]["Enums"]["exercise_difficulty"]
+          equipment_complexity: string | null
           equipment_needed: string[] | null
           exercise_type: Database["public"]["Enums"]["exercise_type"]
+          flexibility_requirement: string | null
           gif_url: string | null
           goals: string[] | null
           id: string
+          is_compound_movement: boolean | null
           max_reps: number
           max_sets: number
           min_reps: number
           min_sets: number
+          mobility_requirements: string | null
+          movement_pattern: string | null
           muscle_group: Database["public"]["Enums"]["muscle_group"]
           name: string
+          power_requirement: string | null
+          preparation_time_minutes: number | null
+          primary_muscles_worked: string[] | null
+          progression_variations: string[] | null
+          recommended_warm_up: string | null
+          regression_variations: string[] | null
           rest_time_seconds: number
+          safety_considerations: string[] | null
+          secondary_muscles_worked: string[] | null
+          stability_requirement: string | null
+          suitable_for_conditions: string[] | null
+          target_heart_rate_zone: string[] | null
+          tempo_recommendation: string | null
+          training_phases: string[] | null
+          typical_duration_seconds: number | null
           updated_at: string
         }
         Insert: {
           alternative_exercises?: string[] | null
+          balance_requirement?: string | null
+          breathing_pattern?: string | null
+          calories_burned_per_hour?: number | null
+          common_mistakes?: string[] | null
+          contraindicated_conditions?: string[] | null
+          coordination_requirement?: string | null
           created_at?: string
           description?: string | null
           difficulty?: Database["public"]["Enums"]["exercise_difficulty"]
+          equipment_complexity?: string | null
           equipment_needed?: string[] | null
           exercise_type: Database["public"]["Enums"]["exercise_type"]
+          flexibility_requirement?: string | null
           gif_url?: string | null
           goals?: string[] | null
           id?: string
+          is_compound_movement?: boolean | null
           max_reps?: number
           max_sets?: number
           min_reps?: number
           min_sets?: number
+          mobility_requirements?: string | null
+          movement_pattern?: string | null
           muscle_group: Database["public"]["Enums"]["muscle_group"]
           name: string
+          power_requirement?: string | null
+          preparation_time_minutes?: number | null
+          primary_muscles_worked?: string[] | null
+          progression_variations?: string[] | null
+          recommended_warm_up?: string | null
+          regression_variations?: string[] | null
           rest_time_seconds?: number
+          safety_considerations?: string[] | null
+          secondary_muscles_worked?: string[] | null
+          stability_requirement?: string | null
+          suitable_for_conditions?: string[] | null
+          target_heart_rate_zone?: string[] | null
+          tempo_recommendation?: string | null
+          training_phases?: string[] | null
+          typical_duration_seconds?: number | null
           updated_at?: string
         }
         Update: {
           alternative_exercises?: string[] | null
+          balance_requirement?: string | null
+          breathing_pattern?: string | null
+          calories_burned_per_hour?: number | null
+          common_mistakes?: string[] | null
+          contraindicated_conditions?: string[] | null
+          coordination_requirement?: string | null
           created_at?: string
           description?: string | null
           difficulty?: Database["public"]["Enums"]["exercise_difficulty"]
+          equipment_complexity?: string | null
           equipment_needed?: string[] | null
           exercise_type?: Database["public"]["Enums"]["exercise_type"]
+          flexibility_requirement?: string | null
           gif_url?: string | null
           goals?: string[] | null
           id?: string
+          is_compound_movement?: boolean | null
           max_reps?: number
           max_sets?: number
           min_reps?: number
           min_sets?: number
+          mobility_requirements?: string | null
+          movement_pattern?: string | null
           muscle_group?: Database["public"]["Enums"]["muscle_group"]
           name?: string
+          power_requirement?: string | null
+          preparation_time_minutes?: number | null
+          primary_muscles_worked?: string[] | null
+          progression_variations?: string[] | null
+          recommended_warm_up?: string | null
+          regression_variations?: string[] | null
           rest_time_seconds?: number
+          safety_considerations?: string[] | null
+          secondary_muscles_worked?: string[] | null
+          stability_requirement?: string | null
+          suitable_for_conditions?: string[] | null
+          target_heart_rate_zone?: string[] | null
+          tempo_recommendation?: string | null
+          training_phases?: string[] | null
+          typical_duration_seconds?: number | null
           updated_at?: string
         }
         Relationships: []
