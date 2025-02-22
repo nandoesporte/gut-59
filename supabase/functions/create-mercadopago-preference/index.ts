@@ -14,14 +14,13 @@ serve(async (req) => {
   }
 
   try {
-    // Check if the request has a body
-    if (!req.body) {
-      throw new Error('Request body is required');
-    }
+    // Parse request body
+    const text = await req.text();
+    console.log('Raw request body:', text);
 
     let requestData;
     try {
-      requestData = await req.json();
+      requestData = text ? JSON.parse(text) : null;
     } catch (e) {
       console.error('JSON parsing error:', e);
       return new Response(
@@ -33,10 +32,19 @@ serve(async (req) => {
       );
     }
 
+    if (!requestData) {
+      return new Response(
+        JSON.stringify({ error: 'Request body is empty' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
     const { userId, amount, description } = requestData;
     
-    // Log incoming request data
-    console.log('Request data:', { userId, amount, description });
+    console.log('Parsed request data:', { userId, amount, description });
 
     if (!userId || !amount || !description) {
       console.error('Missing parameters:', { userId, amount, description });
