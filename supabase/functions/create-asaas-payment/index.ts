@@ -13,14 +13,44 @@ interface PaymentRequest {
   description: string;
 }
 
+const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 15000) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('Tempo limite excedido ao conectar com o serviço de pagamento');
+    }
+    throw error;
+  }
+};
+
+const retryFetch = async (url: string, options: RequestInit, retries = 3) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fetchWithTimeout(url, options);
+    } catch (error) {
+      if (i === retries - 1) throw error;
+      console.log(`Tentativa ${i + 1} falhou, tentando novamente...`);
+      await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // Exponential backoff
+    }
+  }
+};
+
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Verificar se o corpo da requisição é válido
     const requestText = await req.text();
     console.log('Request body:', requestText);
 
@@ -40,13 +70,11 @@ serve(async (req) => {
 
     const asaasApiKey = Deno.env.get('ASAAS_API_KEY');
     if (!asaasApiKey) {
-      console.error('ASAAS_API_KEY not found');
       throw new Error('ASAAS_API_KEY não configurada');
     }
 
     const asaasBaseUrl = 'https://sandbox.asaas.com/api/v3';
 
-    // Criar pagamento
     const paymentData = {
       customer: "cus_000005113263",
       billingType: "BOLETO",
@@ -56,79 +84,56 @@ serve(async (req) => {
       externalReference: userId
     };
 
-    console.log('Payment data being sent to ASAAS:', JSON.stringify(paymentData));
+    console.log('Iniciando criação de pagamento...');
 
-    try {
-      const paymentResponse = await fetch(`${asaasBaseUrl}/payments`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'access_token': asaasApiKey,
-        },
-        body: JSON.stringify(paymentData),
+    const paymentResponse = await retryFetch(`${asaasBaseUrl}/payments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'access_token': asaasApiKey,
+      },
+      body: JSON.stringify(paymentData),
+    });
+
+    const responseText = await paymentResponse.text();
+    console.log('ASAAS response:', responseText);
+
+    if (!responseText) {
+      throw new Error('Resposta vazia do serviço de pagamento');
+    }
+
+    const paymentResult = JSON.parse(responseText);
+
+    if (!paymentResponse.ok) {
+      throw new Error(`Erro do serviço de pagamento: ${JSON.stringify(paymentResult)}`);
+    }
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') || '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+    );
+
+    const { error: paymentError } = await supabase
+      .from('payments')
+      .insert({
+        user_id: userId,
+        payment_id: paymentResult.id,
+        amount: amount,
+        status: paymentResult.status
       });
 
-      console.log('ASAAS response status:', paymentResponse.status);
-      console.log('ASAAS response headers:', Object.fromEntries(paymentResponse.headers.entries()));
-
-      // Verificar se temos uma resposta válida
-      const responseText = await paymentResponse.text();
-      console.log('Raw ASAAS response:', responseText);
-
-      if (!responseText) {
-        throw new Error('Resposta vazia da API do ASAAS');
-      }
-
-      let paymentResult;
-      try {
-        paymentResult = JSON.parse(responseText);
-      } catch (e) {
-        throw new Error(`Erro ao fazer parse da resposta do ASAAS: ${e.message}`);
-      }
-
-      console.log('Parsed ASAAS response:', paymentResult);
-
-      if (!paymentResponse.ok) {
-        throw new Error(`Erro do ASAAS: ${JSON.stringify(paymentResult)}`);
-      }
-
-      // Verificar se temos os campos necessários
-      if (!paymentResult.id || !paymentResult.status) {
-        throw new Error(`Resposta inválida do ASAAS: ${JSON.stringify(paymentResult)}`);
-      }
-
-      // Salvar o pagamento no banco de dados
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL') || '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
-      );
-
-      const { error: paymentError } = await supabase
-        .from('payments')
-        .insert({
-          user_id: userId,
-          payment_id: paymentResult.id,
-          amount: amount,
-          status: paymentResult.status
-        });
-
-      if (paymentError) {
-        console.error('Error saving payment to database:', paymentError);
-      }
-
-      return new Response(
-        JSON.stringify({
-          id: paymentResult.id,
-          status: paymentResult.status,
-          invoiceUrl: paymentResult.invoiceUrl
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-
-    } catch (fetchError) {
-      console.error('Error during ASAAS API call:', fetchError);
-      throw new Error(`Erro na chamada da API do ASAAS: ${fetchError.message}`);
+    if (paymentError) {
+      console.error('Error saving payment to database:', paymentError);
     }
+
+    return new Response(
+      JSON.stringify({
+        id: paymentResult.id,
+        status: paymentResult.status,
+        invoiceUrl: paymentResult.invoiceUrl
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
   } catch (error) {
     console.error('Error in create-asaas-payment:', error);
