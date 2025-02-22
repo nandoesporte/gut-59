@@ -146,6 +146,7 @@ export type Database = {
           equipment_needed: string[] | null
           exercise_type: Database["public"]["Enums"]["exercise_type"]
           gif_url: string | null
+          goals: string[] | null
           id: string
           max_reps: number
           max_sets: number
@@ -164,6 +165,7 @@ export type Database = {
           equipment_needed?: string[] | null
           exercise_type: Database["public"]["Enums"]["exercise_type"]
           gif_url?: string | null
+          goals?: string[] | null
           id?: string
           max_reps?: number
           max_sets?: number
@@ -182,6 +184,7 @@ export type Database = {
           equipment_needed?: string[] | null
           exercise_type?: Database["public"]["Enums"]["exercise_type"]
           gif_url?: string | null
+          goals?: string[] | null
           id?: string
           max_reps?: number
           max_sets?: number
