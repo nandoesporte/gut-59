@@ -4,6 +4,8 @@ import { Coffee, Utensils, Apple, Moon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { usePaymentHandling } from "./hooks/usePaymentHandling";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useState } from "react";
 
 interface ProtocolFood {
   id: string;
@@ -29,15 +31,13 @@ const MealSection = ({
   icon,
   foods,
   selectedFoods,
-  onFoodSelection,
-  disabled
+  onFoodSelection
 }: {
   title: string;
   icon: React.ReactNode;
   foods: ProtocolFood[];
   selectedFoods: string[];
   onFoodSelection: (foodId: string) => void;
-  disabled?: boolean;
 }) => (
   <Card className="p-6 space-y-4 shadow-lg hover:shadow-xl transition-shadow">
     <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
@@ -52,7 +52,6 @@ const MealSection = ({
           key={food.id}
           variant={selectedFoods.includes(food.id) ? "default" : "outline"}
           onClick={() => onFoodSelection(food.id)}
-          disabled={disabled}
           className={`
             h-auto py-3 px-4 w-full text-left justify-start
             ${selectedFoods.includes(food.id)
@@ -76,15 +75,16 @@ export const FoodSelector = ({
   onConfirm,
 }: FoodSelectorProps) => {
   const { isProcessingPayment, hasPaid, handlePaymentAndContinue } = usePaymentHandling();
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
 
   const handleConfirm = async () => {
-    if (!hasPaid) {
-      toast.error("É necessário realizar o pagamento para continuar");
+    if (selectedFoods.length === 0) {
+      toast.error("Selecione pelo menos um alimento");
       return;
     }
 
-    if (selectedFoods.length === 0) {
-      toast.error("Selecione pelo menos um alimento");
+    if (!hasPaid) {
+      setShowPaymentDialog(true);
       return;
     }
 
@@ -105,17 +105,20 @@ export const FoodSelector = ({
         </p>
       </div>
 
-      {!hasPaid && (
-        <Card className="p-6 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
-          <div className="text-center space-y-4">
-            <h3 className="text-xl font-semibold text-gray-800">
-              Desbloqueie seu Plano Alimentar Personalizado
-            </h3>
+      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Desbloqueie seu Plano Alimentar Personalizado</DialogTitle>
+          </DialogHeader>
+          <div className="text-center space-y-4 py-4">
             <p className="text-gray-600">
               Por apenas R$ 19,90, tenha acesso ao seu plano alimentar personalizado com base nas suas preferências.
             </p>
             <Button
-              onClick={handlePaymentAndContinue}
+              onClick={() => {
+                handlePaymentAndContinue();
+                setShowPaymentDialog(false);
+              }}
               disabled={isProcessingPayment}
               className="w-full max-w-md bg-green-500 hover:bg-green-600"
             >
@@ -125,8 +128,8 @@ export const FoodSelector = ({
               }
             </Button>
           </div>
-        </Card>
-      )}
+        </DialogContent>
+      </Dialog>
 
       <div className="space-y-6">
         <MealSection
@@ -135,7 +138,6 @@ export const FoodSelector = ({
           foods={breakfastFoods}
           selectedFoods={selectedFoods}
           onFoodSelection={onFoodSelection}
-          disabled={!hasPaid}
         />
 
         <MealSection
@@ -144,7 +146,6 @@ export const FoodSelector = ({
           foods={lunchFoods}
           selectedFoods={selectedFoods}
           onFoodSelection={onFoodSelection}
-          disabled={!hasPaid}
         />
 
         <MealSection
@@ -153,7 +154,6 @@ export const FoodSelector = ({
           foods={snackFoods}
           selectedFoods={selectedFoods}
           onFoodSelection={onFoodSelection}
-          disabled={!hasPaid}
         />
 
         <MealSection
@@ -162,7 +162,6 @@ export const FoodSelector = ({
           foods={dinnerFoods}
           selectedFoods={selectedFoods}
           onFoodSelection={onFoodSelection}
-          disabled={!hasPaid}
         />
       </div>
 
@@ -176,7 +175,6 @@ export const FoodSelector = ({
             Voltar
           </Button>
           <Button 
-            disabled={!hasPaid || selectedFoods.length === 0} 
             onClick={handleConfirm}
             className="flex-1 bg-green-500 hover:bg-green-600 text-white max-w-md"
           >
