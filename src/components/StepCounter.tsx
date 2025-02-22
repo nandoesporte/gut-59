@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useCallback } from 'react';
 import { Motion } from '@capacitor/motion';
 import { Card, CardContent } from "@/components/ui/card";
@@ -73,7 +74,7 @@ const StepCounter = () => {
       
       // Verifica se o acelerômetro está disponível
       try {
-        const { x, y, z } = await Motion.getAccelerationForce();
+        const { x, y, z } = await Motion.getCurrentAcceleration();
         if (typeof x === 'undefined' || typeof y === 'undefined' || typeof z === 'undefined') {
           throw new Error('Acelerômetro não disponível');
         }
