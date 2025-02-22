@@ -13,36 +13,24 @@ interface PaymentRequest {
   description: string;
 }
 
-const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 15000) => {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
-    return response;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    if (error.name === 'AbortError') {
-      throw new Error('Tempo limite excedido ao conectar com o serviço de pagamento');
-    }
-    throw error;
+const validateAsaasResponse = async (response: Response) => {
+  const contentType = response.headers.get('content-type');
+  if (!contentType?.includes('application/json')) {
+    const text = await response.text();
+    console.error('Invalid content type from ASAAS:', contentType);
+    console.error('Response body:', text);
+    throw new Error('Resposta inválida do serviço de pagamento');
   }
-};
 
-const retryFetch = async (url: string, options: RequestInit, retries = 3) => {
-  for (let i = 0; i < retries; i++) {
-    try {
-      return await fetchWithTimeout(url, options);
-    } catch (error) {
-      if (i === retries - 1) throw error;
-      console.log(`Tentativa ${i + 1} falhou, tentando novamente...`);
-      await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // Exponential backoff
-    }
+  const data = await response.json();
+  console.log('ASAAS response:', data);
+
+  if (!response.ok) {
+    console.error('ASAAS error response:', data);
+    throw new Error(`Erro do ASAAS: ${JSON.stringify(data)}`);
   }
+
+  return data;
 };
 
 serve(async (req) => {
@@ -70,11 +58,11 @@ serve(async (req) => {
 
     const asaasApiKey = Deno.env.get('ASAAS_API_KEY');
     if (!asaasApiKey) {
+      console.error('ASAAS_API_KEY not found');
       throw new Error('ASAAS_API_KEY não configurada');
     }
 
-    const asaasBaseUrl = 'https://sandbox.asaas.com/api/v3';
-
+    const asaasBaseUrl = 'https://www.asaas.com/api/v3'; // Changed to production URL
     const paymentData = {
       customer: "cus_000005113263",
       billingType: "BOLETO",
@@ -84,9 +72,13 @@ serve(async (req) => {
       externalReference: userId
     };
 
-    console.log('Iniciando criação de pagamento...');
+    console.log('Creating payment with ASAAS:', {
+      url: `${asaasBaseUrl}/payments`,
+      data: paymentData,
+      keyLength: asaasApiKey.length
+    });
 
-    const paymentResponse = await retryFetch(`${asaasBaseUrl}/payments`, {
+    const paymentResponse = await fetch(`${asaasBaseUrl}/payments`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -95,19 +87,15 @@ serve(async (req) => {
       body: JSON.stringify(paymentData),
     });
 
-    const responseText = await paymentResponse.text();
-    console.log('ASAAS response:', responseText);
+    const paymentResult = await validateAsaasResponse(paymentResponse);
 
-    if (!responseText) {
-      throw new Error('Resposta vazia do serviço de pagamento');
+    // Verificar campos obrigatórios
+    if (!paymentResult.id || !paymentResult.status) {
+      console.error('Invalid payment result structure:', paymentResult);
+      throw new Error('Estrutura de resposta inválida do ASAAS');
     }
 
-    const paymentResult = JSON.parse(responseText);
-
-    if (!paymentResponse.ok) {
-      throw new Error(`Erro do serviço de pagamento: ${JSON.stringify(paymentResult)}`);
-    }
-
+    // Salvar o pagamento no banco
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') || '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
