@@ -879,6 +879,188 @@ export type Database = {
         }
         Relationships: []
       }
+      rehab_plans: {
+        Row: {
+          condition: Database["public"]["Enums"]["condition_type"]
+          created_at: string
+          end_date: string
+          goal: Database["public"]["Enums"]["rehab_goal"]
+          id: string
+          joint_area: Database["public"]["Enums"]["joint_area"]
+          start_date: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          condition: Database["public"]["Enums"]["condition_type"]
+          created_at?: string
+          end_date: string
+          goal: Database["public"]["Enums"]["rehab_goal"]
+          id?: string
+          joint_area: Database["public"]["Enums"]["joint_area"]
+          start_date?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          condition?: Database["public"]["Enums"]["condition_type"]
+          created_at?: string
+          end_date?: string
+          goal?: Database["public"]["Enums"]["rehab_goal"]
+          id?: string
+          joint_area?: Database["public"]["Enums"]["joint_area"]
+          start_date?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      rehab_progress: {
+        Row: {
+          created_at: string
+          date: string
+          difficulty_rating: number | null
+          exercise_id: string | null
+          id: string
+          notes: string | null
+          pain_level: number | null
+          reps_completed: number
+          session_id: string | null
+          sets_completed: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          difficulty_rating?: number | null
+          exercise_id?: string | null
+          id?: string
+          notes?: string | null
+          pain_level?: number | null
+          reps_completed: number
+          session_id?: string | null
+          sets_completed: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          difficulty_rating?: number | null
+          exercise_id?: string | null
+          id?: string
+          notes?: string | null
+          pain_level?: number | null
+          reps_completed?: number
+          session_id?: string | null
+          sets_completed?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rehab_progress_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rehab_progress_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "rehab_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rehab_session_exercises: {
+        Row: {
+          created_at: string
+          exercise_id: string
+          id: string
+          order_in_session: number
+          reps: number
+          rest_time_seconds: number
+          session_id: string
+          sets: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          exercise_id: string
+          id?: string
+          order_in_session: number
+          reps: number
+          rest_time_seconds?: number
+          session_id: string
+          sets: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          exercise_id?: string
+          id?: string
+          order_in_session?: number
+          reps?: number
+          rest_time_seconds?: number
+          session_id?: string
+          sets?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rehab_session_exercises_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rehab_session_exercises_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "rehab_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rehab_sessions: {
+        Row: {
+          cooldown_description: string
+          created_at: string
+          day_number: number
+          id: string
+          plan_id: string
+          updated_at: string
+          warmup_description: string
+        }
+        Insert: {
+          cooldown_description: string
+          created_at?: string
+          day_number: number
+          id?: string
+          plan_id: string
+          updated_at?: string
+          warmup_description: string
+        }
+        Update: {
+          cooldown_description?: string
+          created_at?: string
+          day_number?: number
+          id?: string
+          plan_id?: string
+          updated_at?: string
+          warmup_description?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rehab_sessions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "rehab_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       session_exercises: {
         Row: {
           created_at: string
@@ -1356,9 +1538,44 @@ export type Database = {
     Enums: {
       activity_level: "sedentary" | "light" | "moderate" | "intense"
       app_role: "admin" | "user" | "personal"
+      condition_type:
+        | "plantar_fasciitis"
+        | "calcaneal_spur"
+        | "ankle_sprain"
+        | "anterior_compartment"
+        | "shin_splints"
+        | "achilles_tendinitis"
+        | "patellofemoral"
+        | "patellar_tendinitis"
+        | "acl_postop"
+        | "mcl_injury"
+        | "meniscus_injury"
+        | "knee_arthrosis"
+        | "trochanteric_bursitis"
+        | "piriformis_syndrome"
+        | "sports_hernia"
+        | "it_band_syndrome"
+        | "disc_protrusion"
+        | "herniated_disc"
+        | "cervical_lordosis"
+        | "frozen_shoulder"
+        | "shoulder_bursitis"
+        | "rotator_cuff"
+        | "impingement"
+        | "medial_epicondylitis"
+        | "lateral_epicondylitis"
+        | "carpal_tunnel"
       exercise_difficulty: "beginner" | "intermediate" | "advanced"
       exercise_type: "strength" | "cardio" | "mobility"
       health_condition: "hypertension" | "diabetes" | "depression_anxiety"
+      joint_area:
+        | "ankle_foot"
+        | "leg"
+        | "knee"
+        | "hip"
+        | "spine"
+        | "shoulder"
+        | "elbow_hand"
       message_type: "nutricionista" | "personal"
       module_status: "active" | "inactive"
       muscle_group:
@@ -1376,6 +1593,7 @@ export type Database = {
         | "ball_exercises"
         | "resistance_band"
       nutritional_goal: "lose_weight" | "maintain" | "gain_mass"
+      rehab_goal: "pain_relief" | "mobility" | "strength" | "return_to_sport"
       training_goal: "lose_weight" | "maintain" | "gain_mass"
       workout_goal: "lose_weight" | "maintain" | "gain_mass"
     }
