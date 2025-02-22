@@ -19,3 +19,6 @@ verify_jwt = true
 [functions.check-mercadopago-payment]
 verify_jwt = true
 
+[functions.generate-rehab-plan]
+verify_jwt = true
+
