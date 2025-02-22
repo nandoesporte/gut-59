@@ -38,14 +38,19 @@ const StepCounter = () => {
   const startTraditionalAccelerometer = async () => {
     try {
       if (!('Accelerometer' in window)) {
+        console.log("Acelerômetro não suportado pelo navegador.");
         throw new Error('Acelerômetro não suportado pelo navegador');
       }
+
+      console.log("Acelerômetro suportado pelo navegador.");
 
       // @ts-ignore - TypeScript não reconhece a API de Sensores Genéricos
       const accelerometer = new Accelerometer({ frequency: 60 });
 
       accelerometer.addEventListener('reading', () => {
-        console.log(`Aceleração: X:${accelerometer.x} Y:${accelerometer.y} Z:${accelerometer.z}`);
+        console.log(`Aceleração X: ${accelerometer.x}`);
+        console.log(`Aceleração Y: ${accelerometer.y}`);
+        console.log(`Aceleração Z: ${accelerometer.z}`);
         setHasPermission(true);
         setIsInitialized(true);
         toast.success("Acelerômetro iniciado com sucesso!");
@@ -54,7 +59,7 @@ const StepCounter = () => {
       accelerometer.addEventListener('error', (error: Error) => {
         console.error("Erro no acelerômetro:", error);
         if (error.name === 'NotAllowedError') {
-          toast.error("Permissão para acessar o acelerômetro foi negada.");
+          toast.error("Permissão para acessar o acelerômetro foi negada. Por favor, habilite a permissão nas configurações do navegador.");
         } else if (error.name === 'NotReadableError') {
           toast.error("Não foi possível acessar o acelerômetro. Verifique se o dispositivo possui esse sensor.");
         }
@@ -65,6 +70,7 @@ const StepCounter = () => {
       return true;
     } catch (error) {
       console.error("Erro ao iniciar acelerômetro tradicional:", error);
+      setSensorSupported(false);
       return false;
     }
   };
@@ -90,6 +96,7 @@ const StepCounter = () => {
       return true;
     } catch (error) {
       console.error("Erro ao iniciar acelerômetro via Capacitor:", error);
+      setSensorSupported(false);
       return false;
     }
   };
@@ -98,17 +105,29 @@ const StepCounter = () => {
     setIsLoading(true);
 
     try {
-      // Primeiro, tenta usar a API de Sensores Genéricos
-      const traditionalSuccess = await startTraditionalAccelerometer();
-      
-      if (!traditionalSuccess) {
-        console.log("API de Sensores Genéricos falhou, tentando Capacitor...");
+      // Primeiro verifica se o navegador suporta a API de Sensores Genéricos
+      if (!('Accelerometer' in window)) {
+        console.log("API de Sensores Genéricos não suportada, tentando Capacitor...");
         const capacitorSuccess = await startCapacitorAccelerometer();
         
         if (!capacitorSuccess) {
           setSensorSupported(false);
-          toast.error("Seu dispositivo não suporta acelerômetro ou as permissões foram negadas.");
+          toast.error("Seu dispositivo não suporta acelerômetro.");
           return;
+        }
+      } else {
+        // Se suportar, tenta usar a API de Sensores Genéricos
+        const traditionalSuccess = await startTraditionalAccelerometer();
+        
+        if (!traditionalSuccess) {
+          console.log("API de Sensores Genéricos falhou, tentando Capacitor...");
+          const capacitorSuccess = await startCapacitorAccelerometer();
+          
+          if (!capacitorSuccess) {
+            setSensorSupported(false);
+            toast.error("Não foi possível acessar o acelerômetro.");
+            return;
+          }
         }
       }
 
