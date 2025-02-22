@@ -15,6 +15,7 @@ import Admin from "./pages/Admin";
 import Menu from "./pages/Menu";
 import Workout from "./pages/Workout";
 import Instructions from "./pages/Instructions";
+import Fisio from "./pages/Fisio";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -126,6 +127,16 @@ function App() {
                   <ProtectedRoute>
                     <Layout>
                       <Admin />
+                    </Layout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/fisio"
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <Fisio />
                     </Layout>
                   </ProtectedRoute>
                 }
