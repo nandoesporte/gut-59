@@ -33,6 +33,52 @@ const validateAsaasResponse = async (response: Response) => {
   return data;
 };
 
+const createOrGetCustomer = async (userId: string, asaasApiKey: string) => {
+  const asaasBaseUrl = 'https://www.asaas.com/api/v3';
+  
+  // First, try to get customer by externalReference
+  const searchResponse = await fetch(
+    `${asaasBaseUrl}/customers?externalReference=${userId}`,
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        'access_token': asaasApiKey,
+      },
+    }
+  );
+
+  const searchResult = await validateAsaasResponse(searchResponse);
+  
+  if (searchResult.data && searchResult.data.length > 0) {
+    console.log('Customer found:', searchResult.data[0]);
+    return searchResult.data[0].id;
+  }
+
+  // If customer not found, create a new one
+  console.log('Creating new customer for user:', userId);
+  
+  const customerData = {
+    name: `Cliente ${userId.slice(0, 8)}`,
+    externalReference: userId,
+    email: `cliente.${userId.slice(0, 8)}@example.com`,
+    phone: "11999999999",
+    cpfCnpj: "01234567890"
+  };
+
+  const createResponse = await fetch(`${asaasBaseUrl}/customers`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'access_token': asaasApiKey,
+    },
+    body: JSON.stringify(customerData),
+  });
+
+  const newCustomer = await validateAsaasResponse(createResponse);
+  console.log('New customer created:', newCustomer);
+  return newCustomer.id;
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -62,9 +108,12 @@ serve(async (req) => {
       throw new Error('ASAAS_API_KEY não configurada');
     }
 
-    const asaasBaseUrl = 'https://www.asaas.com/api/v3'; // Changed to production URL
+    // Get or create customer
+    const customerId = await createOrGetCustomer(userId, asaasApiKey);
+
+    const asaasBaseUrl = 'https://www.asaas.com/api/v3';
     const paymentData = {
-      customer: "cus_000005113263",
+      customer: customerId,
       billingType: "BOLETO",
       value: amount,
       dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
