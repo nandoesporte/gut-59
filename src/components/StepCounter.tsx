@@ -17,19 +17,28 @@ const STEP_LENGTH = 0.762;
 const CALORIES_PER_STEP = 0.04;
 const ACCELERATION_THRESHOLD = 10;
 const MIN_TIME_BETWEEN_STEPS = 250;
-const SENSOR_INIT_TIMEOUT = 3000; // Aumentado para 3 segundos
+const SENSOR_INIT_TIMEOUT = 3000;
+const STORAGE_KEY = 'stepCounter';
 
 const StepCounter = () => {
-  const [stepData, setStepData] = useState<StepData>({
-    steps: 0,
-    distance: 0,
-    calories: 0
+  const [stepData, setStepData] = useState<StepData>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : {
+      steps: 0,
+      distance: 0,
+      calories: 0
+    };
   });
   const [hasPermission, setHasPermission] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [sensorSupported, setSensorSupported] = useState(true);
   const [accelerometerInitialized, setAccelerometerInitialized] = useState(false);
+
+  // Salva os dados no localStorage sempre que mudam
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stepData));
+  }, [stepData]);
 
   const calculateMetrics = useCallback((steps: number) => {
     const distance = (steps * STEP_LENGTH) / 1000;
@@ -85,9 +94,9 @@ const StepCounter = () => {
 
           if (!initialized) {
             if (error.name === 'NotAllowedError') {
-              toast.error("Permissão para acessar o acelerômetro foi negada. Por favor, habilite a permissão nas configurações do navegador.");
+              toast.error("Permissão para acessar o acelerômetro foi negada.");
             } else if (error.name === 'NotReadableError') {
-              toast.error("Não foi possível acessar o acelerômetro. Verifique se o dispositivo possui esse sensor.");
+              toast.error("Não foi possível acessar o acelerômetro.");
             } else {
               toast.error(`Erro ao acessar o acelerômetro: ${error.message}`);
             }
@@ -162,7 +171,7 @@ const StepCounter = () => {
           }, SENSOR_INIT_TIMEOUT);
 
         } catch (error) {
-          console.error("Erro detalhado ao iniciar acelerômetro via Capacitor:", error);
+          console.error("Erro ao iniciar acelerômetro via Capacitor:", error);
           setSensorSupported(false);
           cleanup();
           resolve(false);
@@ -171,6 +180,13 @@ const StepCounter = () => {
 
       init();
     });
+  }, [accelerometerInitialized]);
+
+  // Inicia automaticamente o acelerômetro quando o componente é montado
+  useEffect(() => {
+    if (!accelerometerInitialized && !isLoading) {
+      requestPermissions();
+    }
   }, [accelerometerInitialized]);
 
   const requestPermissions = async () => {
@@ -199,22 +215,22 @@ const StepCounter = () => {
       if (!success) {
         console.log("Todas as tentativas de inicialização falharam");
         setSensorSupported(false);
-        toast.error("Não foi possível inicializar o acelerômetro após múltiplas tentativas.");
+        toast.error("Não foi possível inicializar o acelerômetro.");
       }
 
     } catch (error) {
-      console.error('Erro detalhado na solicitação de permissões:', error);
+      console.error('Erro na solicitação de permissões:', error);
       setSensorSupported(false);
-      toast.error("Erro inesperado ao acessar o acelerômetro. Verifique se seu dispositivo possui esse sensor.");
+      toast.error("Erro ao acessar o acelerômetro.");
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    let lastStepTime = 0;
+    let lastStepTime = Date.now();
     let lastMagnitude = 0;
-    let steps = 0;
+    let steps = stepData.steps; // Inicializa com os passos salvos
     let listener: any = null;
 
     const startStepCounting = async () => {
@@ -224,9 +240,7 @@ const StepCounter = () => {
         console.log("Iniciando contagem de passos...");
 
         listener = await Motion.addListener('accel', (event) => {
-          if (!event || !event.acceleration) {
-            return;
-          }
+          if (!event || !event.acceleration) return;
           
           const { x, y, z } = event.acceleration;
           const magnitude = Math.sqrt(x * x + y * y + z * z);
@@ -269,7 +283,7 @@ const StepCounter = () => {
         console.log("Listeners removidos na limpeza");
       }
     };
-  }, [hasPermission, isInitialized, calculateMetrics]);
+  }, [hasPermission, isInitialized, calculateMetrics, stepData.steps]);
 
   const progress = (stepData.steps / STEPS_GOAL) * 100;
 
