@@ -13,10 +13,10 @@ interface StepData {
 }
 
 const STEPS_GOAL = 10000;
-const STEP_LENGTH = 0.762; // metros (média)
+const STEP_LENGTH = 0.762;
 const CALORIES_PER_STEP = 0.04;
 const ACCELERATION_THRESHOLD = 10;
-const MIN_TIME_BETWEEN_STEPS = 250; // Tempo mínimo entre passos em ms
+const MIN_TIME_BETWEEN_STEPS = 250;
 
 const StepCounter = () => {
   const [stepData, setStepData] = useState<StepData>({
@@ -25,42 +25,34 @@ const StepCounter = () => {
     calories: 0
   });
   const [hasPermission, setHasPermission] = useState(false);
-  const [permissionRequested, setPermissionRequested] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const calculateMetrics = (steps: number) => {
-    const distance = (steps * STEP_LENGTH) / 1000; // km
+    const distance = (steps * STEP_LENGTH) / 1000;
     const calories = steps * CALORIES_PER_STEP;
     return { steps, distance, calories };
   };
 
   const requestPermissions = async () => {
-    if (permissionRequested) return false;
-    
-    setPermissionRequested(true);
-    
     try {
-      let isAvailable = false;
-      
-      // Test if accelerometer is available
-      await Motion.addListener('accel', () => {
-        isAvailable = true;
-        console.log('Accelerometer is available');
+      let listener = await Motion.addListener('accel', () => {
+        setHasPermission(true);
+        setIsInitialized(true);
+        toast.success("Permissão concedida para contagem de passos");
+        Motion.removeAllListeners();
       });
 
-      // Wait a bit to check if the accelerometer callback was triggered
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      if (isAvailable) {
-        setHasPermission(true);
-        toast.success("Permissão concedida para contagem de passos");
-        return true;
-      } else {
-        toast.error("Seu dispositivo não suporta contagem de passos");
-        return false;
-      }
+      // Aguarda um curto período para ver se o listener foi acionado
+      setTimeout(() => {
+        if (!hasPermission && !isInitialized) {
+          Motion.removeAllListeners();
+          toast.error("Seu dispositivo não suporta contagem de passos");
+        }
+      }, 1000);
+
+      return true;
     } catch (error) {
       console.error('Erro ao acessar sensores de movimento:', error);
-      toast.error("Seu dispositivo não suporta contagem de passos");
       return false;
     }
   };
@@ -69,16 +61,12 @@ const StepCounter = () => {
     let lastStepTime = 0;
     let lastMagnitude = 0;
     let steps = 0;
-    let isInitialized = false;
     let listener: any = null;
 
     const startStepCounting = async () => {
-      try {
-        if (!hasPermission && !permissionRequested) {
-          const hasPermissions = await requestPermissions();
-          if (!hasPermissions) return;
-        }
+      if (!hasPermission || !isInitialized) return;
 
+      try {
         // Se já temos um listener ativo, não criar outro
         if (listener) return;
 
@@ -86,12 +74,6 @@ const StepCounter = () => {
         listener = await Motion.addListener('accel', (event) => {
           const { x, y, z } = event.acceleration;
           
-          // Ignora leituras iniciais para estabilização
-          if (!isInitialized) {
-            isInitialized = true;
-            return;
-          }
-
           // Calcula a magnitude da aceleração
           const magnitude = Math.sqrt(x * x + y * y + z * z);
           const now = Date.now();
@@ -121,19 +103,19 @@ const StepCounter = () => {
         
       } catch (error) {
         console.error('Erro ao acessar sensores de movimento:', error);
-        toast.error("Erro ao iniciar contador de passos");
       }
     };
 
-    startStepCounting();
+    if (hasPermission && isInitialized) {
+      startStepCounting();
+    }
 
-    // Cleanup function
     return () => {
       if (listener) {
         Motion.removeAllListeners();
       }
     };
-  }, [hasPermission, permissionRequested]);
+  }, [hasPermission, isInitialized]);
 
   const progress = (stepData.steps / STEPS_GOAL) * 100;
 
@@ -146,7 +128,7 @@ const StepCounter = () => {
             <User className="w-8 h-8 text-primary" />
           </div>
           
-          {!hasPermission && !permissionRequested && (
+          {!hasPermission && !isInitialized && (
             <button
               onClick={requestPermissions}
               className="w-full py-2 px-4 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
