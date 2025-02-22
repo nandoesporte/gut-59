@@ -27,6 +27,7 @@ const StepCounter = () => {
   const [hasPermission, setHasPermission] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [sensorSupported, setSensorSupported] = useState(true);
 
   const calculateMetrics = (steps: number) => {
     const distance = (steps * STEP_LENGTH) / 1000;
@@ -34,17 +35,47 @@ const StepCounter = () => {
     return { steps, distance, calories };
   };
 
-  const requestPermissions = async () => {
-    setIsLoading(true);
-
+  const startTraditionalAccelerometer = async () => {
     try {
-      console.log("Tentando iniciar o acelerômetro...");
+      if (!('Accelerometer' in window)) {
+        throw new Error('Acelerômetro não suportado pelo navegador');
+      }
 
-      // Primeiro, removemos quaisquer listeners existentes
+      // @ts-ignore - TypeScript não reconhece a API de Sensores Genéricos
+      const accelerometer = new Accelerometer({ frequency: 60 });
+
+      accelerometer.addEventListener('reading', () => {
+        console.log(`Aceleração: X:${accelerometer.x} Y:${accelerometer.y} Z:${accelerometer.z}`);
+        setHasPermission(true);
+        setIsInitialized(true);
+        toast.success("Acelerômetro iniciado com sucesso!");
+      });
+
+      accelerometer.addEventListener('error', (error: Error) => {
+        console.error("Erro no acelerômetro:", error);
+        if (error.name === 'NotAllowedError') {
+          toast.error("Permissão para acessar o acelerômetro foi negada.");
+        } else if (error.name === 'NotReadableError') {
+          toast.error("Não foi possível acessar o acelerômetro. Verifique se o dispositivo possui esse sensor.");
+        }
+        setSensorSupported(false);
+      });
+
+      accelerometer.start();
+      return true;
+    } catch (error) {
+      console.error("Erro ao iniciar acelerômetro tradicional:", error);
+      return false;
+    }
+  };
+
+  const startCapacitorAccelerometer = async () => {
+    try {
+      console.log("Tentando iniciar o acelerômetro via Capacitor...");
+
       await Motion.removeAllListeners();
       console.log("Listeners anteriores removidos");
 
-      // Iniciamos o acelerômetro tentando adicionar um listener
       const listener = await Motion.addListener('accel', (event) => {
         if (event && event.acceleration) {
           const { x, y, z } = event.acceleration;
@@ -56,36 +87,44 @@ const StepCounter = () => {
         }
       });
 
-      // Aguardamos um curto período para ver se recebemos dados
+      return true;
+    } catch (error) {
+      console.error("Erro ao iniciar acelerômetro via Capacitor:", error);
+      return false;
+    }
+  };
+
+  const requestPermissions = async () => {
+    setIsLoading(true);
+
+    try {
+      // Primeiro, tenta usar a API de Sensores Genéricos
+      const traditionalSuccess = await startTraditionalAccelerometer();
+      
+      if (!traditionalSuccess) {
+        console.log("API de Sensores Genéricos falhou, tentando Capacitor...");
+        const capacitorSuccess = await startCapacitorAccelerometer();
+        
+        if (!capacitorSuccess) {
+          setSensorSupported(false);
+          toast.error("Seu dispositivo não suporta acelerômetro ou as permissões foram negadas.");
+          return;
+        }
+      }
+
+      // Aguarda um momento para ver se recebemos dados
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       if (!hasPermission) {
-        console.log("Tentando uma segunda vez...");
-        
-        // Se não recebemos dados, tentamos novamente
-        await Motion.addListener('accel', (event) => {
-          if (event && event.acceleration) {
-            const { x, y, z } = event.acceleration;
-            console.log("Acelerômetro funcionando na segunda tentativa:", { x, y, z });
-            
-            setHasPermission(true);
-            setIsInitialized(true);
-            toast.success("Acelerômetro iniciado com sucesso!");
-          }
-        });
-
-        // Aguardamos mais um pouco
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        if (!hasPermission) {
-          console.log("Não foi possível iniciar o acelerômetro");
-          toast.error("Não foi possível acessar o acelerômetro. Por favor, verifique se seu dispositivo possui esse sensor.");
-        }
+        console.log("Nenhuma leitura recebida, sensor pode não estar disponível");
+        setSensorSupported(false);
+        toast.error("Não foi possível receber dados do acelerômetro.");
       }
 
     } catch (error) {
       console.error('Erro ao iniciar acelerômetro:', error);
-      toast.error("Erro ao acessar o acelerômetro. Por favor, verifique se seu dispositivo possui esse sensor.");
+      setSensorSupported(false);
+      toast.error("Erro ao acessar o acelerômetro. Verifique se seu dispositivo possui esse sensor.");
     } finally {
       setIsLoading(false);
     }
@@ -169,7 +208,14 @@ const StepCounter = () => {
             <User className="w-8 h-8 text-primary" />
           </div>
           
-          {!hasPermission && !isInitialized && (
+          {!sensorSupported && (
+            <div className="p-4 bg-yellow-50 text-yellow-800 rounded-lg">
+              Seu dispositivo não suporta a contagem de passos. 
+              Verifique se possui um acelerômetro e se as permissões estão concedidas.
+            </div>
+          )}
+          
+          {sensorSupported && !hasPermission && !isInitialized && (
             <div className="space-y-4">
               <button
                 onClick={requestPermissions}
