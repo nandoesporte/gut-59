@@ -28,12 +28,6 @@ export const usePaymentHandling = () => {
         throw new Error('Usuário não autenticado');
       }
 
-      console.log('Calling create-mercadopago-preference with:', {
-        userId: userData.user.id,
-        amount: 19.90,
-        description: "Plano Alimentar Personalizado"
-      });
-
       const { data, error } = await supabase.functions.invoke('create-mercadopago-preference', {
         body: {
           userId: userData.user.id,
@@ -47,14 +41,12 @@ export const usePaymentHandling = () => {
         throw new Error(`Falha ao criar pagamento: ${error.message}`);
       }
 
-      console.log('Edge function response:', data);
-
       if (!data?.preferenceId) {
-        console.error('Invalid response:', data);
         throw new Error('Resposta inválida do serviço de pagamento');
       }
 
       setPreferenceId(data.preferenceId);
+      window.open(data.initPoint, '_blank');
 
       // Start polling for payment status
       const checkInterval = setInterval(async () => {
@@ -63,12 +55,7 @@ export const usePaymentHandling = () => {
             body: { preferenceId: data.preferenceId }
           });
 
-          if (statusError) {
-            console.error('Status check error:', statusError);
-            throw statusError;
-          }
-
-          console.log('Payment status check result:', statusData);
+          if (statusError) throw statusError;
 
           if (statusData?.isPaid) {
             clearInterval(checkInterval);

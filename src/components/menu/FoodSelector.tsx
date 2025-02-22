@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Coffee, Utensils, Apple, Moon } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -76,43 +75,7 @@ export const FoodSelector = ({
   onBack,
   onConfirm,
 }: FoodSelectorProps) => {
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [hasPaid, setHasPaid] = useState(false);
-
-  const handlePaymentAndContinue = async () => {
-    try {
-      setIsProcessingPayment(true);
-      const payment = await createPayment();
-      
-      // Abre o link de pagamento em uma nova janela
-      window.open(payment.invoiceUrl, '_blank');
-
-      // Inicia o polling para verificar o status do pagamento
-      const checkInterval = setInterval(async () => {
-        try {
-          const isPaid = await checkPaymentStatus(payment.id);
-          if (isPaid) {
-            clearInterval(checkInterval);
-            setHasPaid(true);
-            toast.success("Pagamento confirmado! Você já pode selecionar os alimentos.");
-          }
-        } catch (error) {
-          console.error('Erro ao verificar pagamento:', error);
-        }
-      }, 5000); // Verifica a cada 5 segundos
-
-      // Para o polling após 10 minutos
-      setTimeout(() => {
-        clearInterval(checkInterval);
-      }, 600000);
-
-    } catch (error) {
-      console.error('Erro ao processar pagamento:', error);
-      toast.error("Erro ao processar pagamento. Por favor, tente novamente.");
-    } finally {
-      setIsProcessingPayment(false);
-    }
-  };
+  const { isProcessingPayment, hasPaid, handlePaymentAndContinue } = usePaymentHandling();
 
   const handleConfirm = async () => {
     if (!hasPaid) {
@@ -128,7 +91,6 @@ export const FoodSelector = ({
     onConfirm();
   };
 
-  // Organizar alimentos por grupo
   const breakfastFoods = protocolFoods.filter(food => food.food_group_id === 1);
   const lunchFoods = protocolFoods.filter(food => food.food_group_id === 2);
   const snackFoods = protocolFoods.filter(food => food.food_group_id === 3);
