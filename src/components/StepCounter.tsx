@@ -37,7 +37,7 @@ const StepCounter = () => {
 
   const openAppSettings = async () => {
     try {
-      await App.openSettings();
+      await App.openSystemSettings();
     } catch (error) {
       console.error('Erro ao abrir configurações:', error);
     }
