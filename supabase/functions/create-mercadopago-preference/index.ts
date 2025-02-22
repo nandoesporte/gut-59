@@ -14,7 +14,26 @@ serve(async (req) => {
   }
 
   try {
-    const { userId, amount, description } = await req.json();
+    // Check if the request has a body
+    if (!req.body) {
+      throw new Error('Request body is required');
+    }
+
+    let requestData;
+    try {
+      requestData = await req.json();
+    } catch (e) {
+      console.error('JSON parsing error:', e);
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON in request body' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    const { userId, amount, description } = requestData;
     
     // Log incoming request data
     console.log('Request data:', { userId, amount, description });
@@ -68,7 +87,10 @@ serve(async (req) => {
         preferenceId: result.id,
         initPoint: result.init_point 
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
 
   } catch (error) {
@@ -83,7 +105,10 @@ serve(async (req) => {
         error: 'Failed to create payment preference',
         details: error.message
       }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
   }
 });

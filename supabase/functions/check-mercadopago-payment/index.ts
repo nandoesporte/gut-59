@@ -14,10 +14,35 @@ serve(async (req) => {
   }
 
   try {
-    const { preferenceId } = await req.json();
+    // Check if the request has a body
+    if (!req.body) {
+      throw new Error('Request body is required');
+    }
+
+    let requestData;
+    try {
+      requestData = await req.json();
+    } catch (e) {
+      console.error('JSON parsing error:', e);
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON in request body' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    const { preferenceId } = requestData;
 
     if (!preferenceId) {
-      throw new Error('Preference ID is required');
+      return new Response(
+        JSON.stringify({ error: 'Preference ID is required' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
     const accessToken = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN');
@@ -51,7 +76,10 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({ isPaid }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
 
   } catch (error) {
@@ -61,7 +89,10 @@ serve(async (req) => {
         error: 'Failed to check payment status',
         details: error.message 
       }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
   }
 });
