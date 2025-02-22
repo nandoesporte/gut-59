@@ -63,21 +63,6 @@ const StepCounter = () => {
 
       console.log("Listener adicionado, aguardando eventos...");
 
-      // Tenta obter uma leitura inicial
-      try {
-        const acceleration = await Motion.getCurrentAcceleration();
-        console.log("Leitura inicial do acelerômetro:", acceleration);
-        
-        if (acceleration) {
-          setHasPermission(true);
-          setIsInitialized(true);
-          toast.success("Acelerômetro disponível!");
-        }
-      } catch (error) {
-        console.error("Erro ao obter leitura inicial:", error);
-        toast.error("Não foi possível acessar o acelerômetro. Por favor, verifique as permissões nas configurações do seu dispositivo.");
-      }
-
       // Aguarda um tempo para ver se recebemos eventos
       await new Promise(resolve => setTimeout(resolve, 3000));
 
