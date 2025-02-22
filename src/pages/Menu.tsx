@@ -8,10 +8,6 @@ import { MealPlanDisplay } from "@/components/menu/MealPlanDisplay";
 import { MenuHeader } from "@/components/menu/MenuHeader";
 import { useMenuController } from "@/components/menu/MenuController";
 import { Loader2 } from "lucide-react";
-import { MealPlanHistory } from "@/components/menu/MealPlanHistory";
-import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 
 const Menu = () => {
   const {
@@ -30,40 +26,6 @@ const Menu = () => {
     setFormData,
   } = useMenuController();
 
-  const [historyPlans, setHistoryPlans] = useState<any[]>([]);
-  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
-
-  const fetchMealPlans = useCallback(async () => {
-    try {
-      setIsHistoryLoading(true);
-      const { data: userData } = await supabase.auth.getUser();
-      
-      if (!userData.user) {
-        toast.error("Usuário não autenticado");
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('meal_plans')
-        .select('*')
-        .eq('user_id', userData.user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      
-      setHistoryPlans(data || []);
-    } catch (error) {
-      console.error('Erro ao carregar histórico:', error);
-      toast.error("Erro ao carregar histórico de planos alimentares");
-    } finally {
-      setIsHistoryLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchMealPlans();
-  }, [fetchMealPlans]);
-
   const renderStep = () => {
     if (loading && currentStep !== 1.5) {
       return (
@@ -78,11 +40,6 @@ const Menu = () => {
         return (
           <div className="space-y-6">
             <MenuHeader onStart={() => setCurrentStep(1.5)} />
-            <MealPlanHistory 
-              isLoading={isHistoryLoading}
-              historyPlans={historyPlans}
-              onRefresh={fetchMealPlans}
-            />
             <InitialMenuContent onStartDiet={() => setCurrentStep(1.5)} />
           </div>
         );
@@ -104,6 +61,7 @@ const Menu = () => {
             totalCalories={totalCalories}
             onBack={() => setCurrentStep(1.5)}
             onConfirm={() => setCurrentStep(3)}
+            buttonText="Selecionar"
           />
         );
       case 3:
@@ -116,18 +74,7 @@ const Menu = () => {
       case 4:
         return (
           <div className="space-y-6">
-            {mealPlan ? (
-              <MealPlanDisplay 
-                mealPlan={mealPlan} 
-                onRefresh={fetchMealPlans} 
-              />
-            ) : (
-              <Card className="p-6 bg-white/50 backdrop-blur-sm border border-gray-100">
-                <div className="text-center text-gray-500">
-                  Aguarde enquanto geramos seu plano alimentar...
-                </div>
-              </Card>
-            )}
+            {mealPlan && <MealPlanDisplay mealPlan={mealPlan} />}
           </div>
         );
       default:

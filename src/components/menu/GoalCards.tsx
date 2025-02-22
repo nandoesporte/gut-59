@@ -16,10 +16,10 @@ const goals = [
     label: "Perder peso",
     description: "Foco em queima de gordura",
     icon: Scale,
-    color: "bg-[#FFE8E8]",
-    hoverColor: "hover:bg-[#FFD5D5]",
-    borderColor: "border-red-200",
-    iconColor: "text-red-500",
+    color: "bg-primary-50",
+    hoverColor: "hover:bg-primary-100",
+    borderColor: "border-primary-200",
+    iconColor: "text-primary-500",
     factor: 0.8
   },
   {
