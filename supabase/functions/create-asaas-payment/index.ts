@@ -29,10 +29,13 @@ serve(async (req) => {
       throw new Error('ASAAS_API_KEY não configurada');
     }
 
-    // Criar cliente no ASAAS (necessário antes de criar o pagamento)
+    // Usar ambiente sandbox do ASAAS
     const asaasBaseUrl = 'https://sandbox.asaas.com/api/v3';
+
+    // Gerar um identificador único para o cliente usando timestamp
+    const uniqueId = `${userId}_${Date.now()}`;
     
-    // Primeiro, criar ou recuperar o cliente
+    // Criar cliente no ASAAS
     const customerResponse = await fetch(`${asaasBaseUrl}/customers`, {
       method: 'POST',
       headers: {
@@ -40,39 +43,33 @@ serve(async (req) => {
         'access_token': asaasApiKey,
       },
       body: JSON.stringify({
-        name: userId,  // Usando userId como nome temporário
-        externalReference: userId,
-        email: 'cliente@email.com',  // Email padrão para ambiente de teste
-        phone: '4738010919',  // Telefone padrão para ambiente de teste
-        mobilePhone: '4799376637',  // Celular padrão para ambiente de teste
-        cpfCnpj: '24971563792',  // CPF padrão para ambiente de teste
-        postalCode: '01001001',  // CEP padrão para ambiente de teste
-        addressNumber: '123'  // Número padrão para ambiente de teste
+        name: `Cliente ${uniqueId}`,
+        externalReference: uniqueId,
+        email: `cliente_${uniqueId}@email.com`,
+        cpfCnpj: '24971563792',
+        postalCode: '01001001',
+        addressNumber: '123',
+        phone: '11999999999'
       }),
     });
 
     if (!customerResponse.ok) {
       const customerError = await customerResponse.json();
       console.error('ASAAS customer creation error:', customerError);
-      // Se o erro for de cliente duplicado, vamos tentar recuperar o ID do cliente
-      if (customerError.errors?.[0]?.code === 'invalid_cpfCnpj') {
-        console.log('Customer might already exist, proceeding with payment creation...');
-      } else {
-        throw new Error(`Erro ao criar cliente: ${JSON.stringify(customerError)}`);
-      }
+      throw new Error(`Erro ao criar cliente: ${JSON.stringify(customerError)}`);
     }
 
     const customerData = await customerResponse.json();
-    const customerId = customerData.id || userId;  // Fallback para userId se não conseguir criar cliente
+    console.log('Customer created successfully:', customerData);
 
-    // Criar pagamento com o customerId
+    // Criar pagamento para o cliente
     const paymentData = {
-      customer: customerId,
-      billingType: 'UNDEFINED',  // Permite múltiplas formas de pagamento
+      customer: customerData.id,
+      billingType: 'UNDEFINED',
       value: amount,
-      dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 dias
+      dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       description: description,
-      externalReference: userId,
+      externalReference: uniqueId
     };
 
     console.log('Creating payment with data:', paymentData);
@@ -89,13 +86,13 @@ serve(async (req) => {
     if (!paymentResponse.ok) {
       const errorData = await paymentResponse.json();
       console.error('ASAAS payment creation error:', errorData);
-      throw new Error(`Erro ASAAS: ${JSON.stringify(errorData)}`);
+      throw new Error(`Erro ao criar pagamento: ${JSON.stringify(errorData)}`);
     }
 
     const payment = await paymentResponse.json();
     console.log('Payment created successfully:', payment);
 
-    // Criar registro na tabela de pagamentos
+    // Salvar o pagamento no banco de dados
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') || '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -112,9 +109,9 @@ serve(async (req) => {
 
     if (paymentError) {
       console.error('Error saving payment to database:', paymentError);
-      // Não vamos lançar erro aqui para não impedir o retorno do link de pagamento
     }
 
+    // Retornar os dados do pagamento
     return new Response(
       JSON.stringify({
         id: payment.id,
