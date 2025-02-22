@@ -16,6 +16,7 @@ import { categories } from "./categoryOptions";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
 interface BatchUploadFormProps {
   onUpload: (file: File, category: MuscleGroup) => Promise<void>;
@@ -24,6 +25,33 @@ interface BatchUploadFormProps {
   uploading: boolean;
 }
 
+const trainingLocations = [
+  { value: "gym", label: "Academia" },
+  { value: "home", label: "Casa" },
+  { value: "outdoors", label: "Ao ar livre" },
+  { value: "no_equipment", label: "Sem equipamentos" }
+];
+
+const activityLevels = [
+  { value: "beginner", label: "Iniciante" },
+  { value: "intermediate", label: "Intermediário" },
+  { value: "advanced", label: "Avançado" }
+];
+
+const exerciseTypes = [
+  { value: "strength", label: "Força" },
+  { value: "cardio", label: "Cardio" },
+  { value: "mobility", label: "Mobilidade" }
+];
+
+const goals = [
+  { value: "hypertrophy", label: "Hipertrofia" },
+  { value: "endurance", label: "Resistência" },
+  { value: "strength", label: "Força" },
+  { value: "flexibility", label: "Flexibilidade" },
+  { value: "rehabilitation", label: "Reabilitação" }
+];
+
 export const BatchUploadForm = ({
   onUpload,
   selectedCategory,
@@ -31,6 +59,10 @@ export const BatchUploadForm = ({
   uploading,
 }: BatchUploadFormProps) => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [exerciseType, setExerciseType] = useState("strength");
+  const [activityLevel, setActivityLevel] = useState("beginner");
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
+  const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
   const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB por arquivo
 
   const validateFile = (file: File): boolean => {
@@ -58,6 +90,22 @@ export const BatchUploadForm = ({
     setSelectedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
+  const handleLocationToggle = (location: string) => {
+    setSelectedLocations(prev => 
+      prev.includes(location) 
+        ? prev.filter(l => l !== location)
+        : [...prev, location]
+    );
+  };
+
+  const handleGoalToggle = (goal: string) => {
+    setSelectedGoals(prev => 
+      prev.includes(goal) 
+        ? prev.filter(g => g !== goal)
+        : [...prev, goal]
+    );
+  };
+
   const handleUploadAll = async () => {
     if (selectedFiles.length === 0) {
       toast.error('Selecione pelo menos um arquivo para fazer upload');
@@ -82,26 +130,102 @@ export const BatchUploadForm = ({
         <CardTitle className="text-lg">Upload em Lote</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
+        <div className="space-y-6">
+          {/* Classificação dos Exercícios */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label>Tipo de Exercício</Label>
+              <Select
+                value={exerciseType}
+                onValueChange={setExerciseType}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {exerciseTypes.map(type => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Grupo Muscular</Label>
+              <Select
+                value={selectedCategory}
+                onValueChange={onCategoryChange}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map(category => (
+                    <SelectItem key={category.value} value={category.value}>
+                      {category.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Nível e Local */}
           <div>
-            <Label>Categoria dos Exercícios</Label>
+            <Label>Nível de Atividade Física</Label>
             <Select
-              value={selectedCategory}
-              onValueChange={(value: MuscleGroup) => onCategoryChange(value)}
+              value={activityLevel}
+              onValueChange={setActivityLevel}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Selecione a categoria" />
+                <SelectValue placeholder="Selecione o nível" />
               </SelectTrigger>
               <SelectContent>
-                {categories.map(category => (
-                  <SelectItem key={category.value} value={category.value}>
-                    {category.label}
+                {activityLevels.map(level => (
+                  <SelectItem key={level.value} value={level.value}>
+                    {level.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
+          <div className="space-y-2">
+            <Label>Local de Treino</Label>
+            <div className="grid grid-cols-2 gap-4">
+              {trainingLocations.map(location => (
+                <div key={location.value} className="flex items-center space-x-2">
+                  <Switch
+                    id={`batch-location-${location.value}`}
+                    checked={selectedLocations.includes(location.value)}
+                    onCheckedChange={() => handleLocationToggle(location.value)}
+                  />
+                  <Label htmlFor={`batch-location-${location.value}`}>{location.label}</Label>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Objetivos */}
+          <div className="space-y-2">
+            <Label>Objetivos dos Exercícios</Label>
+            <div className="grid grid-cols-2 gap-4">
+              {goals.map(goal => (
+                <div key={goal.value} className="flex items-center space-x-2">
+                  <Switch
+                    id={`batch-goal-${goal.value}`}
+                    checked={selectedGoals.includes(goal.value)}
+                    onCheckedChange={() => handleGoalToggle(goal.value)}
+                  />
+                  <Label htmlFor={`batch-goal-${goal.value}`}>{goal.label}</Label>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Upload de Arquivos */}
           <div>
             <Label htmlFor="files">Selecionar GIFs</Label>
             <Input

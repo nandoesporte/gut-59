@@ -1,219 +1,85 @@
 
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { Exercise, MuscleGroup, ExerciseType, Difficulty } from "./exercises/types";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { ExerciseForm } from "./exercises/ExerciseForm";
 import { BatchUploadForm } from "./exercises/BatchUploadForm";
 import { ExerciseList } from "./exercises/ExerciseList";
+import { Exercise, MuscleGroup } from "./exercises/types";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export const ExerciseGifsTab = () => {
-  const [exercises, setExercises] = useState<Exercise[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<MuscleGroup>("chest");
-
-  useEffect(() => {
-    fetchExercises();
-  }, []);
-
-  const fetchExercises = async () => {
-    try {
+  const { data: exercises, refetch } = useQuery({
+    queryKey: ['exercises'],
+    queryFn: async () => {
       const { data, error } = await supabase
         .from('exercises')
         .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setExercises(data || []);
-    } catch (error) {
-      toast.error('Erro ao carregar exercícios');
-      console.error('Error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSubmit = async (exerciseData: Omit<Exercise, 'id' | 'gif_url'>, file?: File) => {
-    try {
-      setUploading(true);
-
-      const exercisePayload = {
-        ...exerciseData,
-        min_reps: 8,
-        max_reps: 12,
-        min_sets: 3,
-        max_sets: 5,
-        rest_time_seconds: 60,
-        alternative_exercises: [] as string[],
-        equipment_needed: [] as string[]
-      };
-
-      const { data, error: exerciseError } = await supabase
-        .from('exercises')
-        .insert(exercisePayload)
-        .select()
-        .single();
-
-      if (exerciseError) throw exerciseError;
-
-      if (file && data) {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${data.id}.${fileExt}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('exercise-gifs')
-          .upload(fileName, file, { upsert: true });
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('exercise-gifs')
-          .getPublicUrl(fileName);
-
-        const { error: updateError } = await supabase
-          .from('exercises')
-          .update({ gif_url: publicUrl })
-          .eq('id', data.id);
-
-        if (updateError) throw updateError;
-      }
-
-      toast.success('Exercício criado com sucesso!');
-      fetchExercises();
-    } catch (error) {
-      toast.error('Erro ao criar exercício');
-      console.error('Error:', error);
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleBatchUpload = async (file: File, category: MuscleGroup) => {
-    try {
-      setUploading(true);
-
-      // Define exercise type based on category
-      let exerciseType: ExerciseType = "strength";
-      if (category === "cardio") {
-        exerciseType = "cardio";
-      } else if (category === "mobility") {
-        exerciseType = "mobility";
-      }
-
-      const exerciseName = file.name.replace('.gif', '').replace(/_/g, ' ');
+        .order('name');
       
-      const exercisePayload = {
-        name: exerciseName,
-        description: `Exercício ${exerciseName}`,
-        muscle_group: category,
-        exercise_type: exerciseType,
-        difficulty: "beginner" as Difficulty,
-        min_reps: 8,
-        max_reps: 12,
-        min_sets: 3,
-        max_sets: 5,
-        rest_time_seconds: 60,
-        alternative_exercises: [] as string[],
-        equipment_needed: [] as string[]
-      };
+      if (error) throw error;
+      return data;
+    }
+  });
 
-      const { data: exercise, error: exerciseError } = await supabase
-        .from('exercises')
-        .insert(exercisePayload)
-        .select()
-        .single();
+  const uploadMutation = useMutation({
+    mutationFn: async ({ exerciseData, file }: { exerciseData: Omit<Exercise, 'id' | 'gif_url'>, file?: File }) => {
+      if (!file) {
+        throw new Error('Arquivo GIF é obrigatório');
+      }
 
-      if (exerciseError) throw exerciseError;
-
-      // Upload do arquivo GIF
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${exercise.id}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
+      // Upload the GIF file
+      const { data: uploadData, error: uploadError } = await supabase.storage
         .from('exercise-gifs')
-        .upload(fileName, file, { upsert: true });
+        .upload(`${crypto.randomUUID()}.gif`, file);
 
       if (uploadError) throw uploadError;
 
-      // Atualizar o exercício com a URL do GIF
+      // Get the public URL
       const { data: { publicUrl } } = supabase.storage
         .from('exercise-gifs')
-        .getPublicUrl(fileName);
+        .getPublicUrl(uploadData.path);
 
-      const { error: updateError } = await supabase
+      // Create the exercise record
+      const { error: insertError } = await supabase
         .from('exercises')
-        .update({ gif_url: publicUrl })
-        .eq('id', exercise.id);
+        .insert({
+          ...exerciseData,
+          gif_url: publicUrl
+        });
 
-      if (updateError) throw updateError;
+      if (insertError) throw insertError;
 
-      await fetchExercises();
-    } catch (error) {
-      console.error('Error:', error);
-      toast.error('Erro ao fazer upload do arquivo');
-      throw error;
-    } finally {
-      setUploading(false);
+      return { success: true };
+    },
+    onSuccess: () => {
+      toast.success('Exercício salvo com sucesso!');
+      refetch();
+    },
+    onError: (error) => {
+      toast.error('Erro ao salvar exercício: ' + error.message);
     }
+  });
+
+  const handleSubmit = async (exerciseData: Omit<Exercise, 'id' | 'gif_url'>, file?: File) => {
+    await uploadMutation.mutateAsync({ exerciseData, file });
   };
-
-  const removeGif = async (exerciseId: string, fileName: string) => {
-    try {
-      const { error: deleteError } = await supabase.storage
-        .from('exercise-gifs')
-        .remove([fileName]);
-
-      if (deleteError) throw deleteError;
-
-      const { error: updateError } = await supabase
-        .from('exercises')
-        .update({ gif_url: null })
-        .eq('id', exerciseId);
-
-      if (updateError) throw updateError;
-
-      toast.success('GIF removido com sucesso!');
-      fetchExercises();
-    } catch (error) {
-      toast.error('Erro ao remover GIF');
-      console.error('Error:', error);
-    }
-  };
-
-  if (loading) {
-    return <div className="flex justify-center p-8">Carregando...</div>;
-  }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Adicionar Novo Exercício</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Upload Individual</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ExerciseForm onSubmit={handleSubmit} uploading={uploading} />
-              </CardContent>
-            </Card>
+    <div className="space-y-8">
+      <h2 className="text-2xl font-bold">Upload Individual de Exercício</h2>
+      <ExerciseForm
+        onSubmit={handleSubmit}
+        uploading={uploadMutation.isPending}
+      />
 
-            <BatchUploadForm
-              onUpload={handleBatchUpload}
-              selectedCategory={selectedCategory}
-              onCategoryChange={setSelectedCategory}
-              uploading={uploading}
-            />
-          </div>
-        </CardContent>
-      </Card>
+      <h2 className="text-2xl font-bold mt-12">Upload em Lote</h2>
+      <BatchUploadForm
+        onUpload={handleSubmit}
+        uploading={uploadMutation.isPending}
+      />
 
-      <ExerciseList exercises={exercises} onRemoveGif={removeGif} />
+      <h2 className="text-2xl font-bold mt-12">Exercícios Cadastrados</h2>
+      <ExerciseList exercises={exercises || []} onUpdate={refetch} />
     </div>
   );
 };
