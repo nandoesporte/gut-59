@@ -89,8 +89,91 @@ export const ExerciseGifsTab = () => {
     }
   });
 
+  const uploadPhysioExerciseMutation = useMutation({
+    mutationFn: async ({ 
+      exerciseData, 
+      file, 
+      jointArea, 
+      condition 
+    }: { 
+      exerciseData: any, 
+      file?: File,
+      jointArea: string,
+      condition: string
+    }) => {
+      if (!file) {
+        throw new Error('Arquivo GIF é obrigatório');
+      }
+
+      // Upload the GIF file
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('exercise-gifs')
+        .upload(`physio/${crypto.randomUUID()}.gif`, file);
+
+      if (uploadError) throw uploadError;
+
+      // Get the public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('exercise-gifs')
+        .getPublicUrl(uploadData.path);
+
+      // Create the exercise record in the physio_exercises table
+      const { error: insertError } = await supabase
+        .from('physio_exercises')
+        .insert({
+          name: exerciseData.name,
+          description: exerciseData.description || '',
+          gif_url: publicUrl,
+          joint_area: jointArea,
+          condition: condition,
+          exercise_type: exerciseData.exercise_type,
+          difficulty: exerciseData.difficulty,
+          is_compound_movement: exerciseData.is_compound_movement,
+          required_equipment: exerciseData.equipment_needed || [],
+          balance_requirement: exerciseData.balance_requirement || 'moderate',
+          coordination_requirement: exerciseData.coordination_requirement || 'moderate',
+          strength_requirement: exerciseData.strength_requirement || 'moderate',
+          flexibility_requirement: exerciseData.flexibility_requirement || 'moderate',
+          movement_speed: 'moderate',
+          resistance_level: 'bodyweight',
+          pain_level_threshold: 5,
+          progression_level: 1,
+          recommended_repetitions: 10,
+          recommended_sets: 3,
+          hold_time_seconds: 10,
+          rest_time_seconds: 30,
+          keywords: [exerciseData.name.toLowerCase()],
+          primary_goals: ['rehabilitation'],
+          target_symptoms: [condition]
+        });
+
+      if (insertError) throw insertError;
+
+      return { success: true };
+    },
+    onSuccess: () => {
+      toast.success('Exercício de fisioterapia salvo com sucesso!');
+    },
+    onError: (error) => {
+      toast.error('Erro ao salvar exercício de fisioterapia: ' + error.message);
+    }
+  });
+
   const handleSubmit = async (exerciseData: Omit<Exercise, 'id' | 'gif_url'>, file?: File) => {
     await uploadMutation.mutateAsync({ exerciseData, file });
+  };
+
+  const handlePhysioSubmit = async (exerciseData: any, file?: File, jointArea?: string, condition?: string) => {
+    if (!jointArea || !condition) {
+      toast.error('Área da articulação e condição são obrigatórias');
+      return;
+    }
+    await uploadPhysioExerciseMutation.mutateAsync({ 
+      exerciseData, 
+      file, 
+      jointArea, 
+      condition 
+    });
   };
 
   return (
@@ -118,8 +201,8 @@ export const ExerciseGifsTab = () => {
 
         <TabsContent value="fisio">
           <FisioBatchUploadForm
-            onUpload={handleSubmit}
-            uploading={uploadMutation.isPending}
+            onUpload={handlePhysioSubmit}
+            uploading={uploadPhysioExerciseMutation.isPending}
           />
         </TabsContent>
       </Tabs>

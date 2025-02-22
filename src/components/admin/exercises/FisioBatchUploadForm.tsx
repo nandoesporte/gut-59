@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -130,21 +129,17 @@ export const FisioBatchUploadForm = ({
         const exerciseData = {
           name: file.name.replace('.gif', ''),
           description: '',
-          muscle_group: selectedJointArea as MuscleGroup,
           exercise_type: exerciseType,
           difficulty: difficulty,
           is_compound_movement: isCompoundMovement,
           equipment_needed: requiresEquipment ? ['basic'] : [],
-          suitable_for_conditions: [selectedCondition],
-          mobility_requirements: 'moderate',
-          stability_requirement: 'moderate',
           balance_requirement: 'moderate',
           coordination_requirement: 'moderate',
-          flexibility_requirement: 'moderate',
-          power_requirement: 'moderate'
+          strength_requirement: 'moderate',
+          flexibility_requirement: 'moderate'
         };
         
-        await onUpload(exerciseData, file);
+        await onUpload(exerciseData, file, selectedJointArea, selectedCondition);
       }
       setSelectedFiles([]);
       toast.success('Todos os arquivos foram enviados com sucesso!');

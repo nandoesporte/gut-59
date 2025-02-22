@@ -637,6 +637,144 @@ export type Database = {
         }
         Relationships: []
       }
+      physio_exercises: {
+        Row: {
+          acute_phase_suitable: boolean | null
+          alternative_names: string[] | null
+          balance_requirement: string | null
+          condition: Database["public"]["Enums"]["physio_condition"]
+          contraindications: string[] | null
+          coordination_requirement: string | null
+          created_at: string | null
+          description: string | null
+          difficulty: Database["public"]["Enums"]["exercise_difficulty"]
+          difficulty_progression_path: string[] | null
+          exercise_type: Database["public"]["Enums"]["exercise_type"]
+          flexibility_requirement: string | null
+          gif_url: string | null
+          hold_time_seconds: number | null
+          id: string
+          is_compound_movement: boolean | null
+          joint_area: Database["public"]["Enums"]["physio_joint_area"]
+          keywords: string[] | null
+          maintenance_phase_suitable: boolean | null
+          modified_positions: string[] | null
+          movement_plane: string[] | null
+          movement_speed: string | null
+          name: string
+          objective_measures: string[] | null
+          pain_level_threshold: number | null
+          precautions: string[] | null
+          primary_goals: string[] | null
+          progression_level: number | null
+          recommended_repetitions: number | null
+          recommended_sets: number | null
+          rehabilitation_phase_suitable: boolean | null
+          related_exercises: string[] | null
+          required_equipment: string[] | null
+          resistance_level: string | null
+          rest_time_seconds: number | null
+          rom_requirements: string[] | null
+          secondary_goals: string[] | null
+          setup_instructions: string | null
+          space_requirement: string | null
+          strength_requirement: string | null
+          success_indicators: string[] | null
+          target_symptoms: string[] | null
+          updated_at: string | null
+        }
+        Insert: {
+          acute_phase_suitable?: boolean | null
+          alternative_names?: string[] | null
+          balance_requirement?: string | null
+          condition: Database["public"]["Enums"]["physio_condition"]
+          contraindications?: string[] | null
+          coordination_requirement?: string | null
+          created_at?: string | null
+          description?: string | null
+          difficulty?: Database["public"]["Enums"]["exercise_difficulty"]
+          difficulty_progression_path?: string[] | null
+          exercise_type?: Database["public"]["Enums"]["exercise_type"]
+          flexibility_requirement?: string | null
+          gif_url?: string | null
+          hold_time_seconds?: number | null
+          id?: string
+          is_compound_movement?: boolean | null
+          joint_area: Database["public"]["Enums"]["physio_joint_area"]
+          keywords?: string[] | null
+          maintenance_phase_suitable?: boolean | null
+          modified_positions?: string[] | null
+          movement_plane?: string[] | null
+          movement_speed?: string | null
+          name: string
+          objective_measures?: string[] | null
+          pain_level_threshold?: number | null
+          precautions?: string[] | null
+          primary_goals?: string[] | null
+          progression_level?: number | null
+          recommended_repetitions?: number | null
+          recommended_sets?: number | null
+          rehabilitation_phase_suitable?: boolean | null
+          related_exercises?: string[] | null
+          required_equipment?: string[] | null
+          resistance_level?: string | null
+          rest_time_seconds?: number | null
+          rom_requirements?: string[] | null
+          secondary_goals?: string[] | null
+          setup_instructions?: string | null
+          space_requirement?: string | null
+          strength_requirement?: string | null
+          success_indicators?: string[] | null
+          target_symptoms?: string[] | null
+          updated_at?: string | null
+        }
+        Update: {
+          acute_phase_suitable?: boolean | null
+          alternative_names?: string[] | null
+          balance_requirement?: string | null
+          condition?: Database["public"]["Enums"]["physio_condition"]
+          contraindications?: string[] | null
+          coordination_requirement?: string | null
+          created_at?: string | null
+          description?: string | null
+          difficulty?: Database["public"]["Enums"]["exercise_difficulty"]
+          difficulty_progression_path?: string[] | null
+          exercise_type?: Database["public"]["Enums"]["exercise_type"]
+          flexibility_requirement?: string | null
+          gif_url?: string | null
+          hold_time_seconds?: number | null
+          id?: string
+          is_compound_movement?: boolean | null
+          joint_area?: Database["public"]["Enums"]["physio_joint_area"]
+          keywords?: string[] | null
+          maintenance_phase_suitable?: boolean | null
+          modified_positions?: string[] | null
+          movement_plane?: string[] | null
+          movement_speed?: string | null
+          name?: string
+          objective_measures?: string[] | null
+          pain_level_threshold?: number | null
+          precautions?: string[] | null
+          primary_goals?: string[] | null
+          progression_level?: number | null
+          recommended_repetitions?: number | null
+          recommended_sets?: number | null
+          rehabilitation_phase_suitable?: boolean | null
+          related_exercises?: string[] | null
+          required_equipment?: string[] | null
+          resistance_level?: string | null
+          rest_time_seconds?: number | null
+          rom_requirements?: string[] | null
+          secondary_goals?: string[] | null
+          setup_instructions?: string | null
+          space_requirement?: string | null
+          strength_requirement?: string | null
+          success_indicators?: string[] | null
+          target_symptoms?: string[] | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       product_categories: {
         Row: {
           category_id: string
@@ -1671,6 +1809,41 @@ export type Database = {
         | "ball_exercises"
         | "resistance_band"
       nutritional_goal: "lose_weight" | "maintain" | "gain_mass"
+      physio_condition:
+        | "plantar_fasciitis"
+        | "calcaneal_spur"
+        | "ankle_sprain"
+        | "anterior_compartment"
+        | "shin_splints"
+        | "achilles_tendinitis"
+        | "patellofemoral"
+        | "patellar_tendinitis"
+        | "acl_postop"
+        | "mcl_injury"
+        | "meniscus_injury"
+        | "knee_arthrosis"
+        | "trochanteric_bursitis"
+        | "piriformis_syndrome"
+        | "sports_hernia"
+        | "it_band_syndrome"
+        | "disc_protrusion"
+        | "herniated_disc"
+        | "cervical_lordosis"
+        | "frozen_shoulder"
+        | "shoulder_bursitis"
+        | "rotator_cuff"
+        | "impingement"
+        | "medial_epicondylitis"
+        | "lateral_epicondylitis"
+        | "carpal_tunnel"
+      physio_joint_area:
+        | "ankle_foot"
+        | "leg"
+        | "knee"
+        | "hip"
+        | "spine"
+        | "shoulder"
+        | "elbow_hand"
       rehab_goal: "pain_relief" | "mobility" | "strength" | "return_to_sport"
       training_goal: "lose_weight" | "maintain" | "gain_mass"
       workout_goal: "lose_weight" | "maintain" | "gain_mass"
