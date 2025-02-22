@@ -1,9 +1,9 @@
+
 import { Button } from "@/components/ui/button";
 import { Coffee, Utensils, Apple, Moon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { useState } from "react";
-import { createPayment, checkPaymentStatus } from "@/services/asaas";
+import { usePaymentHandling } from "./hooks/usePaymentHandling";
 
 interface ProtocolFood {
   id: string;
