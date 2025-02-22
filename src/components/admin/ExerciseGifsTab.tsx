@@ -39,14 +39,39 @@ export const ExerciseGifsTab = () => {
         .from('exercise-gifs')
         .getPublicUrl(uploadData.path);
 
-      // Create the exercise record with the additional fields
+      // Create the exercise record with all the additional fields
       const { error: insertError } = await supabase
         .from('exercises')
         .insert({
           ...exerciseData,
           gif_url: publicUrl,
-          goals: exerciseData.goals || [], // Ensure goals field is included
-          equipment_needed: exerciseData.equipment_needed || [] // Ensure equipment_needed field is included
+          goals: exerciseData.goals || [],
+          equipment_needed: exerciseData.equipment_needed || [],
+          primary_muscles_worked: exerciseData.primary_muscles_worked || [],
+          secondary_muscles_worked: exerciseData.secondary_muscles_worked || [],
+          target_heart_rate_zone: exerciseData.target_heart_rate_zone || [],
+          common_mistakes: exerciseData.common_mistakes || [],
+          safety_considerations: exerciseData.safety_considerations || [],
+          progression_variations: exerciseData.progression_variations || [],
+          regression_variations: exerciseData.regression_variations || [],
+          suitable_for_conditions: exerciseData.suitable_for_conditions || [],
+          contraindicated_conditions: exerciseData.contraindicated_conditions || [],
+          training_phases: exerciseData.training_phases || [],
+          is_compound_movement: exerciseData.is_compound_movement || false,
+          equipment_complexity: exerciseData.equipment_complexity || 'basic',
+          mobility_requirements: exerciseData.mobility_requirements || 'moderate',
+          stability_requirement: exerciseData.stability_requirement || 'moderate',
+          balance_requirement: exerciseData.balance_requirement || 'moderate',
+          coordination_requirement: exerciseData.coordination_requirement || 'moderate',
+          flexibility_requirement: exerciseData.flexibility_requirement || 'moderate',
+          power_requirement: exerciseData.power_requirement || 'moderate',
+          preparation_time_minutes: exerciseData.preparation_time_minutes || 15,
+          typical_duration_seconds: exerciseData.typical_duration_seconds || 60,
+          tempo_recommendation: exerciseData.tempo_recommendation || '2-0-2-0',
+          breathing_pattern: exerciseData.breathing_pattern || null,
+          calories_burned_per_hour: exerciseData.calories_burned_per_hour || null,
+          recommended_warm_up: exerciseData.recommended_warm_up || null,
+          movement_pattern: exerciseData.movement_pattern || 'unspecified'
         });
 
       if (insertError) throw insertError;
