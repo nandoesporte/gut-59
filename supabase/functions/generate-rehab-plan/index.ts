@@ -1,5 +1,4 @@
-
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import { corsHeaders } from '../_shared/cors';
 
 interface RehabPlanRequest {
@@ -32,7 +31,6 @@ Deno.serve(async (req) => {
 
     console.log('Gerando plano para:', preferences);
 
-    // Função para selecionar exercícios adequados com base nos critérios
     const selectExercises = async (params: {
       joint_area: string;
       condition: string;
@@ -40,13 +38,11 @@ Deno.serve(async (req) => {
       activity_level: string;
       mobility_level: string;
     }) => {
-      // Determinar nível de dificuldade baseado nos parâmetros
       const difficulty = 
         params.pain_level > 7 ? 'beginner' :
         params.activity_level === 'active' && params.pain_level < 4 ? 'advanced' :
         'intermediate';
 
-      // Determinar tipos de exercícios baseado no nível de mobilidade
       const exerciseTypes = 
         params.mobility_level === 'limited' ? ['mobility'] :
         params.mobility_level === 'moderate' ? ['mobility', 'strength'] :
@@ -59,7 +55,6 @@ Deno.serve(async (req) => {
         exerciseTypes
       });
 
-      // Buscar exercícios adequados
       const { data: exercises, error } = await supabase
         .from('physio_exercises')
         .select(`
@@ -106,7 +101,6 @@ Deno.serve(async (req) => {
       return exercises || [];
     };
 
-    // Buscar exercícios apropriados
     const exercises = await selectExercises({
       joint_area: preferences.joint_area,
       condition: preferences.condition,
@@ -119,10 +113,9 @@ Deno.serve(async (req) => {
       throw new Error('Não foram encontrados exercícios adequados para suas condições');
     }
 
-    // Criar plano de reabilitação
     const startDate = new Date();
     const endDate = new Date();
-    endDate.setDate(endDate.getDate() + 28); // Plano de 4 semanas
+    endDate.setDate(endDate.getDate() + 28);
 
     console.log('Criando plano de reabilitação');
 
@@ -147,23 +140,20 @@ Deno.serve(async (req) => {
 
     console.log('Plano criado:', plan.id);
 
-    // Criar sessões de treino
     const sessions = [];
     for (let day = 1; day <= 28; day++) {
       const week = Math.ceil(day / 7);
       console.log(`Criando sessão para dia ${day} (semana ${week})`);
 
-      // Filtrar exercícios apropriados para cada fase
       const weeklyExercises = exercises.filter(ex => {
         if (week === 1) return ex.acute_phase_suitable;
         if (week === 2 || week === 3) return ex.rehabilitation_phase_suitable;
         return ex.maintenance_phase_suitable;
       });
 
-      // Selecionar exercícios para o dia
       const dailyExercises = weeklyExercises
         .sort(() => Math.random() - 0.5)
-        .slice(0, 4); // 4 exercícios por sessão
+        .slice(0, 4);
 
       const { data: session, error: sessionError } = await supabase
         .from('rehab_sessions')
@@ -185,11 +175,9 @@ Deno.serve(async (req) => {
 
       console.log(`Sessão ${session.id} criada para dia ${day}`);
 
-      // Adicionar exercícios à sessão
       for (let i = 0; i < dailyExercises.length; i++) {
         const exercise = dailyExercises[i];
         
-        // Ajustar séries e repetições com base na fase e dificuldade
         const sets = exercise.recommended_sets || 
           (week === 1 ? 2 : exercise.recommended_sets || 3);
         
@@ -240,7 +228,6 @@ Deno.serve(async (req) => {
 
     console.log('Plano gerado com sucesso');
 
-    // Retornar plano completo
     return new Response(JSON.stringify({
       id: plan.id,
       user_id: plan.user_id,
