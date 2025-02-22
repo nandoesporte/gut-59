@@ -14,27 +14,46 @@ interface PaymentRequest {
 }
 
 const validateAsaasResponse = async (response: Response) => {
-  const contentType = response.headers.get('content-type');
-  if (!contentType?.includes('application/json')) {
-    const text = await response.text();
-    console.error('Invalid content type from ASAAS:', contentType);
-    console.error('Response body:', text);
-    throw new Error('Resposta inválida do serviço de pagamento');
+  try {
+    // First check if we got a response at all
+    if (!response) {
+      throw new Error('Resposta nula do serviço ASAAS');
+    }
+
+    // Log full response details for debugging
+    console.log('ASAAS Response:', {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries()),
+    });
+
+    let data;
+    const contentType = response.headers.get('content-type');
+    const responseText = await response.text();
+    console.log('Raw response text:', responseText);
+
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.error('Failed to parse JSON response:', e);
+      throw new Error(`Resposta inválida do ASAAS: ${responseText}`);
+    }
+
+    console.log('Parsed ASAAS response:', data);
+
+    if (!response.ok) {
+      throw new Error(`Erro do ASAAS: ${JSON.stringify(data)}`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error in validateAsaasResponse:', error);
+    throw error;
   }
-
-  const data = await response.json();
-  console.log('ASAAS response:', data);
-
-  if (!response.ok) {
-    console.error('ASAAS error response:', data);
-    throw new Error(`Erro do ASAAS: ${JSON.stringify(data)}`);
-  }
-
-  return data;
 };
 
 const createOrGetCustomer = async (userId: string, asaasApiKey: string) => {
-  const asaasBaseUrl = 'https://sandbox.asaas.com/api/v3';  // Using sandbox URL for testing
+  const asaasBaseUrl = 'https://sandbox.asaas.com/api/v3';
   
   try {
     // First, try to get customer by externalReference
@@ -47,7 +66,10 @@ const createOrGetCustomer = async (userId: string, asaasApiKey: string) => {
           'access_token': asaasApiKey,
         },
       }
-    );
+    ).catch(error => {
+      console.error('Network error while searching customer:', error);
+      throw new Error('Erro de conexão com ASAAS');
+    });
 
     const searchResult = await validateAsaasResponse(searchResponse);
     
@@ -63,8 +85,8 @@ const createOrGetCustomer = async (userId: string, asaasApiKey: string) => {
       name: `Cliente ${userId.slice(0, 8)}`,
       externalReference: userId,
       email: `cliente.${userId.slice(0, 8)}@example.com`,
-      mobilePhone: "11999999999",  // Changed from phone to mobilePhone
-      cpfCnpj: "12345678909"  // Valid CPF for testing
+      mobilePhone: "11999999999",
+      cpfCnpj: "12345678909"
     };
 
     console.log('Creating customer with data:', customerData);
@@ -76,6 +98,9 @@ const createOrGetCustomer = async (userId: string, asaasApiKey: string) => {
         'access_token': asaasApiKey,
       },
       body: JSON.stringify(customerData),
+    }).catch(error => {
+      console.error('Network error while creating customer:', error);
+      throw new Error('Erro de conexão com ASAAS');
     });
 
     const newCustomer = await validateAsaasResponse(createResponse);
@@ -83,7 +108,7 @@ const createOrGetCustomer = async (userId: string, asaasApiKey: string) => {
     return newCustomer.id;
   } catch (error) {
     console.error('Error in createOrGetCustomer:', error);
-    throw new Error(`Erro ao criar/buscar cliente: ${error.message}`);
+    throw error;
   }
 };
 
@@ -116,11 +141,13 @@ serve(async (req) => {
       throw new Error('ASAAS_API_KEY não configurada');
     }
 
+    console.log('ASAAS API Key length:', asaasApiKey.length);
+
     // Get or create customer
     const customerId = await createOrGetCustomer(userId, asaasApiKey);
     console.log('Got customer ID:', customerId);
 
-    const asaasBaseUrl = 'https://sandbox.asaas.com/api/v3';  // Using sandbox URL for testing
+    const asaasBaseUrl = 'https://sandbox.asaas.com/api/v3';
     const paymentData = {
       customer: customerId,
       billingType: "BOLETO",
@@ -133,7 +160,6 @@ serve(async (req) => {
     console.log('Creating payment with ASAAS:', {
       url: `${asaasBaseUrl}/payments`,
       data: paymentData,
-      keyLength: asaasApiKey.length
     });
 
     const paymentResponse = await fetch(`${asaasBaseUrl}/payments`, {
@@ -143,6 +169,9 @@ serve(async (req) => {
         'access_token': asaasApiKey,
       },
       body: JSON.stringify(paymentData),
+    }).catch(error => {
+      console.error('Network error while creating payment:', error);
+      throw new Error('Erro de conexão com ASAAS');
     });
 
     const paymentResult = await validateAsaasResponse(paymentResponse);
