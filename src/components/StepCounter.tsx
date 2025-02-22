@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { Motion } from '@capacitor/motion';
 import { Card, CardContent } from "@/components/ui/card";
@@ -41,17 +40,7 @@ const StepCounter = () => {
       // Primeiro, removemos qualquer listener existente
       await Motion.removeAllListeners();
 
-      // Solicitar permissões explicitamente
-      const permResult = await Motion.requestPermissions();
-      console.log("Resultado da solicitação de permissões:", permResult);
-
-      if (permResult.accel !== 'granted') {
-        toast.error("Permissão negada para acessar o acelerômetro");
-        setIsLoading(false);
-        return;
-      }
-
-      // Tentar iniciar o monitoramento
+      // Tentar iniciar o monitoramento diretamente
       let accelerometerWorking = false;
       
       const listener = await Motion.addListener('accel', (event) => {
@@ -62,6 +51,8 @@ const StepCounter = () => {
           setHasPermission(true);
           setIsInitialized(true);
           toast.success("Permissão concedida para contagem de passos");
+          // Após confirmar que funciona, removemos este listener inicial
+          Motion.removeAllListeners();
         }
       });
 
