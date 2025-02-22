@@ -18,7 +18,6 @@ const STEP_LENGTH = 0.762;
 const CALORIES_PER_STEP = 0.04;
 const ACCELERATION_THRESHOLD = 10;
 const MIN_TIME_BETWEEN_STEPS = 250;
-const SENSOR_INIT_TIMEOUT = 5000;
 const STORAGE_KEY = 'stepCounter';
 
 const StepCounter = () => {
@@ -46,41 +45,82 @@ const StepCounter = () => {
     return { steps, distance, calories };
   }, []);
 
-  const startCapacitorAccelerometer = useCallback(async () => {
+  const checkAccelerometerAvailability = useCallback(async () => {
+    try {
+      // Primeiro, tenta obter uma leitura inicial do acelerômetro
+      const initialReading = await new Promise((resolve) => {
+        let hasReading = false;
+        
+        Motion.addListener('accel', (event) => {
+          if (!hasReading && event?.acceleration) {
+            hasReading = true;
+            Motion.removeAllListeners();
+            resolve(true);
+          }
+        });
+
+        // Timeout após 2 segundos
+        setTimeout(() => {
+          if (!hasReading) {
+            Motion.removeAllListeners();
+            resolve(false);
+          }
+        }, 2000);
+      });
+
+      return initialReading;
+    } catch (error) {
+      console.error('Erro ao verificar disponibilidade do acelerômetro:', error);
+      return false;
+    }
+  }, []);
+
+  const startAccelerometer = useCallback(async () => {
     if (accelerometerInitialized) return true;
 
     try {
-      console.log("Verificando suporte ao acelerômetro via Capacitor...");
-
-      // Tenta inicializar o acelerômetro
-      let initialized = false;
+      console.log("Tentando iniciar acelerômetro...");
       
-      // Remove todos os listeners existentes primeiro
+      // Remove listeners antigos
       await Motion.removeAllListeners();
       
-      // Adiciona um novo listener
-      await Motion.addListener('accel', (event) => {
-        if (!initialized && event?.acceleration) {
-          console.log("Dados do acelerômetro recebidos:", event.acceleration);
-          initialized = true;
-          setHasPermission(true);
-          setIsInitialized(true);
-          setAccelerometerInitialized(true);
-          toast.success("Acelerômetro iniciado com sucesso!");
-        }
+      // Configura novo listener
+      const initPromise = new Promise<boolean>((resolve) => {
+        let initialized = false;
+        
+        Motion.addListener('accel', (event) => {
+          if (!initialized && event?.acceleration) {
+            const { x, y, z } = event.acceleration;
+            console.log("Dados do acelerômetro:", { x, y, z });
+            
+            initialized = true;
+            setHasPermission(true);
+            setIsInitialized(true);
+            setAccelerometerInitialized(true);
+            toast.success("Acelerômetro iniciado com sucesso!");
+            resolve(true);
+          }
+        });
+
+        // Timeout após 3 segundos
+        setTimeout(() => {
+          if (!initialized) {
+            Motion.removeAllListeners();
+            resolve(false);
+          }
+        }, 3000);
       });
 
-      // Aguarda até 5 segundos para ver se recebemos dados do acelerômetro
-      await new Promise((resolve) => setTimeout(resolve, SENSOR_INIT_TIMEOUT));
+      const result = await initPromise;
       
-      if (!initialized) {
-        console.log("Não foi possível receber dados do acelerômetro");
+      if (!result) {
+        console.log("Não foi possível inicializar o acelerômetro");
         return false;
       }
 
       return true;
     } catch (error) {
-      console.error("Erro ao inicializar acelerômetro:", error);
+      console.error("Erro ao iniciar acelerômetro:", error);
       return false;
     }
   }, [accelerometerInitialized]);
@@ -90,20 +130,29 @@ const StepCounter = () => {
 
     setIsLoading(true);
     setSensorSupported(true);
-    console.log("Iniciando processo de inicialização do acelerômetro...");
 
     try {
-      const success = await startCapacitorAccelerometer();
+      console.log("Verificando disponibilidade do acelerômetro...");
+      const isAvailable = await checkAccelerometerAvailability();
+
+      if (!isAvailable) {
+        console.log("Acelerômetro não disponível no dispositivo");
+        setSensorSupported(false);
+        toast.error("Acelerômetro não encontrado no dispositivo. Verifique se seu dispositivo possui sensor de movimento.");
+        return;
+      }
+
+      console.log("Acelerômetro disponível, iniciando...");
+      const success = await startAccelerometer();
 
       if (!success) {
-        console.log("Falha ao inicializar o acelerômetro");
         setSensorSupported(false);
-        toast.error("Não foi possível inicializar o acelerômetro. Verifique se seu dispositivo possui sensor de movimento.");
+        toast.error("Não foi possível inicializar o acelerômetro. Por favor, tente novamente.");
       }
     } catch (error) {
-      console.error("Erro durante a inicialização:", error);
+      console.error("Erro ao solicitar permissões:", error);
       setSensorSupported(false);
-      toast.error("Erro ao tentar acessar o acelerômetro.");
+      toast.error("Erro ao acessar o acelerômetro.");
     } finally {
       setIsLoading(false);
     }
@@ -121,13 +170,14 @@ const StepCounter = () => {
     let lastStepTime = Date.now();
     let lastMagnitude = 0;
     let steps = stepData.steps;
-    let cleanup: (() => void) | null = null;
 
     const startStepCounting = async () => {
       try {
         console.log("Iniciando contagem de passos...");
 
-        const listener = await Motion.addListener('accel', (event) => {
+        await Motion.removeAllListeners();
+        
+        await Motion.addListener('accel', (event) => {
           if (!event?.acceleration) return;
           
           const { x, y, z } = event.acceleration;
@@ -146,21 +196,18 @@ const StepCounter = () => {
           lastMagnitude = magnitude;
         });
 
-        cleanup = () => {
-          Motion.removeAllListeners();
-          console.log("Listeners removidos");
-        };
-
         console.log('Sistema de contagem de passos iniciado');
       } catch (error) {
         console.error('Erro ao iniciar contagem:', error);
+        setSensorSupported(false);
       }
     };
 
     startStepCounting();
 
     return () => {
-      if (cleanup) cleanup();
+      Motion.removeAllListeners();
+      console.log("Listeners removidos");
     };
   }, [hasPermission, isInitialized, calculateMetrics, stepData.steps]);
 
@@ -178,11 +225,11 @@ const StepCounter = () => {
           {!sensorSupported && (
             <div className="p-4 bg-yellow-50 text-yellow-800 rounded-lg">
               <p>Seu dispositivo não suporta a contagem de passos.</p>
-              <p className="mt-2">Verifique se:</p>
+              <p className="mt-2">Para usar esta função:</p>
               <ul className="list-disc ml-6 mt-1">
-                <li>Seu dispositivo possui acelerômetro</li>
-                <li>As permissões de movimento estão habilitadas</li>
-                <li>Você está usando um navegador compatível</li>
+                <li>Use um dispositivo móvel com acelerômetro</li>
+                <li>Certifique-se que as permissões de movimento estejam ativadas</li>
+                <li>Execute o aplicativo no modo nativo (não no navegador)</li>
               </ul>
               <Button 
                 onClick={() => {
