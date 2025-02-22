@@ -28,12 +28,17 @@ export const usePaymentHandling = () => {
         throw new Error('Usuário não autenticado');
       }
 
+      // Prepare the request payload with strict typing
+      const payload = {
+        userId: userData.user.id,
+        amount: 19.90,
+        description: "Plano Alimentar Personalizado"
+      };
+
+      console.log('Sending payment request with payload:', payload);
+
       const { data, error } = await supabase.functions.invoke('create-mercadopago-preference', {
-        body: {
-          userId: userData.user.id,
-          amount: 19.90,
-          description: "Plano Alimentar Personalizado"
-        }
+        body: JSON.stringify(payload)
       });
 
       if (error) {
@@ -41,7 +46,8 @@ export const usePaymentHandling = () => {
         throw new Error(`Falha ao criar pagamento: ${error.message}`);
       }
 
-      if (!data?.preferenceId) {
+      if (!data?.preferenceId || !data?.initPoint) {
+        console.error('Invalid response:', data);
         throw new Error('Resposta inválida do serviço de pagamento');
       }
 
@@ -51,11 +57,22 @@ export const usePaymentHandling = () => {
       // Start polling for payment status
       const checkInterval = setInterval(async () => {
         try {
-          const { data: statusData, error: statusError } = await supabase.functions.invoke('check-mercadopago-payment', {
-            body: { preferenceId: data.preferenceId }
-          });
+          if (!data.preferenceId) {
+            clearInterval(checkInterval);
+            return;
+          }
 
-          if (statusError) throw statusError;
+          const { data: statusData, error: statusError } = await supabase.functions.invoke(
+            'check-mercadopago-payment',
+            {
+              body: JSON.stringify({ preferenceId: data.preferenceId })
+            }
+          );
+
+          if (statusError) {
+            console.error('Status check error:', statusError);
+            throw statusError;
+          }
 
           if (statusData?.isPaid) {
             clearInterval(checkInterval);
@@ -64,6 +81,7 @@ export const usePaymentHandling = () => {
           }
         } catch (error) {
           console.error('Erro ao verificar pagamento:', error);
+          clearInterval(checkInterval);
         }
       }, 5000);
 
