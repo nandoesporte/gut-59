@@ -5,6 +5,12 @@ import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { useState } from "react";
 import { createPayment, checkPaymentStatus } from "@/services/asaas";
+import { initMercadoPago, Wallet } from "@mercadopago/sdk-react";
+
+// Initialize MercadoPago
+initMercadoPago('TEST-5cc34aa1-d681-40a3-9b1a-5648d21af83b', {
+  locale: 'pt-BR'
+});
 
 interface ProtocolFood {
   id: string;
@@ -77,17 +83,16 @@ export const FoodSelector = ({
   onConfirm,
 }: FoodSelectorProps) => {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [preferenceId, setPreferenceId] = useState<string | null>(null);
   const [hasPaid, setHasPaid] = useState(false);
 
   const handlePaymentAndContinue = async () => {
     try {
       setIsProcessingPayment(true);
       const payment = await createPayment();
+      setPreferenceId(payment.preferenceId);
       
-      // Abre o link de pagamento em uma nova janela
-      window.open(payment.invoiceUrl, '_blank');
-
-      // Inicia o polling para verificar o status do pagamento
+      // Start polling for payment status
       const checkInterval = setInterval(async () => {
         try {
           const isPaid = await checkPaymentStatus(payment.id);
@@ -99,9 +104,9 @@ export const FoodSelector = ({
         } catch (error) {
           console.error('Erro ao verificar pagamento:', error);
         }
-      }, 5000); // Verifica a cada 5 segundos
+      }, 5000); // Check every 5 seconds
 
-      // Para o polling após 10 minutos
+      // Stop polling after 10 minutes
       setTimeout(() => {
         clearInterval(checkInterval);
       }, 600000);
@@ -152,16 +157,25 @@ export const FoodSelector = ({
             <p className="text-gray-600">
               Por apenas R$ 19,90, tenha acesso ao seu plano alimentar personalizado com base nas suas preferências.
             </p>
-            <Button
-              onClick={handlePaymentAndContinue}
-              disabled={isProcessingPayment}
-              className="w-full max-w-md bg-green-500 hover:bg-green-600"
-            >
-              {isProcessingPayment ? 
-                "Processando..." : 
-                "Pagar R$ 19,90 e Continuar"
-              }
-            </Button>
+            {preferenceId ? (
+              <div className="w-full flex justify-center">
+                <Wallet 
+                  initialization={{ preferenceId }}
+                  customization={{ texts: { valueProp: 'Pagamento Seguro' } }}
+                />
+              </div>
+            ) : (
+              <Button
+                onClick={handlePaymentAndContinue}
+                disabled={isProcessingPayment}
+                className="w-full max-w-md bg-green-500 hover:bg-green-600"
+              >
+                {isProcessingPayment ? 
+                  "Processando..." : 
+                  "Pagar R$ 19,90 e Continuar"
+                }
+              </Button>
+            )}
           </div>
         </Card>
       )}
