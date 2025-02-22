@@ -1,262 +1,269 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { corsHeaders } from '../_shared/cors.ts'
+import { createClient } from '@supabase/supabase-js';
+import { corsHeaders } from '../_shared/cors';
 
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-interface RehabPlanPayload {
+interface RehabPlanRequest {
   preferences: {
-    age: number
-    weight: number
-    height: number
-    gender: "male" | "female"
-    joint_area: string
-    condition: string
-    pain_level: number
-    mobility_level: "limited" | "moderate" | "good"
-    previous_treatment: boolean
-    activity_level: "sedentary" | "light" | "moderate" | "active"
-  }
-  userId: string
+    age: number;
+    weight: number;
+    height: number;
+    gender: string;
+    joint_area: string;
+    condition: string;
+    pain_level: number;
+    mobility_level: string;
+    previous_treatment: boolean;
+    activity_level: string;
+  };
+  userId: string;
 }
 
-serve(async (req) => {
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { preferences, userId }: RehabPlanPayload = await req.json()
-    console.log('Generating rehab plan for:', { preferences, userId })
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const { preferences, userId } = await req.json() as RehabPlanRequest;
 
-    // Determinar o objetivo da reabilitação com base nos dados
-    const goal = determineRehabGoal(preferences)
+    console.log('Gerando plano para:', preferences);
 
-    // Criar o plano de reabilitação na base de dados
-    const { data: rehabPlan, error: planError } = await supabase
+    // Função para selecionar exercícios adequados com base nos critérios
+    const selectExercises = async (params: {
+      joint_area: string;
+      condition: string;
+      pain_level: number;
+      activity_level: string;
+      mobility_level: string;
+    }) => {
+      // Determinar nível de dificuldade baseado nos parâmetros
+      const difficulty = 
+        params.pain_level > 7 ? 'beginner' :
+        params.activity_level === 'active' && params.pain_level < 4 ? 'advanced' :
+        'intermediate';
+
+      // Determinar tipos de exercícios baseado no nível de mobilidade
+      const exerciseTypes = 
+        params.mobility_level === 'limited' ? ['mobility'] :
+        params.mobility_level === 'moderate' ? ['mobility', 'strength'] :
+        ['mobility', 'strength', 'cardio'];
+
+      console.log('Buscando exercícios com critérios:', {
+        joint_area: params.joint_area,
+        condition: params.condition,
+        difficulty,
+        exerciseTypes
+      });
+
+      // Buscar exercícios adequados
+      const { data: exercises, error } = await supabase
+        .from('physio_exercises')
+        .select(`
+          id,
+          name,
+          description,
+          gif_url,
+          joint_area,
+          condition,
+          exercise_type,
+          difficulty,
+          is_compound_movement,
+          progression_level,
+          recommended_repetitions,
+          recommended_sets,
+          hold_time_seconds,
+          rest_time_seconds,
+          pain_level_threshold,
+          primary_goals,
+          target_symptoms,
+          setup_instructions,
+          required_equipment,
+          precautions,
+          contraindications,
+          movement_speed,
+          resistance_level,
+          acute_phase_suitable,
+          rehabilitation_phase_suitable,
+          maintenance_phase_suitable
+        `)
+        .eq('joint_area', params.joint_area)
+        .eq('condition', params.condition)
+        .lte('pain_level_threshold', params.pain_level + 2)
+        .in('exercise_type', exerciseTypes)
+        .eq('difficulty', difficulty)
+        .order('progression_level');
+
+      if (error) {
+        console.error('Erro ao buscar exercícios:', error);
+        throw error;
+      }
+
+      console.log(`Encontrados ${exercises?.length || 0} exercícios`);
+      return exercises || [];
+    };
+
+    // Buscar exercícios apropriados
+    const exercises = await selectExercises({
+      joint_area: preferences.joint_area,
+      condition: preferences.condition,
+      pain_level: preferences.pain_level,
+      activity_level: preferences.activity_level,
+      mobility_level: preferences.mobility_level
+    });
+
+    if (exercises.length === 0) {
+      throw new Error('Não foram encontrados exercícios adequados para suas condições');
+    }
+
+    // Criar plano de reabilitação
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + 28); // Plano de 4 semanas
+
+    console.log('Criando plano de reabilitação');
+
+    const { data: plan, error: planError } = await supabase
       .from('rehab_plans')
       .insert({
         user_id: userId,
-        goal,
+        joint_area: preferences.joint_area,
         condition: preferences.condition,
-        start_date: new Date().toISOString(),
-        end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 dias
+        goal: preferences.pain_level > 7 ? 'pain_relief' : 
+              preferences.mobility_level === 'limited' ? 'mobility' : 'strength',
+        start_date: startDate.toISOString(),
+        end_date: endDate.toISOString()
       })
       .select()
-      .single()
+      .single();
 
-    if (planError) throw planError
+    if (planError) {
+      console.error('Erro ao criar plano:', planError);
+      throw planError;
+    }
 
-    // Gerar sessões de reabilitação
-    const sessions = generateRehabSessions(preferences)
-    
-    // Inserir as sessões
-    for (const session of sessions) {
-      const { data: rehabSession, error: sessionError } = await supabase
+    console.log('Plano criado:', plan.id);
+
+    // Criar sessões de treino
+    const sessions = [];
+    for (let day = 1; day <= 28; day++) {
+      const week = Math.ceil(day / 7);
+      console.log(`Criando sessão para dia ${day} (semana ${week})`);
+
+      // Filtrar exercícios apropriados para cada fase
+      const weeklyExercises = exercises.filter(ex => {
+        if (week === 1) return ex.acute_phase_suitable;
+        if (week === 2 || week === 3) return ex.rehabilitation_phase_suitable;
+        return ex.maintenance_phase_suitable;
+      });
+
+      // Selecionar exercícios para o dia
+      const dailyExercises = weeklyExercises
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 4); // 4 exercícios por sessão
+
+      const { data: session, error: sessionError } = await supabase
         .from('rehab_sessions')
         .insert({
-          plan_id: rehabPlan.id,
-          day_number: session.day_number,
-          warmup_description: session.warmup_description,
-          cooldown_description: session.cooldown_description
+          plan_id: plan.id,
+          day_number: day,
+          warmup_description: "Realize 5-10 minutos de aquecimento leve focando na região afetada. " +
+                            "Inclua movimentos suaves e alongamentos leves para preparar os músculos e articulações.",
+          cooldown_description: "Faça alongamentos suaves por 5-10 minutos após os exercícios. " +
+                              "Aplique gelo se necessário para reduzir qualquer inflamação."
         })
         .select()
-        .single()
+        .single();
 
-      if (sessionError) throw sessionError
+      if (sessionError) {
+        console.error('Erro ao criar sessão:', sessionError);
+        throw sessionError;
+      }
 
-      // Inserir os exercícios para cada sessão
-      for (const exercise of session.exercises) {
-        // Primeiro, verificar se o exercício já existe ou criar um novo
-        const { data: existingExercise, error: exerciseQueryError } = await supabase
-          .from('exercises')
-          .select()
-          .eq('name', exercise.name)
-          .single()
+      console.log(`Sessão ${session.id} criada para dia ${day}`);
 
-        if (exerciseQueryError && exerciseQueryError.code !== 'PGRST116') {
-          throw exerciseQueryError
-        }
+      // Adicionar exercícios à sessão
+      for (let i = 0; i < dailyExercises.length; i++) {
+        const exercise = dailyExercises[i];
+        
+        // Ajustar séries e repetições com base na fase e dificuldade
+        const sets = exercise.recommended_sets || 
+          (week === 1 ? 2 : exercise.recommended_sets || 3);
+        
+        const reps = exercise.recommended_repetitions ||
+          (week === 1 ? Math.min(8, exercise.recommended_repetitions || 10) : 
+           exercise.recommended_repetitions || 10);
 
-        const exerciseId = existingExercise?.id
+        const { error: exerciseError } = await supabase
+          .from('rehab_session_exercises')
+          .insert({
+            session_id: session.id,
+            exercise_id: exercise.id,
+            sets,
+            reps,
+            rest_time_seconds: exercise.rest_time_seconds || 30,
+            order_in_session: i + 1
+          });
 
-        // Se não encontrou o exercício, vamos criar um novo
-        if (!exerciseId) {
-          const { data: newExercise, error: exerciseError } = await supabase
-            .from('exercises')
-            .insert({
-              name: exercise.name,
-              description: exercise.notes,
-              difficulty: 'beginner',
-              exercise_type: 'rehabilitation',
-              muscle_group: preferences.joint_area,
-            })
-            .select()
-            .single()
-
-          if (exerciseError) throw exerciseError
-
-          await supabase.from('rehab_session_exercises').insert({
-            session_id: rehabSession.id,
-            exercise_id: newExercise.id,
-            sets: exercise.sets,
-            reps: exercise.reps,
-            rest_time_seconds: exercise.rest_time_seconds
-          })
-        } else {
-          await supabase.from('rehab_session_exercises').insert({
-            session_id: rehabSession.id,
-            exercise_id: exerciseId,
-            sets: exercise.sets,
-            reps: exercise.reps,
-            rest_time_seconds: exercise.rest_time_seconds
-          })
+        if (exerciseError) {
+          console.error('Erro ao adicionar exercício à sessão:', exerciseError);
+          throw exerciseError;
         }
       }
-    }
 
-    // Buscar o plano completo com todas as sessões e exercícios
-    const { data: completePlan, error: fetchError } = await supabase
-      .from('rehab_plans')
-      .select(`
-        *,
-        rehab_sessions (
-          *,
-          rehab_session_exercises (
-            *,
-            exercise:exercises (*)
-          )
-        )
-      `)
-      .eq('id', rehabPlan.id)
-      .single()
-
-    if (fetchError) throw fetchError
-
-    // Transformar os dados para o formato esperado pelo frontend
-    const transformedPlan = {
-      ...completePlan,
-      rehab_sessions: completePlan.rehab_sessions.map((session: any) => ({
-        day_number: session.day_number,
-        warmup_description: session.warmup_description,
-        cooldown_description: session.cooldown_description,
-        exercises: session.rehab_session_exercises.map((se: any) => ({
-          name: se.exercise.name,
-          sets: se.sets,
-          reps: se.reps,
-          rest_time_seconds: se.rest_time_seconds,
-          gifUrl: se.exercise.gif_url,
-          notes: se.exercise.description
+      sessions.push({
+        ...session,
+        exercises: dailyExercises.map((ex, index) => ({
+          name: ex.name,
+          description: ex.description,
+          gifUrl: ex.gif_url,
+          sets: week === 1 ? 2 : ex.recommended_sets || 3,
+          reps: week === 1 ? Math.min(8, ex.recommended_repetitions || 10) : ex.recommended_repetitions || 10,
+          rest_time_seconds: ex.rest_time_seconds || 30,
+          movement_speed: ex.movement_speed,
+          resistance_level: ex.resistance_level,
+          hold_time_seconds: ex.hold_time_seconds,
+          setup_instructions: ex.setup_instructions,
+          precautions: ex.precautions,
+          required_equipment: ex.required_equipment,
+          notes: [
+            ex.setup_instructions,
+            ex.precautions?.length ? `Precauções: ${ex.precautions.join(', ')}` : null,
+            ex.contraindications?.length ? `Contraindicações: ${ex.contraindications.join(', ')}` : null
+          ].filter(Boolean).join('\n\n')
         }))
-      }))
+      });
     }
 
-    return new Response(JSON.stringify(transformedPlan), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    })
+    console.log('Plano gerado com sucesso');
+
+    // Retornar plano completo
+    return new Response(JSON.stringify({
+      id: plan.id,
+      user_id: plan.user_id,
+      goal: plan.goal,
+      condition: plan.condition,
+      start_date: plan.start_date,
+      end_date: plan.end_date,
+      rehab_sessions: sessions
+    }), {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      }
+    });
 
   } catch (error) {
-    console.error('Error:', error)
+    console.error('Erro ao gerar plano:', error);
     return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
-    })
-  }
-})
-
-function determineRehabGoal(preferences: RehabPlanPayload['preferences']) {
-  if (preferences.pain_level >= 7) return 'pain_relief'
-  if (preferences.mobility_level === 'limited') return 'mobility'
-  if (preferences.activity_level === 'active') return 'return_to_sport'
-  return 'strength'
-}
-
-function generateRehabSessions(preferences: RehabPlanPayload['preferences']) {
-  const sessions = []
-  
-  // Gerar 3 sessões por semana durante 4 semanas
-  for (let week = 0; week < 4; week++) {
-    for (let sessionInWeek = 0; sessionInWeek < 3; sessionInWeek++) {
-      const dayNumber = week * 7 + (sessionInWeek * 2) + 1
-      
-      const session = {
-        day_number: dayNumber,
-        warmup_description: generateWarmup(preferences),
-        cooldown_description: generateCooldown(preferences),
-        exercises: generateExercises(preferences, week)
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
       }
-      
-      sessions.push(session)
-    }
+    });
   }
-  
-  return sessions
-}
-
-function generateWarmup(preferences: RehabPlanPayload['preferences']) {
-  const warmups = {
-    ankle_foot: "5-10 minutos de mobilização suave do tornozelo, rotações e flexões",
-    knee: "5-10 minutos de caminhada leve e mobilização do joelho",
-    hip: "5-10 minutos de mobilização do quadril e alongamentos suaves",
-    spine: "5-10 minutos de mobilização da coluna e respiração profunda",
-    shoulder: "5-10 minutos de mobilização do ombro e aquecimento dos braços",
-    elbow_hand: "5-10 minutos de mobilização do punho e cotovelo"
-  }
-  
-  return warmups[preferences.joint_area as keyof typeof warmups] || 
-         "5-10 minutos de aquecimento geral com mobilização articular"
-}
-
-function generateCooldown(preferences: RehabPlanPayload['preferences']) {
-  return "5-10 minutos de alongamentos suaves seguidos de aplicação de gelo se necessário"
-}
-
-function generateExercises(preferences: RehabPlanPayload['preferences'], week: number) {
-  const baseExercises = {
-    ankle_foot: [
-      { name: "Flexão dorsal com banda elástica", sets: 3, reps: 15 },
-      { name: "Flexão plantar em pé", sets: 3, reps: 15 },
-      { name: "Inversão com banda elástica", sets: 3, reps: 12 }
-    ],
-    knee: [
-      { name: "Extensão de joelho sentado", sets: 3, reps: 12 },
-      { name: "Mini agachamento", sets: 3, reps: 10 },
-      { name: "Elevação da perna estendida", sets: 3, reps: 12 }
-    ],
-    hip: [
-      { name: "Ponte", sets: 3, reps: 12 },
-      { name: "Abdução de quadril deitado", sets: 3, reps: 15 },
-      { name: "Extensão de quadril em pé", sets: 3, reps: 12 }
-    ],
-    spine: [
-      { name: "Prancha", sets: 3, reps: 20 },
-      { name: "Bird dog", sets: 3, reps: 12 },
-      { name: "Extensão lombar", sets: 2, reps: 10 }
-    ],
-    shoulder: [
-      { name: "Rotação externa com banda elástica", sets: 3, reps: 15 },
-      { name: "Elevação frontal", sets: 3, reps: 12 },
-      { name: "Retração escapular", sets: 3, reps: 15 }
-    ],
-    elbow_hand: [
-      { name: "Flexão de punho com halter leve", sets: 3, reps: 15 },
-      { name: "Extensão de punho com halter leve", sets: 3, reps: 15 },
-      { name: "Preensão com bola", sets: 3, reps: 20 }
-    ]
-  }
-
-  const exercises = baseExercises[preferences.joint_area as keyof typeof baseExercises] || []
-  
-  // Ajustar dificuldade baseado na semana
-  return exercises.map(ex => ({
-    ...ex,
-    rest_time_seconds: 60,
-    reps: Math.min(ex.reps + week * 2, 20), // Aumenta repetições gradualmente
-    notes: `Realizar o movimento de forma controlada. Parar se sentir dor aguda.`
-  }))
-}
+});
