@@ -36,6 +36,8 @@ export type Condition =
   | "lateral_epicondylitis"
   | "carpal_tunnel";
 
+export type RehabGoal = "pain_relief" | "mobility" | "strength" | "return_to_sport";
+
 export interface FisioPreferences {
   age: number;
   weight: number;
@@ -48,5 +50,3 @@ export interface FisioPreferences {
   previous_treatment: boolean;
   activity_level: "sedentary" | "light" | "moderate" | "active";
 }
-
-export type RehabGoal = "pain_relief" | "mobility" | "strength" | "return_to_sport";

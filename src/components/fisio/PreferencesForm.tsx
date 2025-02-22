@@ -13,9 +13,9 @@ import { Stethoscope, ArrowRight } from "lucide-react";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 
 const formSchema = z.object({
-  age: z.number().min(16, "Idade mínima é 16 anos").max(100, "Idade máxima é 100 anos"),
-  weight: z.number().min(30, "Peso mínimo é 30kg").max(200, "Peso máximo é 200kg"),
-  height: z.number().min(100, "Altura mínima é 100cm").max(250, "Altura máxima é 250cm"),
+  age: z.number().min(16).max(100),
+  weight: z.number().min(30).max(200),
+  height: z.number().min(100).max(250),
   gender: z.enum(["male", "female"]),
   joint_area: z.enum([
     "ankle_foot", "leg", "knee", "hip", "spine", "shoulder", "elbow_hand"
@@ -36,6 +36,8 @@ const formSchema = z.object({
   previous_treatment: z.boolean(),
   activity_level: z.enum(["sedentary", "light", "moderate", "active"])
 });
+
+type FormData = z.infer<typeof formSchema>;
 
 const jointAreaOptions: Record<JointArea, string> = {
   ankle_foot: "Tornozelo e Pé",
@@ -95,7 +97,7 @@ interface PreferencesFormProps {
 }
 
 export const FisioPreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       age: 30,
@@ -111,20 +113,8 @@ export const FisioPreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
     }
   });
 
-  const handleSubmit = async (data: z.infer<typeof formSchema>) => {
-    const preferences: FisioPreferences = {
-      age: data.age,
-      weight: data.weight,
-      height: data.height,
-      gender: data.gender,
-      joint_area: data.joint_area,
-      condition: data.condition,
-      pain_level: data.pain_level,
-      mobility_level: data.mobility_level,
-      previous_treatment: data.previous_treatment,
-      activity_level: data.activity_level
-    };
-    onSubmit(preferences);
+  const handleSubmit = (data: FormData) => {
+    onSubmit(data);
   };
 
   return (
