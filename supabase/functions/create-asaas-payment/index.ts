@@ -20,8 +20,23 @@ serve(async (req) => {
   }
 
   try {
-    const { userId, amount, description } = await req.json() as PaymentRequest;
-    console.log('Payment request received:', { userId, amount, description });
+    // Verificar se o corpo da requisição é válido
+    const requestText = await req.text();
+    console.log('Request body:', requestText);
+
+    if (!requestText) {
+      throw new Error('Corpo da requisição vazio');
+    }
+
+    let paymentRequest: PaymentRequest;
+    try {
+      paymentRequest = JSON.parse(requestText);
+    } catch (e) {
+      throw new Error(`Erro ao fazer parse do JSON da requisição: ${e.message}`);
+    }
+
+    const { userId, amount, description } = paymentRequest;
+    console.log('Payment request parsed:', { userId, amount, description });
 
     const asaasApiKey = Deno.env.get('ASAAS_API_KEY');
     if (!asaasApiKey) {
@@ -31,61 +46,89 @@ serve(async (req) => {
 
     const asaasBaseUrl = 'https://sandbox.asaas.com/api/v3';
 
-    // Criar pagamento diretamente
+    // Criar pagamento
     const paymentData = {
-      customer: "cus_000005113263",  // Cliente de teste fixo no sandbox
-      billingType: "BOLETO",  // Usar boleto como método padrão
+      customer: "cus_000005113263",
+      billingType: "BOLETO",
       value: amount,
       dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       description: description,
       externalReference: userId
     };
 
-    console.log('Creating payment with data:', paymentData);
+    console.log('Payment data being sent to ASAAS:', JSON.stringify(paymentData));
 
-    const paymentResponse = await fetch(`${asaasBaseUrl}/payments`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'access_token': asaasApiKey,
-      },
-      body: JSON.stringify(paymentData),
-    });
-
-    const paymentResult = await paymentResponse.json();
-    console.log('Payment API response:', paymentResult);
-
-    if (!paymentResponse.ok) {
-      throw new Error(`Erro ao criar pagamento: ${JSON.stringify(paymentResult)}`);
-    }
-
-    // Salvar o pagamento no banco de dados
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') || '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
-    );
-
-    const { error: paymentError } = await supabase
-      .from('payments')
-      .insert({
-        user_id: userId,
-        payment_id: paymentResult.id,
-        amount: amount,
-        status: paymentResult.status
+    try {
+      const paymentResponse = await fetch(`${asaasBaseUrl}/payments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'access_token': asaasApiKey,
+        },
+        body: JSON.stringify(paymentData),
       });
 
-    if (paymentError) {
-      console.error('Error saving payment to database:', paymentError);
-    }
+      console.log('ASAAS response status:', paymentResponse.status);
+      console.log('ASAAS response headers:', Object.fromEntries(paymentResponse.headers.entries()));
 
-    return new Response(
-      JSON.stringify({
-        id: paymentResult.id,
-        status: paymentResult.status,
-        invoiceUrl: paymentResult.invoiceUrl
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+      // Verificar se temos uma resposta válida
+      const responseText = await paymentResponse.text();
+      console.log('Raw ASAAS response:', responseText);
+
+      if (!responseText) {
+        throw new Error('Resposta vazia da API do ASAAS');
+      }
+
+      let paymentResult;
+      try {
+        paymentResult = JSON.parse(responseText);
+      } catch (e) {
+        throw new Error(`Erro ao fazer parse da resposta do ASAAS: ${e.message}`);
+      }
+
+      console.log('Parsed ASAAS response:', paymentResult);
+
+      if (!paymentResponse.ok) {
+        throw new Error(`Erro do ASAAS: ${JSON.stringify(paymentResult)}`);
+      }
+
+      // Verificar se temos os campos necessários
+      if (!paymentResult.id || !paymentResult.status) {
+        throw new Error(`Resposta inválida do ASAAS: ${JSON.stringify(paymentResult)}`);
+      }
+
+      // Salvar o pagamento no banco de dados
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL') || '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+      );
+
+      const { error: paymentError } = await supabase
+        .from('payments')
+        .insert({
+          user_id: userId,
+          payment_id: paymentResult.id,
+          amount: amount,
+          status: paymentResult.status
+        });
+
+      if (paymentError) {
+        console.error('Error saving payment to database:', paymentError);
+      }
+
+      return new Response(
+        JSON.stringify({
+          id: paymentResult.id,
+          status: paymentResult.status,
+          invoiceUrl: paymentResult.invoiceUrl
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+
+    } catch (fetchError) {
+      console.error('Error during ASAAS API call:', fetchError);
+      throw new Error(`Erro na chamada da API do ASAAS: ${fetchError.message}`);
+    }
 
   } catch (error) {
     console.error('Error in create-asaas-payment:', error);
