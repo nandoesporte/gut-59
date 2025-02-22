@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from 'react';
 import { Motion } from '@capacitor/motion';
 import { Card, CardContent } from "@/components/ui/card";
@@ -27,7 +26,7 @@ const MIN_TIME_BETWEEN_STEPS = 250;
 const STORAGE_KEY = 'stepCounter';
 const ACCELEROMETER_STATE_KEY = 'accelerometerState';
 const MAX_RECONNECT_ATTEMPTS = 3;
-const RECONNECT_DELAY = 1000; // 1 segundo
+const RECONNECT_DELAY = 1000;
 
 const StepCounter = () => {
   const [stepData, setStepData] = useState<StepData>(() => {
@@ -39,7 +38,6 @@ const StepCounter = () => {
     };
   });
 
-  // Carrega o estado do acelerômetro do localStorage
   const [accelerometerState, setAccelerometerState] = useState<AccelerometerState>(() => {
     const saved = localStorage.getItem(ACCELEROMETER_STATE_KEY);
     return saved ? JSON.parse(saved) : {
@@ -53,7 +51,6 @@ const StepCounter = () => {
   const [sensorSupported, setSensorSupported] = useState(true);
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
 
-  // Salva o estado do acelerômetro no localStorage
   useEffect(() => {
     localStorage.setItem(ACCELEROMETER_STATE_KEY, JSON.stringify(accelerometerState));
   }, [accelerometerState]);
@@ -74,19 +71,33 @@ const StepCounter = () => {
     try {
       console.log(isReconnecting ? "Tentando reconectar..." : "Iniciando acelerômetro...");
       
-      // Remove listeners antigos
+      // Verifica se o acelerômetro está disponível
+      try {
+        const { x, y, z } = await Motion.getAccelerationForce();
+        if (typeof x === 'undefined' || typeof y === 'undefined' || typeof z === 'undefined') {
+          throw new Error('Acelerômetro não disponível');
+        }
+      } catch (error) {
+        console.error('Erro ao verificar acelerômetro:', error);
+        setSensorSupported(false);
+        return false;
+      }
+      
+      // Remove listeners antigos para evitar duplicação
       await Motion.removeAllListeners();
       
-      // Configura novo listener
       return new Promise<boolean>((resolve) => {
         let initialized = false;
+        let timeoutId: number;
         
-        Motion.addListener('accel', (event) => {
+        const initializeListener = Motion.addListener('accel', (event) => {
           if (!initialized && event?.acceleration) {
             const { x, y, z } = event.acceleration;
             console.log("Dados do acelerômetro:", { x, y, z });
             
             initialized = true;
+            clearTimeout(timeoutId);
+            
             setAccelerometerState(prev => ({
               isInitialized: true,
               hasPermission: true,
@@ -96,21 +107,24 @@ const StepCounter = () => {
             if (!isReconnecting) {
               toast.success("Acelerômetro conectado com sucesso!");
             }
+            
             resolve(true);
           }
         });
 
-        // Timeout após 3 segundos
-        setTimeout(() => {
+        // Timeout após 5 segundos
+        timeoutId = setTimeout(async () => {
           if (!initialized) {
-            Motion.removeAllListeners();
+            console.log('Timeout na inicialização do acelerômetro');
+            await Motion.removeAllListeners();
             resolve(false);
           }
-        }, 3000);
+        }, 5000) as unknown as number;
       });
 
     } catch (error) {
       console.error("Erro ao iniciar acelerômetro:", error);
+      toast.error("Erro ao inicializar o acelerômetro. Verifique as permissões do dispositivo.");
       return false;
     }
   }, [isLoading]);
@@ -126,18 +140,17 @@ const StepCounter = () => {
 
       if (!success) {
         setSensorSupported(false);
-        toast.error("Não foi possível inicializar o acelerômetro. Por favor, tente novamente.");
+        toast.error("Não foi possível inicializar o acelerômetro. Verifique as permissões e tente novamente.");
       }
     } catch (error) {
       console.error("Erro ao solicitar permissões:", error);
       setSensorSupported(false);
-      toast.error("Erro ao acessar o acelerômetro.");
+      toast.error("Erro ao acessar o acelerômetro. Verifique as permissões do dispositivo.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Tenta reconectar automaticamente quando a página é recarregada
   useEffect(() => {
     const reconnect = async () => {
       if (accelerometerState.isInitialized && 
@@ -164,7 +177,6 @@ const StepCounter = () => {
     reconnect();
   }, [accelerometerState.isInitialized, accelerometerState.hasPermission, reconnectAttempts, startAccelerometer]);
 
-  // Configura a contagem de passos
   useEffect(() => {
     if (!accelerometerState.hasPermission || !accelerometerState.isInitialized) return;
 
@@ -225,12 +237,12 @@ const StepCounter = () => {
           
           {!sensorSupported && (
             <div className="p-4 bg-yellow-50 text-yellow-800 rounded-lg">
-              <p>Seu dispositivo não suporta a contagem de passos.</p>
+              <p>Seu dispositivo não suporta ou não tem permissão para a contagem de passos.</p>
               <p className="mt-2">Para usar esta função:</p>
               <ul className="list-disc ml-6 mt-1">
                 <li>Use um dispositivo móvel com acelerômetro</li>
-                <li>Certifique-se que as permissões de movimento estejam ativadas</li>
-                <li>Execute o aplicativo no modo nativo (não no navegador)</li>
+                <li>Certifique-se que as permissões de movimento estejam ativadas nas configurações</li>
+                <li>Verifique se o aplicativo tem permissão para acessar os sensores do dispositivo</li>
               </ul>
               <Button 
                 onClick={() => {
