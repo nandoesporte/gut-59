@@ -15,26 +15,36 @@ serve(async (req) => {
 
   try {
     const { userId, amount, description } = await req.json();
+    
+    // Log incoming request data
+    console.log('Request data:', { userId, amount, description });
 
     if (!userId || !amount || !description) {
+      console.error('Missing parameters:', { userId, amount, description });
       return new Response(
         JSON.stringify({ error: 'Missing required parameters' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Initialize MercadoPago client
-    const client = new MercadoPagoConfig({ 
-      accessToken: Deno.env.get('MERCADOPAGO_ACCESS_TOKEN') ?? '' 
-    });
+    const accessToken = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN');
+    if (!accessToken) {
+      console.error('MercadoPago access token not found');
+      throw new Error('MercadoPago configuration error');
+    }
 
-    console.log('Creating preference for user:', userId);
+    // Initialize MercadoPago client
+    const client = new MercadoPagoConfig({ accessToken });
+    console.log('MercadoPago client initialized');
 
     const preference = new Preference(client);
-    const result = await preference.create({
+    
+    // Create preference data
+    const preferenceData = {
       items: [{
+        id: '1',
         title: description,
-        unit_price: amount,
+        unit_price: Number(amount),
         quantity: 1,
         currency_id: 'BRL'
       }],
@@ -46,19 +56,33 @@ serve(async (req) => {
       auto_return: 'approved',
       external_reference: userId,
       notification_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/mercadopago-webhook`
-    });
+    };
 
-    console.log('Preference created:', result);
+    console.log('Creating preference with data:', preferenceData);
+
+    const result = await preference.create(preferenceData);
+    console.log('Preference created successfully:', result);
 
     return new Response(
-      JSON.stringify({ preferenceId: result.id }),
+      JSON.stringify({ 
+        preferenceId: result.id,
+        initPoint: result.init_point 
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
-    console.error('Error creating preference:', error);
+    console.error('Detailed error:', {
+      message: error.message,
+      stack: error.stack,
+      cause: error.cause
+    });
+
     return new Response(
-      JSON.stringify({ error: 'Failed to create payment preference' }),
+      JSON.stringify({ 
+        error: 'Failed to create payment preference',
+        details: error.message
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

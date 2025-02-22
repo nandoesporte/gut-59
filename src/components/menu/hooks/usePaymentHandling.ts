@@ -1,0 +1,102 @@
+
+import { useState } from "react";
+import { initMercadoPago } from "@mercadopago/sdk-react";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+
+// Initialize MercadoPago with test public key
+initMercadoPago('TEST-5cc34aa1-d681-40a3-9b1a-5648d21af83b', {
+  locale: 'pt-BR'
+});
+
+export const usePaymentHandling = () => {
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [preferenceId, setPreferenceId] = useState<string | null>(null);
+  const [hasPaid, setHasPaid] = useState(false);
+
+  const handlePaymentAndContinue = async () => {
+    try {
+      setIsProcessingPayment(true);
+      
+      const { data: userData, error: authError } = await supabase.auth.getUser();
+      if (authError) {
+        console.error('Auth error:', authError);
+        throw new Error('Erro ao obter dados do usuário');
+      }
+
+      if (!userData.user) {
+        throw new Error('Usuário não autenticado');
+      }
+
+      console.log('Calling create-mercadopago-preference with:', {
+        userId: userData.user.id,
+        amount: 19.90,
+        description: "Plano Alimentar Personalizado"
+      });
+
+      const { data, error } = await supabase.functions.invoke('create-mercadopago-preference', {
+        body: {
+          userId: userData.user.id,
+          amount: 19.90,
+          description: "Plano Alimentar Personalizado"
+        }
+      });
+
+      if (error) {
+        console.error('Edge function error:', error);
+        throw new Error(`Falha ao criar pagamento: ${error.message}`);
+      }
+
+      console.log('Edge function response:', data);
+
+      if (!data?.preferenceId) {
+        console.error('Invalid response:', data);
+        throw new Error('Resposta inválida do serviço de pagamento');
+      }
+
+      setPreferenceId(data.preferenceId);
+
+      // Start polling for payment status
+      const checkInterval = setInterval(async () => {
+        try {
+          const { data: statusData, error: statusError } = await supabase.functions.invoke('check-mercadopago-payment', {
+            body: { preferenceId: data.preferenceId }
+          });
+
+          if (statusError) {
+            console.error('Status check error:', statusError);
+            throw statusError;
+          }
+
+          console.log('Payment status check result:', statusData);
+
+          if (statusData?.isPaid) {
+            clearInterval(checkInterval);
+            setHasPaid(true);
+            toast.success("Pagamento confirmado! Você já pode selecionar os alimentos.");
+          }
+        } catch (error) {
+          console.error('Erro ao verificar pagamento:', error);
+        }
+      }, 5000);
+
+      // Stop polling after 10 minutes
+      setTimeout(() => {
+        clearInterval(checkInterval);
+      }, 600000);
+
+    } catch (error) {
+      console.error('Erro completo:', error);
+      toast.error(error instanceof Error ? error.message : "Erro ao processar pagamento. Por favor, tente novamente.");
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  return {
+    isProcessingPayment,
+    preferenceId,
+    hasPaid,
+    handlePaymentAndContinue
+  };
+};
