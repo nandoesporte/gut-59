@@ -35,24 +35,50 @@ const StepCounter = () => {
 
   const requestPermissions = async () => {
     try {
-      let listener = await Motion.addListener('accel', () => {
+      // Primeiro, removemos qualquer listener existente
+      await Motion.removeAllListeners();
+      
+      // Criamos uma Promise que será resolvida quando o acelerômetro responder
+      const permissionResult = await new Promise((resolve) => {
+        let resolved = false;
+
+        // Configuramos um timeout para o caso do dispositivo não suportar
+        const timeoutId = setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            resolve(false);
+          }
+        }, 1000);
+
+        // Tentamos adicionar o listener do acelerômetro
+        Motion.addListener('accel', (event) => {
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeoutId);
+            resolve(true);
+          }
+        }).catch(() => {
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeoutId);
+            resolve(false);
+          }
+        });
+      });
+
+      // Com base no resultado, atualizamos o estado
+      if (permissionResult) {
         setHasPermission(true);
         setIsInitialized(true);
         toast.success("Permissão concedida para contagem de passos");
-        Motion.removeAllListeners();
-      });
+      } else {
+        toast.error("Seu dispositivo não suporta contagem de passos");
+      }
 
-      // Aguarda um curto período para ver se o listener foi acionado
-      setTimeout(() => {
-        if (!hasPermission && !isInitialized) {
-          Motion.removeAllListeners();
-          toast.error("Seu dispositivo não suporta contagem de passos");
-        }
-      }, 1000);
-
-      return true;
+      return permissionResult;
     } catch (error) {
       console.error('Erro ao acessar sensores de movimento:', error);
+      toast.error("Erro ao acessar sensores de movimento");
       return false;
     }
   };
