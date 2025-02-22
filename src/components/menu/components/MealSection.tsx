@@ -1,49 +1,72 @@
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { MacroDistributionBar } from "./MacroDistributionBar";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 import type { Meal, MealFood } from "../types";
 
 interface MealSectionProps {
   title: string;
   icon: React.ReactNode;
-  meal: Meal;  // Changed from foods to meal
-  selectedFoods?: string[];  // Make this optional
-  onFoodSelection?: (foodId: string) => void;  // Make this optional
-  disabled?: boolean;
+  meal: Meal;
 }
 
-export const MealSection = ({
-  title,
-  icon,
+export const MealSection = ({ 
+  title, 
+  icon, 
   meal,
-  selectedFoods = [],
-  onFoodSelection,
-  disabled
-}: MealSectionProps) => (
-  <Card className="p-6 space-y-4 shadow-lg hover:shadow-xl transition-shadow">
-    <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
-      <div className="bg-green-50 p-2 rounded-lg">
+}: MealSectionProps) => {
+  return (
+    <div className="bg-white rounded-lg shadow-sm p-6">
+      <h2 className="text-lg font-semibold flex items-center gap-2 text-gray-900 mb-4">
         {icon}
+        {title} ({meal.calories} kcal)
+      </h2>
+
+      <div className="mb-4">
+        <p className="text-gray-600 italic">{meal.description?.replace(/carboidrato/gi, "carbo")}</p>
       </div>
-      <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-    </div>
-    <div className="space-y-2">
-      <p className="text-sm text-gray-600">{meal.description}</p>
-      {meal.foods.map((food, index) => (
-        <div key={index} className="flex justify-between items-center">
-          <span className="text-gray-700">{food.name}</span>
-          <span className="text-gray-500 text-sm">
-            {food.portion} {food.unit}
-          </span>
+
+      <div className="space-y-4">
+        {meal.foods.map((food, index) => (
+          <div key={index} className="text-gray-700">
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <div className="flex items-baseline gap-1">
+                  <span className="font-medium">{food.portion} {food.unit}</span>
+                  <span className="text-gray-600">de</span>
+                  <span>{food.name.replace(/carboidrato/gi, "carbo")}</span>
+                </div>
+                {food.details && (
+                  <span className="text-gray-500 text-sm block mt-1 ml-4">
+                    {food.details.replace(/carboidrato/gi, "carbo")}
+                  </span>
+                )}
+              </div>
+            </div>
+            {index < meal.foods.length - 1 && <div className="border-b my-3 border-gray-100" />}
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-6 text-sm text-gray-600 border-t pt-4">
+        <div className="grid grid-cols-4 gap-2 mt-2">
+          <div className="font-medium">Proteínas: {meal.macros.protein}g</div>
+          <div className="font-medium">Carbos: {meal.macros.carbs}g</div>
+          <div className="font-medium">Gorduras: {meal.macros.fats}g</div>
+          <div className="font-medium">Fibras: {meal.macros.fiber}g</div>
         </div>
-      ))}
-      <div className="text-sm text-gray-600 mt-2">
-        <strong>Calorias:</strong> {meal.calories.toFixed(0)} kcal
-        <br />
-        <strong>Macros:</strong> P: {meal.macros.protein.toFixed(0)}g | 
-        C: {meal.macros.carbs.toFixed(0)}g | 
-        G: {meal.macros.fats.toFixed(0)}g
+        <div className="mt-3">
+          <MacroDistributionBar 
+            macros={{
+              protein: meal.macros.protein,
+              carbs: meal.macros.carbs,
+              fats: meal.macros.fats
+            }}
+          />
+        </div>
       </div>
     </div>
-  </Card>
-);
+  );
+};
