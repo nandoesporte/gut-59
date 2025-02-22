@@ -34,68 +34,58 @@ const StepCounter = () => {
     return { steps, distance, calories };
   };
 
-  const startAccelerometer = async () => {
-    try {
-      console.log("Iniciando acelerômetro...");
-      
-      await Motion.removeAllListeners();
-      console.log("Listeners anteriores removidos");
-
-      const listener = await Motion.addListener('accel', async (event) => {
-        console.log("Recebido evento do acelerômetro:", event);
-
-        if (event && event.acceleration) {
-          console.log("Acelerômetro funcionando:", event.acceleration);
-          setHasPermission(true);
-          setIsInitialized(true);
-          toast.success("Acelerômetro iniciado com sucesso!");
-          
-          await Motion.removeAllListeners();
-        } else {
-          console.log("Evento do acelerômetro inválido:", event);
-          toast.error("Erro ao acessar o acelerômetro. Verifique as permissões do app.");
-        }
-      });
-
-      console.log("Listener adicionado com sucesso");
-
-    } catch (error) {
-      console.error('Erro ao iniciar acelerômetro:', error);
-      toast.error("Erro ao iniciar o acelerômetro");
-    }
-  };
-
   const requestPermissions = async () => {
     setIsLoading(true);
 
     try {
-      console.log("Verificando permissão do acelerômetro...");
-      
-      const permissionStatus = await navigator.permissions.query({ name: 'accelerometer' as PermissionName });
-      
-      if (permissionStatus.state === 'granted') {
-        console.log("Permissão para acessar o acelerômetro já foi concedida.");
-        await startAccelerometer();
-      } else if (permissionStatus.state === 'prompt') {
-        console.log("Solicitando permissão para acessar o acelerômetro...");
-        await startAccelerometer();
-      } else {
-        console.log("Permissão para acessar o acelerômetro foi negada.");
-        toast.error("Permissão para acessar o acelerômetro foi negada.");
-      }
+      console.log("Tentando iniciar o acelerômetro...");
 
-      // Aguarda 3 segundos para ver se recebemos eventos do acelerômetro
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Primeiro, removemos quaisquer listeners existentes
+      await Motion.removeAllListeners();
+      console.log("Listeners anteriores removidos");
+
+      // Iniciamos o acelerômetro tentando adicionar um listener
+      const listener = await Motion.addListener('accel', (event) => {
+        if (event && event.acceleration) {
+          const { x, y, z } = event.acceleration;
+          console.log("Acelerômetro funcionando:", { x, y, z });
+          
+          setHasPermission(true);
+          setIsInitialized(true);
+          toast.success("Acelerômetro iniciado com sucesso!");
+        }
+      });
+
+      // Aguardamos um curto período para ver se recebemos dados
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       if (!hasPermission) {
-        console.log("Nenhum evento do acelerômetro recebido após espera");
-        await Motion.removeAllListeners();
-        toast.error("Não foi possível acessar o acelerômetro.");
+        console.log("Tentando uma segunda vez...");
+        
+        // Se não recebemos dados, tentamos novamente
+        await Motion.addListener('accel', (event) => {
+          if (event && event.acceleration) {
+            const { x, y, z } = event.acceleration;
+            console.log("Acelerômetro funcionando na segunda tentativa:", { x, y, z });
+            
+            setHasPermission(true);
+            setIsInitialized(true);
+            toast.success("Acelerômetro iniciado com sucesso!");
+          }
+        });
+
+        // Aguardamos mais um pouco
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        if (!hasPermission) {
+          console.log("Não foi possível iniciar o acelerômetro");
+          toast.error("Não foi possível acessar o acelerômetro. Por favor, verifique se seu dispositivo possui esse sensor.");
+        }
       }
 
     } catch (error) {
-      console.error('Erro ao solicitar permissão:', error);
-      toast.error("Erro ao solicitar permissão para o acelerômetro");
+      console.error('Erro ao iniciar acelerômetro:', error);
+      toast.error("Erro ao acessar o acelerômetro. Por favor, verifique se seu dispositivo possui esse sensor.");
     } finally {
       setIsLoading(false);
     }
