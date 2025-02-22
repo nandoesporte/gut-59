@@ -25,6 +25,7 @@ const StepCounter = () => {
     calories: 0
   });
   const [hasPermission, setHasPermission] = useState(false);
+  const [permissionRequested, setPermissionRequested] = useState(false);
 
   const calculateMetrics = (steps: number) => {
     const distance = (steps * STEP_LENGTH) / 1000; // km
@@ -33,18 +34,30 @@ const StepCounter = () => {
   };
 
   const requestPermissions = async () => {
+    if (permissionRequested) return false;
+    
+    setPermissionRequested(true);
+    
     try {
-      // According to Capacitor Motion API, we start listening directly
-      // If the device doesn't support it, it will throw an error
+      let isAvailable = false;
+      
+      // Test if accelerometer is available
       await Motion.addListener('accel', () => {
-        // Test listener to check if accelerometer is available
+        isAvailable = true;
         console.log('Accelerometer is available');
       });
 
-      // If we reach here, the accelerometer is available
-      setHasPermission(true);
-      toast.success("Permissão concedida para contagem de passos");
-      return true;
+      // Wait a bit to check if the accelerometer callback was triggered
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      if (isAvailable) {
+        setHasPermission(true);
+        toast.success("Permissão concedida para contagem de passos");
+        return true;
+      } else {
+        toast.error("Seu dispositivo não suporta contagem de passos");
+        return false;
+      }
     } catch (error) {
       console.error('Erro ao acessar sensores de movimento:', error);
       toast.error("Seu dispositivo não suporta contagem de passos");
@@ -61,8 +74,13 @@ const StepCounter = () => {
 
     const startStepCounting = async () => {
       try {
-        const hasPermissions = await requestPermissions();
-        if (!hasPermissions) return;
+        if (!hasPermission && !permissionRequested) {
+          const hasPermissions = await requestPermissions();
+          if (!hasPermissions) return;
+        }
+
+        // Se já temos um listener ativo, não criar outro
+        if (listener) return;
 
         // Configurar o listener do acelerômetro
         listener = await Motion.addListener('accel', (event) => {
@@ -115,7 +133,7 @@ const StepCounter = () => {
         Motion.removeAllListeners();
       }
     };
-  }, []);
+  }, [hasPermission, permissionRequested]);
 
   const progress = (stepData.steps / STEPS_GOAL) * 100;
 
@@ -125,13 +143,13 @@ const StepCounter = () => {
         <div className="flex flex-col space-y-6">
           <div className="flex justify-between items-center">
             <h2 className="text-2xl font-bold text-gray-800">Atividade Diária</h2>
-            <User className="w-8 h-8 text-primary-500" />
+            <User className="w-8 h-8 text-primary" />
           </div>
           
-          {!hasPermission && (
+          {!hasPermission && !permissionRequested && (
             <button
               onClick={requestPermissions}
-              className="w-full py-2 px-4 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
+              className="w-full py-2 px-4 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
             >
               Permitir contagem de passos
             </button>
@@ -139,7 +157,7 @@ const StepCounter = () => {
           
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <span className="text-4xl font-bold text-primary-500">
+              <span className="text-4xl font-bold text-primary">
                 {stepData.steps.toLocaleString()}
               </span>
               <span className="text-gray-500">/ {STEPS_GOAL.toLocaleString()} passos</span>
