@@ -1,6 +1,7 @@
 
 import { useEffect, useState } from 'react';
 import { Motion } from '@capacitor/motion';
+import { App } from '@capacitor/app';
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Activity, LineChart, User, Loader } from "lucide-react";
@@ -34,17 +35,23 @@ const StepCounter = () => {
     return { steps, distance, calories };
   };
 
+  const openAppSettings = async () => {
+    try {
+      await App.openSettings();
+    } catch (error) {
+      console.error('Erro ao abrir configurações:', error);
+    }
+  };
+
   const requestPermissions = async () => {
     setIsLoading(true);
 
     try {
       console.log("Iniciando verificação do acelerômetro...");
       
-      // Primeiro, removemos qualquer listener existente
       await Motion.removeAllListeners();
       console.log("Listeners anteriores removidos");
 
-      // Tenta iniciar o acelerômetro com configuração específica
       const listener = await Motion.addListener('accel', async (event) => {
         console.log("Recebido evento do acelerômetro:", event);
 
@@ -54,7 +61,6 @@ const StepCounter = () => {
           setIsInitialized(true);
           toast.success("Acelerômetro iniciado com sucesso!");
           
-          // Remove o listener inicial após confirmar funcionamento
           await Motion.removeAllListeners();
         } else {
           console.log("Evento do acelerômetro inválido:", event);
@@ -63,18 +69,31 @@ const StepCounter = () => {
 
       console.log("Listener adicionado, aguardando eventos...");
 
-      // Aguarda um tempo para ver se recebemos eventos
       await new Promise(resolve => setTimeout(resolve, 3000));
 
       if (!hasPermission) {
         console.log("Nenhum evento do acelerômetro recebido após espera");
-        toast.error("Não foi possível acessar o acelerômetro. Por favor, verifique as permissões nas configurações do seu dispositivo.");
         await Motion.removeAllListeners();
+        
+        const errorMessage = "Não foi possível acessar o acelerômetro. Clique aqui para abrir as configurações do dispositivo.";
+        toast.error(errorMessage, {
+          action: {
+            label: "Abrir Configurações",
+            onClick: openAppSettings
+          },
+          duration: 10000 // Mantém a notificação por mais tempo
+        });
       }
 
     } catch (error) {
       console.error('Erro ao configurar acelerômetro:', error);
-      toast.error("Erro ao acessar o acelerômetro. Por favor, verifique as permissões do seu dispositivo.");
+      toast.error("Erro ao acessar o acelerômetro", {
+        action: {
+          label: "Abrir Configurações",
+          onClick: openAppSettings
+        },
+        duration: 10000
+      });
     } finally {
       setIsLoading(false);
     }
@@ -163,20 +182,29 @@ const StepCounter = () => {
           </div>
           
           {!hasPermission && !isInitialized && (
-            <button
-              onClick={requestPermissions}
-              disabled={isLoading}
-              className="w-full py-2 px-4 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {isLoading ? (
-                <>
-                  <Loader className="w-5 h-5 animate-spin" />
-                  <span>Verificando sensor...</span>
-                </>
-              ) : (
-                "Permitir contagem de passos"
-              )}
-            </button>
+            <div className="space-y-4">
+              <button
+                onClick={requestPermissions}
+                disabled={isLoading}
+                className="w-full py-2 px-4 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader className="w-5 h-5 animate-spin" />
+                    <span>Verificando sensor...</span>
+                  </>
+                ) : (
+                  "Permitir contagem de passos"
+                )}
+              </button>
+              
+              <button
+                onClick={openAppSettings}
+                className="w-full py-2 px-4 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Abrir Configurações do App
+              </button>
+            </div>
           )}
           
           <div className="space-y-4">
