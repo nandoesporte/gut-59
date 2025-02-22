@@ -34,16 +34,6 @@ serve(async (req) => {
     const requestBody = await req.text();
     console.log('Raw request body:', requestBody);
 
-    if (!requestBody) {
-      return new Response(
-        JSON.stringify({ error: 'Empty request body' }),
-        { 
-          status: 400,
-          headers: corsHeaders
-        }
-      );
-    }
-
     let requestData;
     try {
       requestData = JSON.parse(requestBody);
@@ -59,7 +49,7 @@ serve(async (req) => {
     }
 
     const { userId, amount, description } = requestData;
-    console.log('Received request data:', { userId, amount, description });
+    console.log('Processing payment request:', { userId, amount, description });
 
     if (!userId || !amount || !description) {
       const missingFields = [];
@@ -83,6 +73,10 @@ serve(async (req) => {
     const client = new MercadoPagoConfig({ accessToken });
     const preference = new Preference(client);
     
+    // Get origin URL
+    const origin = req.headers.get('origin') || 'http://localhost:5173';
+    console.log('Origin URL:', origin);
+
     // Create preference data
     const preferenceData = {
       items: [{
@@ -90,32 +84,40 @@ serve(async (req) => {
         title: description,
         unit_price: Number(amount),
         quantity: 1,
-        currency_id: 'BRL'
+        currency_id: 'BRL',
+        description: 'Nutrição Personalizada'
       }],
       back_urls: {
-        success: `${req.headers.get('origin')}/menu`,
-        failure: `${req.headers.get('origin')}/menu`,
-        pending: `${req.headers.get('origin')}/menu`
+        success: `${origin}/menu`,
+        failure: `${origin}/menu`,
+        pending: `${origin}/menu`
       },
       auto_return: 'approved',
       external_reference: userId,
-      notification_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/mercadopago-webhook`
+      // Use the SUPABASE_URL environment variable for notification URL
+      notification_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/mercadopago-webhook`,
+      // Additional settings for better integration
+      expires: true,
+      expiration_date_to: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours from now
+      statement_descriptor: 'Nutrição Personalizada'
     };
 
     console.log('Creating MercadoPago preference with data:', preferenceData);
 
     try {
       const result = await preference.create(preferenceData);
-      console.log('MercadoPago preference created:', result);
+      console.log('MercadoPago API response:', result);
 
       if (!result.id || !result.init_point) {
+        console.error('Invalid MercadoPago response:', result);
         throw new Error('Invalid response from MercadoPago');
       }
 
       return new Response(
         JSON.stringify({
           preferenceId: result.id,
-          initPoint: result.init_point
+          initPoint: result.init_point,
+          sandboxInitPoint: result.sandbox_init_point
         }),
         { 
           status: 200,
@@ -137,7 +139,12 @@ serve(async (req) => {
     }
 
   } catch (error) {
-    console.error('Unhandled error:', error);
+    console.error('Unhandled error:', {
+      message: error.message,
+      stack: error.stack,
+      cause: error.cause
+    });
+    
     return new Response(
       JSON.stringify({
         error: 'Internal server error',
