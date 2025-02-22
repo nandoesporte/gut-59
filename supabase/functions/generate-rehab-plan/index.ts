@@ -1,5 +1,6 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-import { corsHeaders } from '../_shared/cors';
+import { corsHeaders } from '../_shared/cors.ts';
 
 interface RehabPlanRequest {
   preferences: {
