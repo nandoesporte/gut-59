@@ -2,10 +2,12 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ExerciseForm } from "./exercises/ExerciseForm";
 import { BatchUploadForm } from "./exercises/BatchUploadForm";
+import { FisioBatchUploadForm } from "./exercises/FisioBatchUploadForm";
 import { ExerciseList } from "./exercises/ExerciseList";
 import { Exercise } from "./exercises/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const ExerciseGifsTab = () => {
   const { data: exercises, refetch } = useQuery({
@@ -93,17 +95,34 @@ export const ExerciseGifsTab = () => {
 
   return (
     <div className="space-y-8">
-      <h2 className="text-2xl font-bold">Upload Individual de Exercício</h2>
-      <ExerciseForm
-        onSubmit={handleSubmit}
-        uploading={uploadMutation.isPending}
-      />
+      <Tabs defaultValue="individual" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="individual">Upload Individual</TabsTrigger>
+          <TabsTrigger value="batch">Upload em Lote</TabsTrigger>
+          <TabsTrigger value="fisio">Exercícios Fisioterapia</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="individual">
+          <ExerciseForm
+            onSubmit={handleSubmit}
+            uploading={uploadMutation.isPending}
+          />
+        </TabsContent>
 
-      <h2 className="text-2xl font-bold mt-12">Upload em Lote</h2>
-      <BatchUploadForm
-        onUpload={handleSubmit}
-        uploading={uploadMutation.isPending}
-      />
+        <TabsContent value="batch">
+          <BatchUploadForm
+            onUpload={handleSubmit}
+            uploading={uploadMutation.isPending}
+          />
+        </TabsContent>
+
+        <TabsContent value="fisio">
+          <FisioBatchUploadForm
+            onUpload={handleSubmit}
+            uploading={uploadMutation.isPending}
+          />
+        </TabsContent>
+      </Tabs>
 
       <h2 className="text-2xl font-bold mt-12">Exercícios Cadastrados</h2>
       <ExerciseList exercises={exercises || []} />
