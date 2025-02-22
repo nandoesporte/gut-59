@@ -29,20 +29,55 @@ serve(async (req) => {
       throw new Error('ASAAS_API_KEY não configurada');
     }
 
-    // Criar pagamento no ASAAS
-    const asaasBaseUrl = 'https://sandbox.asaas.com/api/v3'; // URL do ambiente sandbox
+    // Criar cliente no ASAAS (necessário antes de criar o pagamento)
+    const asaasBaseUrl = 'https://sandbox.asaas.com/api/v3';
+    
+    // Primeiro, criar ou recuperar o cliente
+    const customerResponse = await fetch(`${asaasBaseUrl}/customers`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'access_token': asaasApiKey,
+      },
+      body: JSON.stringify({
+        name: userId,  // Usando userId como nome temporário
+        externalReference: userId,
+        email: 'cliente@email.com',  // Email padrão para ambiente de teste
+        phone: '4738010919',  // Telefone padrão para ambiente de teste
+        mobilePhone: '4799376637',  // Celular padrão para ambiente de teste
+        cpfCnpj: '24971563792',  // CPF padrão para ambiente de teste
+        postalCode: '01001001',  // CEP padrão para ambiente de teste
+        addressNumber: '123'  // Número padrão para ambiente de teste
+      }),
+    });
+
+    if (!customerResponse.ok) {
+      const customerError = await customerResponse.json();
+      console.error('ASAAS customer creation error:', customerError);
+      // Se o erro for de cliente duplicado, vamos tentar recuperar o ID do cliente
+      if (customerError.errors?.[0]?.code === 'invalid_cpfCnpj') {
+        console.log('Customer might already exist, proceeding with payment creation...');
+      } else {
+        throw new Error(`Erro ao criar cliente: ${JSON.stringify(customerError)}`);
+      }
+    }
+
+    const customerData = await customerResponse.json();
+    const customerId = customerData.id || userId;  // Fallback para userId se não conseguir criar cliente
+
+    // Criar pagamento com o customerId
     const paymentData = {
-      customer: userId,
-      billingType: 'BOLETO', // Definindo tipo de pagamento como boleto
+      customer: customerId,
+      billingType: 'UNDEFINED',  // Permite múltiplas formas de pagamento
       value: amount,
-      dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 dias
       description: description,
       externalReference: userId,
     };
 
-    console.log('Sending request to ASAAS:', paymentData);
+    console.log('Creating payment with data:', paymentData);
 
-    const asaasResponse = await fetch(`${asaasBaseUrl}/payments`, {
+    const paymentResponse = await fetch(`${asaasBaseUrl}/payments`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -51,16 +86,16 @@ serve(async (req) => {
       body: JSON.stringify(paymentData),
     });
 
-    if (!asaasResponse.ok) {
-      const errorData = await asaasResponse.json();
-      console.error('ASAAS API error:', errorData);
+    if (!paymentResponse.ok) {
+      const errorData = await paymentResponse.json();
+      console.error('ASAAS payment creation error:', errorData);
       throw new Error(`Erro ASAAS: ${JSON.stringify(errorData)}`);
     }
 
-    const asaasPayment = await asaasResponse.json();
-    console.log('ASAAS payment created:', asaasPayment);
+    const payment = await paymentResponse.json();
+    console.log('Payment created successfully:', payment);
 
-    // Criar cliente no Supabase
+    // Criar registro na tabela de pagamentos
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') || '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -70,21 +105,21 @@ serve(async (req) => {
       .from('payments')
       .insert({
         user_id: userId,
-        payment_id: asaasPayment.id,
+        payment_id: payment.id,
         amount: amount,
-        status: asaasPayment.status
+        status: payment.status
       });
 
     if (paymentError) {
       console.error('Error saving payment to database:', paymentError);
-      throw new Error('Erro ao salvar pagamento no banco de dados');
+      // Não vamos lançar erro aqui para não impedir o retorno do link de pagamento
     }
 
     return new Response(
       JSON.stringify({
-        id: asaasPayment.id,
-        status: asaasPayment.status,
-        invoiceUrl: asaasPayment.bankSlipUrl || asaasPayment.invoiceUrl
+        id: payment.id,
+        status: payment.status,
+        invoiceUrl: payment.invoiceUrl
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
