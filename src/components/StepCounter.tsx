@@ -18,7 +18,7 @@ const STEP_LENGTH = 0.762;
 const CALORIES_PER_STEP = 0.04;
 const ACCELERATION_THRESHOLD = 10;
 const MIN_TIME_BETWEEN_STEPS = 250;
-const SENSOR_INIT_TIMEOUT = 5000; // Aumentado para 5 segundos
+const SENSOR_INIT_TIMEOUT = 5000;
 const STORAGE_KEY = 'stepCounter';
 
 const StepCounter = () => {
@@ -46,115 +46,59 @@ const StepCounter = () => {
     return { steps, distance, calories };
   }, []);
 
-  const startTraditionalAccelerometer = useCallback(async () => {
-    if (accelerometerInitialized) return true;
-
-    return new Promise<boolean>((resolve) => {
-      try {
-        if (!('Accelerometer' in window)) {
-          console.log("API tradicional: Acelerômetro não suportado");
-          resolve(false);
-          return;
-        }
-
-        // @ts-ignore
-        const accelerometer = new Accelerometer({ frequency: 60 });
-        let initialized = false;
-
-        accelerometer.addEventListener('reading', () => {
-          if (!initialized) {
-            initialized = true;
-            setHasPermission(true);
-            setIsInitialized(true);
-            setAccelerometerInitialized(true);
-            console.log("API tradicional: Acelerômetro iniciado com sucesso");
-            toast.success("Acelerômetro iniciado com sucesso!");
-            resolve(true);
-          }
-        });
-
-        accelerometer.addEventListener('error', (error: Error) => {
-          console.error("API tradicional: Erro no acelerômetro:", error);
-          setSensorSupported(false);
-          resolve(false);
-        });
-
-        accelerometer.start();
-
-        setTimeout(() => {
-          if (!initialized) {
-            console.log("API tradicional: Timeout na inicialização");
-            resolve(false);
-          }
-        }, SENSOR_INIT_TIMEOUT);
-
-      } catch (error) {
-        console.error("API tradicional: Erro na inicialização:", error);
-        resolve(false);
-      }
-    });
-  }, [accelerometerInitialized]);
-
   const startCapacitorAccelerometer = useCallback(async () => {
     if (accelerometerInitialized) return true;
 
-    return new Promise<boolean>(async (resolve) => {
-      try {
-        console.log("Capacitor: Iniciando acelerômetro...");
-        
-        await Motion.removeAllListeners();
-        
-        let initialized = false;
-        const timeoutId = setTimeout(() => {
-          if (!initialized) {
-            console.log("Capacitor: Timeout na inicialização");
-            Motion.removeAllListeners();
-            resolve(false);
-          }
-        }, SENSOR_INIT_TIMEOUT);
+    try {
+      console.log("Verificando suporte ao acelerômetro via Capacitor...");
 
-        await Motion.addListener('accel', (event) => {
-          if (!initialized && event?.acceleration) {
-            initialized = true;
-            clearTimeout(timeoutId);
-            setHasPermission(true);
-            setIsInitialized(true);
-            setAccelerometerInitialized(true);
-            console.log("Capacitor: Acelerômetro iniciado com sucesso");
-            toast.success("Acelerômetro iniciado com sucesso!");
-            resolve(true);
-          }
-        });
+      // Tenta inicializar o acelerômetro
+      let initialized = false;
+      
+      // Remove todos os listeners existentes primeiro
+      await Motion.removeAllListeners();
+      
+      // Adiciona um novo listener
+      await Motion.addListener('accel', (event) => {
+        if (!initialized && event?.acceleration) {
+          console.log("Dados do acelerômetro recebidos:", event.acceleration);
+          initialized = true;
+          setHasPermission(true);
+          setIsInitialized(true);
+          setAccelerometerInitialized(true);
+          toast.success("Acelerômetro iniciado com sucesso!");
+        }
+      });
 
-      } catch (error) {
-        console.error("Capacitor: Erro na inicialização:", error);
-        resolve(false);
+      // Aguarda até 5 segundos para ver se recebemos dados do acelerômetro
+      await new Promise((resolve) => setTimeout(resolve, SENSOR_INIT_TIMEOUT));
+      
+      if (!initialized) {
+        console.log("Não foi possível receber dados do acelerômetro");
+        return false;
       }
-    });
+
+      return true;
+    } catch (error) {
+      console.error("Erro ao inicializar acelerômetro:", error);
+      return false;
+    }
   }, [accelerometerInitialized]);
 
   const requestPermissions = async () => {
     if (isLoading || accelerometerInitialized) return;
 
     setIsLoading(true);
-    setSensorSupported(true); // Reset do estado de suporte do sensor
+    setSensorSupported(true);
     console.log("Iniciando processo de inicialização do acelerômetro...");
 
     try {
-      // Tenta API tradicional primeiro
-      console.log("Tentando API tradicional...");
-      let success = await startTraditionalAccelerometer();
-
-      // Se falhar, tenta Capacitor
-      if (!success) {
-        console.log("API tradicional falhou, tentando Capacitor...");
-        success = await startCapacitorAccelerometer();
-      }
+      const success = await startCapacitorAccelerometer();
 
       if (!success) {
-        console.log("Todas as tentativas falharam");
+        console.log("Falha ao inicializar o acelerômetro");
         setSensorSupported(false);
-        toast.error("Não foi possível inicializar o acelerômetro após múltiplas tentativas.");
+        toast.error("Não foi possível inicializar o acelerômetro. Verifique se seu dispositivo possui sensor de movimento.");
       }
     } catch (error) {
       console.error("Erro durante a inicialização:", error);
