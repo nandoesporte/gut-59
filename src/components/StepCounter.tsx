@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Motion } from '@capacitor/motion';
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Activity, LineChart, User } from "lucide-react";
+import { Activity, LineChart, User, Loader } from "lucide-react";
 import { toast } from "sonner";
 
 interface StepData {
@@ -26,6 +26,7 @@ const StepCounter = () => {
   });
   const [hasPermission, setHasPermission] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const calculateMetrics = (steps: number) => {
     const distance = (steps * STEP_LENGTH) / 1000;
@@ -34,37 +35,42 @@ const StepCounter = () => {
   };
 
   const requestPermissions = async () => {
+    setIsLoading(true);
+
     try {
       // Primeiro, removemos qualquer listener existente
       await Motion.removeAllListeners();
 
-      let listenerAdded = false;
+      // Tentar adicionar o listener
+      const listener = await Motion.addListener('accel', async (event) => {
+        console.log("Evento do acelerômetro recebido:", event);
+        
+        if (event && event.acceleration) {
+          setHasPermission(true);
+          setIsInitialized(true);
+          toast.success("Permissão concedida para contagem de passos");
+          
+          // Removemos este listener inicial após confirmar que funciona
+          await Motion.removeAllListeners();
+        }
+      });
 
-      try {
-        // Tentar adicionar o listener
-        await Motion.addListener('accel', (event) => {
-          if (!listenerAdded) {
-            listenerAdded = true;
-            setHasPermission(true);
-            setIsInitialized(true);
-            toast.success("Permissão concedida para contagem de passos");
-            console.log("Acelerômetro detectado:", event);
-          }
-        });
+      // Aguardamos um tempo para ver se recebemos algum evento
+      await new Promise(resolve => setTimeout(resolve, 3000));
 
-        // Aguardar mais tempo para dispositivos mais lentos
-        await new Promise(resolve => setTimeout(resolve, 2000));
-
-        return true;
-      } catch (listenerError) {
-        console.error('Erro ao adicionar listener:', listenerError);
+      // Se não recebemos nenhum evento até agora, consideramos que o dispositivo não suporta
+      if (!hasPermission) {
         toast.error("Seu dispositivo não suporta contagem de passos");
-        return false;
+        await Motion.removeAllListeners();
       }
+
+      return hasPermission;
     } catch (error) {
       console.error('Erro ao acessar sensores de movimento:', error);
       toast.error("Erro ao acessar sensores de movimento");
       return false;
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -83,6 +89,8 @@ const StepCounter = () => {
 
         // Configurar o listener do acelerômetro
         listener = await Motion.addListener('accel', (event) => {
+          if (!event || !event.acceleration) return;
+          
           const { x, y, z } = event.acceleration;
           
           // Calcula a magnitude da aceleração
@@ -142,9 +150,17 @@ const StepCounter = () => {
           {!hasPermission && !isInitialized && (
             <button
               onClick={requestPermissions}
-              className="w-full py-2 px-4 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+              disabled={isLoading}
+              className="w-full py-2 px-4 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              Permitir contagem de passos
+              {isLoading ? (
+                <>
+                  <Loader className="w-5 h-5 animate-spin" />
+                  <span>Verificando sensor...</span>
+                </>
+              ) : (
+                "Permitir contagem de passos"
+              )}
             </button>
           )}
           
