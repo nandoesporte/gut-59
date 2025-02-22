@@ -1,6 +1,5 @@
-
 import { useEffect, useState, useCallback } from 'react';
-import { Motion } from '@capacitor/motion';
+import { Motion, MotionEventResult } from '@capacitor/motion';
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Activity, LineChart, User, Loader } from "lucide-react";
@@ -72,18 +71,6 @@ const StepCounter = () => {
     try {
       console.log(isReconnecting ? "Tentando reconectar..." : "Iniciando acelerômetro...");
       
-      // Verifica se o acelerômetro está disponível
-      try {
-        const { x, y, z } = await Motion.getCurrentAcceleration();
-        if (typeof x === 'undefined' || typeof y === 'undefined' || typeof z === 'undefined') {
-          throw new Error('Acelerômetro não disponível');
-        }
-      } catch (error) {
-        console.error('Erro ao verificar acelerômetro:', error);
-        setSensorSupported(false);
-        return false;
-      }
-      
       // Remove listeners antigos para evitar duplicação
       await Motion.removeAllListeners();
       
@@ -91,7 +78,7 @@ const StepCounter = () => {
         let initialized = false;
         let timeoutId: number;
         
-        const initializeListener = Motion.addListener('accel', (event) => {
+        const initializeListener = Motion.addListener('accel', (event: MotionEventResult) => {
           if (!initialized && event?.acceleration) {
             const { x, y, z } = event.acceleration;
             console.log("Dados do acelerômetro:", { x, y, z });
