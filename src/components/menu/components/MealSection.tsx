@@ -1,22 +1,22 @@
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import type { ProtocolFood } from "../types/food";
+import type { Meal, MealFood } from "../types";
 
 interface MealSectionProps {
   title: string;
   icon: React.ReactNode;
-  foods: ProtocolFood[];
-  selectedFoods: string[];
-  onFoodSelection: (foodId: string) => void;
+  meal: Meal;  // Changed from foods to meal
+  selectedFoods?: string[];  // Make this optional
+  onFoodSelection?: (foodId: string) => void;  // Make this optional
   disabled?: boolean;
 }
 
 export const MealSection = ({
   title,
   icon,
-  foods,
-  selectedFoods,
+  meal,
+  selectedFoods = [],
   onFoodSelection,
   disabled
 }: MealSectionProps) => (
@@ -27,23 +27,23 @@ export const MealSection = ({
       </div>
       <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
     </div>
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-      {foods.map((food) => (
-        <Button
-          key={food.id}
-          variant={selectedFoods.includes(food.id) ? "default" : "outline"}
-          onClick={() => onFoodSelection(food.id)}
-          disabled={disabled}
-          className={`
-            h-auto py-3 px-4 w-full text-left justify-start
-            ${selectedFoods.includes(food.id)
-              ? 'bg-green-100 border-green-500 text-green-700 hover:bg-green-200 hover:text-green-800'
-              : 'hover:bg-green-50 hover:border-green-200'}
-          `}
-        >
-          <span className="truncate">{food.name}</span>
-        </Button>
+    <div className="space-y-2">
+      <p className="text-sm text-gray-600">{meal.description}</p>
+      {meal.foods.map((food, index) => (
+        <div key={index} className="flex justify-between items-center">
+          <span className="text-gray-700">{food.name}</span>
+          <span className="text-gray-500 text-sm">
+            {food.portion} {food.unit}
+          </span>
+        </div>
       ))}
+      <div className="text-sm text-gray-600 mt-2">
+        <strong>Calorias:</strong> {meal.calories.toFixed(0)} kcal
+        <br />
+        <strong>Macros:</strong> P: {meal.macros.protein.toFixed(0)}g | 
+        C: {meal.macros.carbs.toFixed(0)}g | 
+        G: {meal.macros.fats.toFixed(0)}g
+      </div>
     </div>
   </Card>
 );
