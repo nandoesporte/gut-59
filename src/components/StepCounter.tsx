@@ -65,11 +65,13 @@ const StepCounter = () => {
           await Motion.removeAllListeners();
         } else {
           console.log("Evento do acelerômetro inválido:", event);
+          toast.error("Erro ao acessar o acelerômetro. Verifique as permissões do app.");
         }
       });
 
       console.log("Listener adicionado, aguardando eventos...");
 
+      // Aguarda 3 segundos para ver se recebemos eventos do acelerômetro
       await new Promise(resolve => setTimeout(resolve, 3000));
 
       if (!hasPermission) {
