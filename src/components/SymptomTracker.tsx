@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -81,10 +82,10 @@ const SymptomTracker = () => {
   };
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
+    <Card className="w-full">
       <CardHeader className="flex flex-row items-center space-x-2">
-        <Activity className="w-6 h-6 text-primary-500" />
-        <CardTitle className="text-2xl text-primary-500">
+        <Activity className="w-6 h-6 text-primary" />
+        <CardTitle className="text-2xl text-gray-900">
           Registro de Sintomas Diários
         </CardTitle>
       </CardHeader>
@@ -111,7 +112,7 @@ const SymptomTracker = () => {
             <label className="block text-sm font-medium text-gray-700">
               Sintomas Específicos
             </label>
-            <div className="grid grid-cols-2 gap-2 mt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
               <SymptomCheckbox
                 label="Normal"
                 checked={symptoms.normal}
@@ -155,7 +156,7 @@ const SymptomTracker = () => {
         <Button
           onClick={handleSymptomLog}
           disabled={loading}
-          className="w-full bg-primary-500 hover:bg-primary-600 text-white"
+          className="w-full bg-primary hover:bg-primary/90 text-white"
         >
           {loading ? "Registrando..." : "Registrar Sintomas"}
         </Button>
@@ -178,7 +179,7 @@ const SymptomCheckbox = ({
       type="checkbox"
       checked={checked}
       onChange={onChange}
-      className="rounded text-primary-500"
+      className="rounded text-primary"
     />
     <span className="text-sm text-gray-700">{label}</span>
   </label>
