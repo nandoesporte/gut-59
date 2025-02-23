@@ -16,7 +16,7 @@ serve(async (req) => {
   }
 
   try {
-    const { userId, planType } = await req.json()
+    const { userId, planType, disablePayment } = await req.json()
     
     if (!userId || !planType) {
       throw new Error('Missing required parameters')
@@ -27,6 +27,29 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
+
+    // If trying to disable payment, verify admin status
+    if (disablePayment) {
+      // Check if the requesting user is an admin
+      const { data: roles, error: rolesError } = await supabaseClient
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .eq('role', 'admin');
+
+      if (rolesError) throw rolesError;
+
+      // If not an admin, return error
+      if (!roles || roles.length === 0) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized. Admin access required.' }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 403,
+          }
+        );
+      }
+    }
 
     // Get or create plan generation counts
     const { data: countData, error: countError } = await supabaseClient
@@ -118,14 +141,18 @@ serve(async (req) => {
       .upsert({
         user_id: userId,
         plan_type: planType,
-        payment_required: true,
+        payment_required: !disablePayment, // Only admins can set this to false
         is_active: true
       });
 
     if (upsertError) throw upsertError;
 
     return new Response(
-      JSON.stringify({ success: true, requiresPayment: true }),
+      JSON.stringify({ 
+        success: true, 
+        requiresPayment: !disablePayment,
+        message: disablePayment ? "Payment requirement disabled by admin" : undefined
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
