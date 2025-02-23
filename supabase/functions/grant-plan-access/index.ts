@@ -29,15 +29,19 @@ Deno.serve(async (req) => {
       }
     )
 
-    // Check if plan access already exists
+    // Get current plan access - using single() since we should only have one record per user/plan type
     const { data: existingAccess, error: queryError } = await supabaseClient
       .from('plan_access')
-      .select('*')
+      .select()
       .eq('user_id', userId)
       .eq('plan_type', planType)
-      .maybeSingle()
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
 
-    if (queryError) {
+    console.log('Current plan access:', existingAccess)
+
+    if (queryError && queryError.code !== 'PGRST116') {
       throw queryError
     }
 
@@ -57,8 +61,8 @@ Deno.serve(async (req) => {
           payment_required: !disablePayment,
           updated_at: new Date().toISOString()
         })
-        .eq('user_id', userId)
-        .eq('plan_type', planType)
+        .eq('id', existingAccess.id) // Using the specific record ID
+        .select()
     } else {
       // Create new plan access entry
       console.log('Creating new plan access:', {
@@ -75,6 +79,7 @@ Deno.serve(async (req) => {
           payment_required: !disablePayment,
           is_active: true
         })
+        .select()
     }
 
     if (result.error) {
