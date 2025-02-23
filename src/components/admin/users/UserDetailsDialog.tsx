@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,17 +19,55 @@ interface UserDetailsDialogProps {
   user: User;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onEdit?: () => void;
+  onSendMessage?: () => Promise<void>;
+  newMessage?: string;
+  onMessageChange?: (value: string) => void;
+  loading?: boolean;
 }
 
 export const UserDetailsDialog = ({
   user,
   open,
   onOpenChange,
+  onEdit,
+  onSendMessage,
+  newMessage = "",
+  onMessageChange,
+  loading = false,
 }: UserDetailsDialogProps) => {
   const [isNutritionPaymentRequired, setIsNutritionPaymentRequired] = useState(true);
   const [isDisablingPayment, setIsDisablingPayment] = useState(false);
 
+  // Load initial payment requirement status
+  useEffect(() => {
+    const loadPaymentStatus = async () => {
+      if (!user?.id) return;
+
+      try {
+        const { data } = await supabase
+          .from('plan_access')
+          .select('payment_required')
+          .eq('user_id', user.id)
+          .eq('plan_type', 'nutrition')
+          .single();
+
+        if (data) {
+          setIsNutritionPaymentRequired(data.payment_required);
+        }
+      } catch (error) {
+        console.error('Error loading payment status:', error);
+      }
+    };
+
+    if (open) {
+      loadPaymentStatus();
+    }
+  }, [open, user?.id]);
+
   const handleTogglePaymentRequirement = async () => {
+    if (!user?.id) return;
+
     try {
       setIsDisablingPayment(true);
       const { data: { user: currentUser } } = await supabase.auth.getUser();
@@ -42,7 +81,7 @@ export const UserDetailsDialog = ({
         body: {
           userId: user.id,
           planType: 'nutrition',
-          disablePayment: isNutritionPaymentRequired // Toggle the current state
+          disablePayment: isNutritionPaymentRequired
         }
       });
 
@@ -57,6 +96,11 @@ export const UserDetailsDialog = ({
       setIsDisablingPayment(false);
     }
   };
+
+  // Don't render if no user is provided
+  if (!user) {
+    return null;
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -98,6 +142,40 @@ export const UserDetailsDialog = ({
               />
             </div>
           </div>
+
+          {onEdit && (
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={onEdit}
+              >
+                Editar
+              </Button>
+            </div>
+          )}
+
+          {onSendMessage && (
+            <div className="space-y-4">
+              <Separator />
+              <div className="space-y-2">
+                <Label>Nova Mensagem</Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={newMessage}
+                    onChange={(e) => onMessageChange?.(e.target.value)}
+                    placeholder="Digite sua mensagem..."
+                    disabled={loading}
+                  />
+                  <Button
+                    onClick={onSendMessage}
+                    disabled={!newMessage?.trim() || loading}
+                  >
+                    Enviar
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="flex justify-end space-x-2">
             <Button

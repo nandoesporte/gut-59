@@ -10,7 +10,7 @@ import { UserDetailsDialog } from "./users/UserDetailsDialog";
 
 export const UsersTab = () => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [selectedUser, setSelectedUser] = useState<UserDetails | null>(null);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -18,11 +18,9 @@ export const UsersTab = () => {
   const { data: users, isLoading: usersLoading, refetch } = useQuery({
     queryKey: ['admin-users'],
     queryFn: async () => {
-      // First get the admin's user ID
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Get all profiles and count their unread messages
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select(`
@@ -36,7 +34,8 @@ export const UsersTab = () => {
 
       return profiles.map(profile => ({
         ...profile,
-        unread_messages: profile.unread_messages?.[0]?.count || 0
+        unread_messages: profile.unread_messages?.[0]?.count || 0,
+        email: null // Add default email value
       }));
     },
   });
@@ -67,34 +66,20 @@ export const UsersTab = () => {
 
   const handleViewDetails = async (user: User) => {
     try {
-      const [progress, meals, waterIntake] = await Promise.all([
-        supabase
-          .from('education_progress')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('updated_at', { ascending: false }),
-        supabase
-          .from('meals')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('meal_date', { ascending: false }),
-        supabase
-          .from('water_intake')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false }),
-      ]);
+      // Get user's auth details to get email
+      const { data: authUser, error: authError } = await supabase
+        .from('auth.users')
+        .select('email')
+        .eq('id', user.id)
+        .single();
 
-      if (progress.error) throw progress.error;
-      if (meals.error) throw meals.error;
-      if (waterIntake.error) throw waterIntake.error;
+      if (authError) {
+        console.error('Error fetching user email:', authError);
+      }
 
       setSelectedUser({
         ...user,
-        meals: meals.data || [],
-        symptoms: [],
-        water_intake: waterIntake.data || [],
-        education_progress: progress.data || [],
+        email: authUser?.email || null
       });
       setShowDetails(true);
     } catch (error) {
@@ -103,7 +88,7 @@ export const UsersTab = () => {
     }
   };
 
-  const sendMessage = async () => {
+  const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedUser) return;
 
     try {
@@ -141,22 +126,24 @@ export const UsersTab = () => {
         />
       )}
 
-      <UserDetailsDialog
-        user={selectedUser}
-        open={showDetails}
-        onOpenChange={setShowDetails}
-        onEdit={() => {
-          setEditingUser(selectedUser);
-          setShowDetails(false);
-        }}
-        onSendMessage={sendMessage}
-        newMessage={newMessage}
-        onMessageChange={setNewMessage}
-        loading={loading}
-      />
+      {selectedUser && (
+        <UserDetailsDialog
+          user={selectedUser}
+          open={showDetails}
+          onOpenChange={setShowDetails}
+          onEdit={() => {
+            setEditingUser(selectedUser);
+            setShowDetails(false);
+          }}
+          onSendMessage={handleSendMessage}
+          newMessage={newMessage}
+          onMessageChange={setNewMessage}
+          loading={loading}
+        />
+      )}
 
       <UsersList
-        users={users}
+        users={users || []}
         isLoading={usersLoading}
         onEdit={setEditingUser}
         onViewDetails={handleViewDetails}
@@ -164,4 +151,3 @@ export const UsersTab = () => {
     </div>
   );
 };
-
