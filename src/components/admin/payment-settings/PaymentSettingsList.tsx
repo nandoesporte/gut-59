@@ -1,6 +1,5 @@
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -9,7 +8,6 @@ import { useEffect, useState } from "react";
 interface PaymentSetting {
   id: string;
   plan_type: 'workout' | 'nutrition' | 'rehabilitation';
-  is_active: boolean;
   price: number;
 }
 
@@ -31,7 +29,7 @@ export const PaymentSettingsList = () => {
     try {
       const { data, error } = await supabase
         .from('payment_settings')
-        .select('*')
+        .select('id, plan_type, price')
         .order('plan_type');
 
       if (error) throw error;
@@ -41,26 +39,6 @@ export const PaymentSettingsList = () => {
       toast.error('Erro ao carregar configurações de pagamento');
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleToggleActive = async (setting: PaymentSetting) => {
-    try {
-      const { error } = await supabase
-        .from('payment_settings')
-        .update({ is_active: !setting.is_active })
-        .eq('id', setting.id);
-
-      if (error) throw error;
-
-      setSettings(settings.map(s =>
-        s.id === setting.id ? { ...s, is_active: !s.is_active } : s
-      ));
-
-      toast.success('Status atualizado com sucesso');
-    } catch (error) {
-      console.error('Error updating payment setting:', error);
-      toast.error('Erro ao atualizar status');
     }
   };
 
@@ -98,7 +76,6 @@ export const PaymentSettingsList = () => {
           <TableRow>
             <TableHead>Tipo de Plano</TableHead>
             <TableHead>Preço (R$)</TableHead>
-            <TableHead>Status</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -114,17 +91,6 @@ export const PaymentSettingsList = () => {
                   onChange={(e) => handlePriceChange(setting, e.target.value)}
                   className="w-24"
                 />
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    checked={setting.is_active}
-                    onCheckedChange={() => handleToggleActive(setting)}
-                  />
-                  <span className="text-sm text-muted-foreground">
-                    {setting.is_active ? 'Ativo' : 'Inativo'}
-                  </span>
-                </div>
               </TableCell>
             </TableRow>
           ))}
