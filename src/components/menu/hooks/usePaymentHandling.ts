@@ -55,6 +55,20 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
             setCheckInterval(null);
           }
           handlePaymentSuccess();
+
+          // Grant access to the plan
+          const { error: grantError } = await supabase.functions.invoke('grant-plan-access', {
+            body: { 
+              userId: userData.user.id,
+              planType: planType
+            }
+          });
+
+          if (grantError) {
+            console.error('Erro ao liberar acesso ao plano:', grantError);
+            toast.error("Erro ao liberar acesso ao plano. Por favor, contate o suporte.");
+            return;
+          }
         }
       };
 
