@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const mercadopagoAccessToken = 'APP_USR-3774959119809997-120919-64feef22e75e3a72fa939db6a1bf230d-86104137';
+const mercadopagoAccessToken = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN');
 
 serve(async (req) => {
   // Handle CORS
@@ -15,11 +15,16 @@ serve(async (req) => {
   }
 
   try {
-    const { userId, amount, description } = await req.json();
+    const { userId, amount, description, planType } = await req.json();
 
     if (!userId || !amount || !description) {
       throw new Error('Dados inválidos');
     }
+
+    const webhookUrl = `${req.headers.get('origin')}/functions/handle-mercadopago-webhook`;
+    const successUrl = `${req.headers.get('origin')}/menu?payment_status=success`;
+    const failureUrl = `${req.headers.get('origin')}/menu`;
+    const pendingUrl = `${req.headers.get('origin')}/menu`;
 
     // Criar preferência no MercadoPago
     const preference = {
@@ -30,14 +35,16 @@ serve(async (req) => {
           quantity: 1,
         },
       ],
-      payer: {
-        external_reference: userId,
-      },
+      external_reference: JSON.stringify({
+        user_id: userId,
+        plan_type: planType
+      }),
       back_urls: {
-        success: `${req.headers.get('origin')}/menu`,
-        failure: `${req.headers.get('origin')}/menu`,
-        pending: `${req.headers.get('origin')}/menu`,
+        success: successUrl,
+        failure: failureUrl,
+        pending: pendingUrl,
       },
+      notification_url: webhookUrl,
       auto_return: 'approved',
       binary_mode: true,
     };
