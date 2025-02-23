@@ -3,6 +3,7 @@ export interface User {
   name: string | null;
   age: number | null;
   health_conditions: string | null;
+  email: string | null;
 }
 
 export interface Symptom {
