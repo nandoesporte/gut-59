@@ -22,10 +22,16 @@ export const PaymentSettings = ({ user }: PaymentSettingsProps) => {
       if (!user?.id) return;
 
       try {
-        const { data: planAccess } = await supabase
+        const { data: planAccess, error } = await supabase
           .from('plan_access')
           .select('plan_type, payment_required')
           .eq('user_id', user.id);
+
+        if (error) {
+          console.error('Error loading payment status:', error);
+          toast.error('Erro ao carregar configurações de pagamento');
+          return;
+        }
 
         if (planAccess) {
           const updatedRequirements = paymentRequirements.map(req => {
@@ -39,6 +45,7 @@ export const PaymentSettings = ({ user }: PaymentSettingsProps) => {
         }
       } catch (error) {
         console.error('Error loading payment status:', error);
+        toast.error('Erro ao carregar configurações de pagamento');
       }
     };
 
@@ -52,31 +59,60 @@ export const PaymentSettings = ({ user }: PaymentSettingsProps) => {
       const requirement = paymentRequirements.find(r => r.planType === planType);
       if (!requirement) return;
 
+      // Update local state first to show loading state
       setPaymentRequirements(prev => prev.map(r => 
         r.planType === planType ? { ...r, isDisabling: true } : r
       ));
 
-      const { error } = await supabase.functions.invoke('grant-plan-access', {
-        body: {
-          userId: user.id,
-          planType: planType,
-          disablePayment: requirement.isRequired
-        }
-      });
+      // Check if there's an existing plan access
+      const { data: existingAccess, error: queryError } = await supabase
+        .from('plan_access')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('plan_type', planType)
+        .maybeSingle();
 
-      if (error) throw error;
+      if (queryError) throw queryError;
 
+      if (existingAccess) {
+        // Update existing plan access
+        const { error: updateError } = await supabase
+          .from('plan_access')
+          .update({
+            payment_required: !requirement.isRequired,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', user.id)
+          .eq('plan_type', planType);
+
+        if (updateError) throw updateError;
+      } else {
+        // Create new plan access
+        const { error: insertError } = await supabase
+          .from('plan_access')
+          .insert({
+            user_id: user.id,
+            plan_type: planType,
+            payment_required: !requirement.isRequired,
+            is_active: true
+          });
+
+        if (insertError) throw insertError;
+      }
+
+      // Update local state with new value
       setPaymentRequirements(prev => prev.map(r => 
         r.planType === planType ? 
         { ...r, isRequired: !r.isRequired, isDisabling: false } : 
         r
       ));
 
-      toast.success(`Requisito de pagamento ${!requirement.isRequired ? 'ativado' : 'desativado'} com sucesso`);
+      toast.success(`Requisito de pagamento ${requirement.isRequired ? 'desativado' : 'ativado'} com sucesso`);
     } catch (error) {
       console.error('Erro ao alterar requisito de pagamento:', error);
       toast.error("Erro ao alterar requisito de pagamento");
       
+      // Revert loading state on error
       setPaymentRequirements(prev => prev.map(r => 
         r.planType === planType ? { ...r, isDisabling: false } : r
       ));
