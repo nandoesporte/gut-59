@@ -12,8 +12,44 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+const MEASUREMENT_GUIDELINES = `
+Use SEMPRE as seguintes unidades de medida ao descrever porções:
+
+1. Medidas Básicas:
+- Gramas (g) para sólidos: "100g de frango"
+- Mililitros (ml) para líquidos: "200ml de leite"
+- Xícaras (xíc) para volumes: "1 xíc de arroz cozido"
+
+2. Colheres:
+- Colher de sopa (cs): "2 cs de azeite"
+- Colher de chá (cc): "1 cc de sal"
+
+3. Unidades e Porções:
+- Unidades inteiras: "1 ovo", "1 maçã"
+- Fatias: "2 fatias de pão integral"
+- Porções: "1 porção média de arroz"
+
+4. Quantidades Aproximadas:
+- Tamanhos: "porção pequena/média/grande"
+- Punhado: "1 punhado de castanhas"
+- Pedaço: "1 pedaço médio de queijo"
+
+5. Preparação:
+- Especificar sempre o modo: "cru", "cozido", "grelhado", "assado", "refogado"
+
+6. Proporções:
+- Usar frações claras: "metade", "um quarto", "três quartos"
+
+7. Cortes:
+- Especificar o tipo: "em cubos", "fatias finas", "ralado"
+
+8. Bebidas:
+- Copo (200-250ml)
+- Garrafa (especificar ml)
+
+IMPORTANTE: Sempre especifique o modo de preparo e o tamanho/quantidade exata dos alimentos.`;
+
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -21,7 +57,6 @@ serve(async (req) => {
   try {
     const { userData, selectedFoods, dietaryPreferences } = await req.json();
 
-    // Validate input data
     if (!userData || !selectedFoods || !dietaryPreferences) {
       throw new Error('Dados incompletos para geração do plano');
     }
@@ -49,8 +84,9 @@ serve(async (req) => {
     console.log('Prompt encontrado:', promptData.name);
     const basePrompt = promptData.prompt;
 
-    // Adicionar instruções específicas para formatação JSON
     const prompt = `${basePrompt}
+
+${MEASUREMENT_GUIDELINES}
 
 IMPORTANTE: Você DEVE retornar APENAS um objeto JSON válido com a seguinte estrutura:
 
@@ -84,7 +120,6 @@ IMPORTANTE: Você DEVE retornar APENAS um objeto JSON válido com a seguinte est
 
 NÃO inclua nenhum texto adicional, markdown ou explicações. Retorne APENAS o JSON.`;
 
-    // Preparar os dados para o modelo
     const modelInput = {
       userData,
       selectedFoods,
@@ -130,10 +165,8 @@ NÃO inclua nenhum texto adicional, markdown ou explicações. Retorne APENAS o 
     let mealPlan;
 
     try {
-      // Log da resposta bruta para debug
       console.log('Raw AI response:', aiResponse.choices[0].message.content);
       
-      // Tenta extrair JSON da resposta, removendo qualquer texto adicional
       const content = aiResponse.choices[0].message.content.trim();
       const jsonStart = content.indexOf('{');
       const jsonEnd = content.lastIndexOf('}') + 1;
@@ -146,7 +179,6 @@ NÃO inclua nenhum texto adicional, markdown ou explicações. Retorne APENAS o 
       throw new Error('A resposta da IA não está no formato JSON esperado');
     }
 
-    // Validar estrutura básica do plano
     if (!mealPlan || !mealPlan.dailyPlan) {
       console.error('Invalid meal plan structure:', mealPlan);
       throw new Error('Plano alimentar gerado com estrutura inválida');
