@@ -19,7 +19,7 @@ export const ExerciseTypesField = ({ form }: ExerciseTypesFieldProps) => {
   return (
     <FormField
       control={form.control}
-      name="preferredExerciseTypes"
+      name="preferred_exercise_types"
       render={({ field }) => (
         <FormItem>
           <FormLabel>Tipos de Exercícios Preferidos</FormLabel>
@@ -29,10 +29,11 @@ export const ExerciseTypesField = ({ form }: ExerciseTypesFieldProps) => {
                 key={type}
                 selected={field.value?.includes(type)}
                 onClick={() => {
-                  if (field.value?.includes(type)) {
-                    field.onChange(field.value?.filter((t) => t !== type));
+                  const currentValue = field.value || [];
+                  if (currentValue.includes(type)) {
+                    field.onChange(currentValue.filter((t: string) => t !== type));
                   } else {
-                    field.onChange([...field.value || [], type]);
+                    field.onChange([...currentValue, type]);
                   }
                 }}
               >
