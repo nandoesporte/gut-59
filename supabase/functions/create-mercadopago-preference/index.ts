@@ -23,14 +23,11 @@ serve(async (req) => {
       throw new Error('MERCADOPAGO_ACCESS_TOKEN not configured');
     }
 
-    const externalReference = JSON.stringify({
-      user_id: userId,
-      plan_type: description.includes('treino') ? 'workout' : 
-                 description.includes('nutricional') ? 'nutrition' : 
-                 'rehabilitation'
-    });
+    const planType = description.toLowerCase().includes('treino') ? 'workout' : 
+                    description.toLowerCase().includes('nutricional') ? 'nutrition' : 
+                    'rehabilitation';
 
-    console.log('Creating preference with external reference:', externalReference);
+    console.log('Determined plan type:', planType);
 
     const preference = {
       items: [{
@@ -44,7 +41,10 @@ serve(async (req) => {
         failure: `${req.headers.get('origin')}/workout`,
         pending: `${req.headers.get('origin')}/workout`
       },
-      external_reference: externalReference,
+      external_reference: JSON.stringify({
+        user_id: userId,
+        plan_type: planType
+      }),
       notification_url: notificationUrl,
       auto_return: 'approved'
     };
@@ -73,7 +73,7 @@ serve(async (req) => {
     const mpResponse = await response.json();
     console.log('Mercado Pago response:', mpResponse);
 
-    // Criar registro do pagamento no banco
+    // Create Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
@@ -83,6 +83,7 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Create payment record
     const { error: paymentError } = await supabase
       .from('payments')
       .insert({
@@ -90,10 +91,7 @@ serve(async (req) => {
         payment_id: mpResponse.id,
         amount: amount,
         status: 'pending',
-        provider: 'mercadopago',
-        plan_type: preference.items[0].title.toLowerCase().includes('treino') ? 'workout' : 
-                  preference.items[0].title.toLowerCase().includes('nutricional') ? 'nutrition' : 
-                  'rehabilitation'
+        plan_type: planType
       });
 
     if (paymentError) {
