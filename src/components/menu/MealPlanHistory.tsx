@@ -24,7 +24,7 @@ interface StoredMealPlan {
   id: string;
   created_at: string;
   user_id: string;
-  plan_data: MealPlan;
+  plan_data: string | MealPlan; // Can be string when coming from DB
   active: boolean;
 }
 
@@ -50,7 +50,16 @@ export const MealPlanHistory = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setPlans(data || []);
+
+      // Parse plan_data for each plan
+      const parsedPlans = (data || []).map(plan => ({
+        ...plan,
+        plan_data: typeof plan.plan_data === 'string' 
+          ? JSON.parse(plan.plan_data)
+          : plan.plan_data
+      }));
+
+      setPlans(parsedPlans);
     } catch (error) {
       console.error('Error fetching meal plans:', error);
       toast.error('Erro ao carregar histórico de planos');
@@ -92,6 +101,19 @@ export const MealPlanHistory = () => {
     }
   };
 
+  const getAverageCalories = (plan: StoredMealPlan) => {
+    try {
+      const planData = typeof plan.plan_data === 'string' 
+        ? JSON.parse(plan.plan_data) 
+        : plan.plan_data;
+      
+      return planData?.weeklyTotals?.averageCalories ?? 0;
+    } catch (error) {
+      console.error('Error parsing plan data:', error);
+      return 0;
+    }
+  };
+
   return (
     <div className="mt-12">
       <h2 className="text-2xl font-semibold mb-6">Histórico de Planos Alimentares</h2>
@@ -112,7 +134,7 @@ export const MealPlanHistory = () => {
                     Plano gerado em {format(new Date(plan.created_at), "d 'de' MMMM 'de' yyyy", { locale: ptBR })}
                   </h3>
                   <p className="text-sm text-gray-500 mt-1">
-                    Média diária: {Math.round(plan.plan_data.weeklyTotals.averageCalories)} kcal
+                    Média diária: {Math.round(getAverageCalories(plan))} kcal
                   </p>
                 </div>
                 <div className="flex gap-2">
