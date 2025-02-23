@@ -1,3 +1,4 @@
+
 import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -105,6 +106,7 @@ export const FisioPreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
   const {
     isProcessingPayment,
     hasPaid,
+    currentPrice,
     handlePaymentAndContinue
   } = usePaymentHandling();
 
@@ -358,7 +360,7 @@ export const FisioPreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Valor: R$ 19,90
+              Valor: R$ {currentPrice.toFixed(2)}
             </p>
             <Button 
               onClick={handlePaymentProcess} 
