@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { initMercadoPago } from "@mercadopago/sdk-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,6 +13,31 @@ export const usePaymentHandling = () => {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [preferenceId, setPreferenceId] = useState<string | null>(null);
   const [hasPaid, setHasPaid] = useState(false);
+  const [currentPrice, setCurrentPrice] = useState<number>(19.90);
+
+  useEffect(() => {
+    const fetchCurrentPrice = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('payment_settings')
+          .select('price')
+          .eq('plan_type', 'nutrition')
+          .eq('is_active', true)
+          .single();
+
+        if (error) throw error;
+        if (data) {
+          setCurrentPrice(data.price);
+        }
+      } catch (error) {
+        console.error('Error fetching price:', error);
+        // Fallback to default price if there's an error
+        setCurrentPrice(19.90);
+      }
+    };
+
+    fetchCurrentPrice();
+  }, []);
 
   const handlePaymentAndContinue = async () => {
     try {
@@ -28,10 +53,10 @@ export const usePaymentHandling = () => {
         throw new Error('Usuário não autenticado');
       }
 
-      // Create payment payload
+      // Create payment payload with current price
       const payload = {
         userId: userData.user.id,
-        amount: 19.90,
+        amount: currentPrice,
         description: "Plano Alimentar Personalizado"
       };
 
@@ -102,6 +127,7 @@ export const usePaymentHandling = () => {
     isProcessingPayment,
     preferenceId,
     hasPaid,
+    currentPrice,
     handlePaymentAndContinue
   };
 };
