@@ -20,7 +20,7 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
   const [hasPaid, setHasPaid] = useState(false);
   const [currentPrice, setCurrentPrice] = useState<number>(19.90);
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [checkInterval, setCheckInterval] = useState<NodeJS.Timer | null>(null);
+  const [checkInterval, setCheckInterval] = useState<number | null>(null);
 
   useEffect(() => {
     const loadPrice = async () => {
@@ -51,7 +51,7 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
         if (isPaid) {
           console.log('Pagamento confirmado, parando verificação...');
           if (checkInterval) {
-            clearInterval(checkInterval);
+            window.clearInterval(checkInterval);
             setCheckInterval(null);
           }
           handlePaymentSuccess();
@@ -62,18 +62,18 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
       checkPayment();
 
       // Configura intervalo de 5 segundos
-      const intervalId = setInterval(checkPayment, 5000);
+      const intervalId = window.setInterval(checkPayment, 5000);
       setCheckInterval(intervalId);
 
       // Limpa intervalo após 10 minutos
-      const timeout = setTimeout(() => {
-        clearInterval(intervalId);
+      const timeoutId = window.setTimeout(() => {
+        window.clearInterval(intervalId);
         setCheckInterval(null);
       }, 600000);
 
       return () => {
-        clearInterval(intervalId);
-        clearTimeout(timeout);
+        window.clearInterval(intervalId);
+        window.clearTimeout(timeoutId);
       };
     };
 
@@ -108,7 +108,7 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
   useEffect(() => {
     return () => {
       if (checkInterval) {
-        clearInterval(checkInterval);
+        window.clearInterval(checkInterval);
       }
     };
   }, [checkInterval]);
@@ -120,7 +120,7 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
     toast.success("Pagamento confirmado com sucesso!");
 
     if (checkInterval) {
-      clearInterval(checkInterval);
+      window.clearInterval(checkInterval);
       setCheckInterval(null);
     }
   };
