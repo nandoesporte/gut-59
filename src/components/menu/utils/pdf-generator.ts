@@ -14,6 +14,21 @@ const renderMealSection = (pdf: jsPDF, meal: Meal | undefined, title: string, yP
   pdf.text(`${title} (${meal.calories} kcal)`, 20, yPos);
   yPos += 6;
 
+  if (meal.description) {
+    pdf.setFont("helvetica", "italic");
+    pdf.setFontSize(10);
+    const descriptionLines = pdf.splitTextToSize(meal.description, 170);
+    descriptionLines.forEach((line: string) => {
+      if (yPos > 270) {
+        pdf.addPage();
+        yPos = 20;
+      }
+      pdf.text(line, 25, yPos);
+      yPos += 5;
+    });
+    yPos += 2;
+  }
+
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(10);
   
@@ -25,8 +40,15 @@ const renderMealSection = (pdf: jsPDF, meal: Meal | undefined, title: string, yP
     pdf.text(`• ${food.portion} ${food.unit} de ${food.name}`, 25, yPos);
     yPos += 5;
     if (food.details) {
-      pdf.text(`  ${food.details}`, 30, yPos);
-      yPos += 5;
+      const detailsLines = pdf.splitTextToSize(food.details, 160);
+      detailsLines.forEach((line: string) => {
+        if (yPos > 270) {
+          pdf.addPage();
+          yPos = 20;
+        }
+        pdf.text(`  ${line}`, 30, yPos);
+        yPos += 5;
+      });
     }
   });
 
@@ -85,6 +107,67 @@ const renderDayPlan = (pdf: jsPDF, dayPlan: DailyPlan, dayName: string, isFirstP
   return yPos;
 };
 
+const renderRecommendations = (pdf: jsPDF, recommendations: MealPlan['recommendations']) => {
+  pdf.addPage();
+  let yPos = 20;
+
+  pdf.setFontSize(14);
+  pdf.setFont("helvetica", "bold");
+  pdf.text("Recomendações e Observações", 20, yPos);
+  yPos += 15;
+
+  pdf.setFontSize(11);
+  pdf.setFont("helvetica", "bold");
+  pdf.text("Recomendações Gerais:", 20, yPos);
+  yPos += 8;
+
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(10);
+  const generalLines = pdf.splitTextToSize(recommendations.general, 170);
+  generalLines.forEach((line: string) => {
+    pdf.text(line, 25, yPos);
+    yPos += 6;
+  });
+  yPos += 5;
+
+  if (recommendations.preworkout) {
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Pré-treino:", 20, yPos);
+    yPos += 8;
+    pdf.setFont("helvetica", "normal");
+    const preworkoutLines = pdf.splitTextToSize(recommendations.preworkout, 170);
+    preworkoutLines.forEach((line: string) => {
+      pdf.text(line, 25, yPos);
+      yPos += 6;
+    });
+    yPos += 5;
+  }
+
+  if (recommendations.postworkout) {
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Pós-treino:", 20, yPos);
+    yPos += 8;
+    pdf.setFont("helvetica", "normal");
+    const postworkoutLines = pdf.splitTextToSize(recommendations.postworkout, 170);
+    postworkoutLines.forEach((line: string) => {
+      pdf.text(line, 25, yPos);
+      yPos += 6;
+    });
+    yPos += 5;
+  }
+
+  if (recommendations.timing && recommendations.timing.length > 0) {
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Horários Recomendados:", 20, yPos);
+    yPos += 8;
+    pdf.setFont("helvetica", "normal");
+    recommendations.timing.forEach(timing => {
+      pdf.text(`• ${timing}`, 25, yPos);
+      yPos += 6;
+    });
+  }
+};
+
 export const generateMealPlanPDF = async (plan: MealPlan) => {
   try {
     const pdf = new jsPDF({
@@ -114,16 +197,16 @@ export const generateMealPlanPDF = async (plan: MealPlan) => {
       isFirstPage = false;
     });
 
-    // Adicionar médias semanais na última página
-    if (plan.weeklyTotals) {
-      pdf.addPage();
-      let yPos = 20;
-      
-      pdf.setFontSize(14);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("Médias Semanais", 20, yPos);
-      yPos += 10;
+    // Adicionar médias semanais
+    pdf.addPage();
+    let yPos = 20;
+    
+    pdf.setFontSize(14);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Médias Semanais", 20, yPos);
+    yPos += 10;
 
+    if (plan.weeklyTotals) {
       pdf.setFontSize(11);
       pdf.setFont("helvetica", "normal");
       pdf.text(`Calorias: ${Math.round(plan.weeklyTotals.averageCalories)} kcal`, 25, yPos);
@@ -135,6 +218,11 @@ export const generateMealPlanPDF = async (plan: MealPlan) => {
       pdf.text(`Gorduras: ${Math.round(plan.weeklyTotals.averageFats)}g`, 25, yPos);
       yPos += 6;
       pdf.text(`Fibras: ${Math.round(plan.weeklyTotals.averageFiber)}g`, 25, yPos);
+    }
+
+    // Adicionar recomendações
+    if (plan.recommendations) {
+      renderRecommendations(pdf, plan.recommendations);
     }
 
     // Salvar o PDF
