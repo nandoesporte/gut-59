@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { initMercadoPago } from "@mercadopago/sdk-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import { fetchCurrentPrice } from "../utils/payment-db";
 import { getSuccessMessage } from "../utils/payment-messages";
 import { createPaymentPreference, checkPaymentStatus } from "../utils/payment-processor";
