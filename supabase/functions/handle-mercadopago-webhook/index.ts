@@ -1,17 +1,17 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-signature',
+  'Access-Control-Allow-Headers': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Max-Age': '86400',
 };
 
 const mercadopagoAccessToken = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN');
 const supabaseUrl = Deno.env.get('SUPABASE_URL');
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-const webhookSecret = 'f858499661ec1575048a990931695644ad65c0cab9071aa210ffd046d7fe7820';
 
 const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
 
@@ -28,33 +28,6 @@ interface MercadoPagoWebhook {
   user_id: number;
 }
 
-// Função para verificar a assinatura do webhook
-async function verifyWebhookSignature(signature: string, data: string) {
-  const encoder = new TextEncoder();
-  const key = encoder.encode(webhookSecret);
-  const message = encoder.encode(data);
-  
-  const hmac = await crypto.subtle.importKey(
-    "raw",
-    key,
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign", "verify"]
-  );
-  
-  const expectedSignature = await crypto.subtle.sign(
-    "HMAC",
-    hmac,
-    message
-  );
-  
-  const expectedSignatureHex = Array.from(new Uint8Array(expectedSignature))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-  
-  return signature === expectedSignatureHex;
-}
-
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -64,6 +37,17 @@ serve(async (req) => {
     });
   }
 
+  // Garantir que apenas requisições POST são aceitas
+  if (req.method !== 'POST') {
+    return new Response(
+      JSON.stringify({ error: 'Method not allowed' }),
+      {
+        status: 405,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+  }
+
   try {
     console.log('Received webhook request:', {
       method: req.method,
@@ -71,24 +55,8 @@ serve(async (req) => {
       url: req.url
     });
 
-    const signature = req.headers.get('x-signature') || '';
     const body = await req.text();
     console.log('Raw webhook body:', body);
-
-    // Verificar a assinatura apenas se ela estiver presente
-    if (signature) {
-      const isValid = await verifyWebhookSignature(signature, body);
-      if (!isValid) {
-        console.error('Invalid webhook signature');
-        return new Response(
-          JSON.stringify({ error: 'Invalid signature' }),
-          { 
-            status: 401,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
-      }
-    }
 
     const webhookData = JSON.parse(body) as MercadoPagoWebhook;
     console.log('Parsed webhook data:', webhookData);
@@ -105,6 +73,7 @@ serve(async (req) => {
       });
 
       if (!response.ok) {
+        console.error('Failed to fetch payment details:', response.statusText);
         throw new Error(`Failed to fetch payment details: ${response.statusText}`);
       }
 
