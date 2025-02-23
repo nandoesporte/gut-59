@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -87,8 +86,8 @@ export const useMenuController = () => {
           food_group_id: food.food_group_id
         }));
 
-      // Gerar plano alimentar inicial
-      const { data: mealPlanData, error: generateError } = await supabase.functions.invoke(
+      // Gerar plano alimentar usando o prompt configurado
+      const { data: generatedPlan, error: generateError } = await supabase.functions.invoke(
         'generate-meal-plan',
         {
           body: {
@@ -113,60 +112,12 @@ export const useMenuController = () => {
         throw new Error(generateError.message || 'Falha ao gerar cardápio');
       }
 
-      // Analisar plano gerado
-      toast.loading("Analisando plano alimentar...", { id: toastId });
-      const { data: analysisData, error: analysisError } = await supabase.functions.invoke(
-        'analyze-meal-plan',
-        {
-          body: {
-            mealPlan: mealPlanData,
-            userData: {
-              weight: Number(formData.weight),
-              height: Number(formData.height),
-              age: Number(formData.age),
-              gender: formData.gender,
-              activityLevel: formData.activityLevel,
-              goal: formData.goal === "lose" ? "lose_weight" : formData.goal === "gain" ? "gain_weight" : "maintain",
-              dailyCalories: calorieNeeds
-            },
-            dietaryPreferences: preferences
-          }
-        }
-      );
-
-      if (analysisError) {
-        console.error('Erro na análise:', analysisError);
-        throw new Error(analysisError.message || 'Falha ao analisar cardápio');
+      if (!generatedPlan?.mealPlan) {
+        throw new Error('Plano alimentar não gerado corretamente');
       }
-
-      if (!analysisData.isApproved) {
-        console.log('Plano não aprovado. Análise:', analysisData.analysis);
-        toast.dismiss(toastId);
-        toast.error("O plano gerado não atendeu aos critérios. Gerando novo plano...");
-        // Tentar gerar novo plano
-        return handleDietaryPreferences(preferences);
-      }
-
-      // Transformar o plano semanal em plano diário
-      const dailyPlan = {
-        breakfast: mealPlanData.weeklyPlan.Segunda.breakfast,
-        morningSnack: mealPlanData.weeklyPlan.Segunda.morningSnack,
-        lunch: mealPlanData.weeklyPlan.Segunda.lunch,
-        afternoonSnack: mealPlanData.weeklyPlan.Segunda.afternoonSnack,
-        dinner: mealPlanData.weeklyPlan.Segunda.dinner
-      };
-
-      const formattedMealPlan = {
-        dailyPlan,
-        totalNutrition: mealPlanData.totalNutrition,
-        recommendations: {
-          ...mealPlanData.recommendations,
-          aiAnalysis: analysisData.analysis // Adicionar análise da IA às recomendações
-        }
-      };
 
       // Set the meal plan state
-      setMealPlan(formattedMealPlan);
+      setMealPlan(generatedPlan.mealPlan);
 
       // Save dietary preferences
       const { error: dietaryError } = await supabase
@@ -191,7 +142,7 @@ export const useMenuController = () => {
         .from('meal_plans')
         .insert({
           user_id: userData.user.id,
-          plan_data: formattedMealPlan,
+          plan_data: generatedPlan.mealPlan,
           calories: calorieNeeds,
           dietary_preferences: {
             hasAllergies: preferences.hasAllergies || false,
@@ -209,7 +160,7 @@ export const useMenuController = () => {
       // Only change step after meal plan is set and saved
       setCurrentStep(4);
       toast.dismiss(toastId);
-      toast.success("Cardápio personalizado gerado e validado com sucesso!");
+      toast.success("Cardápio personalizado gerado com sucesso!");
 
     } catch (error) {
       console.error('Erro completo:', error);

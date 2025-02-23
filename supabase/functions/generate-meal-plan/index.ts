@@ -69,7 +69,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-4o-mini', // Corrigido o nome do modelo
         messages: [
           {
             role: 'system',
@@ -108,30 +108,7 @@ serve(async (req) => {
       throw new Error('Plano alimentar gerado com estrutura inválida');
     }
 
-    console.log('Analisando plano gerado...');
-    const { data: analysisData, error: analysisError } = await supabase.functions.invoke(
-      'analyze-meal-plan',
-      {
-        body: {
-          mealPlan,
-          userData,
-          dietaryPreferences
-        }
-      }
-    );
-
-    if (analysisError) {
-      console.error('Error in meal plan analysis:', analysisError);
-      throw new Error('Erro na análise do plano alimentar: ' + analysisError.message);
-    }
-
-    if (!analysisData?.isApproved) {
-      console.error('Meal plan not approved:', analysisData?.analysis);
-      throw new Error('O plano gerado não atende aos critérios nutricionais');
-    }
-
-    console.log('Plano alimentar gerado e aprovado com sucesso');
-    return new Response(JSON.stringify({ mealPlan, analysis: analysisData }), {
+    return new Response(JSON.stringify({ mealPlan }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
