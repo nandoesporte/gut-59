@@ -41,8 +41,8 @@ const Menu = () => {
         return (
           <div className="space-y-6">
             <MenuHeader onStart={() => setCurrentStep(1.5)} />
-            <InitialMenuContent onStartDiet={() => setCurrentStep(1.5)} />
             <MealPlanHistory />
+            <InitialMenuContent onStartDiet={() => setCurrentStep(1.5)} />
           </div>
         );
       case 1.5:
