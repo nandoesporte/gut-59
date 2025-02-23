@@ -150,7 +150,7 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
               const { error: accessError } = await supabase.functions.invoke('grant-plan-access', {
                 body: {
                   userId: userData.user.id,
-                  planType
+                  planType: planType
                 }
               });
 
