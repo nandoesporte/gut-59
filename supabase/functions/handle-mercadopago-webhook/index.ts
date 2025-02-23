@@ -9,9 +9,19 @@ const corsHeaders = {
   'Access-Control-Max-Age': '86400',
 };
 
+console.log('Edge Function initialized');
+
 const mercadopagoAccessToken = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN');
 const supabaseUrl = Deno.env.get('SUPABASE_URL');
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+if (!mercadopagoAccessToken) {
+  console.error('MERCADOPAGO_ACCESS_TOKEN is not set');
+}
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Missing Supabase configuration');
+}
 
 const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
 
@@ -30,53 +40,54 @@ interface MercadoPagoWebhook {
 
 serve(async (req) => {
   const requestStartTime = new Date().toISOString();
-  console.log(`[${requestStartTime}] Webhook request started`);
-
-  if (req.method === 'OPTIONS') {
-    console.log('Handling OPTIONS request');
-    return new Response(null, { 
-      status: 200,
-      headers: corsHeaders 
-    });
-  }
-
-  if (req.method !== 'POST') {
-    console.log(`Invalid method: ${req.method}`);
-    return new Response(
-      JSON.stringify({ error: 'Method not allowed' }),
-      {
-        status: 405,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    );
-  }
+  const requestId = crypto.randomUUID();
+  
+  console.log(`[${requestId}][${requestStartTime}] Request started`, {
+    method: req.method,
+    url: req.url,
+    headers: Object.fromEntries(req.headers.entries())
+  });
 
   try {
-    console.log('Request details:', {
-      timestamp: requestStartTime,
-      method: req.method,
-      headers: Object.fromEntries(req.headers.entries()),
-      url: req.url
-    });
+    if (req.method === 'OPTIONS') {
+      console.log(`[${requestId}] Handling OPTIONS request`);
+      return new Response(null, { 
+        status: 200,
+        headers: corsHeaders 
+      });
+    }
+
+    if (req.method !== 'POST') {
+      console.log(`[${requestId}] Invalid method: ${req.method}`);
+      return new Response(
+        JSON.stringify({ error: 'Method not allowed' }),
+        {
+          status: 405,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
 
     const body = await req.text();
-    console.log('Raw webhook payload:', body);
+    console.log(`[${requestId}] Raw request body:`, body);
 
-    const webhookData = JSON.parse(body) as MercadoPagoWebhook;
-    console.log('Parsed webhook data:', {
-      ...webhookData,
-      timestamp: requestStartTime,
-      environment: webhookData.live_mode ? 'production' : 'test'
-    });
+    let webhookData: MercadoPagoWebhook;
+    try {
+      webhookData = JSON.parse(body);
+      console.log(`[${requestId}] Parsed webhook data:`, webhookData);
+    } catch (error) {
+      console.error(`[${requestId}] Error parsing webhook body:`, error);
+      throw new Error('Invalid webhook payload');
+    }
 
     if (webhookData.type === 'payment' && webhookData.action === 'payment.updated') {
       const paymentId = webhookData.data.id;
+      console.log(`[${requestId}] Processing payment update for ID: ${paymentId}`);
       
-      // Para webhooks de teste, retornamos sucesso imediatamente
       if (!webhookData.live_mode) {
-        console.log('[TEST] Test webhook detected, returning success');
+        console.log(`[${requestId}][TEST] Test webhook received`);
         return new Response(
-          JSON.stringify({ received: true, test: true }),
+          JSON.stringify({ received: true, test: true, requestId }),
           {
             status: 200,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -84,9 +95,7 @@ serve(async (req) => {
         );
       }
 
-      console.log('[PROD] Fetching payment details from Mercado Pago API');
-      console.log('[PROD] Payment ID:', paymentId);
-      
+      console.log(`[${requestId}][PROD] Fetching payment details`);
       const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
         headers: {
           'Authorization': `Bearer ${mercadopagoAccessToken}`,
@@ -95,79 +104,76 @@ serve(async (req) => {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('[PROD] Failed to fetch payment details:', {
+        console.error(`[${requestId}][PROD] API Error:`, {
           status: response.status,
           statusText: response.statusText,
-          errorBody: errorText
+          body: errorText
         });
-        throw new Error(`Failed to fetch payment details: ${response.status} ${response.statusText}`);
+        throw new Error(`API Error: ${response.status} ${response.statusText}`);
       }
 
       const paymentData = await response.json();
-      console.log('[PROD] Payment data received:', {
+      console.log(`[${requestId}][PROD] Payment data:`, {
         id: paymentData.id,
         status: paymentData.status,
-        live_mode: paymentData.live_mode,
-        external_reference: paymentData.external_reference,
-        timestamp: new Date().toISOString()
+        external_reference: paymentData.external_reference
       });
 
       if (paymentData.status === 'approved' && paymentData.live_mode === true) {
-        console.log('[PROD] Processing approved production payment');
-
+        console.log(`[${requestId}][PROD] Processing approved payment`);
+        
         if (!paymentData.external_reference) {
-          console.error('[PROD] Missing external_reference in production payment');
-          throw new Error('Missing external_reference in production payment');
+          console.error(`[${requestId}][PROD] Missing external_reference`);
+          throw new Error('Missing external_reference');
         }
 
         let userData;
         try {
           userData = JSON.parse(paymentData.external_reference);
-          console.log('[PROD] Parsed user data:', userData);
+          console.log(`[${requestId}][PROD] User data:`, userData);
         } catch (error) {
-          console.error('[PROD] Error parsing external_reference:', error);
+          console.error(`[${requestId}][PROD] Invalid external_reference:`, error);
           throw new Error('Invalid external_reference format');
         }
 
-        console.log('[PROD] Updating payment status in database');
+        console.log(`[${requestId}][PROD] Updating payment status`);
         const { error: paymentError } = await supabase
           .from('payments')
           .update({ status: 'completed' })
           .match({ payment_id: paymentId });
 
         if (paymentError) {
-          console.error('[PROD] Error updating payment status:', paymentError);
+          console.error(`[${requestId}][PROD] Database error:`, paymentError);
           throw paymentError;
         }
 
-        console.log('[PROD] Granting plan access');
+        console.log(`[${requestId}][PROD] Granting access`);
         const { error: accessError } = await supabase.functions.invoke('grant-plan-access', {
           body: { userId: userData.user_id, planType: userData.plan_type }
         });
 
         if (accessError) {
-          console.error('[PROD] Error granting plan access:', accessError);
+          console.error(`[${requestId}][PROD] Access error:`, accessError);
           throw accessError;
         }
 
-        console.log('[PROD] Payment processed successfully');
+        console.log(`[${requestId}][PROD] Payment processed successfully`);
       } else {
-        console.log('[PROD] Payment skipped:', {
+        console.log(`[${requestId}][PROD] Payment skipped:`, {
           status: paymentData.status,
-          live_mode: paymentData.live_mode,
-          timestamp: new Date().toISOString()
+          live_mode: paymentData.live_mode
         });
       }
     }
 
     const requestEndTime = new Date().toISOString();
-    console.log(`[${requestEndTime}] Webhook request completed successfully`);
+    console.log(`[${requestId}] Request completed at ${requestEndTime}`);
 
     return new Response(
       JSON.stringify({ 
         received: true,
-        environment: webhookData.live_mode ? 'production' : 'test',
-        processedAt: requestEndTime
+        requestId,
+        environment: webhookData.live_mode ? 'production' : 'test'
       }),
       {
         status: 200,
@@ -177,16 +183,16 @@ serve(async (req) => {
 
   } catch (error) {
     const errorTime = new Date().toISOString();
-    console.error(`[${errorTime}] Webhook error:`, {
-      error: error.message,
+    console.error(`[${requestId}] Error at ${errorTime}:`, {
+      message: error.message,
       stack: error.stack
     });
 
     return new Response(
       JSON.stringify({ 
         error: error.message,
-        timestamp: errorTime,
-        note: 'Webhook processed with error but returned 200 to prevent retries'
+        requestId,
+        timestamp: errorTime
       }),
       {
         status: 200,
