@@ -2,8 +2,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
 
+// Handle CORS preflight requests
 Deno.serve(async (req) => {
-  // Handle CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -14,6 +14,8 @@ Deno.serve(async (req) => {
     if (!userId || !planType) {
       throw new Error('Missing required fields')
     }
+
+    console.log('Processing request:', { userId, planType, disablePayment })
 
     // Create Supabase client
     const supabaseClient = createClient(
