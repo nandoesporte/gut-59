@@ -23,9 +23,22 @@ serve(async (req) => {
 
     console.log('Parsed webhook data:', webhookData);
 
-    // Mercado Pago sends the data in different formats depending on the notification type
-    const action = webhookData.type || webhookData.action;
-    const paymentId = webhookData.data?.id || webhookData.id;
+    // Mercado Pago IPN format:
+    // { topic: "payment", id: "123456789" }
+    // Merchant order format:
+    // { type: "payment", data: { id: "123456789" } }
+    let action, paymentId;
+
+    if (webhookData.topic === 'payment') {
+      action = 'payment';
+      paymentId = webhookData.id;
+    } else if (webhookData.type === 'payment') {
+      action = webhookData.type;
+      paymentId = webhookData.data?.id;
+    } else if (webhookData.action === 'payment.created') {
+      action = webhookData.action;
+      paymentId = webhookData.data?.id;
+    }
 
     console.log('Extracted payment info:', { action, paymentId });
 
@@ -137,7 +150,11 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ received: true }),
+      JSON.stringify({ 
+        received: true,
+        message: 'Notification received but not processed',
+        info: { action, paymentId }
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
