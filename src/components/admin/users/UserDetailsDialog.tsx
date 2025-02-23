@@ -15,6 +15,12 @@ import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+interface PaymentRequirement {
+  planType: 'nutrition' | 'workout' | 'rehabilitation';
+  isRequired: boolean;
+  isDisabling: boolean;
+}
+
 interface UserDetailsDialogProps {
   user: User;
   open: boolean;
@@ -26,6 +32,12 @@ interface UserDetailsDialogProps {
   loading?: boolean;
 }
 
+const planLabels = {
+  nutrition: 'Plano Nutricional',
+  workout: 'Plano de Treino',
+  rehabilitation: 'Plano de Fisioterapia'
+};
+
 export const UserDetailsDialog = ({
   user,
   open,
@@ -36,23 +48,31 @@ export const UserDetailsDialog = ({
   onMessageChange,
   loading = false,
 }: UserDetailsDialogProps) => {
-  const [isNutritionPaymentRequired, setIsNutritionPaymentRequired] = useState(true);
-  const [isDisablingPayment, setIsDisablingPayment] = useState(false);
+  const [paymentRequirements, setPaymentRequirements] = useState<PaymentRequirement[]>([
+    { planType: 'nutrition', isRequired: true, isDisabling: false },
+    { planType: 'workout', isRequired: true, isDisabling: false },
+    { planType: 'rehabilitation', isRequired: true, isDisabling: false }
+  ]);
 
   useEffect(() => {
     const loadPaymentStatus = async () => {
       if (!user?.id || !open) return;
 
       try {
-        const { data } = await supabase
+        const { data: planAccess } = await supabase
           .from('plan_access')
-          .select('payment_required')
-          .eq('user_id', user.id)
-          .eq('plan_type', 'nutrition')
-          .single();
+          .select('plan_type, payment_required')
+          .eq('user_id', user.id);
 
-        if (data) {
-          setIsNutritionPaymentRequired(data.payment_required);
+        if (planAccess) {
+          const updatedRequirements = paymentRequirements.map(req => {
+            const planStatus = planAccess.find(p => p.plan_type === req.planType);
+            return {
+              ...req,
+              isRequired: planStatus ? planStatus.payment_required : true
+            };
+          });
+          setPaymentRequirements(updatedRequirements);
         }
       } catch (error) {
         console.error('Error loading payment status:', error);
@@ -62,35 +82,45 @@ export const UserDetailsDialog = ({
     loadPaymentStatus();
   }, [open, user?.id]);
 
-  const handleTogglePaymentRequirement = async () => {
+  const handleTogglePaymentRequirement = async (planType: 'nutrition' | 'workout' | 'rehabilitation') => {
     if (!user?.id) return;
 
     try {
-      setIsDisablingPayment(true);
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      
-      if (!currentUser) {
-        toast.error("Usuário não autenticado");
-        return;
-      }
+      // Find and update the specific plan requirement
+      const requirement = paymentRequirements.find(r => r.planType === planType);
+      if (!requirement) return;
+
+      // Set loading state for this specific plan
+      setPaymentRequirements(prev => prev.map(r => 
+        r.planType === planType ? { ...r, isDisabling: true } : r
+      ));
 
       const { error } = await supabase.functions.invoke('grant-plan-access', {
         body: {
           userId: user.id,
-          planType: 'nutrition',
-          disablePayment: isNutritionPaymentRequired
+          planType: planType,
+          disablePayment: requirement.isRequired
         }
       });
 
       if (error) throw error;
 
-      setIsNutritionPaymentRequired(!isNutritionPaymentRequired);
-      toast.success(`Requisito de pagamento ${!isNutritionPaymentRequired ? 'ativado' : 'desativado'} com sucesso`);
+      // Update local state
+      setPaymentRequirements(prev => prev.map(r => 
+        r.planType === planType ? 
+        { ...r, isRequired: !r.isRequired, isDisabling: false } : 
+        r
+      ));
+
+      toast.success(`Requisito de pagamento ${!requirement.isRequired ? 'ativado' : 'desativado'} com sucesso`);
     } catch (error) {
       console.error('Erro ao alterar requisito de pagamento:', error);
       toast.error("Erro ao alterar requisito de pagamento");
-    } finally {
-      setIsDisablingPayment(false);
+      
+      // Reset loading state on error
+      setPaymentRequirements(prev => prev.map(r => 
+        r.planType === planType ? { ...r, isDisabling: false } : r
+      ));
     }
   };
 
@@ -124,18 +154,22 @@ export const UserDetailsDialog = ({
 
           <div>
             <h3 className="text-lg font-semibold mb-4">Configurações de Pagamento</h3>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <h4 className="font-medium">Requisito de Pagamento - Plano Nutricional</h4>
-                <p className="text-sm text-muted-foreground">
-                  Ative ou desative o requisito de pagamento para o plano nutricional
-                </p>
-              </div>
-              <Switch
-                checked={isNutritionPaymentRequired}
-                onCheckedChange={handleTogglePaymentRequirement}
-                disabled={isDisablingPayment || !user.id}
-              />
+            <div className="space-y-4">
+              {paymentRequirements.map((requirement) => (
+                <div key={requirement.planType} className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <h4 className="font-medium">Requisito de Pagamento - {planLabels[requirement.planType]}</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Ative ou desative o requisito de pagamento para o {planLabels[requirement.planType].toLowerCase()}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={requirement.isRequired}
+                    onCheckedChange={() => handleTogglePaymentRequirement(requirement.planType)}
+                    disabled={requirement.isDisabling || !user.id}
+                  />
+                </div>
+              ))}
             </div>
           </div>
 
