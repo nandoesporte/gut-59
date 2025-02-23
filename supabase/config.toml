@@ -25,3 +25,5 @@ verify_jwt = false
 [functions.generate-rehab-plan]
 verify_jwt = true
 
+[functions.grant-plan-access]
+verify_jwt = true
