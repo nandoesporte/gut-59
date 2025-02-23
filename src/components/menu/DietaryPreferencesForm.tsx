@@ -1,11 +1,12 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { CreditCard } from "@/components/ui/icons";
-import { usePaymentHandling } from "@/hooks/usePaymentHandling";
+import { CreditCard } from "lucide-react";
+import { usePaymentHandling } from "./hooks/usePaymentHandling";
 
 interface DietaryPreferencesFormProps {
   onSubmit: (preferences: DietaryPreferences) => void;
@@ -20,8 +21,8 @@ interface DietaryPreferences {
 }
 
 export const DietaryPreferencesForm = ({ onSubmit, onBack }: DietaryPreferencesFormProps) => {
-  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = React.useState(false);
-  const [formData, setFormData] = React.useState<FormData | null>(null);
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [formData, setFormData] = useState<FormData | null>(null);
   
   const {
     isProcessingPayment,
