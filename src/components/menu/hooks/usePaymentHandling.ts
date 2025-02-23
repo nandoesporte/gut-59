@@ -20,6 +20,7 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
   const [hasPaid, setHasPaid] = useState(false);
   const [currentPrice, setCurrentPrice] = useState<number>(19.90);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [checkInterval, setCheckInterval] = useState<number | null>(null);
 
   useEffect(() => {
     const loadPrice = async () => {
@@ -29,24 +30,50 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
     loadPrice();
   }, [planType]);
 
-  // Check URL parameters for payment status
+  // Check URL parameters for payment status on mount and when URL changes
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const status = urlParams.get('status');
-    const message = urlParams.get('message');
+    const checkURLParameters = () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const status = urlParams.get('status');
+      const message = urlParams.get('message');
 
-    if (status === 'success' && message) {
-      setHasPaid(true);
-      setShowConfirmation(true);
-      // Clean up URL parameters
-      window.history.replaceState({}, '', window.location.pathname);
-    }
+      if (status === 'success' && message) {
+        setHasPaid(true);
+        setShowConfirmation(true);
+        toast.success("Pagamento confirmado com sucesso!");
+        // Clean up URL parameters
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    };
+
+    checkURLParameters();
+    window.addEventListener('popstate', checkURLParameters);
+
+    return () => {
+      window.removeEventListener('popstate', checkURLParameters);
+    };
   }, []);
 
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (checkInterval) {
+        clearInterval(checkInterval);
+      }
+    };
+  }, [checkInterval]);
+
   const handlePaymentSuccess = () => {
+    console.log("Pagamento confirmado, atualizando estado...");
     setHasPaid(true);
     setShowConfirmation(true);
     toast.success("Pagamento confirmado com sucesso!");
+
+    // Limpa o intervalo de verificação após confirmação
+    if (checkInterval) {
+      clearInterval(checkInterval);
+      setCheckInterval(null);
+    }
   };
 
   const handlePaymentAndContinue = async () => {
@@ -69,10 +96,12 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
       window.open(paymentUrl.toString(), '_blank');
 
       // Start polling for payment status
-      const checkInterval = setInterval(async () => {
+      const intervalId = window.setInterval(async () => {
+        console.log("Verificando status do pagamento...");
         const { data: userData } = await supabase.auth.getUser();
         if (!userData.user?.id) {
-          clearInterval(checkInterval);
+          clearInterval(intervalId);
+          setCheckInterval(null);
           return;
         }
 
@@ -85,14 +114,18 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
         );
 
         if (isPaid) {
-          clearInterval(checkInterval);
+          clearInterval(intervalId);
+          setCheckInterval(null);
           handlePaymentSuccess();
         }
       }, 5000);
 
+      setCheckInterval(intervalId);
+
       // Stop polling after 10 minutes
       setTimeout(() => {
-        clearInterval(checkInterval);
+        clearInterval(intervalId);
+        setCheckInterval(null);
       }, 600000);
 
     } catch (error) {

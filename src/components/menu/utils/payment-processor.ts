@@ -6,7 +6,6 @@ import { updatePaymentStatus, grantPlanAccess } from "./payment-db";
 
 type PlanType = 'nutrition' | 'workout' | 'rehabilitation';
 
-// Since this URL is already public in the client configuration, we can safely define it here
 const WEBHOOK_URL = "https://sxjafhzikftdenqnkcri.supabase.co/functions/v1/handle-mercadopago-webhook";
 
 export const createPaymentPreference = async (
@@ -34,8 +33,6 @@ export const createPaymentPreference = async (
     }
   );
 
-  console.log('Resposta da função de criar preferência:', { data, error });
-
   if (error || !data?.preferenceId || !data?.initPoint) {
     console.error('Erro ao criar preferência:', error);
     throw new Error('Falha ao criar pagamento. Por favor, tente novamente.');
@@ -55,6 +52,8 @@ export const checkPaymentStatus = async (
   onSuccess: () => void
 ) => {
   try {
+    console.log('Verificando status do pagamento:', preferenceId);
+    
     const { data: statusData, error: statusError } = await supabase.functions.invoke(
       'check-mercadopago-payment',
       {
@@ -62,7 +61,7 @@ export const checkPaymentStatus = async (
       }
     );
 
-    console.log('Status do pagamento:', statusData);
+    console.log('Resposta do status do pagamento:', statusData);
 
     if (statusError) {
       console.error('Erro ao verificar status:', statusError);
@@ -70,10 +69,19 @@ export const checkPaymentStatus = async (
     }
 
     if (statusData?.isPaid) {
+      console.log('Pagamento confirmado, atualizando status...');
+      
       await updatePaymentStatus(userId, preferenceId, planType, amount);
       await grantPlanAccess(userId, planType);
+      
+      console.log('Status atualizado, chamando callback de sucesso...');
       onSuccess();
-      toast.success("Pagamento confirmado! Seu plano foi liberado.");
+      
+      toast.success("Pagamento confirmado! Seu plano foi liberado.", {
+        duration: 5000,
+        position: 'top-center'
+      });
+      
       return true;
     }
 
