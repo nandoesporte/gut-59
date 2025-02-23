@@ -19,7 +19,7 @@ export const createPaymentPreference = async (
     userId: userData.user.id,
     amount: amount,
     description: getPlanDescription(planType),
-    notificationUrl: `${Deno.env.get('SUPABASE_URL')}/functions/v1/handle-mercadopago-webhook`
+    notificationUrl: `${supabase.supabaseUrl}/functions/v1/handle-mercadopago-webhook`
   };
 
   console.log('Enviando payload para criação de preferência:', payload);
