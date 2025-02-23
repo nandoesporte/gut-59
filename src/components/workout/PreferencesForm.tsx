@@ -1,4 +1,5 @@
-import * as React from "react";
+
+import React, { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -37,12 +38,15 @@ interface PreferencesFormProps {
 export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = React.useState(false);
   const [formData, setFormData] = React.useState<FormSchema | null>(null);
+  const [isGrantingAccess, setIsGrantingAccess] = React.useState(false);
 
   const {
     isProcessingPayment,
     hasPaid,
     currentPrice,
-    handlePaymentAndContinue
+    handlePaymentAndContinue,
+    showConfirmation,
+    setShowConfirmation
   } = usePaymentHandling('workout');
 
   const form = useForm<FormSchema>({
@@ -61,13 +65,8 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
   });
 
   const handleSubmit = async (data: FormSchema) => {
-    if (!hasPaid) {
-      setFormData(data);
-      setIsPaymentDialogOpen(true);
-      return;
-    }
-
     try {
+      setIsGrantingAccess(true);
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
@@ -75,14 +74,39 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
         return;
       }
 
+      const { data: paymentSettings } = await supabase
+        .from('payment_settings')
+        .select('is_active')
+        .eq('plan_type', 'workout')
+        .single();
+
+      if (paymentSettings?.is_active && !hasPaid) {
+        setFormData(data);
+        setIsPaymentDialogOpen(true);
+        return;
+      }
+
+      // Grant access to workout plan
+      const { data: grantResponse, error: grantError } = await supabase.functions.invoke('grant-plan-access', {
+        body: {
+          userId: user.id,
+          planType: 'workout' as const
+        }
+      });
+
+      if (grantError) {
+        console.error('Erro ao liberar acesso ao plano:', grantError);
+        toast.error("Erro ao liberar acesso ao plano. Por favor, contate o suporte.");
+        return;
+      }
+
+      // Check if payment needs to be reactivated
+      if (grantResponse?.requiresPayment) {
+        toast.info("Você atingiu o limite de gerações de plano gratuitas. Pagamento reativado.");
+      }
+
       const workoutPreferences: WorkoutPreferences = {
-        age: data.age,
-        weight: data.weight,
-        height: data.height,
-        gender: data.gender,
-        goal: data.goal,
-        activity_level: data.activity_level,
-        preferred_exercise_types: data.preferred_exercise_types,
+        ...data,
         available_equipment: data.training_location === "gym" 
           ? ["all"] 
           : data.training_location === "home"
@@ -92,29 +116,14 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
           : ["bodyweight"],
       };
 
-      const { error: upsertError } = await supabase
-        .from('user_workout_preferences')
-        .upsert({
-          user_id: user.id,
-          ...workoutPreferences
-        }, {
-          onConflict: 'user_id'
-        });
-
-      if (upsertError) {
-        console.error("Erro ao salvar preferências:", upsertError);
-        throw upsertError;
-      }
-
-      console.log("Preferências salvas com sucesso!");
-      console.log("Gerando plano com preferências:", workoutPreferences);
-      toast.success("Preferências salvas com sucesso!");
-      toast.info("Gerando seu plano de treino personalizado...");
-      
       onSubmit(workoutPreferences);
-    } catch (error: any) {
-      console.error("Erro ao processar formulário:", error);
-      toast.error(error.message || "Erro ao salvar preferências. Por favor, tente novamente.");
+      toast.success("Plano de treino sendo gerado...");
+
+    } catch (error) {
+      console.error('Erro ao processar formulário:', error);
+      toast.error("Erro ao processar sua solicitação. Por favor, tente novamente.");
+    } finally {
+      setIsGrantingAccess(false);
     }
   };
 
@@ -162,12 +171,12 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
               <Button 
                 type="submit" 
                 className="w-full"
-                disabled={!isValid || isProcessingPayment}
+                disabled={!isValid || isProcessingPayment || isGrantingAccess}
                 size="lg"
               >
-                Gerar Plano de Treino
-                {!isProcessingPayment && <ArrowRight className="w-5 h-5 ml-2" />}
-                {isProcessingPayment && (
+                {isGrantingAccess ? "Processando..." : "Gerar Plano de Treino"}
+                {!isProcessingPayment && !isGrantingAccess && <ArrowRight className="w-5 h-5 ml-2" />}
+                {(isProcessingPayment || isGrantingAccess) && (
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white ml-2" />
                 )}
               </Button>

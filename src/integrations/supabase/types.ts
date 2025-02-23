@@ -862,6 +862,36 @@ export type Database = {
         }
         Relationships: []
       }
+      plan_generation_counts: {
+        Row: {
+          created_at: string
+          id: string
+          nutrition_count: number | null
+          rehabilitation_count: number | null
+          updated_at: string
+          user_id: string | null
+          workout_count: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          nutrition_count?: number | null
+          rehabilitation_count?: number | null
+          updated_at?: string
+          user_id?: string | null
+          workout_count?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          nutrition_count?: number | null
+          rehabilitation_count?: number | null
+          updated_at?: string
+          user_id?: string | null
+          workout_count?: number | null
+        }
+        Relationships: []
+      }
       product_categories: {
         Row: {
           category_id: string
