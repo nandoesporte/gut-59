@@ -41,6 +41,32 @@ export interface Meal {
   };
 }
 
+export interface DailyPlan {
+  dayName: string;
+  meals: {
+    breakfast: Meal;
+    morningSnack: Meal;
+    lunch: Meal;
+    afternoonSnack: Meal;
+    dinner: Meal;
+  };
+  dailyTotals: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fats: number;
+    fiber: number;
+  };
+}
+
+export interface WeeklyTotals {
+  averageCalories: number;
+  averageProtein: number;
+  averageCarbs: number;
+  averageFats: number;
+  averageFiber: number;
+}
+
 export interface DietaryPreferences {
   hasAllergies: boolean;
   allergies: string[];
@@ -49,20 +75,16 @@ export interface DietaryPreferences {
 }
 
 export interface MealPlan {
-  dailyPlan: {
-    breakfast: Meal;
-    morningSnack: Meal;
-    lunch: Meal;
-    afternoonSnack: Meal;
-    dinner: Meal;
+  weeklyPlan: {
+    monday: DailyPlan;
+    tuesday: DailyPlan;
+    wednesday: DailyPlan;
+    thursday: DailyPlan;
+    friday: DailyPlan;
+    saturday: DailyPlan;
+    sunday: DailyPlan;
   };
-  totalNutrition: {
-    calories: number;
-    protein: number;
-    carbs: number;
-    fats: number;
-    fiber: number;
-  };
+  weeklyTotals: WeeklyTotals;
   recommendations: {
     general: string;
     preworkout: string;
