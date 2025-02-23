@@ -33,13 +33,43 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
         }
       } catch (error) {
         console.error('Error fetching price:', error);
-        // Fallback to default price if there's an error
         setCurrentPrice(19.90);
       }
     };
 
     fetchCurrentPrice();
   }, [planType]);
+
+  const updatePaymentStatus = async (userId: string, preferenceId: string) => {
+    try {
+      const { error } = await supabase
+        .from('payments')
+        .insert({
+          user_id: userId,
+          preference_id: preferenceId,
+          plan_type: planType,
+          amount: currentPrice,
+          status: 'completed'
+        });
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error updating payment status:', error);
+    }
+  };
+
+  const showSuccessMessage = (planType: PlanType) => {
+    const messages = {
+      nutrition: "Seu plano nutricional está pronto para ser gerado!",
+      workout: "Seu plano de treino está pronto para ser gerado!",
+      rehabilitation: "Seu plano de reabilitação está pronto para ser gerado!"
+    };
+
+    toast.success("Pagamento confirmado com sucesso!", {
+      description: messages[planType],
+      duration: 5000
+    });
+  };
 
   const handlePaymentAndContinue = async () => {
     try {
@@ -61,7 +91,6 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
         rehabilitation: "Plano de Reabilitação Personalizado"
       };
 
-      // Create payment payload with current price
       const payload = {
         userId: userData.user.id,
         amount: currentPrice,
@@ -109,8 +138,22 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
 
           if (statusData?.isPaid) {
             clearInterval(checkInterval);
+            await updatePaymentStatus(userData.user.id, data.preferenceId);
             setHasPaid(true);
-            toast.success("Pagamento confirmado! Você já pode prosseguir.");
+            showSuccessMessage(planType);
+
+            // Registrar acesso ao plano
+            const { error: accessError } = await supabase
+              .from('plan_access')
+              .insert({
+                user_id: userData.user.id,
+                plan_type: planType,
+                is_active: true
+              });
+
+            if (accessError) {
+              console.error('Erro ao registrar acesso ao plano:', accessError);
+            }
           }
         } catch (error) {
           console.error('Erro ao verificar pagamento:', error);
