@@ -3,13 +3,6 @@ import { useState, useEffect } from "react";
 import { initMercadoPago } from "@mercadopago/sdk-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
 
 type PlanType = 'nutrition' | 'workout' | 'rehabilitation';
 
@@ -154,7 +147,6 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
             showSuccessMessage(planType);
 
             try {
-              // Insert diretamente na tabela plan_access
               const { error: accessError } = await supabase
                 .from('plan_access')
                 .insert({
@@ -188,30 +180,13 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
     }
   };
 
-  const PaymentConfirmationDialog = () => {
+  const getConfirmationMessage = () => {
     const messages = {
       nutrition: "Seu plano nutricional está pronto para ser gerado!",
       workout: "Seu plano de treino está pronto para ser gerado!",
       rehabilitation: "Seu plano de reabilitação está pronto para ser gerado!"
     };
-
-    return (
-      <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Pagamento Confirmado!</DialogTitle>
-            <DialogDescription>
-              <p className="mt-2">
-                {messages[planType]}
-              </p>
-              <p className="mt-4 text-sm text-gray-500">
-                Você pode prosseguir com a geração do seu plano.
-              </p>
-            </DialogDescription>
-          </DialogHeader>
-        </DialogContent>
-      </Dialog>
-    );
+    return messages[planType];
   };
 
   return {
@@ -220,6 +195,8 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
     hasPaid,
     currentPrice,
     handlePaymentAndContinue,
-    PaymentConfirmationDialog
+    showConfirmation,
+    setShowConfirmation,
+    confirmationMessage: getConfirmationMessage()
   };
 };
