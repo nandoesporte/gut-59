@@ -32,10 +32,6 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
   const handlePaymentSuccess = () => {
     setHasPaid(true);
     setShowConfirmation(true);
-    toast.success("Pagamento confirmado com sucesso!", {
-      description: getSuccessMessage(planType),
-      duration: 5000
-    });
   };
 
   const handlePaymentAndContinue = async () => {
