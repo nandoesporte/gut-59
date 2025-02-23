@@ -11,6 +11,7 @@ import { Apple, Activity, Stethoscope } from "lucide-react";
 
 export const AIAgentsTab = () => {
   const [editingPrompt, setEditingPrompt] = useState<AIAgentPrompt | null>(null);
+  const [selectedType, setSelectedType] = useState<AIAgentPrompt["agent_type"]>("meal_plan");
 
   const { data: prompts, refetch } = useQuery({
     queryKey: ['ai-agent-prompts'],
@@ -34,6 +35,11 @@ export const AIAgentsTab = () => {
     return prompts?.filter(prompt => prompt.agent_type === type) || [];
   };
 
+  const handleEdit = (prompt: AIAgentPrompt) => {
+    setEditingPrompt(prompt);
+    setSelectedType(prompt.agent_type);
+  };
+
   const renderPromptsList = (type: AIAgentPrompt["agent_type"]) => {
     const typePrompts = getPromptsForType(type);
 
@@ -52,7 +58,7 @@ export const AIAgentsTab = () => {
                 <Button 
                   variant="outline" 
                   size="sm"
-                  onClick={() => setEditingPrompt(prompt)}
+                  onClick={() => handleEdit(prompt)}
                 >
                   Editar
                 </Button>
@@ -69,7 +75,7 @@ export const AIAgentsTab = () => {
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="meal_plan">
+      <Tabs value={selectedType} onValueChange={(value) => setSelectedType(value as AIAgentPrompt["agent_type"])}>
         <TabsList className="mb-4">
           <TabsTrigger value="meal_plan" className="flex items-center gap-2">
             <Apple className="w-4 h-4" />
@@ -90,7 +96,7 @@ export const AIAgentsTab = () => {
             <Card>
               <CardContent className="p-6">
                 <h3 className="text-lg font-semibold mb-4">
-                  {editingPrompt ? 'Editar Prompt' : 'Novo Prompt'}
+                  {editingPrompt?.agent_type === 'meal_plan' ? 'Editar Prompt' : 'Novo Prompt'}
                 </h3>
                 <AgentPromptForm
                   type="meal_plan"
@@ -108,7 +114,7 @@ export const AIAgentsTab = () => {
             <Card>
               <CardContent className="p-6">
                 <h3 className="text-lg font-semibold mb-4">
-                  {editingPrompt ? 'Editar Prompt' : 'Novo Prompt'}
+                  {editingPrompt?.agent_type === 'workout' ? 'Editar Prompt' : 'Novo Prompt'}
                 </h3>
                 <AgentPromptForm
                   type="workout"
@@ -126,7 +132,7 @@ export const AIAgentsTab = () => {
             <Card>
               <CardContent className="p-6">
                 <h3 className="text-lg font-semibold mb-4">
-                  {editingPrompt ? 'Editar Prompt' : 'Novo Prompt'}
+                  {editingPrompt?.agent_type === 'physiotherapy' ? 'Editar Prompt' : 'Novo Prompt'}
                 </h3>
                 <AgentPromptForm
                   type="physiotherapy"
@@ -139,6 +145,16 @@ export const AIAgentsTab = () => {
           </div>
         </TabsContent>
       </Tabs>
+
+      {editingPrompt && (
+        <Button 
+          variant="outline" 
+          onClick={() => setEditingPrompt(null)}
+          className="mt-4"
+        >
+          Cancelar Edição
+        </Button>
+      )}
     </div>
   );
 };
