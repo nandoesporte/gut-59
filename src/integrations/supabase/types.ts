@@ -607,6 +607,36 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_notifications: {
+        Row: {
+          created_at: string
+          id: string
+          payment_id: string
+          plan_type: Database["public"]["Enums"]["plan_type"]
+          read: boolean | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          payment_id: string
+          plan_type: Database["public"]["Enums"]["plan_type"]
+          read?: boolean | null
+          status: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          payment_id?: string
+          plan_type?: Database["public"]["Enums"]["plan_type"]
+          read?: boolean | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       payment_settings: {
         Row: {
           created_at: string
