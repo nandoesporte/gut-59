@@ -39,10 +39,10 @@ export const generateWorkoutPDF = async (plan: WorkoutPlan) => {
       pdf.text('Exercícios:', 20, yOffset);
       yOffset += 10;
 
-      session.exercises.forEach((exercise) => {
+      session.session_exercises.forEach((exerciseSession) => {
         pdf.setFontSize(10);
-        pdf.text(`• ${exercise.name}`, 25, yOffset);
-        pdf.text(`  ${exercise.sets} séries x ${exercise.reps} repetições (${exercise.rest_time_seconds}s descanso)`, 25, yOffset + 5);
+        pdf.text(`• ${exerciseSession.exercise.name}`, 25, yOffset);
+        pdf.text(`  ${exerciseSession.sets} séries x ${exerciseSession.reps} repetições (${exerciseSession.rest_time_seconds}s descanso)`, 25, yOffset + 5);
         yOffset += 15;
       });
 

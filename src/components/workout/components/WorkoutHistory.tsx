@@ -148,7 +148,7 @@ export const WorkoutHistoryView = ({ isLoading, historyPlans, onRefresh }: Worko
             <CollapsibleContent>
               <CardContent className="p-4 pt-0">
                 {plan.workout_sessions.map((session) => (
-                  <div key={session.day_number} className="border-t pt-4 mt-4 first:border-t-0 first:pt-0 first:mt-0">
+                  <div key={session.id} className="border-t pt-4 mt-4 first:border-t-0 first:pt-0 first:mt-0">
                     <div className="flex items-center gap-2 mb-3">
                       <Activity className="w-5 h-5 text-primary" />
                       <h4 className="font-medium">Dia {session.day_number}</h4>
@@ -156,29 +156,29 @@ export const WorkoutHistoryView = ({ isLoading, historyPlans, onRefresh }: Worko
                     <div className="ml-2 md:ml-4">
                       <p className="text-sm text-gray-600">{session.warmup_description}</p>
                       <ul className="list-none space-y-6 my-4">
-                        {session.exercises.map((exercise, idx) => (
-                          <li key={`${session.day_number}-${idx}`} className="text-sm">
+                        {session.session_exercises.map((exerciseSession, idx) => (
+                          <li key={`${session.id}-${idx}`} className="text-sm">
                             <div className="flex flex-col md:flex-row gap-4 items-start">
-                              {exercise.gifUrl && (
+                              {exerciseSession.exercise.gif_url && (
                                 <div className="w-full md:w-48 h-48 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                                   <img 
-                                    src={exercise.gifUrl} 
-                                    alt={exercise.name}
+                                    src={exerciseSession.exercise.gif_url} 
+                                    alt={exerciseSession.exercise.name}
                                     className="w-full h-full object-cover"
                                     loading="lazy"
                                   />
                                 </div>
                               )}
                               <div className="flex-grow">
-                                <span className="font-medium text-base">{exercise.name}</span>
+                                <span className="font-medium text-base">{exerciseSession.exercise.name}</span>
                                 <div className="text-gray-600 mt-1">
-                                  {exercise.sets} séries x {exercise.reps} repetições
+                                  {exerciseSession.sets} séries x {exerciseSession.reps} repetições
                                   <span className="text-gray-500 block mt-1">
-                                    Descanso: {exercise.rest_time_seconds} segundos
+                                    Descanso: {exerciseSession.rest_time_seconds} segundos
                                   </span>
                                 </div>
-                                {exercise.notes && (
-                                  <p className="text-sm text-gray-500 mt-2">{exercise.notes}</p>
+                                {exerciseSession.exercise.description && (
+                                  <p className="text-sm text-gray-500 mt-2">{exerciseSession.exercise.description}</p>
                                 )}
                               </div>
                             </div>

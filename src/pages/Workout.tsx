@@ -39,30 +39,7 @@ const Workout = () => {
 
       if (error) throw error;
       
-      // Transform the data to match WorkoutPlan type
-      const transformedPlans: WorkoutPlan[] = plans?.map(plan => ({
-        id: plan.id,
-        user_id: plan.user_id,
-        goal: plan.goal,
-        start_date: plan.start_date,
-        end_date: plan.end_date,
-        workout_sessions: plan.workout_sessions.map((session: any) => ({
-          day_number: session.day_number,
-          warmup_description: session.warmup_description,
-          cooldown_description: session.cooldown_description,
-          exercises: session.session_exercises.map((exerciseSession: any) => ({
-            name: exerciseSession.exercise.name,
-            sets: exerciseSession.sets,
-            reps: exerciseSession.reps,
-            rest_time_seconds: exerciseSession.rest_time_seconds,
-            gifUrl: exerciseSession.exercise.gif_url,
-            notes: exerciseSession.exercise.description
-          }))
-        })),
-        user_fitness_level: 'beginner' // Default value, adjust based on your needs
-      })) || [];
-
-      setHistoryPlans(transformedPlans);
+      setHistoryPlans(plans || []);
     } catch (error) {
       console.error('Error fetching workout history:', error);
     } finally {
