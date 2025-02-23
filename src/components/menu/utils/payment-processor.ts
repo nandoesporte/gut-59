@@ -38,6 +38,27 @@ export const createPaymentPreference = async (
     throw new Error('Falha ao criar pagamento. Por favor, tente novamente.');
   }
 
+  // Registra o pagamento no banco de dados
+  try {
+    const { error: paymentError } = await supabase
+      .from('payments')
+      .insert({
+        user_id: userData.user.id,
+        payment_id: data.preferenceId,
+        plan_type: planType,
+        amount: amount,
+        status: 'pending'
+      });
+
+    if (paymentError) {
+      console.error('Erro ao registrar pagamento:', paymentError);
+      throw new Error('Erro ao registrar pagamento. Por favor, tente novamente.');
+    }
+  } catch (error) {
+    console.error('Erro ao registrar pagamento:', error);
+    throw new Error('Erro ao registrar pagamento. Por favor, tente novamente.');
+  }
+
   return {
     preferenceId: data.preferenceId,
     initPoint: data.initPoint
@@ -83,46 +104,31 @@ export const checkPaymentStatus = async (
 
       const currentCount = countData ? countData[`${planType}_count`] : 0;
 
-      if (currentCount >= 3) {
-        // Reactivate payment requirement if count is 3 or more
-        const { error: grantError } = await supabase.functions.invoke('grant-plan-access', {
-          body: {
-            userId,
-            planType,
-            disablePayment: false, // Reactivate payment requirement
-          }
-        });
-
-        if (grantError) {
-          console.error('Erro ao reativar requisito de pagamento:', grantError);
-          throw grantError;
+      // Disable payment requirement through plan_access update
+      const { error: grantError } = await supabase.functions.invoke('grant-plan-access', {
+        body: {
+          userId,
+          planType,
+          disablePayment: true
         }
+      });
 
-        toast.warning("Você atingiu o limite de gerações do plano. Um novo pagamento será necessário para continuar.", {
+      if (grantError) {
+        console.error('Erro ao liberar acesso ao plano:', grantError);
+        throw grantError;
+      }
+
+      console.log('Acesso ao plano liberado com sucesso');
+      onSuccess();
+      
+      // Show appropriate message based on count
+      if (currentCount >= 3) {
+        toast.warning("Você atingiu o limite de gerações do plano. Um novo pagamento será necessário.", {
           duration: 6000,
-          position: 'top-center'
         });
       } else {
-        // Disable payment requirement
-        const { error: grantError } = await supabase.functions.invoke('grant-plan-access', {
-          body: {
-            userId,
-            planType,
-            disablePayment: true
-          }
-        });
-
-        if (grantError) {
-          console.error('Erro ao liberar acesso ao plano:', grantError);
-          throw grantError;
-        }
-
-        console.log('Acesso ao plano liberado com sucesso');
-        onSuccess();
-        
         toast.success("Pagamento confirmado! Você tem direito a 3 gerações do plano.", {
           duration: 5000,
-          position: 'top-center'
         });
       }
       
