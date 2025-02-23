@@ -46,38 +46,42 @@ serve(async (req) => {
       throw new Error('No suitable exercises found for the given preferences')
     }
 
-    // Create workout plan structure
-    const workoutPlan = {
-      user_id: userId,
-      goal: preferences.goal,
-      start_date: new Date(),
-      end_date: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000), // 28 days from now
-      workout_sessions: generateWorkoutSessions(exercises, preferences)
-    }
-
-    // Save the workout plan
-    const { data: plan, error: planError } = await supabase
+    // First create the workout plan
+    const { data: workoutPlan, error: planError } = await supabase
       .from('workout_plans')
-      .insert(workoutPlan)
-      .select('id')
+      .insert({
+        user_id: userId,
+        goal: preferences.goal,
+        start_date: new Date().toISOString(),
+        end_date: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString(), // 28 days from now
+      })
+      .select()
       .single()
 
     if (planError) throw planError
 
-    // Save workout sessions
-    for (const session of workoutPlan.workout_sessions) {
+    console.log('Created workout plan:', workoutPlan)
+
+    // Generate and save workout sessions
+    const sessions = generateWorkoutSessions(exercises, preferences)
+    const savedSessions = []
+
+    for (const session of sessions) {
+      // Create the workout session
       const { data: workoutSession, error: sessionError } = await supabase
         .from('workout_sessions')
         .insert({
-          plan_id: plan.id,
+          plan_id: workoutPlan.id,
           day_number: session.day_number,
           warmup_description: session.warmup_description,
           cooldown_description: session.cooldown_description
         })
-        .select('id')
+        .select()
         .single()
 
       if (sessionError) throw sessionError
+
+      console.log('Created workout session:', workoutSession)
 
       // Save session exercises
       for (const exercise of session.exercises) {
@@ -88,14 +92,38 @@ serve(async (req) => {
             exercise_id: exercise.id,
             sets: exercise.sets,
             reps: exercise.reps,
-            rest_time_seconds: exercise.rest_time_seconds
+            rest_time_seconds: exercise.rest_time_seconds,
+            order_in_session: session.exercises.indexOf(exercise)
           })
 
         if (exerciseError) throw exerciseError
       }
+
+      // Fetch the complete session with exercises
+      const { data: completeSession, error: fetchError } = await supabase
+        .from('workout_sessions')
+        .select(`
+          *,
+          session_exercises (
+            *,
+            exercise:exercises (*)
+          )
+        `)
+        .eq('id', workoutSession.id)
+        .single()
+
+      if (fetchError) throw fetchError
+
+      savedSessions.push(completeSession)
     }
 
-    return new Response(JSON.stringify(workoutPlan), {
+    // Return the complete workout plan with sessions
+    const response = {
+      ...workoutPlan,
+      workout_sessions: savedSessions
+    }
+
+    return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
@@ -151,7 +179,7 @@ function selectExercisesForSession(exercises: any[], preferences: any) {
   for (let i = 0; i < exercisesPerSession; i++) {
     const availableTypes = Object.keys(exercisesByType).filter(type => 
       exercisesByType[type].length > 0 &&
-      preferences.preferred_exercise_types.includes(type)
+      (!preferences.preferred_exercise_types?.length || preferences.preferred_exercise_types.includes(type))
     )
 
     if (availableTypes.length === 0) break
