@@ -7,7 +7,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 type PaymentConfirmationDialogProps = {
   open: boolean;
@@ -35,8 +37,19 @@ export const PaymentConfirmationDialog: React.FC<PaymentConfirmationDialogProps>
             <p className="mt-4 text-sm text-green-600 dark:text-green-400 font-medium">
               Você tem direito a gerar seu plano até 3 vezes!
             </p>
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              Após utilizar todas as gerações, será necessário um novo pagamento.
+            </p>
           </DialogDescription>
         </DialogHeader>
+        <DialogFooter>
+          <Button 
+            className="w-full" 
+            onClick={() => onOpenChange(false)}
+          >
+            Entendi
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
