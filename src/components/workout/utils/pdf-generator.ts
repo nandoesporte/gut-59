@@ -1,71 +1,113 @@
 
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
-import { toast } from "sonner";
-import { WorkoutPlan } from "../types/workout-plan";
+import { WorkoutPlan } from '../types/workout-plan';
+import { jsPDF } from 'jspdf';
+import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 export const generateWorkoutPDF = async (plan: WorkoutPlan) => {
   try {
-    const pdf = new jsPDF();
-    let yOffset = 20;
+    // Criar novo documento PDF
+    const doc = new jsPDF();
+    let yPos = 20;
+    const lineHeight = 10;
 
-    // Add title
-    pdf.setFontSize(20);
-    pdf.text('Plano de Treino Personalizado', 20, yOffset);
-    yOffset += 20;
+    // Adicionar título
+    doc.setFontSize(20);
+    doc.text('Plano de Treino', 105, yPos, { align: 'center' });
+    yPos += lineHeight * 2;
 
-    // Add plan period
-    pdf.setFontSize(12);
-    pdf.text(`Período: ${new Date(plan.start_date).toLocaleDateString()} - ${new Date(plan.end_date).toLocaleDateString()}`, 20, yOffset);
-    yOffset += 20;
+    // Adicionar informações do plano
+    doc.setFontSize(12);
+    doc.text(`Objetivo: ${translateGoal(plan.goal)}`, 20, yPos);
+    yPos += lineHeight;
+    doc.text(`Período: ${format(new Date(plan.start_date), 'dd/MM/yyyy')} - ${format(new Date(plan.end_date), 'dd/MM/yyyy')}`, 20, yPos);
+    yPos += lineHeight * 2;
 
-    plan.workout_sessions.forEach((session) => {
-      // Add day header
-      pdf.setFontSize(16);
-      pdf.text(`Dia ${session.day_number}`, 20, yOffset);
-      yOffset += 10;
+    // Para cada sessão de treino
+    if (plan.workout_sessions) {
+      plan.workout_sessions.sort((a, b) => a.day_number - b.day_number);
+      
+      for (const session of plan.workout_sessions) {
+        // Verificar se precisamos adicionar uma nova página
+        if (yPos > 250) {
+          doc.addPage();
+          yPos = 20;
+        }
 
-      // Add warmup
-      pdf.setFontSize(12);
-      pdf.text('Aquecimento:', 20, yOffset);
-      yOffset += 7;
-      pdf.setFontSize(10);
-      const warmupLines = pdf.splitTextToSize(session.warmup_description, 170);
-      pdf.text(warmupLines, 20, yOffset);
-      yOffset += (warmupLines.length * 5) + 10;
+        // Título da sessão
+        doc.setFontSize(16);
+        doc.text(`Dia ${session.day_number}`, 20, yPos);
+        yPos += lineHeight;
 
-      // Add exercises
-      pdf.setFontSize(12);
-      pdf.text('Exercícios:', 20, yOffset);
-      yOffset += 10;
+        // Aquecimento
+        if (session.warmup_description) {
+          doc.setFontSize(12);
+          doc.text('Aquecimento:', 20, yPos);
+          yPos += lineHeight;
+          doc.setFontSize(10);
+          doc.text(session.warmup_description, 30, yPos);
+          yPos += lineHeight;
+        }
 
-      session.session_exercises.forEach((exerciseSession) => {
-        pdf.setFontSize(10);
-        pdf.text(`• ${exerciseSession.exercise.name}`, 25, yOffset);
-        pdf.text(`  ${exerciseSession.sets} séries x ${exerciseSession.reps} repetições (${exerciseSession.rest_time_seconds}s descanso)`, 25, yOffset + 5);
-        yOffset += 15;
-      });
+        // Exercícios
+        if (session.session_exercises && session.session_exercises.length > 0) {
+          doc.setFontSize(12);
+          doc.text('Exercícios:', 20, yPos);
+          yPos += lineHeight;
 
-      // Add cooldown
-      pdf.setFontSize(12);
-      pdf.text('Volta à calma:', 20, yOffset);
-      yOffset += 7;
-      pdf.setFontSize(10);
-      const cooldownLines = pdf.splitTextToSize(session.cooldown_description, 170);
-      pdf.text(cooldownLines, 20, yOffset);
-      yOffset += (cooldownLines.length * 5) + 20;
+          for (const exerciseSession of session.session_exercises) {
+            // Verificar se precisamos adicionar uma nova página
+            if (yPos > 250) {
+              doc.addPage();
+              yPos = 20;
+            }
 
-      // Add new page if needed
-      if (yOffset > 250) {
-        pdf.addPage();
-        yOffset = 20;
+            const exercise = exerciseSession.exercise;
+            if (exercise) {
+              doc.setFontSize(10);
+              doc.text(`• ${exercise.name}`, 30, yPos);
+              doc.text(`${exerciseSession.sets}x${exerciseSession.reps} - Descanso: ${exerciseSession.rest_time_seconds}s`, 150, yPos);
+              yPos += lineHeight;
+            }
+          }
+        }
+
+        // Desaquecimento
+        if (session.cooldown_description) {
+          yPos += lineHeight;
+          doc.setFontSize(12);
+          doc.text('Desaquecimento:', 20, yPos);
+          yPos += lineHeight;
+          doc.setFontSize(10);
+          doc.text(session.cooldown_description, 30, yPos);
+          yPos += lineHeight * 1.5;
+        }
+
+        yPos += lineHeight; // Espaço extra entre sessões
       }
-    });
+    }
 
-    pdf.save('plano-de-treino.pdf');
-    toast.success("PDF gerado com sucesso!");
+    // Salvar o PDF
+    const fileName = `plano_treino_${format(new Date(), 'dd_MM_yyyy')}.pdf`;
+    doc.save(fileName);
+    toast.success('PDF gerado com sucesso!');
+
   } catch (error) {
-    console.error("Erro ao gerar PDF:", error);
-    toast.error("Erro ao gerar PDF");
+    console.error('Erro ao gerar PDF:', error);
+    toast.error('Erro ao gerar PDF. Por favor, tente novamente.');
+  }
+};
+
+// Função auxiliar para traduzir o objetivo
+const translateGoal = (goal: string): string => {
+  switch (goal) {
+    case 'lose_weight':
+      return 'Emagrecimento';
+    case 'gain_mass':
+      return 'Ganho de Massa';
+    case 'maintain':
+      return 'Manutenção';
+    default:
+      return goal;
   }
 };
