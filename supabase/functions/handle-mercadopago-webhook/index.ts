@@ -44,17 +44,19 @@ serve(async (req) => {
         const orderData = await orderResponse.json();
         console.log('Order data:', orderData);
 
-        // Get associated payment ID from the order
+        // Get associated payment ID and preference ID from the order
         const paymentId = orderData.payments?.[0]?.id;
-        if (!paymentId) {
-          console.log('No payment found in order');
+        const preferenceId = orderData.preference_id;
+
+        if (!paymentId || !preferenceId) {
+          console.log('No payment or preference ID found in order');
           return new Response(
-            JSON.stringify({ message: 'No payment found in order' }),
+            JSON.stringify({ message: 'No payment or preference ID found in order' }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
 
-        console.log('Found payment ID:', paymentId);
+        console.log('Found payment ID:', paymentId, 'and preference ID:', preferenceId);
 
         // Initialize Supabase client
         const supabaseClient = createClient(
@@ -68,11 +70,11 @@ serve(async (req) => {
           }
         );
 
-        // Get payment details from our database
+        // Get payment details from our database using preference_id
         const { data: paymentData, error: paymentError } = await supabaseClient
           .from('payments')
           .select('user_id, plan_type, status')
-          .eq('payment_id', paymentId)
+          .eq('payment_id', preferenceId)
           .maybeSingle();
 
         if (paymentError) {
@@ -81,7 +83,7 @@ serve(async (req) => {
         }
 
         if (!paymentData) {
-          console.log('No payment data found for payment ID:', paymentId);
+          console.log('No payment data found for preference ID:', preferenceId);
           return new Response(
             JSON.stringify({ message: 'Payment not found in database' }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -100,11 +102,15 @@ serve(async (req) => {
           );
         }
 
-        // Update payment status
+        // Update payment status in our database
         const { error: updateError } = await supabaseClient
           .from('payments')
-          .update({ status: 'completed' })
-          .eq('payment_id', paymentId);
+          .update({ 
+            status: 'completed',
+            // Store the actual payment ID from Mercado Pago as well
+            payment_id: paymentId.toString()
+          })
+          .eq('payment_id', preferenceId);
 
         if (updateError) {
           console.error('Error updating payment status:', updateError);
@@ -151,7 +157,7 @@ serve(async (req) => {
           .from('payment_notifications')
           .insert({
             user_id: paymentData.user_id,
-            payment_id: paymentId,
+            payment_id: paymentId.toString(),
             status: 'completed',
             plan_type: paymentData.plan_type
           });
