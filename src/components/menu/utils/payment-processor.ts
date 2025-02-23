@@ -74,27 +74,57 @@ export const checkPaymentStatus = async (
       // First, update payment status in the payments table
       await updatePaymentStatus(userId, preferenceId, planType, amount);
 
-      // Then explicitly call grant-plan-access to disable payment requirement
-      const { error: grantError } = await supabase.functions.invoke('grant-plan-access', {
-        body: {
-          userId,
-          planType,
-          disablePayment: true // This flag tells the function to disable payment requirement
+      // Then check generation count
+      const { data: countData } = await supabase
+        .from('plan_generation_counts')
+        .select(`${planType}_count`)
+        .eq('user_id', userId)
+        .single();
+
+      const currentCount = countData ? countData[`${planType}_count`] : 0;
+
+      if (currentCount >= 3) {
+        // Reactivate payment requirement if count is 3 or more
+        const { error: grantError } = await supabase.functions.invoke('grant-plan-access', {
+          body: {
+            userId,
+            planType,
+            disablePayment: false, // Reactivate payment requirement
+          }
+        });
+
+        if (grantError) {
+          console.error('Erro ao reativar requisito de pagamento:', grantError);
+          throw grantError;
         }
-      });
 
-      if (grantError) {
-        console.error('Erro ao liberar acesso ao plano:', grantError);
-        throw grantError;
+        toast.warning("Você atingiu o limite de gerações do plano. Um novo pagamento será necessário para continuar.", {
+          duration: 6000,
+          position: 'top-center'
+        });
+      } else {
+        // Disable payment requirement
+        const { error: grantError } = await supabase.functions.invoke('grant-plan-access', {
+          body: {
+            userId,
+            planType,
+            disablePayment: true
+          }
+        });
+
+        if (grantError) {
+          console.error('Erro ao liberar acesso ao plano:', grantError);
+          throw grantError;
+        }
+
+        console.log('Acesso ao plano liberado com sucesso');
+        onSuccess();
+        
+        toast.success("Pagamento confirmado! Você tem direito a 3 gerações do plano.", {
+          duration: 5000,
+          position: 'top-center'
+        });
       }
-
-      console.log('Acesso ao plano liberado com sucesso');
-      onSuccess();
-      
-      toast.success("Pagamento confirmado! Você tem direito a 3 gerações do plano.", {
-        duration: 5000,
-        position: 'top-center'
-      });
       
       return true;
     }
