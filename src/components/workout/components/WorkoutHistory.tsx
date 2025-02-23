@@ -2,9 +2,8 @@
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { WorkoutPlan } from '../types/workout-plan';
-import { Button } from '@/components/ui/button';
 import { Download, FileText } from 'lucide-react';
-import { generatePDF } from '../utils/pdf-generator';
+import { generateWorkoutPDF } from '../utils/pdf-generator';
 
 interface WorkoutHistoryProps {
   plans: WorkoutPlan[];
@@ -29,7 +28,7 @@ const WorkoutHistory: React.FC<WorkoutHistoryProps> = ({ plans }) => {
             <div className="flex gap-2">
               <div 
                 className="cursor-pointer hover:bg-gray-100 p-2 rounded-lg"
-                onClick={() => generatePDF(plan)}
+                onClick={() => generateWorkoutPDF(plan)}
               >
                 <Download className="h-5 w-5 text-gray-600" />
               </div>

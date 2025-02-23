@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { WorkoutPreferences } from '@/components/workout/types';
 import { PreferencesForm } from '@/components/workout/PreferencesForm';
 import { WorkoutPlanDisplay } from '@/components/workout/WorkoutPlanDisplay';
-import { WorkoutHistoryView } from '@/components/workout/components/WorkoutHistory';
+import WorkoutHistory from '@/components/workout/components/WorkoutHistory';
 import { Dumbbell } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import type { WorkoutPlan } from '@/components/workout/types/workout-plan';
@@ -80,10 +80,8 @@ const Workout = () => {
           )}
 
           <div className="mt-8">
-            <WorkoutHistoryView
-              isLoading={isLoadingHistory}
-              historyPlans={historyPlans}
-              onRefresh={fetchWorkoutHistory}
+            <WorkoutHistory
+              plans={historyPlans}
             />
           </div>
         </div>
