@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getPlanDescription } from "./payment-messages";
 import { updatePaymentStatus, grantPlanAccess } from "./payment-db";
+import { SUPABASE_URL } from "@/integrations/supabase/client";
 
 type PlanType = 'nutrition' | 'workout' | 'rehabilitation';
 
@@ -19,7 +20,7 @@ export const createPaymentPreference = async (
     userId: userData.user.id,
     amount: amount,
     description: getPlanDescription(planType),
-    notificationUrl: `${supabase.supabaseUrl}/functions/v1/handle-mercadopago-webhook`
+    notificationUrl: `${SUPABASE_URL}/functions/v1/handle-mercadopago-webhook`
   };
 
   console.log('Enviando payload para criação de preferência:', payload);
