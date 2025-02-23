@@ -1,10 +1,10 @@
-
 import { Card } from "@/components/ui/card";
 import { InitialMenuContent } from "@/components/menu/InitialMenuContent";
 import { CalorieCalculatorStep } from "@/components/menu/CalorieCalculatorStep";
 import { FoodSelector } from "@/components/menu/FoodSelector";
 import { DietaryPreferencesForm } from "@/components/menu/DietaryPreferencesForm";
 import { MealPlanDisplay } from "@/components/menu/MealPlanDisplay";
+import { MealPlanHistory } from "@/components/menu/MealPlanHistory";
 import { MenuHeader } from "@/components/menu/MenuHeader";
 import { useMenuController } from "@/components/menu/MenuController";
 import { Loader2 } from "lucide-react";
@@ -41,6 +41,7 @@ const Menu = () => {
           <div className="space-y-6">
             <MenuHeader onStart={() => setCurrentStep(1.5)} />
             <InitialMenuContent onStartDiet={() => setCurrentStep(1.5)} />
+            <MealPlanHistory />
           </div>
         );
       case 1.5:
