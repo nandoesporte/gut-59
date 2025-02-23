@@ -64,41 +64,26 @@ export const PaymentSettings = ({ user }: PaymentSettingsProps) => {
         r.planType === planType ? { ...r, isDisabling: true } : r
       ));
 
-      // Check if there's an existing plan access
-      const { data: existingAccess, error: queryError } = await supabase
+      // Primeiro, delete registros existentes para esse usuário e tipo de plano
+      await supabase
         .from('plan_access')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('plan_type', planType)
-        .maybeSingle();
+        .delete()
+        .match({ 
+          user_id: user.id, 
+          plan_type: planType 
+        });
 
-      if (queryError) throw queryError;
+      // Agora insere o novo registro
+      const { error: insertError } = await supabase
+        .from('plan_access')
+        .insert({
+          user_id: user.id,
+          plan_type: planType,
+          payment_required: !requirement.isRequired,
+          is_active: true
+        });
 
-      if (existingAccess) {
-        // Update existing plan access
-        const { error: updateError } = await supabase
-          .from('plan_access')
-          .update({
-            payment_required: !requirement.isRequired,
-            updated_at: new Date().toISOString()
-          })
-          .eq('user_id', user.id)
-          .eq('plan_type', planType);
-
-        if (updateError) throw updateError;
-      } else {
-        // Create new plan access
-        const { error: insertError } = await supabase
-          .from('plan_access')
-          .insert({
-            user_id: user.id,
-            plan_type: planType,
-            payment_required: !requirement.isRequired,
-            is_active: true
-          });
-
-        if (insertError) throw insertError;
-      }
+      if (insertError) throw insertError;
 
       // Update local state with new value
       setPaymentRequirements(prev => prev.map(r => 
