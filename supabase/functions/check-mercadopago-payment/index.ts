@@ -1,59 +1,112 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { corsHeaders } from '../_shared/cors.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-const mercadopagoAccessToken = 'APP_USR-3774959119809997-120919-64feef22e75e3a72fa939db6a1bf230d-86104137';
-
-serve(async (req) => {
+// Handle CORS preflight requests
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const { preferenceId } = await req.json();
-
-    if (!preferenceId) {
-      throw new Error('ID de preferência inválido');
+    const { paymentId } = await req.json()
+    
+    if (!paymentId) {
+      throw new Error('Payment ID is required')
     }
 
-    // Buscar pagamentos associados à preferência
-    const response = await fetch(`https://api.mercadopago.com/v1/payments/search?preference_id=${preferenceId}`, {
-      headers: {
-        'Authorization': `Bearer ${mercadopagoAccessToken}`,
-      },
-    });
+    console.log('Checking payment status for ID:', paymentId)
 
-    const data = await response.json();
+    // Create Supabase client
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    )
 
-    if (!response.ok) {
-      console.error('Erro MercadoPago:', data);
-      throw new Error('Erro ao verificar status do pagamento');
+    // First check in our database
+    const { data: paymentData, error: dbError } = await supabaseClient
+      .from('payments')
+      .select('status')
+      .eq('payment_id', paymentId)
+      .maybeSingle()
+
+    if (dbError) {
+      throw dbError
     }
 
-    // Verifica se existe algum pagamento aprovado
-    const isPaid = data.results.some(
-      (payment: any) => payment.status === 'approved'
-    );
+    if (paymentData?.status === 'completed') {
+      console.log('Payment already marked as completed in database')
+      return new Response(
+        JSON.stringify({ isPaid: true }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Check with MercadoPago
+    console.log('Checking payment status with MercadoPago API')
+    const mpResponse = await fetch(
+      `https://api.mercadopago.com/v1/payments/${paymentId}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get('MERCADOPAGO_ACCESS_TOKEN')}`
+        }
+      }
+    )
+
+    if (!mpResponse.ok) {
+      const errorText = await mpResponse.text()
+      console.error('MercadoPago API error:', errorText)
+      throw new Error(`Failed to check payment status: ${mpResponse.statusText}`)
+    }
+
+    const mpPayment = await mpResponse.json()
+    console.log('MercadoPago payment data:', JSON.stringify(mpPayment, null, 2))
+
+    const isPaid = mpPayment.status === 'approved'
+    
+    if (isPaid) {
+      console.log('Payment is approved')
+      // Update payment status in our database
+      const { error: updateError } = await supabaseClient
+        .from('payments')
+        .update({ 
+          status: 'completed',
+          updated_at: new Date().toISOString()
+        })
+        .eq('payment_id', paymentId)
+
+      if (updateError) {
+        console.error('Error updating payment status:', updateError)
+        throw updateError
+      }
+    }
 
     return new Response(
-      JSON.stringify({ isPaid }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+      JSON.stringify({ 
+        isPaid,
+        status: mpPayment.status,
+        paymentId 
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
 
   } catch (error) {
-    console.error('Erro:', error);
+    console.error('Error checking payment:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        status: 400,
+      JSON.stringify({ 
+        error: error.message,
+        details: error.toString() 
+      }),
+      { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400 
       }
-    );
+    )
   }
-});
+})

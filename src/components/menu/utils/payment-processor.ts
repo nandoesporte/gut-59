@@ -39,36 +39,28 @@ export const createPaymentPreference = async (
   }
 
   try {
-    const { data: existingPayment } = await supabase
+    // Delete any existing pending payments for this user and plan type
+    await supabase
       .from('payments')
-      .select('payment_id, status')
+      .delete()
       .eq('user_id', userData.user.id)
       .eq('plan_type', planType)
-      .eq('status', 'pending')
-      .maybeSingle();
+      .eq('status', 'pending');
 
-    if (existingPayment) {
-      const { error: updateError } = await supabase
-        .from('payments')
-        .update({
-          amount: amount,
-          updated_at: new Date().toISOString()
-        })
-        .eq('payment_id', existingPayment.payment_id);
+    // Create new payment record
+    const { error: insertError } = await supabase
+      .from('payments')
+      .insert({
+        user_id: userData.user.id,
+        payment_id: data.preferenceId,
+        plan_type: planType,
+        amount: amount,
+        status: 'pending'
+      });
 
-      if (updateError) throw updateError;
-    } else {
-      const { error: insertError } = await supabase
-        .from('payments')
-        .insert({
-          user_id: userData.user.id,
-          payment_id: data.preferenceId,
-          plan_type: planType,
-          amount: amount,
-          status: 'pending'
-        });
-
-      if (insertError) throw insertError;
+    if (insertError) {
+      console.error('Erro ao inserir pagamento:', insertError);
+      throw insertError;
     }
 
   } catch (error) {
@@ -83,21 +75,21 @@ export const createPaymentPreference = async (
 };
 
 export const checkPaymentStatus = async (
-  preferenceId: string,
+  paymentId: string,
   userId: string,
   planType: PlanType,
   amount: number,
   onSuccess: () => void
 ) => {
   try {
-    console.log('Verificando status do pagamento:', preferenceId);
+    console.log('Verificando status do pagamento:', paymentId);
     
-    // Primeiro verifica no nosso banco de dados
+    // Check payment status in our database first
     const { data: paymentData } = await supabase
       .from('payments')
       .select('status')
-      .eq('payment_id', preferenceId)
-      .single();
+      .eq('payment_id', paymentId)
+      .maybeSingle();
 
     if (paymentData?.status === 'completed') {
       console.log('Pagamento já está marcado como completo no banco de dados');
@@ -105,11 +97,11 @@ export const checkPaymentStatus = async (
       return true;
     }
 
-    // Se não estiver completo no banco, verifica com o Mercado Pago
+    // If not completed in database, check with Mercado Pago
     const { data: statusData, error: statusError } = await supabase.functions.invoke(
       'check-mercadopago-payment',
       {
-        body: { paymentId: preferenceId }
+        body: { paymentId }
       }
     );
 
@@ -123,16 +115,18 @@ export const checkPaymentStatus = async (
     if (statusData?.isPaid) {
       console.log('Pagamento confirmado, atualizando status...');
       
-      await updatePaymentStatus(userId, preferenceId, planType, amount);
+      await updatePaymentStatus(userId, paymentId, planType, amount);
 
+      // Check current plan generation count
       const { data: countData } = await supabase
         .from('plan_generation_counts')
         .select(`${planType}_count`)
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
       const currentCount = countData ? countData[`${planType}_count`] : 0;
 
+      // Grant plan access
       const { error: grantError } = await supabase.functions.invoke('grant-plan-access', {
         body: {
           userId,
