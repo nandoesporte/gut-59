@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { CreditCard } from "lucide-react";
-import { usePaymentHandling } from "./hooks/usePaymentHandling";
+import { usePaymentHandling } from "@/components/menu/hooks/usePaymentHandling";
 
 interface DietaryPreferencesFormProps {
   onSubmit: (preferences: DietaryPreferences) => void;
@@ -19,6 +19,8 @@ interface DietaryPreferences {
   dietaryRestrictions: string[];
   trainingTime: string | null;
 }
+
+type FormData = DietaryPreferences;
 
 export const DietaryPreferencesForm = ({ onSubmit, onBack }: DietaryPreferencesFormProps) => {
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
