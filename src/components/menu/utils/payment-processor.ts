@@ -73,6 +73,7 @@ export const checkPaymentStatus = async (
       await updatePaymentStatus(userId, preferenceId, planType, amount);
       await grantPlanAccess(userId, planType);
       onSuccess();
+      toast.success("Pagamento confirmado! Seu plano foi liberado.");
       return true;
     }
 

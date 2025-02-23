@@ -29,27 +29,43 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
     loadPrice();
   }, [planType]);
 
+  // Check URL parameters for payment status
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const status = urlParams.get('status');
+    const message = urlParams.get('message');
+
+    if (status === 'success' && message) {
+      setHasPaid(true);
+      setShowConfirmation(true);
+      // Clean up URL parameters
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
   const handlePaymentSuccess = () => {
     setHasPaid(true);
     setShowConfirmation(true);
+    toast.success("Pagamento confirmado com sucesso!");
   };
 
   const handlePaymentAndContinue = async () => {
     try {
       setIsProcessingPayment(true);
       
-      // Create the return URL with the success message
-      const returnUrl = new URL(window.location.href);
-      returnUrl.searchParams.set('payment_status', 'success');
-      returnUrl.searchParams.set('message', getSuccessMessage(planType));
-      
       const { preferenceId: newPreferenceId, initPoint } = await createPaymentPreference(planType, currentPrice);
       setPreferenceId(newPreferenceId);
       
-      // Add the return URL to the payment window
-      const paymentUrl = new URL(initPoint);
-      paymentUrl.searchParams.set('back_urls_success', returnUrl.toString());
+      // Add success URL with message
+      const successUrl = new URL(window.location.href);
+      successUrl.searchParams.set('status', 'success');
+      successUrl.searchParams.set('message', getSuccessMessage(planType));
       
+      // Add the success URL to the payment window URL
+      const paymentUrl = new URL(initPoint);
+      paymentUrl.searchParams.set('back_urls_success', successUrl.toString());
+      
+      // Open payment window
       window.open(paymentUrl.toString(), '_blank');
 
       // Start polling for payment status
@@ -70,6 +86,7 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
 
         if (isPaid) {
           clearInterval(checkInterval);
+          handlePaymentSuccess();
         }
       }, 5000);
 
