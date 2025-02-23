@@ -1,223 +1,187 @@
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { corsHeaders } from '../_shared/cors.ts'
+import { createClient } from '@supabase/supabase-js'
 
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Content-Type': 'application/json'
-};
+interface Meal {
+  calories: number;
+  macros: {
+    protein: number;
+    carbs: number;
+    fats: number;
+    fiber: number;
+  };
+}
 
-serve(async (req) => {
+interface WeeklyMealPlan {
+  [key: string]: {
+    breakfast: Meal;
+    morningSnack: Meal;
+    lunch: Meal;
+    afternoonSnack: Meal;
+    dinner: Meal;
+  }
+}
+
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { 
-      status: 204,
-      headers: corsHeaders 
-    });
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const { userData, selectedFoods, dietaryPreferences } = await req.json();
-    
-    console.log('Input data:', {
+    const {
       userData,
-      selectedFoodsCount: selectedFoods?.length,
+      selectedFoods,
       dietaryPreferences
-    });
+    } = await req.json()
 
-    const openAIKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openAIKey) {
-      return new Response(
-        JSON.stringify({ error: 'OpenAI API key not configured' }), 
-        { status: 500, headers: corsHeaders }
-      );
-    }
+    console.log('Generating meal plan with data:', {
+      userData,
+      foodCount: selectedFoods.length,
+      preferences: dietaryPreferences
+    })
 
-    const systemPrompt = `You are a nutrition expert API that returns ONLY raw JSON for a single day meal plan in Portuguese.
-    The response must be a valid JSON object with this exact structure:
+    // Generate a different plan for each day of the week
+    const weekDays = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']
+    const weeklyPlan: WeeklyMealPlan = {}
 
-    {
-      "dailyPlan": {
-        "breakfast": {
-          "description": "string",
-          "foods": [
-            {
-              "name": "string",
-              "portion": number,
-              "unit": "string",
-              "details": "string"
-            }
-          ],
-          "calories": number,
-          "macros": {
-            "protein": number,
-            "carbs": number,
-            "fats": number,
-            "fiber": number
+    for (const day of weekDays) {
+      // Randomize food selections for each day while respecting dietary preferences
+      const shuffledFoods = selectedFoods
+        .sort(() => Math.random() - 0.5)
+        .filter(food => {
+          // Apply dietary filters
+          if (dietaryPreferences.hasAllergies && 
+              food.allergies?.some(allergen => 
+                dietaryPreferences.allergies.includes(allergen))) {
+            return false
           }
-        },
-        "morningSnack": { same structure as breakfast },
-        "lunch": { same structure as breakfast },
-        "afternoonSnack": { same structure as breakfast },
-        "dinner": { same structure as breakfast }
-      },
-      "totalNutrition": {
-        "calories": number,
-        "protein": number,
-        "carbs": number,
-        "fats": number,
-        "fiber": number
-      },
-      "recommendations": {
-        "general": "string",
-        "preworkout": "string",
-        "postworkout": "string",
-        "timing": ["string"]
+          return true
+        })
+
+      const dailyPlan = {
+        breakfast: generateMeal('breakfast', shuffledFoods, userData.dailyCalories * 0.25),
+        morningSnack: generateMeal('morningSnack', shuffledFoods, userData.dailyCalories * 0.15),
+        lunch: generateMeal('lunch', shuffledFoods, userData.dailyCalories * 0.3),
+        afternoonSnack: generateMeal('afternoonSnack', shuffledFoods, userData.dailyCalories * 0.15),
+        dinner: generateMeal('dinner', shuffledFoods, userData.dailyCalories * 0.15)
       }
+
+      weeklyPlan[day] = dailyPlan
     }
 
-    Return ONLY the JSON object, no markdown or extra text.`;
+    // Calculate total nutrition for the week (average)
+    const totalNutrition = calculateWeeklyNutrition(weeklyPlan)
 
-    const userPrompt = `Create a daily meal plan with:
-    Target Daily Calories: ${userData.dailyCalories}kcal
-    Profile: ${userData.age} years, ${userData.gender}, ${userData.weight}kg
-    Goal: ${userData.goal}
-    Available Foods: ${selectedFoods.map(f => `${f.name} (${f.calories}kcal/100g, P:${f.protein}g, C:${f.carbs}g, F:${f.fats}g)`).join(', ')}
-    Dietary Restrictions: ${dietaryPreferences.dietaryRestrictions?.join(', ') || 'None'}
-    Allergies: ${dietaryPreferences.allergies?.join(', ') || 'None'}
-    Training Time: ${dietaryPreferences.trainingTime || 'Not specified'}
-
-    Requirements:
-    1. Use ONLY the provided foods
-    2. Keep daily calories close to the target
-    3. Include description and macros for each meal
-    4. All numeric values must be numbers, not strings
-    5. Return ONLY the raw JSON object
-    6. Include timing recommendations`;
-
-    console.log('Sending request to OpenAI...');
-
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: 0.7,
-      }),
-    });
-
-    if (!response.ok) {
-      console.error('OpenAI Error:', await response.text());
-      return new Response(
-        JSON.stringify({ error: 'Failed to generate meal plan' }), 
-        { status: 500, headers: corsHeaders }
-      );
+    const mealPlan = {
+      weeklyPlan,
+      totalNutrition,
+      recommendations: generateRecommendations(dietaryPreferences, userData)
     }
 
-    const data = await response.json();
-
-    if (!data.choices?.[0]?.message?.content) {
-      console.error('Invalid OpenAI response:', data);
-      return new Response(
-        JSON.stringify({ error: 'Invalid model response' }), 
-        { status: 500, headers: corsHeaders }
-      );
-    }
-
-    try {
-      const content = data.choices[0].message.content.trim()
-        .replace(/```json\n?/g, '')
-        .replace(/```\n?/g, '')
-        .trim();
-      
-      console.log('Raw content:', content);
-      const mealPlan = JSON.parse(content);
-      console.log('Successfully parsed JSON');
-
-      const meals = ['breakfast', 'morningSnack', 'lunch', 'afternoonSnack', 'dinner'];
-
-      // Validate structure
-      if (!mealPlan.dailyPlan) {
-        throw new Error('Missing dailyPlan');
-      }
-
-      for (const meal of meals) {
-        const mealData = mealPlan.dailyPlan[meal];
-        if (!mealData) {
-          throw new Error(`Missing ${meal}`);
-        }
-
-        if (typeof mealData.description !== 'string') {
-          throw new Error(`Missing description for ${meal}`);
-        }
-
-        if (!Array.isArray(mealData.foods)) {
-          throw new Error(`Invalid foods array for ${meal}`);
-        }
-
-        for (const food of mealData.foods) {
-          if (!food.name || typeof food.portion !== 'number' || !food.unit || !food.details) {
-            throw new Error(`Invalid food structure in ${meal}`);
-          }
-        }
-
-        if (typeof mealData.calories !== 'number') {
-          throw new Error(`Invalid calories for ${meal}`);
-        }
-
-        const macros = mealData.macros;
-        if (!macros || 
-            typeof macros.protein !== 'number' ||
-            typeof macros.carbs !== 'number' ||
-            typeof macros.fats !== 'number' ||
-            typeof macros.fiber !== 'number') {
-          throw new Error(`Invalid macros for ${meal}`);
-        }
-      }
-
-      const nutrition = mealPlan.totalNutrition;
-      if (!nutrition || 
-          typeof nutrition.calories !== 'number' ||
-          typeof nutrition.protein !== 'number' ||
-          typeof nutrition.carbs !== 'number' ||
-          typeof nutrition.fats !== 'number' ||
-          typeof nutrition.fiber !== 'number') {
-        throw new Error('Invalid totalNutrition');
-      }
-
-      if (!mealPlan.recommendations ||
-          typeof mealPlan.recommendations.general !== 'string' ||
-          typeof mealPlan.recommendations.preworkout !== 'string' ||
-          typeof mealPlan.recommendations.postworkout !== 'string' ||
-          !Array.isArray(mealPlan.recommendations.timing)) {
-        throw new Error('Invalid recommendations structure');
-      }
-
-      console.log('Validation successful, returning plan');
-      return new Response(
-        JSON.stringify(mealPlan),
-        { status: 200, headers: corsHeaders }
-      );
-
-    } catch (error) {
-      console.error('Error processing meal plan:', error);
-      return new Response(
-        JSON.stringify({ error: 'Failed to process meal plan: ' + error.message }), 
-        { status: 500, headers: corsHeaders }
-      );
-    }
-  } catch (error) {
-    console.error('Edge function error:', error);
     return new Response(
-      JSON.stringify({ error: error.message || 'Internal server error' }), 
-      { status: 500, headers: corsHeaders }
-    );
+      JSON.stringify(mealPlan),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+
+  } catch (error) {
+    console.error('Error generating meal plan:', error)
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
   }
-});
+})
+
+function calculateWeeklyNutrition(weeklyPlan: WeeklyMealPlan) {
+  const dailyTotals = Object.values(weeklyPlan).map(dailyPlan => {
+    const meals = Object.values(dailyPlan)
+    return meals.reduce((total, meal) => ({
+      calories: total.calories + meal.calories,
+      protein: total.protein + meal.macros.protein,
+      carbs: total.carbs + meal.macros.carbs,
+      fats: total.fats + meal.macros.fats,
+      fiber: total.fiber + meal.macros.fiber
+    }), {
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fats: 0,
+      fiber: 0
+    })
+  })
+
+  // Calculate average
+  const daysCount = dailyTotals.length
+  return {
+    calories: Math.round(dailyTotals.reduce((sum, day) => sum + day.calories, 0) / daysCount),
+    protein: Math.round(dailyTotals.reduce((sum, day) => sum + day.protein, 0) / daysCount),
+    carbs: Math.round(dailyTotals.reduce((sum, day) => sum + day.carbs, 0) / daysCount),
+    fats: Math.round(dailyTotals.reduce((sum, day) => sum + day.fats, 0) / daysCount),
+    fiber: Math.round(dailyTotals.reduce((sum, day) => sum + day.fiber, 0) / daysCount)
+  }
+}
+
+// Helper function to generate a single meal
+function generateMeal(mealType: string, foods: any[], targetCalories: number) {
+  const mealFoods = selectFoodsForMeal(foods, targetCalories);
+  
+  let totalCalories = 0;
+  let totalProtein = 0;
+  let totalCarbs = 0;
+  let totalFats = 0;
+  let totalFiber = 0;
+
+  mealFoods.forEach(food => {
+    totalCalories += food.calories;
+    totalProtein += food.protein || 0;
+    totalCarbs += food.carbs || 0;
+    totalFats += food.fats || 0;
+  });
+
+  return {
+    calories: Math.round(totalCalories),
+    macros: {
+      protein: Math.round(totalProtein),
+      carbs: Math.round(totalCarbs),
+      fats: Math.round(totalFats),
+      fiber: Math.round(totalFiber)
+    }
+  };
+}
+
+function selectFoodsForMeal(foods: any[], targetCalories: number) {
+  let selectedFoods = [];
+  let currentCalories = 0;
+  
+  // Sort foods by calorie density (calories per portion), ascending
+  const sortedFoods = [...foods].sort((a, b) => (a.calories / (a.portion || 100)) - (b.calories / (b.portion || 100)));
+
+  for (const food of sortedFoods) {
+    if (currentCalories + food.calories <= targetCalories) {
+      selectedFoods.push(food);
+      currentCalories += food.calories;
+    }
+    if (currentCalories >= targetCalories * 0.9) {
+      break; // Close enough
+    }
+  }
+  return selectedFoods;
+}
+
+function generateRecommendations(preferences: any, userData: any) {
+  return {
+    general: "Mantenha-se hidratado e tente seguir os horários sugeridos.",
+    preworkout: "Consuma carboidratos complexos 2-3 horas antes do treino.",
+    postworkout: "Priorize proteínas e carboidratos após o treino.",
+    timing: [
+      "Café da manhã: 7:00-8:00",
+      "Lanche da manhã: 10:00-10:30",
+      "Almoço: 12:00-13:00",
+      "Lanche da tarde: 15:00-15:30",
+      "Jantar: 19:00-20:00"
+    ]
+  }
+}
