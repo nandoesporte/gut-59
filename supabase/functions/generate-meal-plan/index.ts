@@ -1,364 +1,122 @@
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { corsHeaders } from '../_shared/cors.ts'
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const supabaseUrl = Deno.env.get('SUPABASE_URL')
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
-// Contador de tentativas para evitar loop infinito
-let attempts = 0;
-const MAX_ATTEMPTS = 3;
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { userData, selectedFoods } = await req.json()
-    const { userId, dailyCalories, goal } = userData
+    const { userData, selectedFoods, dietaryPreferences } = await req.json();
 
-    attempts++; // Incrementa o contador de tentativas
-    if (attempts > MAX_ATTEMPTS) {
-      attempts = 0; // Reset contador
-      throw new Error('Número máximo de tentativas excedido ao gerar plano alimentar');
-    }
-
-    // Criar cliente Supabase
-    const supabase = createClient(supabaseUrl!, supabaseServiceKey!)
-
-    // Buscar preferências dietéticas salvas do usuário
-    const { data: dietaryPrefs, error: prefsError } = await supabase
-      .from('dietary_preferences')
+    // Buscar o prompt ativo mais recente para planos alimentares
+    const { data: promptData, error: promptError } = await supabase
+      .from('ai_agent_prompts')
       .select('*')
-      .eq('user_id', userId)
-      .single()
+      .eq('agent_type', 'meal_plan')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(1);
 
-    if (prefsError && prefsError.code !== 'PGRST116') { // Ignora erro de não encontrado
-      throw new Error('Erro ao buscar preferências dietéticas: ' + prefsError.message)
-    }
+    if (promptError) throw new Error('Erro ao buscar prompt: ' + promptError.message);
+    if (!promptData || promptData.length === 0) throw new Error('Nenhum prompt ativo encontrado');
 
-    // Usar preferências salvas ou valores padrão
-    const dietaryPreferences = {
-      hasAllergies: dietaryPrefs?.has_allergies || false,
-      allergies: dietaryPrefs?.allergies || [],
-      dietaryRestrictions: dietaryPrefs?.dietary_restrictions || [],
-      trainingTime: dietaryPrefs?.training_time || null
-    }
+    const prompt = promptData[0].prompt;
 
-    // Calcular distribuição de macros
-    const macroTargets = calculateMacroDistribution(dailyCalories, goal);
-
-    // Filtrar alimentos baseado nas restrições salvas
-    let availableFoods = [...selectedFoods];
-    if (dietaryPreferences.hasAllergies && dietaryPreferences.allergies.length > 0) {
-      availableFoods = availableFoods.filter(food => 
-        !dietaryPreferences.allergies.some(allergy => 
-          food.name.toLowerCase().includes(allergy.toLowerCase())
-        )
-      );
-    }
-
-    // Filtrar alimentos baseado nas restrições dietéticas
-    if (dietaryPreferences.dietaryRestrictions.length > 0) {
-      availableFoods = availableFoods.filter(food => {
-        const restrictions = dietaryPreferences.dietaryRestrictions;
-        if (restrictions.includes('vegetarian')) {
-          return !food.food_category?.includes('meat');
-        }
-        if (restrictions.includes('vegan')) {
-          return !food.food_category?.some(cat => 
-            ['meat', 'dairy', 'eggs'].includes(cat)
-          );
-        }
-        return true;
-      });
-    }
-
-    // Verificar se há alimentos suficientes após filtragem
-    if (availableFoods.length < 5) {
-      throw new Error('Não há alimentos suficientes disponíveis após aplicar as restrições dietéticas');
-    }
-
-    // Gerar plano semanal considerando horário de treino
-    const weeklyPlan = {};
-    const trainingTime = dietaryPreferences.trainingTime;
-    
-    for (const day of ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']) {
-      let dayPlan;
-      if (trainingTime) {
-        const trainingHour = new Date(`2000-01-01T${trainingTime}`).getHours();
-        const adjustedDistribution = getAdjustedMealDistribution(trainingHour);
-        
-        dayPlan = {
-          breakfast: generateMeal(availableFoods, adjustedDistribution.breakfast * dailyCalories, 1),
-          morningSnack: generateMeal(availableFoods, adjustedDistribution.morningSnack * dailyCalories, 3),
-          lunch: generateMeal(availableFoods, adjustedDistribution.lunch * dailyCalories, 2),
-          afternoonSnack: generateMeal(availableFoods, adjustedDistribution.afternoonSnack * dailyCalories, 3),
-          dinner: generateMeal(availableFoods, adjustedDistribution.dinner * dailyCalories, 2)
-        };
-      } else {
-        const standardDistribution = {
-          breakfast: 0.25,
-          morningSnack: 0.15,
-          lunch: 0.30,
-          afternoonSnack: 0.10,
-          dinner: 0.20
-        };
-
-        dayPlan = {
-          breakfast: generateMeal(availableFoods, standardDistribution.breakfast * dailyCalories, 1),
-          morningSnack: generateMeal(availableFoods, standardDistribution.morningSnack * dailyCalories, 3),
-          lunch: generateMeal(availableFoods, standardDistribution.lunch * dailyCalories, 2),
-          afternoonSnack: generateMeal(availableFoods, standardDistribution.afternoonSnack * dailyCalories, 3),
-          dinner: generateMeal(availableFoods, standardDistribution.dinner * dailyCalories, 2)
-        };
-      }
-
-      weeklyPlan[day] = dayPlan;
-    }
-
-    // Gerar recomendações personalizadas
-    const recommendations = generateRecommendations(userData, dietaryPreferences);
-
-    // Calcular nutrição total
-    const totalNutrition = calculateTotalNutrition(weeklyPlan.Segunda);
-
-    const mealPlan = {
-      weeklyPlan,
-      totalNutrition,
-      recommendations,
+    // Preparar os dados para o modelo
+    const modelInput = {
+      prompt,
+      userData,
+      selectedFoods,
       dietaryPreferences
     };
 
-    // Analisar o plano gerado
-    try {
-      const { data: analysis } = await supabase.functions.invoke(
-        'analyze-meal-plan',
-        {
-          body: {
-            mealPlan,
-            userData,
-            dietaryPreferences
-          }
-        }
-      );
-
-      if (!analysis.isApproved) {
-        console.log('Plano não aprovado. Motivo:', analysis.analysis);
-        // Tenta gerar um novo plano
-        if (attempts < MAX_ATTEMPTS) {
-          return await serve(req);
-        } else {
-          attempts = 0; // Reset contador
-          throw new Error('Não foi possível gerar um plano adequado após várias tentativas');
-        }
-      }
-
-      // Plano aprovado - reset contador e inclui análise
-      attempts = 0;
-      mealPlan.recommendations.aiAnalysis = analysis.analysis;
-
-      return new Response(
-        JSON.stringify(mealPlan),
-        {
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json',
+    // Fazer a chamada para a API da OpenAI
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: prompt
           },
-        }
-      );
+          {
+            role: 'user',
+            content: JSON.stringify({
+              userData,
+              selectedFoods,
+              dietaryPreferences
+            })
+          }
+        ],
+        temperature: 0.7,
+      }),
+    });
 
-    } catch (analysisError) {
-      console.error('Erro na análise:', analysisError);
-      throw new Error('Erro ao analisar o plano alimentar: ' + analysisError.message);
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('OpenAI API error:', error);
+      throw new Error('Erro ao gerar plano alimentar');
     }
 
+    const aiResponse = await response.json();
+    let mealPlan;
+
+    try {
+      mealPlan = JSON.parse(aiResponse.choices[0].message.content);
+    } catch (error) {
+      console.error('Error parsing AI response:', error);
+      console.log('Raw AI response:', aiResponse.choices[0].message.content);
+      throw new Error('Erro ao processar resposta da IA');
+    }
+
+    // Validar e analisar o plano gerado
+    const { data: analysisData, error: analysisError } = await supabase.functions.invoke(
+      'analyze-meal-plan',
+      {
+        body: {
+          mealPlan,
+          userData,
+          dietaryPreferences
+        }
+      }
+    );
+
+    if (analysisError) {
+      console.error('Error in meal plan analysis:', analysisError);
+      throw new Error('Erro na análise do plano alimentar');
+    }
+
+    if (!analysisData.isApproved) {
+      throw new Error('O plano gerado não atende aos critérios nutricionais');
+    }
+
+    return new Response(JSON.stringify(mealPlan), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   } catch (error) {
     console.error('Error:', error);
-    attempts = 0; // Reset contador em caso de erro
-    return new Response(
-      JSON.stringify({ 
-        error: error.message,
-        details: error.stack
-      }), 
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      }
-    );
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });
-
-function generateMeal(foods: any[], targetCalories: number, foodGroupId: number) {
-  const groupFoods = foods.filter(food => food.food_group_id === foodGroupId);
-  if (groupFoods.length === 0) return null;
-
-  let meal = {
-    description: "Refeição balanceada com foco em nutrientes essenciais",
-    foods: [],
-    calories: 0,
-    macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
-  };
-
-  while (meal.calories < targetCalories && groupFoods.length > 0) {
-    const foodIndex = Math.floor(Math.random() * groupFoods.length);
-    const selectedFood = groupFoods[foodIndex];
-    
-    const portion = Math.min(
-      100,
-      ((targetCalories - meal.calories) / selectedFood.calories) * 100
-    );
-
-    if (portion < 20) break;
-
-    const foodWithPortion = {
-      name: selectedFood.name,
-      portion: Math.round(portion),
-      unit: selectedFood.portionUnit || 'g',
-      details: `${selectedFood.protein}g proteína, ${selectedFood.carbs}g carboidratos, ${selectedFood.fats}g gorduras`
-    };
-
-    meal.foods.push(foodWithPortion);
-    meal.calories += (selectedFood.calories * portion) / 100;
-    meal.macros.protein += (selectedFood.protein * portion) / 100;
-    meal.macros.carbs += (selectedFood.carbs * portion) / 100;
-    meal.macros.fats += (selectedFood.fats * portion) / 100;
-
-    groupFoods.splice(foodIndex, 1);
-  }
-
-  meal.calories = Math.round(meal.calories);
-  meal.macros.protein = Math.round(meal.macros.protein);
-  meal.macros.carbs = Math.round(meal.macros.carbs);
-  meal.macros.fats = Math.round(meal.macros.fats);
-
-  return meal;
-}
-
-function calculateMacroDistribution(totalCalories: number, goal: string) {
-  let proteinPercentage: number;
-  let carbsPercentage: number;
-  let fatsPercentage: number;
-
-  switch (goal) {
-    case 'gain_weight':
-      proteinPercentage = 0.25;
-      carbsPercentage = 0.55;
-      fatsPercentage = 0.20;
-      break;
-    case 'lose_weight':
-      proteinPercentage = 0.30;
-      carbsPercentage = 0.40;
-      fatsPercentage = 0.30;
-      break;
-    default:
-      proteinPercentage = 0.25;
-      carbsPercentage = 0.50;
-      fatsPercentage = 0.25;
-  }
-
-  return {
-    protein: Math.round((totalCalories * proteinPercentage) / 4),
-    carbs: Math.round((totalCalories * carbsPercentage) / 4),
-    fats: Math.round((totalCalories * fatsPercentage) / 9)
-  };
-}
-
-function calculateTotalNutrition(dayPlan: any) {
-  const total = {
-    calories: 0,
-    protein: 0,
-    carbs: 0,
-    fats: 0,
-    fiber: 0
-  };
-
-  Object.values(dayPlan).forEach((meal: any) => {
-    if (meal && meal.calories) {
-      total.calories += meal.calories;
-      total.protein += meal.macros.protein;
-      total.carbs += meal.macros.carbs;
-      total.fats += meal.macros.fats;
-      total.fiber += meal.macros.fiber || 0;
-    }
-  });
-
-  return total;
-}
-
-function getAdjustedMealDistribution(trainingHour: number) {
-  if (trainingHour < 10) {
-    return {
-      breakfast: 0.20,
-      morningSnack: 0.25,
-      lunch: 0.30,
-      afternoonSnack: 0.10,
-      dinner: 0.15
-    };
-  } else if (trainingHour < 16) {
-    return {
-      breakfast: 0.25,
-      morningSnack: 0.15,
-      lunch: 0.25,
-      afternoonSnack: 0.20,
-      dinner: 0.15
-    };
-  } else {
-    return {
-      breakfast: 0.25,
-      morningSnack: 0.15,
-      lunch: 0.30,
-      afternoonSnack: 0.15,
-      dinner: 0.15
-    };
-  }
-}
-
-function generateRecommendations(userData: any, preferences: any) {
-  const { goal, gender, age, activityLevel } = userData;
-  const { trainingTime } = preferences;
-
-  let recommendations = {
-    general: "Mantenha uma dieta equilibrada e variada.",
-    preworkout: "",
-    postworkout: "",
-    timing: []
-  };
-
-  switch (goal) {
-    case 'lose_weight':
-      recommendations.general = "Foque em alimentos com alta densidade nutricional e baixa densidade calórica. Priorize proteínas magras e vegetais.";
-      break;
-    case 'gain_weight':
-      recommendations.general = "Aumente gradualmente a ingestão calórica com alimentos nutritivos. Priorize proteínas e carboidratos complexos.";
-      break;
-    default:
-      recommendations.general = "Mantenha uma alimentação equilibrada com foco em alimentos integrais e naturais.";
-  }
-
-  if (trainingTime) {
-    const trainingHour = new Date(`2000-01-01T${trainingTime}`).getHours();
-    recommendations.preworkout = `Consuma carboidratos complexos 2-3 horas antes do treino (${trainingHour - 2}:00).`;
-    recommendations.postworkout = `Após o treino (${trainingHour + 1}:00), priorize proteínas e carboidratos para recuperação.`;
-
-    recommendations.timing = [
-      `Café da manhã: ${trainingHour - 4 < 6 ? '6:00' : `${trainingHour - 4}:00`}`,
-      `Lanche da manhã: ${trainingHour - 2}:00`,
-      `Almoço: ${trainingHour + 2 > 14 ? '12:00' : `${trainingHour + 2}:00`}`,
-      `Lanche da tarde: 15:30`,
-      `Jantar: 19:00`
-    ];
-  } else {
-    recommendations.timing = [
-      "Café da manhã: 7:00-8:00",
-      "Lanche da manhã: 10:00-10:30",
-      "Almoço: 12:00-13:00",
-      "Lanche da tarde: 15:00-15:30",
-      "Jantar: 19:00-20:00"
-    ];
-  }
-
-  return recommendations;
-}
