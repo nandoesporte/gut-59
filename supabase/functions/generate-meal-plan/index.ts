@@ -12,6 +12,16 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+const WEEK_DAYS = [
+  "Segunda-feira",
+  "Terça-feira",
+  "Quarta-feira",
+  "Quinta-feira",
+  "Sexta-feira",
+  "Sábado",
+  "Domingo"
+];
+
 const MEASUREMENT_GUIDELINES = `
 Use SEMPRE as seguintes unidades de medida ao descrever porções:
 
@@ -88,27 +98,45 @@ serve(async (req) => {
 
 ${MEASUREMENT_GUIDELINES}
 
-IMPORTANTE: Você DEVE retornar APENAS um objeto JSON válido com a seguinte estrutura:
+IMPORTANTE: Você DEVE gerar um cardápio diferente para CADA DIA DA SEMANA e retornar APENAS um objeto JSON válido com a seguinte estrutura:
 
 {
-  "dailyPlan": {
-    "breakfast": {
-      "description": string,
-      "foods": Array<{ name: string, portion: number, unit: string, details?: string }>,
-      "calories": number,
-      "macros": { protein: number, carbs: number, fats: number, fiber: number }
+  "weeklyPlan": {
+    "monday": {
+      "dayName": "Segunda-feira",
+      "meals": {
+        "breakfast": {
+          "description": string,
+          "foods": Array<{ name: string, portion: number, unit: string, details?: string }>,
+          "calories": number,
+          "macros": { protein: number, carbs: number, fats: number, fiber: number }
+        },
+        "morningSnack": { ... mesmo formato do café da manhã },
+        "lunch": { ... mesmo formato do café da manhã },
+        "afternoonSnack": { ... mesmo formato do café da manhã },
+        "dinner": { ... mesmo formato do café da manhã }
+      },
+      "dailyTotals": {
+        "calories": number,
+        "protein": number,
+        "carbs": number,
+        "fats": number,
+        "fiber": number
+      }
     },
-    "morningSnack": { ... mesmo formato do café da manhã },
-    "lunch": { ... mesmo formato do café da manhã },
-    "afternoonSnack": { ... mesmo formato do café da manhã },
-    "dinner": { ... mesmo formato do café da manhã }
+    "tuesday": { ... mesmo formato de segunda-feira },
+    "wednesday": { ... mesmo formato de segunda-feira },
+    "thursday": { ... mesmo formato de segunda-feira },
+    "friday": { ... mesmo formato de segunda-feira },
+    "saturday": { ... mesmo formato de segunda-feira },
+    "sunday": { ... mesmo formato de segunda-feira }
   },
-  "totalNutrition": {
-    "calories": number,
-    "protein": number,
-    "carbs": number,
-    "fats": number,
-    "fiber": number
+  "weeklyTotals": {
+    "averageCalories": number,
+    "averageProtein": number,
+    "averageCarbs": number,
+    "averageFats": number,
+    "averageFiber": number
   },
   "recommendations": {
     "general": string,
@@ -117,6 +145,14 @@ IMPORTANTE: Você DEVE retornar APENAS um objeto JSON válido com a seguinte est
     "timing": string[]
   }
 }
+
+REGRAS IMPORTANTES:
+1. Gere um cardápio DIFERENTE para cada dia da semana
+2. Mantenha as calorias e macronutrientes dentro das metas diárias
+3. Varie os alimentos para garantir diversidade nutricional
+4. Considere a rotina do usuário em cada dia da semana
+5. Use as unidades de medida especificadas acima
+6. NÃO repita as mesmas refeições em dias consecutivos
 
 NÃO inclua nenhum texto adicional, markdown ou explicações. Retorne APENAS o JSON.`;
 
@@ -139,7 +175,7 @@ NÃO inclua nenhum texto adicional, markdown ou explicações. Retorne APENAS o 
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4o',
         messages: [
           {
             role: 'system',
@@ -179,7 +215,7 @@ NÃO inclua nenhum texto adicional, markdown ou explicações. Retorne APENAS o 
       throw new Error('A resposta da IA não está no formato JSON esperado');
     }
 
-    if (!mealPlan || !mealPlan.dailyPlan) {
+    if (!mealPlan || !mealPlan.weeklyPlan) {
       console.error('Invalid meal plan structure:', mealPlan);
       throw new Error('Plano alimentar gerado com estrutura inválida');
     }
