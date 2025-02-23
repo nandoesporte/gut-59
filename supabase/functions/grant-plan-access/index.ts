@@ -6,6 +6,7 @@ interface RequestBody {
   userId: string
   planType: 'nutrition' | 'workout' | 'rehabilitation'
   disablePayment?: boolean
+  incrementCount?: boolean
 }
 
 const MAX_FREE_GENERATIONS = 3;
@@ -21,11 +22,85 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { userId, planType, disablePayment } = await req.json() as RequestBody
+    const { userId, planType, disablePayment, incrementCount } = await req.json() as RequestBody
+    console.log('Request received:', { userId, planType, disablePayment, incrementCount })
 
-    // If disablePayment is explicitly set, we're coming from the admin panel
-    if (disablePayment !== undefined) {
-      console.log('Admin disabling payment for user:', userId)
+    // Get current plan access status
+    const { data: planAccess } = await supabaseClient
+      .from('plan_access')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('plan_type', planType)
+      .single()
+
+    console.log('Current plan access:', planAccess)
+
+    // Get current generation count
+    const { data: genCount } = await supabaseClient
+      .from('plan_generation_counts')
+      .select('*')
+      .eq('user_id', userId)
+      .single()
+
+    console.log('Current generation count:', genCount)
+
+    let currentCount = 0;
+    const countField = `${planType}_count`;
+    if (genCount) {
+      currentCount = genCount[countField] || 0;
+    }
+
+    console.log('Current count for', planType, ':', currentCount)
+
+    // If incrementCount is true, we're generating a new plan
+    if (incrementCount) {
+      currentCount += 1;
+      console.log('Incrementing count to:', currentCount)
+
+      // Update generation count
+      const { error: countError } = await supabaseClient
+        .from('plan_generation_counts')
+        .upsert({
+          user_id: userId,
+          [countField]: currentCount,
+        })
+
+      if (countError) {
+        console.error('Error updating count:', countError)
+        throw countError
+      }
+
+      // If user has reached max generations, reactivate payment
+      if (currentCount >= MAX_FREE_GENERATIONS && !planAccess?.payment_required) {
+        console.log('Max generations reached, reactivating payment')
+        const { error: reactivateError } = await supabaseClient
+          .from('plan_access')
+          .upsert({
+            user_id: userId,
+            plan_type: planType,
+            payment_required: true,
+            is_active: true
+          })
+
+        if (reactivateError) throw reactivateError
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            requiresPayment: true,
+            message: "Você atingiu o limite de gerações gratuitas. Um novo pagamento é necessário."
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200
+          }
+        )
+      }
+    }
+
+    // If disablePayment is set (coming from payment confirmation)
+    if (disablePayment) {
+      console.log('Disabling payment requirement for user:', userId)
       const { error: updateError } = await supabaseClient
         .from('plan_access')
         .upsert({
@@ -36,74 +111,22 @@ Deno.serve(async (req) => {
         })
 
       if (updateError) throw updateError
-      return new Response(JSON.stringify({ success: true }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
-      })
-    }
 
-    // Check existing plan access and generation count
-    const { data: planAccess } = await supabaseClient
-      .from('plan_access')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('plan_type', planType)
-      .single()
-
-    const { data: genCount } = await supabaseClient
-      .from('plan_generation_counts')
-      .select('*')
-      .eq('user_id', userId)
-      .single()
-
-    let currentCount = 0;
-    switch (planType) {
-      case 'nutrition':
-        currentCount = genCount?.nutrition_count || 0;
-        break;
-      case 'workout':
-        currentCount = genCount?.workout_count || 0;
-        break;
-      case 'rehabilitation':
-        currentCount = genCount?.rehabilitation_count || 0;
-        break;
-    }
-
-    // If user has generated maximum plans, reactivate payment requirement
-    if (currentCount >= MAX_FREE_GENERATIONS && !planAccess?.payment_required) {
-      console.log(`User ${userId} reached max generations. Reactivating payment.`)
-      const { error: reactivateError } = await supabaseClient
-        .from('plan_access')
+      // Reset generation count when payment is confirmed
+      const { error: resetError } = await supabaseClient
+        .from('plan_generation_counts')
         .upsert({
           user_id: userId,
-          plan_type: planType,
-          payment_required: true,
-          is_active: true
+          [countField]: 0
         })
 
-      if (reactivateError) throw reactivateError
+      if (resetError) throw resetError
 
       return new Response(
         JSON.stringify({ 
-          success: true, 
-          requiresPayment: true,
-          message: "Você atingiu o limite de gerações gratuitas. Pagamento reativado."
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200
-        }
-      )
-    }
-
-    // If user has paid but hasn't reached max generations, continue allowing access
-    if (planAccess && !planAccess.payment_required) {
-      const remainingGenerations = MAX_FREE_GENERATIONS - currentCount;
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
+          success: true,
           requiresPayment: false,
-          remainingGenerations
+          remainingGenerations: MAX_FREE_GENERATIONS
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -112,11 +135,30 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Payment is required
+    // For regular checks (not incrementing or disabling)
+    if (planAccess?.payment_required) {
+      console.log('Payment required for user:', userId)
+      return new Response(
+        JSON.stringify({ 
+          success: true,
+          requiresPayment: true,
+          message: "É necessário realizar o pagamento para gerar um novo plano."
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200
+        }
+      )
+    }
+
+    const remainingGenerations = MAX_FREE_GENERATIONS - currentCount;
+    console.log('Remaining generations:', remainingGenerations)
+
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        requiresPayment: true 
+      JSON.stringify({
+        success: true,
+        requiresPayment: false,
+        remainingGenerations
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

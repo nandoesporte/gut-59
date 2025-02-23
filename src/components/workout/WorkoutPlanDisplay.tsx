@@ -76,11 +76,12 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
         return;
       }
 
-      // Check plan access and generation count
+      // Check plan access and increment generation count
       const { data: accessData, error: accessError } = await supabase.functions.invoke('grant-plan-access', {
         body: { 
           userId: user.id, 
-          planType: 'workout'
+          planType: 'workout',
+          incrementCount: true // This tells the function to increment the count
         }
       });
 
@@ -111,7 +112,8 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
       setWorkoutPlan(response);
       
       if (accessData?.remainingGenerations !== undefined) {
-        toast.success(`Plano gerado com sucesso! Você ainda tem ${accessData.remainingGenerations} gerações disponíveis.`);
+        const plural = accessData.remainingGenerations === 1 ? "geração" : "gerações";
+        toast.success(`Plano gerado com sucesso! Você ainda tem ${accessData.remainingGenerations} ${plural} disponível${accessData.remainingGenerations === 1 ? '' : 'is'}.`);
       } else {
         toast.success("Plano de treino gerado com sucesso!");
       }
