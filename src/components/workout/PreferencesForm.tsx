@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,22 +7,23 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { usePaymentHandling } from "@/components/menu/hooks/usePaymentHandling";
+import { WorkoutPreferences } from "./types";
 
 interface PreferencesFormProps {
-  onSubmit: (preferences: Preferences) => void;
-}
-
-interface Preferences {
-  trainingDays: string;
-  trainingTime: string;
-  level: string;
+  onSubmit: (preferences: WorkoutPreferences) => void;
 }
 
 export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
-  const [preferences, setPreferences] = useState<Preferences>({
-    trainingDays: "",
-    trainingTime: "",
-    level: "",
+  const [preferences, setPreferences] = useState<WorkoutPreferences>({
+    age: 0,
+    weight: 0,
+    height: 0,
+    gender: "male",
+    goal: "maintain",
+    activity_level: "moderate",
+    preferred_exercise_types: ["strength"],
+    available_equipment: [],
+    health_conditions: []
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -45,7 +47,7 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
     handlePaymentAndContinue,
     showConfirmation,
     setShowConfirmation
-  } = usePaymentHandling('workout'); // Note the 'workout' plan type
+  } = usePaymentHandling('workout');
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +63,7 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
       const { error: grantError } = await supabase.functions.invoke('grant-plan-access', {
         body: {
           userId: user.id,
-          planType: 'workout' as const // Explicitly type as 'workout'
+          planType: 'workout' as const
         }
       });
 
@@ -85,43 +87,83 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
         <h3 className="text-lg font-semibold">Preferências de Treino</h3>
 
         <div>
-          <Label htmlFor="trainingDays">Dias de Treino</Label>
+          <Label htmlFor="age">Idade</Label>
           <Input
-            type="text"
-            id="trainingDays"
-            name="trainingDays"
-            value={preferences.trainingDays}
-            onChange={handleInputChange}
-            placeholder="Ex: Seg, Qua, Sex"
-            className="w-full"
-          />
-        </div>
-
-        <div>
-          <Label htmlFor="trainingTime">Horário de Treino</Label>
-          <Input
-            type="time"
-            id="trainingTime"
-            name="trainingTime"
-            value={preferences.trainingTime}
+            type="number"
+            id="age"
+            name="age"
+            value={preferences.age}
             onChange={handleInputChange}
             className="w-full"
           />
         </div>
 
         <div>
-          <Label htmlFor="level">Nível de Experiência</Label>
+          <Label htmlFor="weight">Peso (kg)</Label>
+          <Input
+            type="number"
+            id="weight"
+            name="weight"
+            value={preferences.weight}
+            onChange={handleInputChange}
+            className="w-full"
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="height">Altura (cm)</Label>
+          <Input
+            type="number"
+            id="height"
+            name="height"
+            value={preferences.height}
+            onChange={handleInputChange}
+            className="w-full"
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="gender">Gênero</Label>
           <select
-            id="level"
-            name="level"
-            value={preferences.level}
+            id="gender"
+            name="gender"
+            value={preferences.gender}
             onChange={handleInputChange}
             className="w-full border rounded-md py-2 px-3"
           >
-            <option value="">Selecione</option>
-            <option value="beginner">Iniciante</option>
-            <option value="intermediate">Intermediário</option>
-            <option value="advanced">Avançado</option>
+            <option value="male">Masculino</option>
+            <option value="female">Feminino</option>
+          </select>
+        </div>
+
+        <div>
+          <Label htmlFor="goal">Objetivo</Label>
+          <select
+            id="goal"
+            name="goal"
+            value={preferences.goal}
+            onChange={handleInputChange}
+            className="w-full border rounded-md py-2 px-3"
+          >
+            <option value="lose_weight">Perder Peso</option>
+            <option value="maintain">Manter</option>
+            <option value="gain_mass">Ganhar Massa</option>
+          </select>
+        </div>
+
+        <div>
+          <Label htmlFor="activity_level">Nível de Atividade</Label>
+          <select
+            id="activity_level"
+            name="activity_level"
+            value={preferences.activity_level}
+            onChange={handleInputChange}
+            className="w-full border rounded-md py-2 px-3"
+          >
+            <option value="sedentary">Sedentário</option>
+            <option value="light">Leve</option>
+            <option value="moderate">Moderado</option>
+            <option value="intense">Intenso</option>
           </select>
         </div>
 
