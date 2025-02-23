@@ -17,6 +17,41 @@ export const createPaymentPreference = async (
     throw new Error('Erro ao obter dados do usuário');
   }
 
+  // Verificar configuração global de pagamento
+  const { data: paymentSettings, error: settingsError } = await supabase
+    .from('payment_settings')
+    .select('is_active')
+    .eq('plan_type', planType)
+    .single();
+
+  if (settingsError) {
+    console.error('Erro ao verificar configuração de pagamento:', settingsError);
+    throw new Error('Erro ao verificar configuração de pagamento');
+  }
+
+  // Se o pagamento não estiver ativo globalmente, não criar preferência
+  if (!paymentSettings?.is_active) {
+    throw new Error('Pagamento não é necessário para este plano');
+  }
+
+  // Verificar configuração específica do usuário
+  const { data: planAccess, error: accessError } = await supabase
+    .from('plan_access')
+    .select('payment_required')
+    .eq('user_id', userData.user.id)
+    .eq('plan_type', planType)
+    .maybeSingle();
+
+  if (accessError) {
+    console.error('Erro ao verificar acesso do usuário:', accessError);
+    throw new Error('Erro ao verificar acesso do usuário');
+  }
+
+  // Se o usuário tiver acesso especial sem necessidade de pagamento
+  if (planAccess && !planAccess.payment_required) {
+    throw new Error('Pagamento não é necessário para este usuário');
+  }
+
   const payload = {
     userId: userData.user.id,
     amount: amount,
@@ -162,3 +197,4 @@ export const checkPaymentStatus = async (
     return false;
   }
 };
+
