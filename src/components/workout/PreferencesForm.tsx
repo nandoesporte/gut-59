@@ -105,8 +105,15 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
         toast.info("Você atingiu o limite de gerações de plano gratuitas. Pagamento reativado.");
       }
 
+      // Ensure all required properties are present
       const workoutPreferences: WorkoutPreferences = {
-        ...data,
+        age: data.age,
+        weight: data.weight,
+        height: data.height,
+        gender: data.gender,
+        goal: data.goal,
+        activity_level: data.activity_level,
+        preferred_exercise_types: data.preferred_exercise_types,
         available_equipment: data.training_location === "gym" 
           ? ["all"] 
           : data.training_location === "home"
@@ -114,6 +121,7 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
           : data.training_location === "outdoors"
           ? ["bodyweight", "resistance-bands"]
           : ["bodyweight"],
+        health_conditions: [] // Providing default empty array for health conditions
       };
 
       onSubmit(workoutPreferences);
