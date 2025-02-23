@@ -21,7 +21,7 @@ type FormData = {
   name: string;
   description: string | null;
   prompt: string;
-  is_active: boolean;
+  is_active: boolean | null;
 };
 
 export const AgentPromptForm = ({ type, prompt, onSuccess }: AgentPromptFormProps) => {
@@ -40,10 +40,19 @@ export const AgentPromptForm = ({ type, prompt, onSuccess }: AgentPromptFormProp
     try {
       setIsLoading(true);
       
+      const { agent_type, name, description, prompt: promptText, is_active } = data;
+      const insertData = {
+        agent_type,
+        name,
+        description,
+        prompt: promptText,
+        is_active,
+      };
+      
       if (prompt?.id) {
         const { error } = await supabase
           .from('ai_agent_prompts')
-          .update(data)
+          .update(insertData)
           .eq('id', prompt.id);
           
         if (error) throw error;
@@ -51,7 +60,7 @@ export const AgentPromptForm = ({ type, prompt, onSuccess }: AgentPromptFormProp
       } else {
         const { error } = await supabase
           .from('ai_agent_prompts')
-          .insert(data);
+          .insert(insertData);
           
         if (error) throw error;
         toast.success('Prompt criado com sucesso');
@@ -124,7 +133,7 @@ export const AgentPromptForm = ({ type, prompt, onSuccess }: AgentPromptFormProp
               <FormLabel>Ativo</FormLabel>
               <FormControl>
                 <Switch
-                  checked={field.value}
+                  checked={field.value || false}
                   onCheckedChange={field.onChange}
                 />
               </FormControl>

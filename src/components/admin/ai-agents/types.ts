@@ -8,7 +8,7 @@ export interface AIAgentPrompt {
   description: string | null;
   prompt: string;
   created_at: string;
-  updated_at: string;
-  created_by: string;
-  is_active: boolean;
+  updated_at: string | null;
+  created_by: string | null;
+  is_active: boolean | null;
 }
