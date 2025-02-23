@@ -9,6 +9,42 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      ai_agent_prompts: {
+        Row: {
+          agent_type: Database["public"]["Enums"]["agent_type"]
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          prompt: string
+          updated_at: string | null
+        }
+        Insert: {
+          agent_type: Database["public"]["Enums"]["agent_type"]
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          prompt: string
+          updated_at?: string | null
+        }
+        Update: {
+          agent_type?: Database["public"]["Enums"]["agent_type"]
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          prompt?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           created_at: string
@@ -1880,6 +1916,7 @@ export type Database = {
     }
     Enums: {
       activity_level: "sedentary" | "light" | "moderate" | "intense"
+      agent_type: "meal_plan" | "workout" | "physiotherapy"
       app_role: "admin" | "user" | "personal"
       condition_type:
         | "plantar_fasciitis"

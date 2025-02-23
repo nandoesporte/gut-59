@@ -16,9 +16,17 @@ interface AgentPromptFormProps {
   onSuccess: () => void;
 }
 
+type FormData = {
+  agent_type: AgentType;
+  name: string;
+  description: string | null;
+  prompt: string;
+  is_active: boolean;
+};
+
 export const AgentPromptForm = ({ type, prompt, onSuccess }: AgentPromptFormProps) => {
   const [isLoading, setIsLoading] = useState(false);
-  const form = useForm<Omit<AIAgentPrompt, 'id' | 'created_at' | 'updated_at' | 'created_by'>>({
+  const form = useForm<FormData>({
     defaultValues: {
       agent_type: type,
       name: prompt?.name || '',
@@ -28,7 +36,7 @@ export const AgentPromptForm = ({ type, prompt, onSuccess }: AgentPromptFormProp
     },
   });
 
-  const onSubmit = async (data: Omit<AIAgentPrompt, 'id' | 'created_at' | 'updated_at' | 'created_by'>) => {
+  const onSubmit = async (data: FormData) => {
     try {
       setIsLoading(true);
       

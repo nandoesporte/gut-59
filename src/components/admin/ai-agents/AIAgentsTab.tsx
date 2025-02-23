@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AgentPromptForm } from "./AgentPromptForm";
 import type { AIAgentPrompt } from "./types";
-import { nutrition, activity, medicalCross } from "lucide-react";
+import { Apple, Activity, Stethoscope } from "lucide-react";
 
 export const AIAgentsTab = () => {
   const [editingPrompt, setEditingPrompt] = useState<AIAgentPrompt | null>(null);
@@ -72,15 +72,15 @@ export const AIAgentsTab = () => {
       <Tabs defaultValue="meal_plan">
         <TabsList className="mb-4">
           <TabsTrigger value="meal_plan" className="flex items-center gap-2">
-            <nutrition className="w-4 h-4" />
+            <Apple className="w-4 h-4" />
             Planos Alimentares
           </TabsTrigger>
           <TabsTrigger value="workout" className="flex items-center gap-2">
-            <activity className="w-4 h-4" />
+            <Activity className="w-4 h-4" />
             Treinos Personalizados
           </TabsTrigger>
           <TabsTrigger value="physiotherapy" className="flex items-center gap-2">
-            <medicalCross className="w-4 h-4" />
+            <Stethoscope className="w-4 h-4" />
             Fisioterapia
           </TabsTrigger>
         </TabsList>
