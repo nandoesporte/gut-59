@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { initMercadoPago } from "@mercadopago/sdk-react";
 import { toast } from "sonner";
@@ -29,25 +30,7 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
     loadPrice();
   }, [planType]);
 
-  const grantPlanAccess = async (userId: string) => {
-    try {
-      const { error: grantError } = await supabase.functions.invoke('grant-plan-access', {
-        body: {
-          userId,
-          planType
-        }
-      });
-
-      if (grantError) {
-        console.error('Erro ao liberar acesso ao plano:', grantError);
-        throw new Error('Erro ao liberar acesso ao plano');
-      }
-    } catch (error) {
-      console.error('Erro ao processar acesso ao plano:', error);
-      throw error;
-    }
-  };
-
+  // Effect to check payment status every 5 seconds when there's a preferenceId
   useEffect(() => {
     const startPaymentCheck = async () => {
       if (!preferenceId || hasPaid) return;
@@ -73,20 +56,30 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
           }
           handlePaymentSuccess();
 
-          try {
-            await grantPlanAccess(userData.user.id);
-          } catch (error) {
+          // Grant access to the plan
+          const { error: grantError } = await supabase.functions.invoke('grant-plan-access', {
+            body: { 
+              userId: userData.user.id,
+              planType: planType
+            }
+          });
+
+          if (grantError) {
+            console.error('Erro ao liberar acesso ao plano:', grantError);
             toast.error("Erro ao liberar acesso ao plano. Por favor, contate o suporte.");
             return;
           }
         }
       };
 
+      // Inicia verificação imediata
       checkPayment();
 
+      // Configura intervalo de 5 segundos
       const intervalId = window.setInterval(checkPayment, 5000);
       setCheckInterval(intervalId);
 
+      // Limpa intervalo após 10 minutos
       const timeoutId = window.setTimeout(() => {
         window.clearInterval(intervalId);
         setCheckInterval(null);
@@ -101,6 +94,7 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
     startPaymentCheck();
   }, [preferenceId, hasPaid, planType, currentPrice]);
 
+  // Check URL parameters for payment status
   useEffect(() => {
     const checkURLParameters = () => {
       const urlParams = new URLSearchParams(window.location.search);
@@ -111,6 +105,7 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
         setHasPaid(true);
         setShowConfirmation(true);
         toast.success("Pagamento confirmado com sucesso!");
+        // Clean up URL parameters
         window.history.replaceState({}, '', window.location.pathname);
       }
     };
@@ -123,6 +118,7 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
     };
   }, []);
 
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (checkInterval) {
@@ -150,13 +146,16 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
       const { preferenceId: newPreferenceId, initPoint } = await createPaymentPreference(planType, currentPrice);
       setPreferenceId(newPreferenceId);
       
+      // Add success URL with message
       const successUrl = new URL(window.location.href);
       successUrl.searchParams.set('status', 'success');
       successUrl.searchParams.set('message', getSuccessMessage(planType));
       
+      // Add the success URL to the payment window URL
       const paymentUrl = new URL(initPoint);
       paymentUrl.searchParams.set('back_urls_success', successUrl.toString());
       
+      // Open payment window
       window.open(paymentUrl.toString(), '_blank');
 
     } catch (error) {
