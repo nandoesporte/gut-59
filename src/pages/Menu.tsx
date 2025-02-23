@@ -1,3 +1,4 @@
+
 import { Card } from "@/components/ui/card";
 import { InitialMenuContent } from "@/components/menu/InitialMenuContent";
 import { CalorieCalculatorStep } from "@/components/menu/CalorieCalculatorStep";
@@ -77,7 +78,7 @@ const Menu = () => {
             {mealPlan && (
               <MealPlanDisplay 
                 mealPlan={mealPlan} 
-                onRefresh={async () => Promise.resolve()} // Fixed: return a Promise
+                onRefresh={async () => Promise.resolve()} 
               />
             )}
           </div>

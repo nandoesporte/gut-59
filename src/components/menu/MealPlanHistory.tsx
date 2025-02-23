@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FileDown, Trash2 } from "lucide-react";
@@ -20,15 +20,22 @@ import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-interface StoredMealPlan extends MealPlan {
+interface StoredMealPlan {
   id: string;
   created_at: string;
+  user_id: string;
+  plan_data: MealPlan;
+  active: boolean;
 }
 
 export const MealPlanHistory = () => {
   const [plans, setPlans] = useState<StoredMealPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchPlans();
+  }, []);
 
   const fetchPlans = async () => {
     try {
@@ -70,26 +77,13 @@ export const MealPlanHistory = () => {
     setDeleteId(null);
   };
 
-  const handleDownload = async (plan: MealPlan) => {
+  const handleDownload = async (plan: StoredMealPlan) => {
     try {
       const element = document.createElement('div');
       element.style.position = 'absolute';
       element.style.left = '-9999px';
       document.body.appendChild(element);
 
-      // Render plan content
-      const content = (
-        <div className="p-8">
-          {Object.entries(plan.weeklyPlan).map(([day, dayPlan]) => (
-            <div key={day} className="mb-8">
-              <h2 className="text-xl font-bold mb-4">{dayPlan.dayName}</h2>
-              {/* Add meal sections here */}
-            </div>
-          ))}
-        </div>
-      );
-
-      // Generate PDF
       await generateMealPlanPDF(element);
       document.body.removeChild(element);
     } catch (error) {
@@ -118,7 +112,7 @@ export const MealPlanHistory = () => {
                     Plano gerado em {format(new Date(plan.created_at), "d 'de' MMMM 'de' yyyy", { locale: ptBR })}
                   </h3>
                   <p className="text-sm text-gray-500 mt-1">
-                    Média diária: {Math.round(plan.weeklyTotals.averageCalories)} kcal
+                    Média diária: {Math.round(plan.plan_data.weeklyTotals.averageCalories)} kcal
                   </p>
                 </div>
                 <div className="flex gap-2">
