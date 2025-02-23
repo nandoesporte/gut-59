@@ -147,6 +147,16 @@ serve(async (req) => {
           throw paymentError;
         }
 
+        // Dispara um evento em tempo real para notificar o cliente
+        await supabase
+          .from('payment_notifications')
+          .insert({
+            user_id: userData.user_id,
+            payment_id: paymentId,
+            status: 'completed',
+            plan_type: userData.plan_type
+          });
+
         console.log(`[${requestId}][PROD] Granting access`);
         const { error: accessError } = await supabase.functions.invoke('grant-plan-access', {
           body: { userId: userData.user_id, planType: userData.plan_type }
