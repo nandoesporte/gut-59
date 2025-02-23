@@ -66,6 +66,7 @@ serve(async (req) => {
       const paymentId = webhookData.data.id;
       
       // Buscar detalhes do pagamento na API do Mercado Pago
+      console.log('Fetching payment details for ID:', paymentId);
       const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
         headers: {
           'Authorization': `Bearer ${mercadopagoAccessToken}`,
@@ -78,43 +79,56 @@ serve(async (req) => {
       }
 
       const paymentData = await response.json();
-      console.log('Payment details:', paymentData);
+      console.log('Full payment data:', paymentData);
 
+      // Verificar se o pagamento está aprovado
       if (paymentData.status === 'approved') {
-        try {
-          const externalReference = paymentData.external_reference;
-          if (!externalReference) {
-            throw new Error('Missing external_reference in payment data');
+        // Para pagamentos de teste, criar uma referência simulada
+        let userData;
+        
+        if (!paymentData.external_reference && webhookData.live_mode === false) {
+          console.log('Test payment detected, using simulated reference');
+          userData = {
+            user_id: "00000000-0000-0000-0000-000000000000",
+            plan_type: "nutrition"
+          };
+        } else if (paymentData.external_reference) {
+          try {
+            userData = JSON.parse(paymentData.external_reference);
+          } catch (error) {
+            console.error('Error parsing external_reference:', error);
+            throw new Error('Invalid external_reference format');
           }
-
-          const { user_id, plan_type } = JSON.parse(externalReference);
-
-          // Update payment status in database
-          const { error: paymentError } = await supabase
-            .from('payments')
-            .update({ status: 'completed' })
-            .match({ payment_id: paymentId });
-
-          if (paymentError) {
-            console.error('Error updating payment status:', paymentError);
-            throw paymentError;
-          }
-
-          // Grant plan access
-          const { error: accessError } = await supabase.functions.invoke('grant-plan-access', {
-            body: { userId: user_id, planType: plan_type }
-          });
-
-          if (accessError) {
-            console.error('Error granting plan access:', accessError);
-            throw accessError;
-          }
-
-          console.log('Payment processed successfully');
-        } catch (error) {
-          console.error('Error processing approved payment:', error);
-          throw error;
+        } else {
+          throw new Error('Missing external_reference in payment data');
         }
+
+        console.log('Processing payment with user data:', userData);
+
+        // Update payment status in database
+        const { error: paymentError } = await supabase
+          .from('payments')
+          .update({ status: 'completed' })
+          .match({ payment_id: paymentId });
+
+        if (paymentError) {
+          console.error('Error updating payment status:', paymentError);
+          throw paymentError;
+        }
+
+        // Grant plan access
+        const { error: accessError } = await supabase.functions.invoke('grant-plan-access', {
+          body: { userId: userData.user_id, planType: userData.plan_type }
+        });
+
+        if (accessError) {
+          console.error('Error granting plan access:', accessError);
+          throw accessError;
+        }
+
+        console.log('Payment processed successfully');
+      } else {
+        console.log('Payment not approved, status:', paymentData.status);
       }
     }
 
