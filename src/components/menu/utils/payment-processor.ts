@@ -2,7 +2,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getPlanDescription } from "./payment-messages";
-import { updatePaymentStatus, grantPlanAccess } from "./payment-db";
+import { updatePaymentStatus } from "./payment-db";
 
 type PlanType = 'nutrition' | 'workout' | 'rehabilitation';
 
@@ -71,38 +71,24 @@ export const checkPaymentStatus = async (
     if (statusData?.isPaid) {
       console.log('Pagamento confirmado, atualizando status...');
       
+      // First, update payment status in the payments table
       await updatePaymentStatus(userId, preferenceId, planType, amount);
 
-      // After payment is confirmed, disable payment requirement and reset generation count
-      const { error: accessError } = await supabase
-        .from('plan_access')
-        .upsert({
-          user_id: userId,
-          plan_type: planType,
-          payment_required: false,
-          is_active: true
-        });
+      // Then explicitly call grant-plan-access to disable payment requirement
+      const { error: grantError } = await supabase.functions.invoke('grant-plan-access', {
+        body: {
+          userId,
+          planType,
+          disablePayment: true // This flag tells the function to disable payment requirement
+        }
+      });
 
-      if (accessError) {
-        console.error('Erro ao atualizar acesso ao plano:', accessError);
-        throw accessError;
+      if (grantError) {
+        console.error('Erro ao liberar acesso ao plano:', grantError);
+        throw grantError;
       }
 
-      // Reset generation count for this plan type
-      const updateField = `${planType}_count`;
-      const { error: countError } = await supabase
-        .from('plan_generation_counts')
-        .upsert({
-          user_id: userId,
-          [updateField]: 0
-        });
-
-      if (countError) {
-        console.error('Erro ao resetar contagem de gerações:', countError);
-        throw countError;
-      }
-
-      console.log('Status atualizado, chamando callback de sucesso...');
+      console.log('Acesso ao plano liberado com sucesso');
       onSuccess();
       
       toast.success("Pagamento confirmado! Você tem direito a 3 gerações do plano.", {
