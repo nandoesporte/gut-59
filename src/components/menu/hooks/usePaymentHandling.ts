@@ -142,17 +142,18 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
             setHasPaid(true);
             showSuccessMessage(planType);
 
-            // Insert directly into plan_access table
-            const { error: accessError } = await supabase
-              .from('plan_access')
-              .insert({
-                user_id: userData.user.id,
-                plan_type: planType,
-                is_active: true
+            try {
+              // Call the stored function through a custom endpoint
+              const { error: accessError } = await supabase.functions.invoke('grant-plan-access', {
+                body: {
+                  userId: userData.user.id,
+                  planType: planType
+                }
               });
 
-            if (accessError) {
-              console.error('Erro ao registrar acesso ao plano:', accessError);
+              if (accessError) throw accessError;
+            } catch (error) {
+              console.error('Erro ao registrar acesso ao plano:', error);
               toast.error("Erro ao liberar acesso ao plano. Por favor, contate o suporte.");
             }
           }
