@@ -38,23 +38,19 @@ export const createPaymentPreference = async (
     throw new Error('Falha ao criar pagamento. Por favor, tente novamente.');
   }
 
-  // Registra o pagamento no banco de dados
   try {
-    // Primeiro verifica se já existe um pagamento pendente
     const { data: existingPayment } = await supabase
       .from('payments')
       .select('payment_id, status')
       .eq('user_id', userData.user.id)
       .eq('plan_type', planType)
       .eq('status', 'pending')
-      .single();
+      .maybeSingle();
 
-    // Se existir, atualiza com o novo preference_id
     if (existingPayment) {
       const { error: updateError } = await supabase
         .from('payments')
         .update({
-          payment_id: data.preferenceId,
           amount: amount,
           updated_at: new Date().toISOString()
         })
@@ -62,7 +58,6 @@ export const createPaymentPreference = async (
 
       if (updateError) throw updateError;
     } else {
-      // Se não existir, cria um novo
       const { error: insertError } = await supabase
         .from('payments')
         .insert({
@@ -114,7 +109,7 @@ export const checkPaymentStatus = async (
     const { data: statusData, error: statusError } = await supabase.functions.invoke(
       'check-mercadopago-payment',
       {
-        body: { preferenceId }
+        body: { paymentId: preferenceId }
       }
     );
 
