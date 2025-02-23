@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { UsersTab } from "@/components/admin/UsersTab";
 import { TrainingTab } from "@/components/admin/TrainingTab";
 import { ProfessionalsTab } from "@/components/admin/professionals/ProfessionalsTab";
+import { PaymentSettingsTab } from "@/components/admin/PaymentSettingsTab";
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -70,6 +71,7 @@ const Admin = () => {
           <TabsTrigger value="users">Usuários</TabsTrigger>
           <TabsTrigger value="training">Instruções</TabsTrigger>
           <TabsTrigger value="professionals">Profissionais</TabsTrigger>
+          <TabsTrigger value="payments">Pagamentos</TabsTrigger>
         </TabsList>
         <TabsContent value="users">
           <UsersTab />
@@ -79,6 +81,9 @@ const Admin = () => {
         </TabsContent>
         <TabsContent value="professionals">
           <ProfessionalsTab />
+        </TabsContent>
+        <TabsContent value="payments">
+          <PaymentSettingsTab />
         </TabsContent>
       </Tabs>
     </div>

@@ -607,6 +607,33 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_settings: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean | null
+          plan_type: Database["public"]["Enums"]["plan_type"]
+          price: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          plan_type: Database["public"]["Enums"]["plan_type"]
+          price?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          plan_type?: Database["public"]["Enums"]["plan_type"]
+          price?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount: number
@@ -1844,6 +1871,7 @@ export type Database = {
         | "spine"
         | "shoulder"
         | "elbow_hand"
+      plan_type: "workout" | "nutrition" | "rehabilitation"
       rehab_goal: "pain_relief" | "mobility" | "strength" | "return_to_sport"
       training_goal: "lose_weight" | "maintain" | "gain_mass"
       workout_goal: "lose_weight" | "maintain" | "gain_mass"
