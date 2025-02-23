@@ -51,12 +51,6 @@ const Navigation = () => {
             active={isActive("/")}
           />
           <NavLink
-            to="/menu"
-            icon={<UtensilsCrossed className="w-6 h-6 md:w-7 md:h-7" />}
-            text="Nutri"
-            active={isActive("/menu")}
-          />
-          <NavLink
             to="/instructions"
             icon={<Book className="w-6 h-6 md:w-7 md:h-7" />}
             text="Instruções"
@@ -67,6 +61,12 @@ const Navigation = () => {
             icon={<Dumbbell className="w-6 h-6 md:w-7 md:h-7" />}
             text="Treino"
             active={isActive("/workout")}
+          />
+          <NavLink
+            to="/menu"
+            icon={<UtensilsCrossed className="w-6 h-6 md:w-7 md:h-7" />}
+            text="Nutri"
+            active={isActive("/menu")}
           />
           <NavLink
             to="/fisio"
