@@ -30,7 +30,7 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
     loadPrice();
   }, [planType]);
 
-  // Effect to check payment status every 5 seconds when there's a preferenceId
+  // Effect to check payment status and notification channel
   useEffect(() => {
     const startPaymentCheck = async () => {
       if (!preferenceId || hasPaid) return;
@@ -45,7 +45,11 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
           userData.user.id,
           planType,
           currentPrice,
-          handlePaymentSuccess
+          () => {
+            setHasPaid(true);
+            setShowConfirmation(true);
+            toast.success("Pagamento confirmado com sucesso!");
+          }
         );
 
         if (isPaid) {
@@ -54,21 +58,7 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
             window.clearInterval(checkInterval);
             setCheckInterval(null);
           }
-          handlePaymentSuccess();
-
-          // Grant access to the plan
-          const { error: grantError } = await supabase.functions.invoke('grant-plan-access', {
-            body: { 
-              userId: userData.user.id,
-              planType: planType
-            }
-          });
-
-          if (grantError) {
-            console.error('Erro ao liberar acesso ao plano:', grantError);
-            toast.error("Erro ao liberar acesso ao plano. Por favor, contate o suporte.");
-            return;
-          }
+          setHasPaid(true);
         }
       };
 
@@ -92,52 +82,44 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
     };
 
     startPaymentCheck();
-  }, [preferenceId, hasPaid, planType, currentPrice]);
 
-  // Check URL parameters for payment status
-  useEffect(() => {
-    const checkURLParameters = () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const status = urlParams.get('status');
-      const message = urlParams.get('message');
+    // Subscribe to payment notifications channel
+    const channel = supabase
+      .channel('payment_notifications')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'payment_notifications',
+        filter: `plan_type=eq.${planType}`
+      }, async (payload) => {
+        console.log('Notificação de pagamento recebida:', payload);
+        
+        if (payload.new.status === 'completed') {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user?.id === payload.new.user_id) {
+            setHasPaid(true);
+            setShowConfirmation(true);
+            
+            // Reproduzir som de notificação
+            const audio = new Audio('/notification.mp3');
+            audio.play().catch(() => {});
+            
+            toast.success("Pagamento confirmado com sucesso!", {
+              description: "Seu plano foi liberado! Você pode gerar até 3 planos.",
+              duration: 6000,
+            });
+          }
+        }
+      })
+      .subscribe();
 
-      if (status === 'success' && message) {
-        setHasPaid(true);
-        setShowConfirmation(true);
-        toast.success("Pagamento confirmado com sucesso!");
-        // Clean up URL parameters
-        window.history.replaceState({}, '', window.location.pathname);
-      }
-    };
-
-    checkURLParameters();
-    window.addEventListener('popstate', checkURLParameters);
-
-    return () => {
-      window.removeEventListener('popstate', checkURLParameters);
-    };
-  }, []);
-
-  // Cleanup on unmount
-  useEffect(() => {
     return () => {
       if (checkInterval) {
         window.clearInterval(checkInterval);
       }
+      supabase.removeChannel(channel);
     };
-  }, [checkInterval]);
-
-  const handlePaymentSuccess = () => {
-    console.log("Pagamento confirmado, atualizando estado...");
-    setHasPaid(true);
-    setShowConfirmation(true);
-    toast.success("Pagamento confirmado com sucesso!");
-
-    if (checkInterval) {
-      window.clearInterval(checkInterval);
-      setCheckInterval(null);
-    }
-  };
+  }, [preferenceId, hasPaid, planType, currentPrice]);
 
   const handlePaymentAndContinue = async () => {
     try {
