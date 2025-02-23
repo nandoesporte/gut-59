@@ -125,6 +125,44 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
     try {
       setIsProcessingPayment(true);
       
+      // Verificar primeiro se o pagamento está habilitado
+      const { data: paymentSettings, error: settingsError } = await supabase
+        .from('payment_settings')
+        .select('is_active')
+        .eq('plan_type', planType)
+        .single();
+
+      if (settingsError) {
+        throw new Error('Erro ao verificar configuração de pagamento');
+      }
+
+      // Se o pagamento não estiver ativo globalmente, permitir continuar sem pagamento
+      if (!paymentSettings?.is_active) {
+        setHasPaid(true);
+        setShowConfirmation(true);
+        return;
+      }
+
+      // Verificar acesso específico do usuário
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) {
+        throw new Error('Usuário não autenticado');
+      }
+
+      const { data: planAccess } = await supabase
+        .from('plan_access')
+        .select('payment_required')
+        .eq('user_id', user.id)
+        .eq('plan_type', planType)
+        .maybeSingle();
+
+      // Se o usuário tiver acesso especial sem necessidade de pagamento
+      if (planAccess && !planAccess.payment_required) {
+        setHasPaid(true);
+        setShowConfirmation(true);
+        return;
+      }
+
       const { preferenceId: newPreferenceId, initPoint } = await createPaymentPreference(planType, currentPrice);
       setPreferenceId(newPreferenceId);
       
@@ -140,7 +178,15 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
       // Open payment window
       window.open(paymentUrl.toString(), '_blank');
 
-    } catch (error) {
+    } catch (error: any) {
+      // Se o erro for que o pagamento não é necessário, permitir continuar
+      if (error.message === 'Pagamento não é necessário para este plano' ||
+          error.message === 'Pagamento não é necessário para este usuário') {
+        setHasPaid(true);
+        setShowConfirmation(true);
+        return;
+      }
+      
       console.error('Erro completo:', error);
       toast.error(error instanceof Error ? error.message : "Erro ao processar pagamento");
     } finally {
