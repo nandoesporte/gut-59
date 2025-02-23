@@ -83,7 +83,8 @@ export const useMenuController = () => {
           carbs: food.carbs || 0,
           fats: food.fats || 0,
           portion: food.portion || 100,
-          portionUnit: food.portionUnit || 'g'
+          portionUnit: food.portionUnit || 'g',
+          food_group_id: food.food_group_id
         }));
 
       if (selectedFoodsDetails.length === 0) {
@@ -103,7 +104,7 @@ export const useMenuController = () => {
               age: Number(formData.age),
               gender: formData.gender,
               activityLevel: formData.activityLevel,
-              goal: formData.goal,
+              goal: formData.goal === "lose" ? "lose_weight" : formData.goal === "gain" ? "gain_weight" : "maintain",
               userId: userData.user.id,
               dailyCalories: calorieNeeds
             },
@@ -124,11 +125,38 @@ export const useMenuController = () => {
       }
 
       if (!mealPlanData || !mealPlanData.weeklyPlan || !mealPlanData.totalNutrition) {
+        console.error('Dados do plano recebidos:', mealPlanData);
         throw new Error('Estrutura inválida do plano alimentar recebido');
       }
 
+      // Transformar o plano semanal em plano diário para compatibilidade
+      const dailyPlan = {
+        breakfast: mealPlanData.weeklyPlan.Segunda.breakfast,
+        morningSnack: mealPlanData.weeklyPlan.Segunda.morningSnack,
+        lunch: mealPlanData.weeklyPlan.Segunda.lunch,
+        afternoonSnack: mealPlanData.weeklyPlan.Segunda.afternoonSnack,
+        dinner: mealPlanData.weeklyPlan.Segunda.dinner
+      };
+
+      const formattedMealPlan = {
+        dailyPlan,
+        totalNutrition: mealPlanData.totalNutrition,
+        recommendations: mealPlanData.recommendations || {
+          general: "Mantenha-se hidratado e tente seguir os horários sugeridos.",
+          preworkout: "Consuma carboidratos complexos 2-3 horas antes do treino.",
+          postworkout: "Priorize proteínas e carboidratos após o treino.",
+          timing: [
+            "Café da manhã: 7:00-8:00",
+            "Lanche da manhã: 10:00-10:30",
+            "Almoço: 12:00-13:00",
+            "Lanche da tarde: 15:00-15:30",
+            "Jantar: 19:00-20:00"
+          ]
+        }
+      };
+
       // Set the meal plan state first
-      setMealPlan(mealPlanData);
+      setMealPlan(formattedMealPlan);
 
       // Save dietary preferences
       const { error: dietaryError } = await supabase
@@ -153,7 +181,7 @@ export const useMenuController = () => {
         .from('meal_plans')
         .insert({
           user_id: userData.user.id,
-          plan_data: mealPlanData,
+          plan_data: formattedMealPlan,
           calories: calorieNeeds,
           dietary_preferences: {
             hasAllergies: preferences.hasAllergies || false,
