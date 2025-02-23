@@ -5,7 +5,8 @@ import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { usePaymentHandling } from "./hooks/usePaymentHandling";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ProtocolFood {
   id: string;
@@ -76,6 +77,49 @@ export const FoodSelector = ({
 }: FoodSelectorProps) => {
   const { isProcessingPayment, hasPaid, handlePaymentAndContinue } = usePaymentHandling();
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [paymentRequired, setPaymentRequired] = useState(true);
+
+  useEffect(() => {
+    const checkPaymentRequirement = async () => {
+      try {
+        // Verificar configuração global de pagamento
+        const { data: paymentSettings, error: settingsError } = await supabase
+          .from('payment_settings')
+          .select('is_active')
+          .eq('plan_type', 'nutrition')
+          .single();
+
+        if (settingsError) {
+          console.error('Erro ao verificar configurações de pagamento:', settingsError);
+          return;
+        }
+
+        // Se o pagamento não estiver ativo globalmente
+        if (!paymentSettings?.is_active) {
+          setPaymentRequired(false);
+          return;
+        }
+
+        // Verificar acesso específico do usuário
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user?.id) return;
+
+        const { data: planAccess } = await supabase
+          .from('plan_access')
+          .select('payment_required')
+          .eq('user_id', user.id)
+          .eq('plan_type', 'nutrition')
+          .maybeSingle();
+
+        // Se o usuário tiver acesso especial sem necessidade de pagamento
+        setPaymentRequired(planAccess?.payment_required !== false);
+      } catch (error) {
+        console.error('Erro ao verificar requisito de pagamento:', error);
+      }
+    };
+
+    checkPaymentRequirement();
+  }, []);
 
   const handleConfirm = async () => {
     if (selectedFoods.length === 0) {
@@ -83,7 +127,7 @@ export const FoodSelector = ({
       return;
     }
 
-    if (!hasPaid) {
+    if (paymentRequired && !hasPaid) {
       setShowPaymentDialog(true);
       return;
     }
@@ -105,31 +149,33 @@ export const FoodSelector = ({
         </p>
       </div>
 
-      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Desbloqueie seu Plano Alimentar Personalizado</DialogTitle>
-          </DialogHeader>
-          <div className="text-center space-y-4 py-4">
-            <p className="text-gray-600">
-              Por apenas R$ 19,90, tenha acesso ao seu plano alimentar personalizado com base nas suas preferências.
-            </p>
-            <Button
-              onClick={() => {
-                handlePaymentAndContinue();
-                setShowPaymentDialog(false);
-              }}
-              disabled={isProcessingPayment}
-              className="w-full max-w-md bg-green-500 hover:bg-green-600"
-            >
-              {isProcessingPayment ? 
-                "Processando..." : 
-                "Pagar R$ 19,90 e Continuar"
-              }
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {paymentRequired && (
+        <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Desbloqueie seu Plano Alimentar Personalizado</DialogTitle>
+            </DialogHeader>
+            <div className="text-center space-y-4 py-4">
+              <p className="text-gray-600">
+                Por apenas R$ 19,90, tenha acesso ao seu plano alimentar personalizado com base nas suas preferências.
+              </p>
+              <Button
+                onClick={() => {
+                  handlePaymentAndContinue();
+                  setShowPaymentDialog(false);
+                }}
+                disabled={isProcessingPayment}
+                className="w-full max-w-md bg-green-500 hover:bg-green-600"
+              >
+                {isProcessingPayment ? 
+                  "Processando..." : 
+                  "Pagar R$ 19,90 e Continuar"
+                }
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       <div className="space-y-6">
         <MealSection
