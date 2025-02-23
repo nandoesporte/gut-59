@@ -86,7 +86,12 @@ export const useWorkoutForm = (onSubmit: (data: WorkoutPreferences) => void, pay
       }
 
       if (grantResponse?.requiresPayment && paymentRequired) {
-        toast.info("Você atingiu o limite de gerações de plano gratuitas. Pagamento reativado.");
+        if (grantResponse?.remainingGenerations !== undefined) {
+          toast.info(`Você tem mais ${grantResponse.remainingGenerations} gerações gratuitas disponíveis.`);
+        } else {
+          toast.info("Você atingiu o limite de gerações de plano gratuitas. Pagamento reativado.");
+          return;
+        }
       }
 
       const workoutPreferences: WorkoutPreferences = {
