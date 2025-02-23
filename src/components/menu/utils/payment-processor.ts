@@ -1,10 +1,13 @@
 
-import { supabase, SUPABASE_URL } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getPlanDescription } from "./payment-messages";
 import { updatePaymentStatus, grantPlanAccess } from "./payment-db";
 
 type PlanType = 'nutrition' | 'workout' | 'rehabilitation';
+
+// Since this URL is already public in the client configuration, we can safely define it here
+const WEBHOOK_URL = "https://sxjafhzikftdenqnkcri.supabase.co/functions/v1/handle-mercadopago-webhook";
 
 export const createPaymentPreference = async (
   planType: PlanType,
@@ -19,7 +22,7 @@ export const createPaymentPreference = async (
     userId: userData.user.id,
     amount: amount,
     description: getPlanDescription(planType),
-    notificationUrl: `${SUPABASE_URL}/functions/v1/handle-mercadopago-webhook`
+    notificationUrl: WEBHOOK_URL
   };
 
   console.log('Enviando payload para criação de preferência:', payload);
