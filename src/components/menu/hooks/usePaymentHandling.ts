@@ -142,13 +142,13 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
             setHasPaid(true);
             showSuccessMessage(planType);
 
-            // For now, we'll use a direct query since the plan_access table
-            // is not yet in the TypeScript types. In a future update, we should 
-            // add it to the Database types.
+            // Insert directly into plan_access table
             const { error: accessError } = await supabase
-              .rpc('grant_plan_access', {
-                p_user_id: userData.user.id,
-                p_plan_type: planType
+              .from('plan_access')
+              .insert({
+                user_id: userData.user.id,
+                plan_type: planType,
+                is_active: true
               });
 
             if (accessError) {

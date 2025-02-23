@@ -1759,6 +1759,13 @@ export type Database = {
         }
         Returns: number
       }
+      grant_plan_access: {
+        Args: {
+          p_user_id: string
+          p_plan_type: string
+        }
+        Returns: undefined
+      }
       has_role: {
         Args: {
           role: Database["public"]["Enums"]["app_role"]
