@@ -87,13 +87,7 @@ export const useMenuController = () => {
           food_group_id: food.food_group_id
         }));
 
-      if (selectedFoodsDetails.length === 0) {
-        toast.dismiss(toastId);
-        toast.error("Erro ao processar alimentos selecionados");
-        return;
-      }
-
-      // Chamar a edge function para gerar o plano alimentar
+      // Gerar plano alimentar inicial
       const { data: mealPlanData, error: generateError } = await supabase.functions.invoke(
         'generate-meal-plan',
         {
@@ -109,12 +103,7 @@ export const useMenuController = () => {
               dailyCalories: calorieNeeds
             },
             selectedFoods: selectedFoodsDetails,
-            dietaryPreferences: {
-              hasAllergies: preferences.hasAllergies || false,
-              allergies: preferences.allergies || [],
-              dietaryRestrictions: preferences.dietaryRestrictions || [],
-              trainingTime: preferences.trainingTime || null
-            }
+            dietaryPreferences: preferences
           }
         }
       );
@@ -124,12 +113,41 @@ export const useMenuController = () => {
         throw new Error(generateError.message || 'Falha ao gerar cardápio');
       }
 
-      if (!mealPlanData || !mealPlanData.weeklyPlan || !mealPlanData.totalNutrition) {
-        console.error('Dados do plano recebidos:', mealPlanData);
-        throw new Error('Estrutura inválida do plano alimentar recebido');
+      // Analisar plano gerado
+      toast.loading("Analisando plano alimentar...", { id: toastId });
+      const { data: analysisData, error: analysisError } = await supabase.functions.invoke(
+        'analyze-meal-plan',
+        {
+          body: {
+            mealPlan: mealPlanData,
+            userData: {
+              weight: Number(formData.weight),
+              height: Number(formData.height),
+              age: Number(formData.age),
+              gender: formData.gender,
+              activityLevel: formData.activityLevel,
+              goal: formData.goal === "lose" ? "lose_weight" : formData.goal === "gain" ? "gain_weight" : "maintain",
+              dailyCalories: calorieNeeds
+            },
+            dietaryPreferences: preferences
+          }
+        }
+      );
+
+      if (analysisError) {
+        console.error('Erro na análise:', analysisError);
+        throw new Error(analysisError.message || 'Falha ao analisar cardápio');
       }
 
-      // Transformar o plano semanal em plano diário para compatibilidade
+      if (!analysisData.isApproved) {
+        console.log('Plano não aprovado. Análise:', analysisData.analysis);
+        toast.dismiss(toastId);
+        toast.error("O plano gerado não atendeu aos critérios. Gerando novo plano...");
+        // Tentar gerar novo plano
+        return handleDietaryPreferences(preferences);
+      }
+
+      // Transformar o plano semanal em plano diário
       const dailyPlan = {
         breakfast: mealPlanData.weeklyPlan.Segunda.breakfast,
         morningSnack: mealPlanData.weeklyPlan.Segunda.morningSnack,
@@ -141,21 +159,13 @@ export const useMenuController = () => {
       const formattedMealPlan = {
         dailyPlan,
         totalNutrition: mealPlanData.totalNutrition,
-        recommendations: mealPlanData.recommendations || {
-          general: "Mantenha-se hidratado e tente seguir os horários sugeridos.",
-          preworkout: "Consuma carboidratos complexos 2-3 horas antes do treino.",
-          postworkout: "Priorize proteínas e carboidratos após o treino.",
-          timing: [
-            "Café da manhã: 7:00-8:00",
-            "Lanche da manhã: 10:00-10:30",
-            "Almoço: 12:00-13:00",
-            "Lanche da tarde: 15:00-15:30",
-            "Jantar: 19:00-20:00"
-          ]
+        recommendations: {
+          ...mealPlanData.recommendations,
+          aiAnalysis: analysisData.analysis // Adicionar análise da IA às recomendações
         }
       };
 
-      // Set the meal plan state first
+      // Set the meal plan state
       setMealPlan(formattedMealPlan);
 
       // Save dietary preferences
@@ -199,7 +209,7 @@ export const useMenuController = () => {
       // Only change step after meal plan is set and saved
       setCurrentStep(4);
       toast.dismiss(toastId);
-      toast.success("Cardápio personalizado gerado com sucesso!");
+      toast.success("Cardápio personalizado gerado e validado com sucesso!");
 
     } catch (error) {
       console.error('Erro completo:', error);
