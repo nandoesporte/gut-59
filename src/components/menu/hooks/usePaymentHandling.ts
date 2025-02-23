@@ -38,9 +38,19 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
     try {
       setIsProcessingPayment(true);
       
+      // Create the return URL with the success message
+      const returnUrl = new URL(window.location.href);
+      returnUrl.searchParams.set('payment_status', 'success');
+      returnUrl.searchParams.set('message', getSuccessMessage(planType));
+      
       const { preferenceId: newPreferenceId, initPoint } = await createPaymentPreference(planType, currentPrice);
       setPreferenceId(newPreferenceId);
-      window.open(initPoint, '_blank');
+      
+      // Add the return URL to the payment window
+      const paymentUrl = new URL(initPoint);
+      paymentUrl.searchParams.set('back_urls_success', returnUrl.toString());
+      
+      window.open(paymentUrl.toString(), '_blank');
 
       // Start polling for payment status
       const checkInterval = setInterval(async () => {

@@ -3,6 +3,7 @@ import { ReactNode, useEffect, useState } from "react";
 import Navigation from "./Navigation";
 import { supabase } from "@/integrations/supabase/client";
 import { useLocation } from "react-router-dom";
+import { PaymentConfirmationDialog } from "./menu/components/PaymentConfirmationDialog";
 
 interface LayoutProps {
   children: ReactNode;
@@ -10,6 +11,8 @@ interface LayoutProps {
 
 const Layout = ({ children }: LayoutProps) => {
   const [hasNewMessage, setHasNewMessage] = useState(false);
+  const [showPaymentConfirmation, setShowPaymentConfirmation] = useState(false);
+  const [paymentMessage, setPaymentMessage] = useState("");
   const location = useLocation();
 
   useEffect(() => {
@@ -28,6 +31,16 @@ const Layout = ({ children }: LayoutProps) => {
           setHasNewMessage(true);
         })
         .subscribe();
+
+      // Check for payment confirmation in URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const paymentStatus = urlParams.get('payment_status');
+      const message = urlParams.get('message');
+      
+      if (paymentStatus === 'success' && message) {
+        setPaymentMessage(decodeURIComponent(message));
+        setShowPaymentConfirmation(true);
+      }
 
       return () => {
         supabase.removeChannel(channel);
@@ -69,6 +82,12 @@ const Layout = ({ children }: LayoutProps) => {
         {children}
       </main>
       <Navigation />
+      
+      <PaymentConfirmationDialog
+        open={showPaymentConfirmation}
+        onOpenChange={setShowPaymentConfirmation}
+        message={paymentMessage}
+      />
     </div>
   );
 };
