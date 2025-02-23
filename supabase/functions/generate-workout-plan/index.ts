@@ -1,194 +1,185 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { WorkoutPreferences } from "../_shared/types.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { corsHeaders } from "../_shared/cors.ts"
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-interface Exercise {
-  id: string;
-  name: string;
-  gif_url: string;
-  exercise_type: string;
-  muscle_group: string;
-  difficulty: string;
-  equipment_needed: string[];
-  goals: string[];
-  description: string;
-  rest_time_seconds: number;
-  min_reps: number;
-  max_reps: number;
-  min_sets: number;
-  max_sets: number;
-}
+const supabaseUrl = Deno.env.get('SUPABASE_URL')
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    const requestId = crypto.randomUUID();
-    console.log(`[${requestId}] Starting workout plan generation`);
+    const supabase = createClient(supabaseUrl!, supabaseServiceKey!)
+    const { preferences, userId } = await req.json()
 
-    const { preferences } = await req.json();
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    console.log('Received preferences:', preferences)
 
-    // Fetch exercises that match user preferences
-    const { data: exercises, error: exercisesError } = await supabase
+    // Fetch exercises based on preferences
+    let query = supabase
       .from('exercises')
       .select('*')
-      .in('exercise_type', preferences.preferred_exercise_types)
-      .contains('equipment_needed', preferences.available_equipment)
-      .contains('goals', [preferences.goal])
-      .not('gif_url', 'is', null);
+
+    // Filter by exercise type if specified
+    if (preferences.preferred_exercise_types && preferences.preferred_exercise_types.length > 0) {
+      query = query.in('exercise_type', preferences.preferred_exercise_types)
+    }
+
+    // Add equipment filter if specified
+    if (preferences.available_equipment && preferences.available_equipment.length > 0) {
+      if (!preferences.available_equipment.includes('all')) {
+        query = query.overlaps('equipment_needed', preferences.available_equipment)
+      }
+    }
+
+    const { data: exercises, error: exercisesError } = await query
 
     if (exercisesError) {
-      throw new Error('Error fetching exercises: ' + exercisesError.message);
+      throw exercisesError
     }
 
-    console.log(`[${requestId}] Found ${exercises?.length || 0} exercises`);
+    console.log(`Found ${exercises?.length || 0} matching exercises`)
 
     if (!exercises || exercises.length === 0) {
-      throw new Error('No suitable exercises found for the given preferences');
+      throw new Error('No suitable exercises found for the given preferences')
     }
 
-    // Group exercises by type for better distribution
-    const exercisesByType = exercises.reduce((acc, exercise) => {
-      if (!acc[exercise.exercise_type]) {
-        acc[exercise.exercise_type] = [];
-      }
-      acc[exercise.exercise_type].push(exercise);
-      return acc;
-    }, {} as Record<string, Exercise[]>);
-
-    // Generate a 7-day workout plan
+    // Create workout plan structure
     const workoutPlan = {
+      user_id: userId,
       goal: preferences.goal,
-      start_date: new Date().toISOString(),
-      end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      workout_sessions: Array.from({ length: 7 }, (_, dayIndex) => {
-        // Alternate between different exercise types
-        const dayType = preferences.preferred_exercise_types[dayIndex % preferences.preferred_exercise_types.length];
-        const availableExercises = exercisesByType[dayType] || [];
-        
-        // Select exercises for the day
-        const dayExercises = shuffleArray(availableExercises)
-          .slice(0, 6)
-          .map(exercise => ({
-            name: exercise.name,
-            sets: Math.floor((exercise.min_sets + exercise.max_sets) / 2),
-            reps: Math.floor((exercise.min_reps + exercise.max_reps) / 2),
-            rest_time_seconds: exercise.rest_time_seconds,
-            gifUrl: exercise.gif_url,
-            notes: exercise.description
-          }));
-
-        return {
-          day_number: dayIndex + 1,
-          warmup_description: generateWarmup(dayType),
-          cooldown_description: generateCooldown(dayType),
-          exercises: dayExercises
-        };
-      })
-    };
+      start_date: new Date(),
+      end_date: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000), // 28 days from now
+      workout_sessions: generateWorkoutSessions(exercises, preferences)
+    }
 
     // Save the workout plan
-    const { data: savedPlan, error: saveError } = await supabase
+    const { data: plan, error: planError } = await supabase
       .from('workout_plans')
-      .insert({
-        user_id: preferences.userId,
-        goal: preferences.goal,
-        start_date: workoutPlan.start_date,
-        end_date: workoutPlan.end_date
-      })
-      .select()
-      .single();
+      .insert(workoutPlan)
+      .select('id')
+      .single()
 
-    if (saveError) {
-      throw new Error('Error saving workout plan: ' + saveError.message);
-    }
+    if (planError) throw planError
 
     // Save workout sessions
     for (const session of workoutPlan.workout_sessions) {
-      const { data: savedSession, error: sessionError } = await supabase
+      const { data: workoutSession, error: sessionError } = await supabase
         .from('workout_sessions')
         .insert({
-          plan_id: savedPlan.id,
+          plan_id: plan.id,
           day_number: session.day_number,
           warmup_description: session.warmup_description,
           cooldown_description: session.cooldown_description
         })
-        .select()
-        .single();
+        .select('id')
+        .single()
 
-      if (sessionError) {
-        throw new Error('Error saving workout session: ' + sessionError.message);
-      }
+      if (sessionError) throw sessionError
 
-      // Save exercises for this session
-      const sessionExercises = session.exercises.map((exercise, index) => ({
-        session_id: savedSession.id,
-        exercise_id: exercises.find(e => e.name === exercise.name)?.id,
-        sets: exercise.sets,
-        reps: exercise.reps,
-        rest_time_seconds: exercise.rest_time_seconds,
-        order_in_session: index + 1
-      }));
+      // Save session exercises
+      for (const exercise of session.exercises) {
+        const { error: exerciseError } = await supabase
+          .from('session_exercises')
+          .insert({
+            session_id: workoutSession.id,
+            exercise_id: exercise.id,
+            sets: exercise.sets,
+            reps: exercise.reps,
+            rest_time_seconds: exercise.rest_time_seconds
+          })
 
-      const { error: exercisesError } = await supabase
-        .from('session_exercises')
-        .insert(sessionExercises);
-
-      if (exercisesError) {
-        throw new Error('Error saving session exercises: ' + exercisesError.message);
+        if (exerciseError) throw exerciseError
       }
     }
 
-    return new Response(
-      JSON.stringify(workoutPlan),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify(workoutPlan), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    })
 
   } catch (error) {
-    console.error('Error generating workout plan:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-    );
+    console.error('Error generating workout plan:', error)
+    return new Response(JSON.stringify({ error: error.message }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 400,
+    })
   }
-});
+})
 
-// Helper functions
-function shuffleArray<T>(array: T[]): T[] {
-  const newArray = [...array];
-  for (let i = newArray.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+function generateWorkoutSessions(exercises: any[], preferences: any) {
+  // Create 3 workout sessions per week for 4 weeks
+  const sessions = []
+  const sessionsPerWeek = 3
+  const numberOfWeeks = 4
+
+  for (let week = 0; week < numberOfWeeks; week++) {
+    for (let session = 0; session < sessionsPerWeek; session++) {
+      const dayNumber = week * sessionsPerWeek + session + 1
+
+      // Select random exercises for this session
+      const sessionExercises = selectExercisesForSession(exercises, preferences)
+
+      sessions.push({
+        day_number: dayNumber,
+        warmup_description: generateWarmup(),
+        cooldown_description: generateCooldown(),
+        exercises: sessionExercises
+      })
+    }
   }
-  return newArray;
+
+  return sessions
 }
 
-function generateWarmup(exerciseType: string): string {
-  const warmups = {
-    strength: "5-10 minutos de exercício cardio leve seguido por movimentos de mobilidade articular. Faça 2-3 séries leves dos primeiros exercícios para aquecer os músculos específicos.",
-    cardio: "5 minutos de caminhada leve, seguido por alongamentos dinâmicos e exercícios de mobilidade. Aumente gradualmente a intensidade.",
-    mobility: "10 minutos de mobilidade articular progressiva, focando nas áreas que serão trabalhadas. Movimentos suaves e controlados."
-  };
-  return warmups[exerciseType as keyof typeof warmups] || warmups.strength;
+function selectExercisesForSession(exercises: any[], preferences: any) {
+  const exercisesPerSession = 6
+  const selectedExercises = []
+
+  // Ensure we have a mix of exercise types
+  const exercisesByType = exercises.reduce((acc: any, exercise: any) => {
+    if (!acc[exercise.exercise_type]) {
+      acc[exercise.exercise_type] = []
+    }
+    acc[exercise.exercise_type].push(exercise)
+    return acc
+  }, {})
+
+  // Select exercises based on user's preferred types
+  for (let i = 0; i < exercisesPerSession; i++) {
+    const availableTypes = Object.keys(exercisesByType).filter(type => 
+      exercisesByType[type].length > 0 &&
+      preferences.preferred_exercise_types.includes(type)
+    )
+
+    if (availableTypes.length === 0) break
+
+    const randomType = availableTypes[Math.floor(Math.random() * availableTypes.length)]
+    const typeExercises = exercisesByType[randomType]
+    const randomIndex = Math.floor(Math.random() * typeExercises.length)
+    const selectedExercise = typeExercises[randomIndex]
+
+    // Remove selected exercise to avoid duplicates
+    exercisesByType[randomType] = typeExercises.filter((_: any, index: number) => index !== randomIndex)
+
+    selectedExercises.push({
+      id: selectedExercise.id,
+      name: selectedExercise.name,
+      sets: Math.floor(Math.random() * (selectedExercise.max_sets - selectedExercise.min_sets + 1)) + selectedExercise.min_sets,
+      reps: Math.floor(Math.random() * (selectedExercise.max_reps - selectedExercise.min_reps + 1)) + selectedExercise.min_reps,
+      rest_time_seconds: selectedExercise.rest_time_seconds
+    })
+  }
+
+  return selectedExercises
 }
 
-function generateCooldown(exerciseType: string): string {
-  const cooldowns = {
-    strength: "5-10 minutos de alongamentos estáticos focando nos músculos trabalhados. Mantenha cada alongamento por 20-30 segundos.",
-    cardio: "5 minutos de caminhada leve para normalizar a frequência cardíaca, seguido por alongamentos suaves.",
-    mobility: "Série de alongamentos suaves e exercícios de respiração para relaxamento. Foco em restaurar a amplitude de movimento normal."
-  };
-  return cooldowns[exerciseType as keyof typeof cooldowns] || cooldowns.strength;
+function generateWarmup() {
+  return "5-10 minutos de aquecimento cardiovascular leve seguido por exercícios de mobilidade dinâmica"
+}
+
+function generateCooldown() {
+  return "5-10 minutos de alongamento dos principais grupos musculares trabalhados"
 }
