@@ -1,87 +1,124 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const mercadopagoAccessToken = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN');
-
 serve(async (req) => {
-  // Handle CORS
+  console.log('Create preference function started');
+  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { userId, amount, description, planType } = await req.json();
+    const { userId, amount, description, notificationUrl } = await req.json();
+    console.log('Received request data:', { userId, amount, description, notificationUrl });
 
-    if (!userId || !amount || !description) {
-      throw new Error('Dados inválidos');
+    const mercadopagoAccessToken = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN');
+    if (!mercadopagoAccessToken) {
+      throw new Error('MERCADOPAGO_ACCESS_TOKEN not configured');
     }
 
-    const webhookUrl = `${req.headers.get('origin')}/functions/handle-mercadopago-webhook`;
-    const successUrl = `${req.headers.get('origin')}/menu?payment_status=success`;
-    const failureUrl = `${req.headers.get('origin')}/menu`;
-    const pendingUrl = `${req.headers.get('origin')}/menu`;
+    const externalReference = JSON.stringify({
+      user_id: userId,
+      plan_type: description.includes('treino') ? 'workout' : 
+                 description.includes('nutricional') ? 'nutrition' : 
+                 'rehabilitation'
+    });
 
-    // Criar preferência no MercadoPago
+    console.log('Creating preference with external reference:', externalReference);
+
     const preference = {
-      items: [
-        {
-          title: description,
-          unit_price: amount,
-          quantity: 1,
-        },
-      ],
-      external_reference: JSON.stringify({
-        user_id: userId,
-        plan_type: planType
-      }),
+      items: [{
+        title: description,
+        quantity: 1,
+        currency_id: 'BRL',
+        unit_price: amount
+      }],
       back_urls: {
-        success: successUrl,
-        failure: failureUrl,
-        pending: pendingUrl,
+        success: `${req.headers.get('origin')}/workout`,
+        failure: `${req.headers.get('origin')}/workout`,
+        pending: `${req.headers.get('origin')}/workout`
       },
-      notification_url: webhookUrl,
-      auto_return: 'approved',
-      binary_mode: true,
+      external_reference: externalReference,
+      notification_url: notificationUrl,
+      auto_return: 'approved'
     };
+
+    console.log('Sending preference to Mercado Pago:', preference);
 
     const response = await fetch('https://api.mercadopago.com/checkout/preferences', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${mercadopagoAccessToken}`,
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
       },
-      body: JSON.stringify(preference),
+      body: JSON.stringify(preference)
     });
 
-    const data = await response.json();
-
     if (!response.ok) {
-      console.error('Erro MercadoPago:', data);
-      throw new Error('Erro ao criar preferência de pagamento');
+      const errorText = await response.text();
+      console.error('Mercado Pago API error:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText
+      });
+      throw new Error(`Mercado Pago API error: ${response.status} ${response.statusText}`);
+    }
+
+    const mpResponse = await response.json();
+    console.log('Mercado Pago response:', mpResponse);
+
+    // Criar registro do pagamento no banco
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Missing Supabase configuration');
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const { error: paymentError } = await supabase
+      .from('payments')
+      .insert({
+        user_id: userId,
+        payment_id: mpResponse.id,
+        amount: amount,
+        status: 'pending',
+        provider: 'mercadopago',
+        plan_type: preference.items[0].title.toLowerCase().includes('treino') ? 'workout' : 
+                  preference.items[0].title.toLowerCase().includes('nutricional') ? 'nutrition' : 
+                  'rehabilitation'
+      });
+
+    if (paymentError) {
+      console.error('Error creating payment record:', paymentError);
+      throw new Error('Failed to create payment record');
     }
 
     return new Response(
       JSON.stringify({
-        preferenceId: data.id,
-        initPoint: data.init_point,
+        preferenceId: mpResponse.id,
+        initPoint: mpResponse.init_point
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
       }
     );
 
   } catch (error) {
-    console.error('Erro:', error);
+    console.error('Error creating preference:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       {
-        status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
       }
     );
   }

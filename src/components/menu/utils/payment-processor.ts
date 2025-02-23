@@ -18,10 +18,11 @@ export const createPaymentPreference = async (
   const payload = {
     userId: userData.user.id,
     amount: amount,
-    description: getPlanDescription(planType)
+    description: getPlanDescription(planType),
+    notificationUrl: `${Deno.env.get('SUPABASE_URL')}/functions/v1/handle-mercadopago-webhook`
   };
 
-  console.log('Enviando payload:', payload);
+  console.log('Enviando payload para criação de preferência:', payload);
 
   const { data, error } = await supabase.functions.invoke(
     'create-mercadopago-preference',
@@ -30,9 +31,10 @@ export const createPaymentPreference = async (
     }
   );
 
-  console.log('Resposta da função:', { data, error });
+  console.log('Resposta da função de criar preferência:', { data, error });
 
   if (error || !data?.preferenceId || !data?.initPoint) {
+    console.error('Erro ao criar preferência:', error);
     throw new Error('Falha ao criar pagamento. Por favor, tente novamente.');
   }
 
