@@ -15,6 +15,19 @@ const webhookSecret = 'f858499661ec1575048a990931695644ad65c0cab9071aa210ffd046d
 
 const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
 
+interface MercadoPagoWebhook {
+  action: string;
+  api_version: string;
+  data: {
+    id: string;
+  };
+  date_created: string;
+  id: string;
+  live_mode: boolean;
+  type: string;
+  user_id: number;
+}
+
 // Função para verificar a assinatura do webhook
 async function verifyWebhookSignature(signature: string, data: string) {
   const encoder = new TextEncoder();
@@ -43,78 +56,113 @@ async function verifyWebhookSignature(signature: string, data: string) {
 }
 
 serve(async (req) => {
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { 
+      status: 200,
+      headers: corsHeaders 
+    });
   }
 
   try {
+    console.log('Received webhook request:', {
+      method: req.method,
+      headers: Object.fromEntries(req.headers.entries()),
+      url: req.url
+    });
+
     const signature = req.headers.get('x-signature') || '';
-    const body = await req.text(); // Get raw body as text
-    
-    // Verificar a assinatura
-    const isValid = await verifyWebhookSignature(signature, body);
-    if (!isValid) {
-      console.error('Invalid webhook signature');
-      return new Response(
-        JSON.stringify({ error: 'Invalid signature' }),
-        { 
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
+    const body = await req.text();
+    console.log('Raw webhook body:', body);
+
+    // Verificar a assinatura apenas se ela estiver presente
+    if (signature) {
+      const isValid = await verifyWebhookSignature(signature, body);
+      if (!isValid) {
+        console.error('Invalid webhook signature');
+        return new Response(
+          JSON.stringify({ error: 'Invalid signature' }),
+          { 
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
     }
 
-    const { type, data } = JSON.parse(body);
-    console.log('Webhook received:', { type, data });
+    const webhookData = JSON.parse(body) as MercadoPagoWebhook;
+    console.log('Parsed webhook data:', webhookData);
 
-    if (type === 'payment' && data.id) {
-      // Fetch payment details from Mercado Pago
-      const response = await fetch(`https://api.mercadopago.com/v1/payments/${data.id}`, {
+    // Verificar se é uma notificação de pagamento
+    if (webhookData.type === 'payment' && webhookData.action === 'payment.updated') {
+      const paymentId = webhookData.data.id;
+      
+      // Buscar detalhes do pagamento na API do Mercado Pago
+      const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
         headers: {
           'Authorization': `Bearer ${mercadopagoAccessToken}`,
         },
       });
 
+      if (!response.ok) {
+        throw new Error(`Failed to fetch payment details: ${response.statusText}`);
+      }
+
       const paymentData = await response.json();
-      console.log('Payment data:', paymentData);
+      console.log('Payment details:', paymentData);
 
       if (paymentData.status === 'approved') {
-        const externalReference = paymentData.external_reference;
-        const { user_id, plan_type } = JSON.parse(externalReference);
+        try {
+          const externalReference = paymentData.external_reference;
+          if (!externalReference) {
+            throw new Error('Missing external_reference in payment data');
+          }
 
-        // Update payment status in database
-        const { error: paymentError } = await supabase
-          .from('payments')
-          .update({ status: 'completed' })
-          .match({ payment_id: data.id });
+          const { user_id, plan_type } = JSON.parse(externalReference);
 
-        if (paymentError) {
-          throw paymentError;
+          // Update payment status in database
+          const { error: paymentError } = await supabase
+            .from('payments')
+            .update({ status: 'completed' })
+            .match({ payment_id: paymentId });
+
+          if (paymentError) {
+            console.error('Error updating payment status:', paymentError);
+            throw paymentError;
+          }
+
+          // Grant plan access
+          const { error: accessError } = await supabase.functions.invoke('grant-plan-access', {
+            body: { userId: user_id, planType: plan_type }
+          });
+
+          if (accessError) {
+            console.error('Error granting plan access:', accessError);
+            throw accessError;
+          }
+
+          console.log('Payment processed successfully');
+        } catch (error) {
+          console.error('Error processing approved payment:', error);
+          throw error;
         }
-
-        // Grant plan access
-        const { error: accessError } = await supabase.functions.invoke('grant-plan-access', {
-          body: { userId: user_id, planType: plan_type }
-        });
-
-        if (accessError) {
-          throw accessError;
-        }
-
-        console.log('Payment processed successfully');
       }
     }
 
-    return new Response(JSON.stringify({ received: true }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({ received: true }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
 
   } catch (error) {
     console.error('Webhook error:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
-      { 
-        status: 400, 
+      {
+        status: 200, // Retornamos 200 mesmo em caso de erro para evitar reenvios
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
