@@ -1,9 +1,8 @@
 
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_URL } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getPlanDescription } from "./payment-messages";
 import { updatePaymentStatus, grantPlanAccess } from "./payment-db";
-import { SUPABASE_URL } from "@/integrations/supabase/client";
 
 type PlanType = 'nutrition' | 'workout' | 'rehabilitation';
 
