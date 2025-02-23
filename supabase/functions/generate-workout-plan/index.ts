@@ -1,25 +1,29 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-import { corsHeaders } from '../_shared/cors.ts';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { WorkoutPreferences } from "../_shared/types.ts";
 
-interface WorkoutPlanRequest {
-  preferences: {
-    age: number;
-    weight: number;
-    height: number;
-    gender: string;
-    goal: 'lose_weight' | 'maintain' | 'gain_mass';
-    activity_level: 'sedentary' | 'light' | 'moderate' | 'intense';
-    preferred_exercise_types: string[];
-    available_equipment: string[];
-    health_conditions?: string[];
-  };
-  userId: string;
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+interface Exercise {
+  id: string;
+  name: string;
+  gif_url: string;
+  exercise_type: string;
+  muscle_group: string;
+  difficulty: string;
+  equipment_needed: string[];
+  goals: string[];
+  description: string;
+  rest_time_seconds: number;
+  min_reps: number;
+  max_reps: number;
+  min_sets: number;
+  max_sets: number;
 }
-
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -27,263 +31,164 @@ serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const { preferences, userId } = await req.json() as WorkoutPlanRequest;
+    const requestId = crypto.randomUUID();
+    console.log(`[${requestId}] Starting workout plan generation`);
 
-    console.log('Gerando plano para:', preferences);
+    const { preferences } = await req.json();
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
 
-    // Função para selecionar exercícios apropriados
-    const selectExercises = async (params: {
-      exerciseTypes: string[];
-      equipment: string[];
-      difficulty: string;
-      goals: string[];
-      muscleGroups: string[];
-    }) => {
-      console.log('Buscando exercícios com critérios:', params);
+    // Fetch exercises that match user preferences
+    const { data: exercises, error: exercisesError } = await supabase
+      .from('exercises')
+      .select('*')
+      .in('exercise_type', preferences.preferred_exercise_types)
+      .contains('equipment_needed', preferences.available_equipment)
+      .contains('goals', [preferences.goal])
+      .not('gif_url', 'is', null);
 
-      let query = supabase
-        .from('exercises')
-        .select(`
-          id,
-          name,
-          description,
-          gif_url,
-          exercise_type,
-          muscle_group,
-          difficulty,
-          equipment_needed,
-          min_sets,
-          max_sets,
-          min_reps,
-          max_reps,
-          rest_time_seconds,
-          preparation_time_minutes,
-          is_compound_movement,
-          movement_pattern,
-          equipment_complexity,
-          typical_duration_seconds,
-          calories_burned_per_hour,
-          recommended_warm_up,
-          common_mistakes,
-          safety_considerations,
-          progression_variations,
-          regression_variations,
-          tempo_recommendation,
-          breathing_pattern,
-          stability_requirement,
-          balance_requirement,
-          coordination_requirement,
-          flexibility_requirement,
-          power_requirement
-        `)
-        .in('exercise_type', params.exerciseTypes)
-        .eq('difficulty', params.difficulty);
+    if (exercisesError) {
+      throw new Error('Error fetching exercises: ' + exercisesError.message);
+    }
 
-      // Se não tiver acesso a todos os equipamentos, filtrar
-      if (!params.equipment.includes('all')) {
-        query = query.overlaps('equipment_needed', params.equipment);
+    console.log(`[${requestId}] Found ${exercises?.length || 0} exercises`);
+
+    if (!exercises || exercises.length === 0) {
+      throw new Error('No suitable exercises found for the given preferences');
+    }
+
+    // Group exercises by type for better distribution
+    const exercisesByType = exercises.reduce((acc, exercise) => {
+      if (!acc[exercise.exercise_type]) {
+        acc[exercise.exercise_type] = [];
       }
+      acc[exercise.exercise_type].push(exercise);
+      return acc;
+    }, {} as Record<string, Exercise[]>);
 
-      if (params.goals.length > 0) {
-        query = query.overlaps('goals', params.goals);
-      }
+    // Generate a 7-day workout plan
+    const workoutPlan = {
+      goal: preferences.goal,
+      start_date: new Date().toISOString(),
+      end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      workout_sessions: Array.from({ length: 7 }, (_, dayIndex) => {
+        // Alternate between different exercise types
+        const dayType = preferences.preferred_exercise_types[dayIndex % preferences.preferred_exercise_types.length];
+        const availableExercises = exercisesByType[dayType] || [];
+        
+        // Select exercises for the day
+        const dayExercises = shuffleArray(availableExercises)
+          .slice(0, 6)
+          .map(exercise => ({
+            name: exercise.name,
+            sets: Math.floor((exercise.min_sets + exercise.max_sets) / 2),
+            reps: Math.floor((exercise.min_reps + exercise.max_reps) / 2),
+            rest_time_seconds: exercise.rest_time_seconds,
+            gifUrl: exercise.gif_url,
+            notes: exercise.description
+          }));
 
-      const { data: exercises, error } = await query
-        .in('muscle_group', params.muscleGroups)
-        .order('is_compound_movement', { ascending: false });
-
-      if (error) {
-        console.error('Erro ao buscar exercícios:', error);
-        throw error;
-      }
-
-      console.log(`Encontrados ${exercises?.length || 0} exercícios`);
-      return exercises || [];
+        return {
+          day_number: dayIndex + 1,
+          warmup_description: generateWarmup(dayType),
+          cooldown_description: generateCooldown(dayType),
+          exercises: dayExercises
+        };
+      })
     };
 
-    // Determinar nível de dificuldade baseado no nível de atividade
-    const difficulty = 
-      preferences.activity_level === 'sedentary' ? 'beginner' :
-      preferences.activity_level === 'intense' ? 'advanced' :
-      'intermediate';
-
-    // Definir grupos musculares para cada dia
-    const muscleGroups = [
-      ['chest', 'back', 'shoulders'],
-      ['legs', 'core'],
-      ['arms', 'shoulders', 'core'],
-      ['full_body']
-    ];
-
-    // Definir objetivos baseado nas preferências
-    const goals = [
-      preferences.goal === 'lose_weight' ? ['fat_loss', 'endurance'] :
-      preferences.goal === 'gain_mass' ? ['muscle_gain', 'strength'] :
-      ['maintenance', 'general_fitness']
-    ];
-
-    console.log('Criando plano de treino');
-
-    // Criar plano
-    const startDate = new Date();
-    const endDate = new Date();
-    endDate.setDate(endDate.getDate() + 28); // Plano de 4 semanas
-
-    const { data: plan, error: planError } = await supabase
+    // Save the workout plan
+    const { data: savedPlan, error: saveError } = await supabase
       .from('workout_plans')
       .insert({
-        user_id: userId,
+        user_id: preferences.userId,
         goal: preferences.goal,
-        start_date: startDate.toISOString(),
-        end_date: endDate.toISOString()
+        start_date: workoutPlan.start_date,
+        end_date: workoutPlan.end_date
       })
       .select()
       .single();
 
-    if (planError) {
-      console.error('Erro ao criar plano:', planError);
-      throw planError;
+    if (saveError) {
+      throw new Error('Error saving workout plan: ' + saveError.message);
     }
 
-    console.log('Plano criado:', plan.id);
-
-    // Criar sessões de treino
-    const sessions = [];
-    for (let day = 1; day <= 28; day++) {
-      const weekDay = (day - 1) % 7;
-      const dayType = weekDay % 4; // 0-3 para diferentes focos de treino
-      
-      console.log(`Criando sessão para dia ${day} (tipo ${dayType})`);
-
-      // Selecionar exercícios para o dia
-      const exercises = await selectExercises({
-        exerciseTypes: preferences.preferred_exercise_types,
-        equipment: preferences.available_equipment,
-        difficulty,
-        goals,
-        muscleGroups: muscleGroups[dayType]
-      });
-
-      // Garantir variedade e distribuição adequada dos exercícios
-      const selectedExercises = exercises
-        .sort((a, b) => {
-          // Priorizar exercícios compostos no início do treino
-          if (a.is_compound_movement && !b.is_compound_movement) return -1;
-          if (!a.is_compound_movement && b.is_compound_movement) return 1;
-          return Math.random() - 0.5;
-        })
-        .slice(0, 6); // 6 exercícios por sessão
-
-      const { data: session, error: sessionError } = await supabase
+    // Save workout sessions
+    for (const session of workoutPlan.workout_sessions) {
+      const { data: savedSession, error: sessionError } = await supabase
         .from('workout_sessions')
         .insert({
-          plan_id: plan.id,
-          day_number: day,
-          warmup_description: "5-10 minutos de aquecimento cardiovascular leve seguido de mobilidade articular. " +
-                            "Faça 2-3 séries de aquecimento com peso leve para os exercícios principais.",
-          cooldown_description: "5-10 minutos de alongamentos para os músculos trabalhados. " +
-                              "Exercícios de respiração e relaxamento para normalizar a frequência cardíaca."
+          plan_id: savedPlan.id,
+          day_number: session.day_number,
+          warmup_description: session.warmup_description,
+          cooldown_description: session.cooldown_description
         })
         .select()
         .single();
 
       if (sessionError) {
-        console.error('Erro ao criar sessão:', sessionError);
-        throw sessionError;
+        throw new Error('Error saving workout session: ' + sessionError.message);
       }
 
-      console.log(`Sessão ${session.id} criada para dia ${day}`);
+      // Save exercises for this session
+      const sessionExercises = session.exercises.map((exercise, index) => ({
+        session_id: savedSession.id,
+        exercise_id: exercises.find(e => e.name === exercise.name)?.id,
+        sets: exercise.sets,
+        reps: exercise.reps,
+        rest_time_seconds: exercise.rest_time_seconds,
+        order_in_session: index + 1
+      }));
 
-      // Adicionar exercícios à sessão
-      for (let i = 0; i < selectedExercises.length; i++) {
-        const exercise = selectedExercises[i];
-        
-        // Ajustar séries e repetições com base no objetivo
-        let sets = exercise.is_compound_movement ? 
-          Math.max(exercise.min_sets, 4) : 
-          exercise.min_sets;
-        
-        let reps = preferences.goal === 'gain_mass' ? 
-          Math.min(exercise.max_reps, 12) : 
-          Math.min(exercise.max_reps, 15);
+      const { error: exercisesError } = await supabase
+        .from('session_exercises')
+        .insert(sessionExercises);
 
-        const { error: exerciseError } = await supabase
-          .from('session_exercises')
-          .insert({
-            session_id: session.id,
-            exercise_id: exercise.id,
-            sets,
-            reps,
-            rest_time_seconds: exercise.rest_time_seconds,
-            order_in_session: i + 1
-          });
-
-        if (exerciseError) {
-          console.error('Erro ao adicionar exercício à sessão:', exerciseError);
-          throw exerciseError;
-        }
+      if (exercisesError) {
+        throw new Error('Error saving session exercises: ' + exercisesError.message);
       }
-
-      // Adicionar informações detalhadas dos exercícios à sessão
-      sessions.push({
-        ...session,
-        exercises: selectedExercises.map((ex, index) => {
-          // Determinar recomendações de peso baseadas no nível
-          const weightRecommendation = {
-            beginner: ex.is_compound_movement ? "40-50% 1RM" : "30-40% 1RM",
-            intermediate: ex.is_compound_movement ? "60-70% 1RM" : "50-60% 1RM",
-            advanced: ex.is_compound_movement ? "75-85% 1RM" : "65-75% 1RM"
-          };
-
-          return {
-            name: ex.name,
-            description: ex.description,
-            gifUrl: ex.gif_url,
-            sets: ex.is_compound_movement ? Math.max(ex.min_sets, 4) : ex.min_sets,
-            reps: preferences.goal === 'gain_mass' ? 
-              Math.min(ex.max_reps, 12) : 
-              Math.min(ex.max_reps, 15),
-            rest_time_seconds: ex.rest_time_seconds,
-            weight_recommendation: weightRecommendation,
-            notes: [
-              `Padrão de Movimento: ${ex.movement_pattern}`,
-              `Tempo de Execução: ${ex.tempo_recommendation}`,
-              `Padrão Respiratório: ${ex.breathing_pattern}`,
-              ex.common_mistakes?.length ? `Erros Comuns: ${ex.common_mistakes.join(', ')}` : null,
-              ex.safety_considerations?.length ? `Considerações de Segurança: ${ex.safety_considerations.join(', ')}` : null
-            ].filter(Boolean).join('\n\n')
-          };
-        })
-      });
     }
 
-    console.log('Plano gerado com sucesso');
-
-    // Retornar plano completo
-    return new Response(JSON.stringify({
-      id: plan.id,
-      user_id: plan.user_id,
-      goal: plan.goal,
-      start_date: plan.start_date,
-      end_date: plan.end_date,
-      workout_sessions: sessions,
-      user_fitness_level: difficulty
-    }), {
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'application/json'
-      }
-    });
+    return new Response(
+      JSON.stringify(workoutPlan),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
   } catch (error) {
-    console.error('Erro ao gerar plano:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 400,
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'application/json'
-      }
-    });
+    console.error('Error generating workout plan:', error);
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+    );
   }
 });
+
+// Helper functions
+function shuffleArray<T>(array: T[]): T[] {
+  const newArray = [...array];
+  for (let i = newArray.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+  }
+  return newArray;
+}
+
+function generateWarmup(exerciseType: string): string {
+  const warmups = {
+    strength: "5-10 minutos de exercício cardio leve seguido por movimentos de mobilidade articular. Faça 2-3 séries leves dos primeiros exercícios para aquecer os músculos específicos.",
+    cardio: "5 minutos de caminhada leve, seguido por alongamentos dinâmicos e exercícios de mobilidade. Aumente gradualmente a intensidade.",
+    mobility: "10 minutos de mobilidade articular progressiva, focando nas áreas que serão trabalhadas. Movimentos suaves e controlados."
+  };
+  return warmups[exerciseType as keyof typeof warmups] || warmups.strength;
+}
+
+function generateCooldown(exerciseType: string): string {
+  const cooldowns = {
+    strength: "5-10 minutos de alongamentos estáticos focando nos músculos trabalhados. Mantenha cada alongamento por 20-30 segundos.",
+    cardio: "5 minutos de caminhada leve para normalizar a frequência cardíaca, seguido por alongamentos suaves.",
+    mobility: "Série de alongamentos suaves e exercícios de respiração para relaxamento. Foco em restaurar a amplitude de movimento normal."
+  };
+  return cooldowns[exerciseType as keyof typeof cooldowns] || cooldowns.strength;
+}
