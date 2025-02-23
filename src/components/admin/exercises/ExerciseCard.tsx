@@ -1,63 +1,71 @@
 
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Exercise } from "./types";
-import { AlertCircle, Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ExerciseCardProps {
-  exercise: Exercise;
-  onRemoveGif: (fileName: string) => void;
+  exercise: any;
+  onUpdate: () => void;
 }
 
-export const ExerciseCard = ({ exercise, onRemoveGif }: ExerciseCardProps) => {
+export const ExerciseCard = ({ exercise, onUpdate }: ExerciseCardProps) => {
+  const handleDelete = async () => {
+    if (!confirm('Tem certeza que deseja excluir este exercício?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('exercises')
+        .delete()
+        .eq('id', exercise.id);
+
+      if (error) throw error;
+      
+      onUpdate();
+      toast.success('Exercício excluído com sucesso!');
+    } catch (error) {
+      console.error('Error deleting exercise:', error);
+      toast.error('Erro ao excluir exercício');
+    }
+  };
+
   return (
-    <div className="border p-4 rounded-lg">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h3 className="font-medium">{exercise.name}</h3>
-          <div className="flex gap-2 items-center mt-2">
-            <span className="px-2 py-1 text-xs rounded bg-primary/10 text-primary">
-              {exercise.exercise_type}
-            </span>
-            <span className="px-2 py-1 text-xs rounded bg-secondary/10 text-secondary">
-              {exercise.muscle_group}
-            </span>
-            <span className="px-2 py-1 text-xs rounded bg-muted text-muted-foreground">
-              {exercise.difficulty}
-            </span>
+    <Card>
+      <CardHeader className="space-y-1">
+        <div className="flex justify-between items-start">
+          <CardTitle className="text-xl">{exercise.name}</CardTitle>
+          <div className="flex gap-2">
+            <Button size="icon" variant="outline">
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button size="icon" variant="outline" onClick={handleDelete}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
           </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {exercise.gif_url && (
+          <div className="mb-4 relative pt-[56.25%]">
+            <img
+              src={exercise.gif_url}
+              alt={exercise.name}
+              className="absolute top-0 left-0 w-full h-full object-cover rounded-md"
+            />
+          </div>
+        )}
+        <div className="space-y-2 text-sm">
+          <p><strong>Tipo:</strong> {exercise.exercise_type}</p>
+          <p><strong>Grupo Muscular:</strong> {exercise.muscle_group}</p>
+          <p><strong>Séries:</strong> {exercise.min_sets}-{exercise.max_sets}</p>
+          <p><strong>Repetições:</strong> {exercise.min_reps}-{exercise.max_reps}</p>
           {exercise.description && (
-            <p className="text-sm mt-2">{exercise.description}</p>
+            <p className="text-muted-foreground">{exercise.description}</p>
           )}
         </div>
-        
-        <div className="flex items-center gap-4">
-          {exercise.gif_url ? (
-            <div className="flex items-center gap-2">
-              <img
-                src={exercise.gif_url}
-                alt="Demonstração do exercício"
-                className="w-16 h-16 object-cover rounded"
-              />
-              <Button
-                variant="destructive"
-                size="icon"
-                onClick={() => {
-                  const fileName = exercise.gif_url!.split('/').pop();
-                  if (fileName) onRemoveGif(fileName);
-                }}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 text-yellow-600">
-              <AlertCircle className="h-4 w-4" />
-              <span className="text-sm">Sem GIF</span>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 };
-
