@@ -1,3 +1,4 @@
+
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ExerciseForm } from "./exercises/ExerciseForm";
 import { BatchUploadForm } from "./exercises/BatchUploadForm";
@@ -144,29 +145,29 @@ export const ExerciseGifsTab = () => {
         </TabsList>
         
         <TabsContent value="individual">
-          <ExerciseForm
-            onSubmit={handleSubmit}
-            uploading={uploadMutation.isPending}
+          <ExerciseForm 
+            onSuccess={() => refetch()} 
+            onCancel={() => {}} 
           />
         </TabsContent>
 
         <TabsContent value="batch">
-          <BatchUploadForm
-            onUpload={handleSubmit}
-            uploading={uploadMutation.isPending}
+          <BatchUploadForm 
+            onSuccess={() => refetch()} 
+            onCancel={() => {}} 
           />
         </TabsContent>
 
         <TabsContent value="fisio">
           <FisioBatchUploadForm
-            onUpload={handlePhysioSubmit}
-            uploading={uploadPhysioExerciseMutation.isPending}
+            onSuccess={() => refetch()} 
+            onCancel={() => {}} 
           />
         </TabsContent>
       </Tabs>
 
       <h2 className="text-2xl font-bold mt-12">Exercícios Cadastrados</h2>
-      <ExerciseList exercises={exercises || []} />
+      <ExerciseList />
     </div>
   );
 };
