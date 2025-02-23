@@ -5,14 +5,85 @@ import { WorkoutPreferences } from '@/components/workout/types';
 import { PreferencesForm } from '@/components/workout/PreferencesForm';
 import { WorkoutPlanDisplay } from '@/components/workout/WorkoutPlanDisplay';
 import { WorkoutHistoryView } from '@/components/workout/components/WorkoutHistory';
-import { Dumbbell } from 'lucide-react';
+import { Dumbbell, DollarSign } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import type { WorkoutPlan } from '@/components/workout/types/workout-plan';
+import { Switch } from '@/components/ui/switch';
+import { Card } from '@/components/ui/card';
+import { toast } from 'sonner';
 
 const Workout = () => {
   const [preferences, setPreferences] = useState<WorkoutPreferences | null>(null);
   const [historyPlans, setHistoryPlans] = useState<WorkoutPlan[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [paymentRequired, setPaymentRequired] = useState(true);
+  const [isLoadingPaymentSetting, setIsLoadingPaymentSetting] = useState(true);
+
+  const fetchPaymentSetting = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('plan_access')
+        .select('payment_required')
+        .eq('user_id', user.id)
+        .eq('plan_type', 'workout')
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching payment setting:', error);
+        return;
+      }
+
+      // If no record exists, create one with default value
+      if (!data) {
+        const { error: insertError } = await supabase
+          .from('plan_access')
+          .insert([{
+            user_id: user.id,
+            plan_type: 'workout',
+            payment_required: true
+          }]);
+
+        if (insertError) {
+          console.error('Error creating payment setting:', insertError);
+          return;
+        }
+
+        setPaymentRequired(true);
+      } else {
+        setPaymentRequired(data.payment_required);
+      }
+    } finally {
+      setIsLoadingPaymentSetting(false);
+    }
+  };
+
+  const togglePaymentRequired = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const newValue = !paymentRequired;
+      const { error } = await supabase
+        .from('plan_access')
+        .update({ payment_required: newValue })
+        .eq('user_id', user.id)
+        .eq('plan_type', 'workout');
+
+      if (error) throw error;
+
+      setPaymentRequired(newValue);
+      toast.success(newValue 
+        ? "Pagamento habilitado para novos planos" 
+        : "Pagamento desabilitado para novos planos"
+      );
+    } catch (error) {
+      console.error('Error updating payment setting:', error);
+      toast.error("Erro ao atualizar configuração de pagamento");
+    }
+  };
 
   const fetchWorkoutHistory = async () => {
     try {
@@ -49,6 +120,7 @@ const Workout = () => {
 
   useEffect(() => {
     fetchWorkoutHistory();
+    fetchPaymentSetting();
   }, []);
 
   return (
@@ -67,9 +139,28 @@ const Workout = () => {
         </div>
 
         <div className="max-w-4xl mx-auto space-y-8">
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-primary" />
+                <span className="font-medium">Requisito de Pagamento</span>
+              </div>
+              <Switch
+                checked={paymentRequired}
+                onCheckedChange={togglePaymentRequired}
+                disabled={isLoadingPaymentSetting}
+              />
+            </div>
+            <p className="text-sm text-muted-foreground mt-2">
+              {paymentRequired 
+                ? "Pagamento é necessário para gerar novos planos de treino" 
+                : "Planos de treino podem ser gerados gratuitamente"}
+            </p>
+          </Card>
+
           {!preferences ? (
             <div className="transform transition-all duration-500 hover:scale-[1.01]">
-              <PreferencesForm onSubmit={setPreferences} />
+              <PreferencesForm onSubmit={setPreferences} paymentRequired={paymentRequired} />
             </div>
           ) : (
             <WorkoutPlanDisplay 

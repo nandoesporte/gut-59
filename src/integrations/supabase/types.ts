@@ -840,6 +840,7 @@ export type Database = {
           created_at: string
           id: string
           is_active: boolean | null
+          payment_required: boolean | null
           plan_type: Database["public"]["Enums"]["plan_type"]
           updated_at: string
           user_id: string
@@ -848,6 +849,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean | null
+          payment_required?: boolean | null
           plan_type: Database["public"]["Enums"]["plan_type"]
           updated_at?: string
           user_id: string
@@ -856,6 +858,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean | null
+          payment_required?: boolean | null
           plan_type?: Database["public"]["Enums"]["plan_type"]
           updated_at?: string
           user_id?: string

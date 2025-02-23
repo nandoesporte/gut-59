@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -33,9 +32,10 @@ type FormSchema = z.infer<typeof formSchema>;
 
 interface PreferencesFormProps {
   onSubmit: (data: WorkoutPreferences) => void;
+  paymentRequired?: boolean;
 }
 
-export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
+export const PreferencesForm = ({ onSubmit, paymentRequired = true }: PreferencesFormProps) => {
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = React.useState(false);
   const [formData, setFormData] = React.useState<FormSchema | null>(null);
   const [isGrantingAccess, setIsGrantingAccess] = React.useState(false);
@@ -80,7 +80,7 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
         .eq('plan_type', 'workout')
         .single();
 
-      if (paymentSettings?.is_active && !hasPaid) {
+      if (paymentSettings?.is_active && paymentRequired && !hasPaid) {
         setFormData(data);
         setIsPaymentDialogOpen(true);
         return;
@@ -100,8 +100,8 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
         return;
       }
 
-      // Check if payment needs to be reactivated
-      if (grantResponse?.requiresPayment) {
+      // Check if payment needs to be reativated
+      if (grantResponse?.requiresPayment && paymentRequired) {
         toast.info("Você atingiu o limite de gerações de plano gratuitas. Pagamento reativado.");
       }
 
