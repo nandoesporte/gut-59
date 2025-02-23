@@ -88,13 +88,11 @@ export const MealPlanHistory = () => {
 
   const handleDownload = async (plan: StoredMealPlan) => {
     try {
-      const element = document.createElement('div');
-      element.style.position = 'absolute';
-      element.style.left = '-9999px';
-      document.body.appendChild(element);
-
-      await generateMealPlanPDF(element);
-      document.body.removeChild(element);
+      const planData = typeof plan.plan_data === 'string' 
+        ? JSON.parse(plan.plan_data) 
+        : plan.plan_data;
+      
+      await generateMealPlanPDF(planData as MealPlan);
     } catch (error) {
       console.error('Error generating PDF:', error);
       toast.error('Erro ao gerar PDF');

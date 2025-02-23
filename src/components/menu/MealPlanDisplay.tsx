@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FileDown, RefreshCcw } from "lucide-react";
@@ -30,8 +29,8 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
   const [selectedDay, setSelectedDay] = useState<string>("monday");
 
   const handleDownloadPDF = async () => {
-    if (!planRef.current) return;
-    await generateMealPlanPDF(planRef.current);
+    if (!mealPlan) return;
+    await generateMealPlanPDF(mealPlan);
   };
 
   if (!mealPlan || !mealPlan.weeklyPlan) {
