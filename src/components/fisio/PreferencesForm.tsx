@@ -133,7 +133,16 @@ export const FisioPreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
 
     try {
       const preferences: FisioPreferences = {
-        ...data
+        age: data.age,
+        weight: data.weight,
+        height: data.height,
+        gender: data.gender,
+        joint_area: data.joint_area,
+        condition: data.condition,
+        pain_level: data.pain_level,
+        mobility_level: data.mobility_level,
+        previous_treatment: data.previous_treatment,
+        activity_level: data.activity_level
       };
       
       toast.info("Gerando seu plano de reabilitação personalizado...");
