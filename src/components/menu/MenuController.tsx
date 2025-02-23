@@ -72,42 +72,25 @@ export const useMenuController = () => {
         return;
       }
 
-      // Salvar preferências alimentares
-      const dietaryPreference = {
-        user_id: userData.user.id,
-        has_allergies: preferences.hasAllergies || false,
-        allergies: preferences.allergies || [],
-        dietary_restrictions: preferences.dietaryRestrictions || [],
-        training_time: preferences.trainingTime || null
-      };
-
-      const { error: dietaryError } = await supabase
-        .from('dietary_preferences')
-        .upsert(dietaryPreference);
-
-      if (dietaryError) {
-        console.error('Error saving dietary preferences:', dietaryError);
-        toast.dismiss(toastId);
-        toast.error("Erro ao salvar preferências alimentares");
-        return;
-      }
-
-      setDietaryPreferences(preferences);
-
       // Preparar dados dos alimentos
-      const selectedFoodsDetails = protocolFoods.filter(food => selectedFoods.includes(food.id));
-      
+      const selectedFoodsDetails = protocolFoods
+        .filter(food => selectedFoods.includes(food.id))
+        .map(food => ({
+          id: food.id,
+          name: food.name,
+          calories: food.calories,
+          protein: food.protein || 0,
+          carbs: food.carbs || 0,
+          fats: food.fats || 0,
+          portion: food.portion_size || 100,
+          portionUnit: food.portion_unit || 'g'
+        }));
+
       if (selectedFoodsDetails.length === 0) {
         toast.dismiss(toastId);
         toast.error("Erro ao processar alimentos selecionados");
         return;
       }
-
-      console.log('Calling edge function with:', {
-        userData,
-        selectedFoodsDetails,
-        dietaryPreference
-      });
 
       // Chamar a edge function para gerar o plano alimentar
       const { data: mealPlanData, error: generateError } = await supabase.functions.invoke(
@@ -124,16 +107,7 @@ export const useMenuController = () => {
               userId: userData.user.id,
               dailyCalories: calorieNeeds
             },
-            selectedFoods: selectedFoodsDetails.map(food => ({
-              id: food.id,
-              name: food.name,
-              calories: food.calories,
-              protein: food.protein || 0,
-              carbs: food.carbs || 0,
-              fats: food.fats || 0,
-              portion: food.portion || 100,
-              portionUnit: food.portionUnit || 'g'
-            })),
+            selectedFoods: selectedFoodsDetails,
             dietaryPreferences: {
               hasAllergies: preferences.hasAllergies || false,
               allergies: preferences.allergies || [],
@@ -144,35 +118,49 @@ export const useMenuController = () => {
         }
       );
 
-      console.log('Edge function response:', mealPlanData);
-
       if (generateError) {
         console.error('Erro na edge function:', generateError);
         throw new Error(generateError.message || 'Falha ao gerar cardápio');
       }
 
-      if (!mealPlanData) {
-        throw new Error('Nenhum dado recebido do gerador de cardápio');
-      }
-
-      // Validate meal plan data structure
-      if (!mealPlanData.dailyPlan || !mealPlanData.totalNutrition || !mealPlanData.recommendations) {
-        console.error('Invalid meal plan structure:', mealPlanData);
-        throw new Error('Estrutura inválida do plano alimentar');
+      if (!mealPlanData || !mealPlanData.weeklyPlan || !mealPlanData.totalNutrition) {
+        throw new Error('Estrutura inválida do plano alimentar recebido');
       }
 
       // Set the meal plan state first
       setMealPlan(mealPlanData);
 
-      // Then save to the database
+      // Save dietary preferences
+      const { error: dietaryError } = await supabase
+        .from('dietary_preferences')
+        .upsert({
+          user_id: userData.user.id,
+          has_allergies: preferences.hasAllergies || false,
+          allergies: preferences.allergies || [],
+          dietary_restrictions: preferences.dietaryRestrictions || [],
+          training_time: preferences.trainingTime || null
+        });
+
+      if (dietaryError) {
+        console.error('Erro ao salvar preferências alimentares:', dietaryError);
+        throw new Error('Falha ao salvar preferências alimentares');
+      }
+
+      setDietaryPreferences(preferences);
+
+      // Save the meal plan to the database
       const { error: saveError } = await supabase
         .from('meal_plans')
         .insert({
           user_id: userData.user.id,
           plan_data: mealPlanData,
           calories: calorieNeeds,
-          active: true,
-          dietary_preferences: dietaryPreference
+          dietary_preferences: {
+            hasAllergies: preferences.hasAllergies || false,
+            allergies: preferences.allergies || [],
+            dietaryRestrictions: preferences.dietaryRestrictions || [],
+            training_time: preferences.trainingTime || null
+          }
         });
 
       if (saveError) {
