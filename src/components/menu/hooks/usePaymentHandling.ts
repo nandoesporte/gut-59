@@ -40,13 +40,13 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
     fetchCurrentPrice();
   }, [planType]);
 
-  const updatePaymentStatus = async (userId: string, preferenceId: string) => {
+  const updatePaymentStatus = async (userId: string, mercadopagoId: string) => {
     try {
       const { error } = await supabase
         .from('payments')
         .insert({
           user_id: userId,
-          preference_id: preferenceId,
+          payment_id: mercadopagoId,
           plan_type: planType,
           amount: currentPrice,
           status: 'completed'
@@ -142,17 +142,19 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
             setHasPaid(true);
             showSuccessMessage(planType);
 
-            // Registrar acesso ao plano
-            const { error: accessError } = await supabase
-              .from('plan_access')
-              .insert({
-                user_id: userData.user.id,
-                plan_type: planType,
-                is_active: true
-              });
+            try {
+              const { error: accessError } = await supabase
+                .from('plan_access')
+                .insert({
+                  user_id: userData.user.id,
+                  plan_type: planType,
+                  is_active: true
+                });
 
-            if (accessError) {
-              console.error('Erro ao registrar acesso ao plano:', accessError);
+              if (accessError) throw accessError;
+            } catch (error) {
+              console.error('Erro ao registrar acesso ao plano:', error);
+              toast.error("Erro ao liberar acesso ao plano. Por favor, contate o suporte.");
             }
           }
         } catch (error) {
