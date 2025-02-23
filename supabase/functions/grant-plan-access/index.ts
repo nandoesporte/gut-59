@@ -20,7 +20,6 @@ serve(async (req) => {
   const requestId = crypto.randomUUID();
   console.log(`[${requestId}] Request started`);
 
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       status: 200,
@@ -29,11 +28,9 @@ serve(async (req) => {
   }
 
   try {
-    // Log raw request body for debugging
     const rawBody = await req.text();
     console.log(`[${requestId}] Raw request body:`, rawBody);
 
-    // Parse request body
     let body: RequestBody;
     try {
       body = JSON.parse(rawBody);
@@ -45,13 +42,8 @@ serve(async (req) => {
     const { userId, planType } = body;
     console.log(`[${requestId}] Processing request:`, { userId, planType });
 
-    // Validate required parameters
-    if (!userId) {
-      throw new Error('Missing userId parameter');
-    }
-    if (!planType) {
-      throw new Error('Missing planType parameter');
-    }
+    if (!userId) throw new Error('Missing userId parameter');
+    if (!planType) throw new Error('Missing planType parameter');
     if (!['nutrition', 'workout', 'rehabilitation'].includes(planType)) {
       throw new Error('Invalid planType. Must be nutrition, workout, or rehabilitation');
     }
@@ -68,31 +60,69 @@ serve(async (req) => {
       .eq('id', userId)
       .single();
 
-    if (userError) {
-      console.error(`[${requestId}] Database error checking user:`, userError);
-      throw new Error('Error checking user existence');
-    }
+    if (userError) throw new Error('Error checking user existence');
+    if (!user) throw new Error('User not found');
 
-    if (!user) {
-      console.error(`[${requestId}] User not found:`, userId);
-      throw new Error('User not found');
-    }
-
-    console.log(`[${requestId}] User verified, granting access to plan`);
-
-    // Inserir ou atualizar o acesso ao plano
-    const { error: accessError } = await supabaseClient
-      .from('plan_access')
+    // Atualizar ou criar contagem de gerações de plano
+    const countColumn = `${planType}_count`;
+    const { data: countData, error: countError } = await supabaseClient
+      .from('plan_generation_counts')
       .upsert({
         user_id: userId,
-        plan_type: planType,
-        is_active: true,
-        updated_at: new Date().toISOString()
-      });
+        [countColumn]: 1
+      }, {
+        onConflict: 'user_id',
+        count: 'exact'
+      })
+      .select('nutrition_count, workout_count, rehabilitation_count');
 
-    if (accessError) {
-      console.error(`[${requestId}] Database error granting access:`, accessError);
-      throw new Error('Error granting plan access');
+    if (countError) throw new Error('Error updating plan generation count');
+
+    // Verificar total de gerações
+    const totalGenerations = (countData?.[0]?.nutrition_count || 0) +
+                           (countData?.[0]?.workout_count || 0) +
+                           (countData?.[0]?.rehabilitation_count || 0);
+
+    console.log(`[${requestId}] Total plan generations:`, totalGenerations);
+
+    // Se atingiu 3 gerações, reativar pagamentos
+    if (totalGenerations >= 3) {
+      console.log(`[${requestId}] Reactivating payments for user`);
+      
+      const { error: settingsError } = await supabaseClient
+        .from('payment_settings')
+        .update({ is_active: true })
+        .eq('plan_type', planType);
+
+      if (settingsError) {
+        console.error(`[${requestId}] Error reactivating payments:`, settingsError);
+      }
+
+      // Resetar contadores
+      const { error: resetError } = await supabaseClient
+        .from('plan_generation_counts')
+        .update({
+          nutrition_count: 0,
+          workout_count: 0,
+          rehabilitation_count: 0
+        })
+        .eq('user_id', userId);
+
+      if (resetError) {
+        console.error(`[${requestId}] Error resetting counters:`, resetError);
+      }
+    } else {
+      // Desativar pagamentos após primeira geração
+      console.log(`[${requestId}] Deactivating payments for user`);
+      
+      const { error: settingsError } = await supabaseClient
+        .from('payment_settings')
+        .update({ is_active: false })
+        .eq('plan_type', planType);
+
+      if (settingsError) {
+        console.error(`[${requestId}] Error deactivating payments:`, settingsError);
+      }
     }
 
     // Criar notificação de pagamento
@@ -102,12 +132,11 @@ serve(async (req) => {
         user_id: userId,
         plan_type: planType,
         status: 'completed',
-        payment_id: requestId // Usando requestId como identificador único
+        payment_id: requestId
       });
 
     if (notificationError) {
       console.error(`[${requestId}] Error creating payment notification:`, notificationError);
-      // Não vamos falhar o processo por erro na notificação
     }
 
     console.log(`[${requestId}] Access granted successfully`);
@@ -116,7 +145,8 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         message: 'Access granted successfully',
-        requestId
+        requestId,
+        requiresPayment: totalGenerations >= 3
       }),
       {
         status: 200,
