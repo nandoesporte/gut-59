@@ -47,7 +47,42 @@ serve(async (req) => {
     }
 
     console.log('Prompt encontrado:', promptData.name);
-    const prompt = promptData.prompt;
+    const basePrompt = promptData.prompt;
+
+    // Adicionar instruções específicas para formatação JSON
+    const prompt = `${basePrompt}
+
+IMPORTANTE: Você DEVE retornar APENAS um objeto JSON válido com a seguinte estrutura:
+
+{
+  "dailyPlan": {
+    "breakfast": {
+      "description": string,
+      "foods": Array<{ name: string, portion: number, unit: string, details?: string }>,
+      "calories": number,
+      "macros": { protein: number, carbs: number, fats: number, fiber: number }
+    },
+    "morningSnack": { ... mesmo formato do café da manhã },
+    "lunch": { ... mesmo formato do café da manhã },
+    "afternoonSnack": { ... mesmo formato do café da manhã },
+    "dinner": { ... mesmo formato do café da manhã }
+  },
+  "totalNutrition": {
+    "calories": number,
+    "protein": number,
+    "carbs": number,
+    "fats": number,
+    "fiber": number
+  },
+  "recommendations": {
+    "general": string,
+    "preworkout": string,
+    "postworkout": string,
+    "timing": string[]
+  }
+}
+
+NÃO inclua nenhum texto adicional, markdown ou explicações. Retorne APENAS o JSON.`;
 
     // Preparar os dados para o modelo
     const modelInput = {
@@ -69,7 +104,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini', // Corrigido o nome do modelo
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
@@ -95,7 +130,16 @@ serve(async (req) => {
     let mealPlan;
 
     try {
-      mealPlan = JSON.parse(aiResponse.choices[0].message.content);
+      // Log da resposta bruta para debug
+      console.log('Raw AI response:', aiResponse.choices[0].message.content);
+      
+      // Tenta extrair JSON da resposta, removendo qualquer texto adicional
+      const content = aiResponse.choices[0].message.content.trim();
+      const jsonStart = content.indexOf('{');
+      const jsonEnd = content.lastIndexOf('}') + 1;
+      const jsonStr = content.slice(jsonStart, jsonEnd);
+      
+      mealPlan = JSON.parse(jsonStr);
     } catch (error) {
       console.error('Error parsing AI response:', error);
       console.log('Raw AI response:', aiResponse.choices[0].message.content);
