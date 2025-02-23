@@ -22,27 +22,37 @@ export const PaymentSettings = ({ user }: PaymentSettingsProps) => {
       if (!user?.id) return;
 
       try {
-        const { data: planAccess, error } = await supabase
+        // Buscar configurações de pagamento globais
+        const { data: paymentSettings, error: settingsError } = await supabase
+          .from('payment_settings')
+          .select('plan_type, is_active')
+          .in('plan_type', ['nutrition', 'workout', 'rehabilitation']);
+
+        if (settingsError) throw settingsError;
+
+        // Buscar configurações específicas do usuário
+        const { data: planAccess, error: accessError } = await supabase
           .from('plan_access')
           .select('plan_type, payment_required')
           .eq('user_id', user.id);
 
-        if (error) {
-          console.error('Error loading payment status:', error);
-          toast.error('Erro ao carregar configurações de pagamento');
-          return;
-        }
+        if (accessError) throw accessError;
 
-        if (planAccess) {
-          const updatedRequirements = paymentRequirements.map(req => {
-            const planStatus = planAccess.find(p => p.plan_type === req.planType);
-            return {
-              ...req,
-              isRequired: planStatus ? planStatus.payment_required : true
-            };
-          });
-          setPaymentRequirements(updatedRequirements);
-        }
+        const updatedRequirements = paymentRequirements.map(req => {
+          const globalSetting = paymentSettings?.find(s => s.plan_type === req.planType);
+          const userSetting = planAccess?.find(p => p.plan_type === req.planType);
+          
+          // Payment is required if global setting is active and user doesn't have special access
+          const isRequired = globalSetting?.is_active && 
+            (!userSetting || userSetting.payment_required);
+
+          return {
+            ...req,
+            isRequired
+          };
+        });
+
+        setPaymentRequirements(updatedRequirements);
       } catch (error) {
         console.error('Error loading payment status:', error);
         toast.error('Erro ao carregar configurações de pagamento');
@@ -59,10 +69,22 @@ export const PaymentSettings = ({ user }: PaymentSettingsProps) => {
       const requirement = paymentRequirements.find(r => r.planType === planType);
       if (!requirement) return;
 
-      // Update local state first to show loading state
       setPaymentRequirements(prev => prev.map(r => 
         r.planType === planType ? { ...r, isDisabling: true } : r
       ));
+
+      // Atualizar configuração global de pagamento
+      const { error: updateSettingError } = await supabase
+        .from('payment_settings')
+        .upsert({
+          plan_type: planType,
+          is_active: !requirement.isRequired,
+          price: 19.90 // Mantém o preço padrão
+        }, {
+          onConflict: 'plan_type'
+        });
+
+      if (updateSettingError) throw updateSettingError;
 
       // Primeiro, delete registros existentes para esse usuário e tipo de plano
       await supabase
@@ -73,7 +95,7 @@ export const PaymentSettings = ({ user }: PaymentSettingsProps) => {
           plan_type: planType 
         });
 
-      // Agora insere o novo registro
+      // Agora insere o novo registro de acesso do usuário
       const { error: insertError } = await supabase
         .from('plan_access')
         .insert({
@@ -85,7 +107,7 @@ export const PaymentSettings = ({ user }: PaymentSettingsProps) => {
 
       if (insertError) throw insertError;
 
-      // Update local state with new value
+      // Atualiza o estado local
       setPaymentRequirements(prev => prev.map(r => 
         r.planType === planType ? 
         { ...r, isRequired: !r.isRequired, isDisabling: false } : 
@@ -97,7 +119,6 @@ export const PaymentSettings = ({ user }: PaymentSettingsProps) => {
       console.error('Erro ao alterar requisito de pagamento:', error);
       toast.error("Erro ao alterar requisito de pagamento");
       
-      // Revert loading state on error
       setPaymentRequirements(prev => prev.map(r => 
         r.planType === planType ? { ...r, isDisabling: false } : r
       ));
