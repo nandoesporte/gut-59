@@ -10,16 +10,37 @@ serve(async (req) => {
   }
 
   try {
-    const { data } = await req.json()
-    console.log('Webhook received:', data)
+    const rawBody = await req.text();
+    console.log('Raw webhook body:', rawBody);
 
-    if (data.action === "payment.created" && data.data?.id) {
-      const paymentId = data.data.id;
-      
+    let webhookData;
+    try {
+      webhookData = JSON.parse(rawBody);
+    } catch (e) {
+      console.error('Error parsing webhook data:', e);
+      throw new Error('Invalid JSON payload');
+    }
+
+    console.log('Parsed webhook data:', webhookData);
+
+    // Mercado Pago sends the data in different formats depending on the notification type
+    // We need to handle both IPN and Webhooks formats
+    const action = webhookData.type || webhookData.action;
+    const paymentId = webhookData.data?.id || webhookData.id;
+
+    console.log('Extracted payment info:', { action, paymentId });
+
+    if ((action === "payment" || action === "payment.created") && paymentId) {
       // Initialize Supabase client
       const supabaseClient = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false
+          }
+        }
       )
 
       // Get payment details from our database
@@ -29,7 +50,12 @@ serve(async (req) => {
         .eq('payment_id', paymentId)
         .single()
 
-      if (paymentError) throw paymentError
+      if (paymentError) {
+        console.error('Error fetching payment data:', paymentError);
+        throw paymentError;
+      }
+
+      console.log('Found payment data:', paymentData);
 
       if (paymentData) {
         // Update payment status
@@ -38,7 +64,12 @@ serve(async (req) => {
           .update({ status: 'completed' })
           .eq('payment_id', paymentId)
 
-        if (updateError) throw updateError
+        if (updateError) {
+          console.error('Error updating payment status:', updateError);
+          throw updateError;
+        }
+
+        console.log('Payment status updated successfully');
 
         // Reset generation count for this plan type
         const { error: countError } = await supabaseClient
@@ -48,19 +79,30 @@ serve(async (req) => {
             [`${paymentData.plan_type}_count`]: 0
           })
 
-        if (countError) throw countError
+        if (countError) {
+          console.error('Error resetting generation count:', countError);
+          throw countError;
+        }
 
-        // Disable payment requirement
-        const { error: accessError } = await supabaseClient.functions.invoke('grant-plan-access', {
-          body: {
-            userId: paymentData.user_id,
-            planType: paymentData.plan_type,
-            disablePayment: true,
-            message: 'Payment processed successfully'
-          }
-        })
+        console.log('Generation count reset successfully');
 
-        if (accessError) throw accessError
+        // Disable payment requirement through grant-plan-access
+        const { data: accessData, error: accessError } = await supabaseClient
+          .from('plan_access')
+          .upsert({
+            user_id: paymentData.user_id,
+            plan_type: paymentData.plan_type,
+            payment_required: false,
+            is_active: true,
+            updated_at: new Date().toISOString()
+          })
+
+        if (accessError) {
+          console.error('Error updating plan access:', accessError);
+          throw accessError;
+        }
+
+        console.log('Plan access updated successfully');
 
         // Create notification
         const { error: notificationError } = await supabaseClient
@@ -72,7 +114,12 @@ serve(async (req) => {
             plan_type: paymentData.plan_type
           })
 
-        if (notificationError) throw notificationError
+        if (notificationError) {
+          console.error('Error creating notification:', notificationError);
+          throw notificationError;
+        }
+
+        console.log('Payment notification created successfully');
       }
     }
 
@@ -82,10 +129,13 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Error processing webhook:', error)
+    console.error('Error processing webhook:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
+        status: 400 
+      }
     )
   }
 })
