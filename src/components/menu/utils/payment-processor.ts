@@ -40,20 +40,42 @@ export const createPaymentPreference = async (
 
   // Registra o pagamento no banco de dados
   try {
-    const { error: paymentError } = await supabase
+    // Primeiro verifica se já existe um pagamento pendente
+    const { data: existingPayment } = await supabase
       .from('payments')
-      .insert({
-        user_id: userData.user.id,
-        payment_id: data.preferenceId,
-        plan_type: planType,
-        amount: amount,
-        status: 'pending'
-      });
+      .select('payment_id, status')
+      .eq('user_id', userData.user.id)
+      .eq('plan_type', planType)
+      .eq('status', 'pending')
+      .single();
 
-    if (paymentError) {
-      console.error('Erro ao registrar pagamento:', paymentError);
-      throw new Error('Erro ao registrar pagamento. Por favor, tente novamente.');
+    // Se existir, atualiza com o novo preference_id
+    if (existingPayment) {
+      const { error: updateError } = await supabase
+        .from('payments')
+        .update({
+          payment_id: data.preferenceId,
+          amount: amount,
+          updated_at: new Date().toISOString()
+        })
+        .eq('payment_id', existingPayment.payment_id);
+
+      if (updateError) throw updateError;
+    } else {
+      // Se não existir, cria um novo
+      const { error: insertError } = await supabase
+        .from('payments')
+        .insert({
+          user_id: userData.user.id,
+          payment_id: data.preferenceId,
+          plan_type: planType,
+          amount: amount,
+          status: 'pending'
+        });
+
+      if (insertError) throw insertError;
     }
+
   } catch (error) {
     console.error('Erro ao registrar pagamento:', error);
     throw new Error('Erro ao registrar pagamento. Por favor, tente novamente.');
@@ -75,6 +97,20 @@ export const checkPaymentStatus = async (
   try {
     console.log('Verificando status do pagamento:', preferenceId);
     
+    // Primeiro verifica no nosso banco de dados
+    const { data: paymentData } = await supabase
+      .from('payments')
+      .select('status')
+      .eq('payment_id', preferenceId)
+      .single();
+
+    if (paymentData?.status === 'completed') {
+      console.log('Pagamento já está marcado como completo no banco de dados');
+      onSuccess();
+      return true;
+    }
+
+    // Se não estiver completo no banco, verifica com o Mercado Pago
     const { data: statusData, error: statusError } = await supabase.functions.invoke(
       'check-mercadopago-payment',
       {
@@ -92,10 +128,8 @@ export const checkPaymentStatus = async (
     if (statusData?.isPaid) {
       console.log('Pagamento confirmado, atualizando status...');
       
-      // First, update payment status in the payments table
       await updatePaymentStatus(userId, preferenceId, planType, amount);
 
-      // Then check generation count
       const { data: countData } = await supabase
         .from('plan_generation_counts')
         .select(`${planType}_count`)
@@ -104,7 +138,6 @@ export const checkPaymentStatus = async (
 
       const currentCount = countData ? countData[`${planType}_count`] : 0;
 
-      // Disable payment requirement through plan_access update
       const { error: grantError } = await supabase.functions.invoke('grant-plan-access', {
         body: {
           userId,
@@ -121,7 +154,6 @@ export const checkPaymentStatus = async (
       console.log('Acesso ao plano liberado com sucesso');
       onSuccess();
       
-      // Show appropriate message based on count
       if (currentCount >= 3) {
         toast.warning("Você atingiu o limite de gerações do plano. Um novo pagamento será necessário.", {
           duration: 6000,
