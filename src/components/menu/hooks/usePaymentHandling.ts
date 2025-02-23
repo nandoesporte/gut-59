@@ -20,7 +20,7 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
   const [hasPaid, setHasPaid] = useState(false);
   const [currentPrice, setCurrentPrice] = useState<number>(19.90);
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [checkInterval, setCheckInterval] = useState<number | null>(null);
+  const [checkInterval, setCheckInterval] = useState<NodeJS.Timer | null>(null);
 
   useEffect(() => {
     const loadPrice = async () => {
@@ -30,7 +30,57 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
     loadPrice();
   }, [planType]);
 
-  // Check URL parameters for payment status on mount and when URL changes
+  // Effect to check payment status every 5 seconds when there's a preferenceId
+  useEffect(() => {
+    const startPaymentCheck = async () => {
+      if (!preferenceId || hasPaid) return;
+
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user?.id) return;
+
+      const checkPayment = async () => {
+        console.log(`Verificando status do pagamento ${preferenceId}...`);
+        const isPaid = await checkPaymentStatus(
+          preferenceId,
+          userData.user.id,
+          planType,
+          currentPrice,
+          handlePaymentSuccess
+        );
+
+        if (isPaid) {
+          console.log('Pagamento confirmado, parando verificação...');
+          if (checkInterval) {
+            clearInterval(checkInterval);
+            setCheckInterval(null);
+          }
+          handlePaymentSuccess();
+        }
+      };
+
+      // Inicia verificação imediata
+      checkPayment();
+
+      // Configura intervalo de 5 segundos
+      const intervalId = setInterval(checkPayment, 5000);
+      setCheckInterval(intervalId);
+
+      // Limpa intervalo após 10 minutos
+      const timeout = setTimeout(() => {
+        clearInterval(intervalId);
+        setCheckInterval(null);
+      }, 600000);
+
+      return () => {
+        clearInterval(intervalId);
+        clearTimeout(timeout);
+      };
+    };
+
+    startPaymentCheck();
+  }, [preferenceId, hasPaid, planType, currentPrice]);
+
+  // Check URL parameters for payment status
   useEffect(() => {
     const checkURLParameters = () => {
       const urlParams = new URLSearchParams(window.location.search);
@@ -54,7 +104,7 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
     };
   }, []);
 
-  // Cleanup interval on unmount
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (checkInterval) {
@@ -69,7 +119,6 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
     setShowConfirmation(true);
     toast.success("Pagamento confirmado com sucesso!");
 
-    // Limpa o intervalo de verificação após confirmação
     if (checkInterval) {
       clearInterval(checkInterval);
       setCheckInterval(null);
@@ -94,39 +143,6 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
       
       // Open payment window
       window.open(paymentUrl.toString(), '_blank');
-
-      // Start polling for payment status
-      const intervalId = window.setInterval(async () => {
-        console.log("Verificando status do pagamento...");
-        const { data: userData } = await supabase.auth.getUser();
-        if (!userData.user?.id) {
-          clearInterval(intervalId);
-          setCheckInterval(null);
-          return;
-        }
-
-        const isPaid = await checkPaymentStatus(
-          newPreferenceId,
-          userData.user.id,
-          planType,
-          currentPrice,
-          handlePaymentSuccess
-        );
-
-        if (isPaid) {
-          clearInterval(intervalId);
-          setCheckInterval(null);
-          handlePaymentSuccess();
-        }
-      }, 5000);
-
-      setCheckInterval(intervalId);
-
-      // Stop polling after 10 minutes
-      setTimeout(() => {
-        clearInterval(intervalId);
-        setCheckInterval(null);
-      }, 600000);
 
     } catch (error) {
       console.error('Erro completo:', error);
