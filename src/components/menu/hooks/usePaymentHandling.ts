@@ -147,13 +147,12 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
             showSuccessMessage(planType);
 
             try {
-              const { error: accessError } = await supabase
-                .from('plan_access')
-                .insert({
-                  user_id: userData.user.id,
-                  plan_type: planType,
-                  is_active: true
-                });
+              const { error: accessError } = await supabase.functions.invoke('grant-plan-access', {
+                body: {
+                  userId: userData.user.id,
+                  planType
+                }
+              });
 
               if (accessError) throw accessError;
             } catch (error) {
