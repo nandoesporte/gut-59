@@ -106,7 +106,7 @@ const Auth = () => {
               Mais Saúde
             </h1>
             <p className="text-gray-600 mt-2">
-              Sua jornada para uma vida mais saudável começa aqui
+              Tecnologia e personalização para resultados reais, em tempo recorde
             </p>
           </div>
         </div>
