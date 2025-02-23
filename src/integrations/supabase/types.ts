@@ -640,6 +640,7 @@ export type Database = {
           created_at: string
           id: string
           payment_id: string
+          plan_type: Database["public"]["Enums"]["plan_type"]
           status: string
           updated_at: string
           user_id: string
@@ -649,6 +650,7 @@ export type Database = {
           created_at?: string
           id?: string
           payment_id: string
+          plan_type: Database["public"]["Enums"]["plan_type"]
           status: string
           updated_at?: string
           user_id: string
@@ -658,6 +660,7 @@ export type Database = {
           created_at?: string
           id?: string
           payment_id?: string
+          plan_type?: Database["public"]["Enums"]["plan_type"]
           status?: string
           updated_at?: string
           user_id?: string
