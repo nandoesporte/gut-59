@@ -9,6 +9,8 @@ import { Switch } from "@/components/ui/switch";
 import type { AIAgentPrompt, AgentType } from "./types";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import * as z from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 interface AgentPromptFormProps {
   type: AgentType;
@@ -16,17 +18,22 @@ interface AgentPromptFormProps {
   onSuccess: () => void;
 }
 
-type FormData = {
-  agent_type: AgentType;
-  name: string;
-  description: string | null;
-  prompt: string;
-  is_active: boolean | null;
-};
+// Schema de validação
+const formSchema = z.object({
+  agent_type: z.enum(['meal_plan', 'workout', 'physiotherapy'] as const),
+  name: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres'),
+  description: z.string().nullable(),
+  prompt: z.string().min(10, 'Prompt deve ter pelo menos 10 caracteres'),
+  is_active: z.boolean().nullable(),
+});
+
+type FormData = z.infer<typeof formSchema>;
 
 export const AgentPromptForm = ({ type, prompt, onSuccess }: AgentPromptFormProps) => {
   const [isLoading, setIsLoading] = useState(false);
+
   const form = useForm<FormData>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
       agent_type: type,
       name: prompt?.name || '',
@@ -52,7 +59,10 @@ export const AgentPromptForm = ({ type, prompt, onSuccess }: AgentPromptFormProp
       if (prompt?.id) {
         const { error } = await supabase
           .from('ai_agent_prompts')
-          .update(insertData)
+          .update({
+            ...insertData,
+            updated_at: new Date().toISOString(),
+          })
           .eq('id', prompt.id);
           
         if (error) throw error;
@@ -60,7 +70,10 @@ export const AgentPromptForm = ({ type, prompt, onSuccess }: AgentPromptFormProp
       } else {
         const { error } = await supabase
           .from('ai_agent_prompts')
-          .insert(insertData);
+          .insert({
+            ...insertData,
+            created_at: new Date().toISOString(),
+          });
           
         if (error) throw error;
         toast.success('Prompt criado com sucesso');
@@ -100,7 +113,11 @@ export const AgentPromptForm = ({ type, prompt, onSuccess }: AgentPromptFormProp
             <FormItem>
               <FormLabel>Descrição</FormLabel>
               <FormControl>
-                <Textarea {...field} placeholder="Descrição do prompt" />
+                <Textarea 
+                  {...field} 
+                  placeholder="Descrição do prompt"
+                  value={field.value || ''} 
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -117,7 +134,7 @@ export const AgentPromptForm = ({ type, prompt, onSuccess }: AgentPromptFormProp
                 <Textarea 
                   {...field} 
                   placeholder="Digite o prompt para o agente de IA"
-                  className="min-h-[200px]"
+                  className="min-h-[200px] font-mono text-sm"
                 />
               </FormControl>
               <FormMessage />
