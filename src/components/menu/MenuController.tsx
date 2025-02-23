@@ -82,8 +82,8 @@ export const useMenuController = () => {
           protein: food.protein || 0,
           carbs: food.carbs || 0,
           fats: food.fats || 0,
-          portion: food.portion_size || 100,
-          portionUnit: food.portion_unit || 'g'
+          portion: food.portion || 100,
+          portionUnit: food.portionUnit || 'g'
         }));
 
       if (selectedFoodsDetails.length === 0) {
