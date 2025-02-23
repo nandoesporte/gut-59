@@ -17,19 +17,34 @@ export const MealSection = ({
   icon, 
   meal,
 }: MealSectionProps) => {
+  // Ensure meal has all required properties with fallbacks
+  const safeFood = {
+    calories: meal?.calories || 0,
+    description: meal?.description || "",
+    foods: meal?.foods || [],
+    macros: {
+      protein: meal?.macros?.protein || 0,
+      carbs: meal?.macros?.carbs || 0,
+      fats: meal?.macros?.fats || 0,
+      fiber: meal?.macros?.fiber || 0
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-sm p-6">
       <h2 className="text-lg font-semibold flex items-center gap-2 text-gray-900 mb-4">
         {icon}
-        {title} ({meal.calories} kcal)
+        {title} ({safeFood.calories} kcal)
       </h2>
 
       <div className="mb-4">
-        <p className="text-gray-600 italic">{meal.description?.replace(/carboidrato/gi, "carbo")}</p>
+        <p className="text-gray-600 italic">
+          {safeFood.description?.replace(/carboidrato/gi, "carbo")}
+        </p>
       </div>
 
       <div className="space-y-4">
-        {meal.foods.map((food, index) => (
+        {safeFood.foods.map((food, index) => (
           <div key={index} className="text-gray-700">
             <div className="flex justify-between items-start">
               <div className="flex-1">
@@ -45,24 +60,24 @@ export const MealSection = ({
                 )}
               </div>
             </div>
-            {index < meal.foods.length - 1 && <div className="border-b my-3 border-gray-100" />}
+            {index < safeFood.foods.length - 1 && <div className="border-b my-3 border-gray-100" />}
           </div>
         ))}
       </div>
 
       <div className="mt-6 text-sm text-gray-600 border-t pt-4">
         <div className="grid grid-cols-4 gap-2 mt-2">
-          <div className="font-medium">Proteínas: {meal.macros.protein}g</div>
-          <div className="font-medium">Carbos: {meal.macros.carbs}g</div>
-          <div className="font-medium">Gorduras: {meal.macros.fats}g</div>
-          <div className="font-medium">Fibras: {meal.macros.fiber}g</div>
+          <div className="font-medium">Proteínas: {safeFood.macros.protein}g</div>
+          <div className="font-medium">Carbos: {safeFood.macros.carbs}g</div>
+          <div className="font-medium">Gorduras: {safeFood.macros.fats}g</div>
+          <div className="font-medium">Fibras: {safeFood.macros.fiber}g</div>
         </div>
         <div className="mt-3">
           <MacroDistributionBar 
             macros={{
-              protein: meal.macros.protein,
-              carbs: meal.macros.carbs,
-              fats: meal.macros.fats
+              protein: safeFood.macros.protein,
+              carbs: safeFood.macros.carbs,
+              fats: safeFood.macros.fats
             }}
           />
         </div>
