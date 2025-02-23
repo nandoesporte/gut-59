@@ -72,12 +72,40 @@ export const checkPaymentStatus = async (
       console.log('Pagamento confirmado, atualizando status...');
       
       await updatePaymentStatus(userId, preferenceId, planType, amount);
-      await grantPlanAccess(userId, planType);
-      
+
+      // After payment is confirmed, disable payment requirement and reset generation count
+      const { error: accessError } = await supabase
+        .from('plan_access')
+        .upsert({
+          user_id: userId,
+          plan_type: planType,
+          payment_required: false,
+          is_active: true
+        });
+
+      if (accessError) {
+        console.error('Erro ao atualizar acesso ao plano:', accessError);
+        throw accessError;
+      }
+
+      // Reset generation count for this plan type
+      const updateField = `${planType}_count`;
+      const { error: countError } = await supabase
+        .from('plan_generation_counts')
+        .upsert({
+          user_id: userId,
+          [updateField]: 0
+        });
+
+      if (countError) {
+        console.error('Erro ao resetar contagem de gerações:', countError);
+        throw countError;
+      }
+
       console.log('Status atualizado, chamando callback de sucesso...');
       onSuccess();
       
-      toast.success("Pagamento confirmado! Seu plano foi liberado.", {
+      toast.success("Pagamento confirmado! Você tem direito a 3 gerações do plano.", {
         duration: 5000,
         position: 'top-center'
       });

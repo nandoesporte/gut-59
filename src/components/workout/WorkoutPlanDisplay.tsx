@@ -76,6 +76,22 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
         return;
       }
 
+      // Check plan access and generation count
+      const { data: accessData, error: accessError } = await supabase.functions.invoke('grant-plan-access', {
+        body: { 
+          userId: user.id, 
+          planType: 'workout'
+        }
+      });
+
+      if (accessError) throw accessError;
+
+      if (accessData?.requiresPayment) {
+        toast.error(accessData.message || "Pagamento necessário para gerar novo plano");
+        setLoading(false);
+        return;
+      }
+
       console.log("Chamando edge function com:", { preferences, userId: user.id });
 
       const { data: response, error } = await supabase.functions.invoke('generate-workout-plan', {
@@ -93,7 +109,12 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
 
       console.log("Plano gerado:", response);
       setWorkoutPlan(response);
-      toast.success("Plano de treino gerado com sucesso!");
+      
+      if (accessData?.remainingGenerations !== undefined) {
+        toast.success(`Plano gerado com sucesso! Você ainda tem ${accessData.remainingGenerations} gerações disponíveis.`);
+      } else {
+        toast.success("Plano de treino gerado com sucesso!");
+      }
     } catch (error: any) {
       console.error("Erro ao gerar plano:", error);
       toast.error(error.message || "Erro ao gerar plano de treino. Por favor, tente novamente.");
