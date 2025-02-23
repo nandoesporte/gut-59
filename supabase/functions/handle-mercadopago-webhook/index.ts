@@ -10,7 +10,7 @@ Deno.serve(async (req) => {
 
   try {
     const payload = await req.json()
-    console.log('Received webhook payload:', payload)
+    console.log('Received webhook payload:', JSON.stringify(payload))
 
     // Validate payload
     if (!payload.data || !payload.type) {
@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
     }
 
     const paymentId = payload.data.id
-    console.log('Processing payment:', paymentId)
+    console.log('Found payment ID:', paymentId)
 
     // Create Supabase client
     const supabaseClient = createClient(
@@ -41,7 +41,24 @@ Deno.serve(async (req) => {
       }
     )
 
-    // Get payment details from our database
+    // Check payment status with MercadoPago
+    const mpResponse = await fetch(
+      `https://api.mercadopago.com/v1/payments/${paymentId}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get('MERCADOPAGO_ACCESS_TOKEN')}`
+        }
+      }
+    )
+
+    if (!mpResponse.ok) {
+      throw new Error(`Failed to fetch payment status: ${mpResponse.statusText}`)
+    }
+
+    const mpPayment = await mpResponse.json()
+    console.log('Payment status from MercadoPago:', mpPayment.status)
+
+    // Find the corresponding payment in our database
     const { data: paymentData, error: paymentError } = await supabaseClient
       .from('payments')
       .select('*')
@@ -53,24 +70,16 @@ Deno.serve(async (req) => {
     }
 
     if (!paymentData) {
-      throw new Error(`Payment not found: ${paymentId}`)
+      console.log('Payment not found in database:', paymentId)
+      return new Response(
+        JSON.stringify({ success: false, error: 'Payment not found' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    // Check payment status with MercadoPago
-    const mpResponse = await fetch(
-      `https://api.mercadopago.com/v1/payments/${paymentId}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${Deno.env.get('MERCADOPAGO_ACCESS_TOKEN')}`
-        }
-      }
-    )
-
-    const mpPayment = await mpResponse.json()
-    console.log('MercadoPago payment status:', mpPayment.status)
-
-    // Update payment status in our database
+    // Update payment status if approved
     if (mpPayment.status === 'approved') {
+      // Update payment record
       const { error: updateError } = await supabaseClient
         .from('payments')
         .update({
@@ -83,7 +92,7 @@ Deno.serve(async (req) => {
         throw updateError
       }
 
-      // Create payment notification
+      // Create notification
       const { error: notificationError } = await supabaseClient
         .from('payment_notifications')
         .insert({
@@ -97,19 +106,36 @@ Deno.serve(async (req) => {
         throw notificationError
       }
 
+      // Reset plan generation count
+      const countColumn = `${paymentData.plan_type}_count` as keyof { workout_count: number, nutrition_count: number, rehabilitation_count: number }
+      
+      const { error: resetError } = await supabaseClient
+        .from('plan_generation_counts')
+        .upsert({
+          user_id: paymentData.user_id,
+          [countColumn]: 0,
+          updated_at: new Date().toISOString()
+        })
+
+      if (resetError) {
+        console.error('Error resetting plan count:', resetError)
+      }
+
       // Grant plan access
       const { error: accessError } = await supabaseClient
         .from('plan_access')
         .insert({
           user_id: paymentData.user_id,
           plan_type: paymentData.plan_type,
-          payment_required: true,
+          payment_required: false,
           is_active: true
         })
 
       if (accessError) {
         throw accessError
       }
+
+      console.log('Successfully processed payment:', paymentId)
     }
 
     return new Response(

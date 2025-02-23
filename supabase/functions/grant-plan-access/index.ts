@@ -2,6 +2,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
 
+type PlanType = 'nutrition' | 'workout' | 'rehabilitation';
+
 // Handle CORS preflight requests
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -13,6 +15,10 @@ Deno.serve(async (req) => {
 
     if (!userId || !planType) {
       throw new Error('Missing required fields')
+    }
+
+    if (!['nutrition', 'workout', 'rehabilitation'].includes(planType)) {
+      throw new Error('Invalid plan type')
     }
 
     console.log('Processing grant-plan-access request:', { userId, planType, disablePayment })
@@ -38,7 +44,6 @@ Deno.serve(async (req) => {
       })
       .eq('user_id', userId)
       .eq('plan_type', planType)
-      .eq('is_active', true)
 
     if (deactivateError) {
       console.error('Error deactivating existing plans:', deactivateError)
@@ -65,6 +70,24 @@ Deno.serve(async (req) => {
 
     if (insertError) {
       throw insertError
+    }
+
+    // Reset plan generation count if disabling payment
+    if (disablePayment) {
+      const countColumn = `${planType}_count` as keyof { workout_count: number, nutrition_count: number, rehabilitation_count: number }
+      
+      const { error: resetError } = await supabaseClient
+        .from('plan_generation_counts')
+        .upsert({
+          user_id: userId,
+          [countColumn]: 0,
+          updated_at: new Date().toISOString()
+        })
+
+      if (resetError) {
+        console.error('Error resetting plan count:', resetError)
+        // Don't throw here, as the main operation succeeded
+      }
     }
 
     console.log('Successfully created new plan access:', newAccess)
