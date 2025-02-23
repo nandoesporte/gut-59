@@ -4,6 +4,7 @@ import Navigation from "./Navigation";
 import { supabase } from "@/integrations/supabase/client";
 import { useLocation } from "react-router-dom";
 import { PaymentConfirmationDialog } from "./menu/components/PaymentConfirmationDialog";
+import { toast } from "sonner";
 
 interface LayoutProps {
   children: ReactNode;
@@ -20,7 +21,8 @@ const Layout = ({ children }: LayoutProps) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const channel = supabase
+      // Canal para mensagens
+      const messagesChannel = supabase
         .channel('messages')
         .on('postgres_changes', { 
           event: 'INSERT', 
@@ -29,6 +31,42 @@ const Layout = ({ children }: LayoutProps) => {
           filter: `receiver_id=eq.${user.id}`
         }, () => {
           setHasNewMessage(true);
+        });
+
+      // Canal para notificações de pagamento
+      const paymentsChannel = supabase
+        .channel('payment_notifications')
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'payment_notifications',
+          filter: `user_id=eq.${user.id}`
+        }, (payload) => {
+          console.log('Notificação de pagamento recebida:', payload);
+          
+          if (payload.new.status === 'completed') {
+            // Toasts para diferentes tipos de plano
+            const planMessages = {
+              nutrition: "Seu plano nutricional foi liberado!",
+              workout: "Seu plano de treino foi liberado!",
+              rehabilitation: "Seu plano de reabilitação foi liberado!"
+            };
+            
+            const message = planMessages[payload.new.plan_type] || "Seu plano foi liberado!";
+            
+            toast.success("Pagamento confirmado!", {
+              description: message,
+              duration: 5000,
+            });
+
+            // Atualizar estado para mostrar diálogo de confirmação
+            setPaymentMessage(message);
+            setShowPaymentConfirmation(true);
+
+            // Reproduzir som de notificação
+            const audio = new Audio('/notification.mp3');
+            audio.play().catch(() => {}); // Ignora erro se o usuário não interagiu com a página
+          }
         })
         .subscribe();
 
@@ -43,7 +81,8 @@ const Layout = ({ children }: LayoutProps) => {
       }
 
       return () => {
-        supabase.removeChannel(channel);
+        supabase.removeChannel(messagesChannel);
+        supabase.removeChannel(paymentsChannel);
       };
     };
 
