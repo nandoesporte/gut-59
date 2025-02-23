@@ -160,8 +160,8 @@ export const ExerciseGifsTab = () => {
 
         <TabsContent value="fisio">
           <FisioBatchUploadForm
-            onSuccess={() => refetch()} 
-            onCancel={() => {}} 
+            onUpload={handlePhysioSubmit}
+            uploading={uploadPhysioExerciseMutation.isPending}
           />
         </TabsContent>
       </Tabs>

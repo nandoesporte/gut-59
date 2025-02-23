@@ -20,6 +20,8 @@ import { Switch } from "@/components/ui/switch";
 interface FisioBatchUploadFormProps {
   onUpload: (exerciseData: PhysioExercise, file: File) => Promise<void>;
   uploading: boolean;
+  onSuccess?: () => void;
+  onCancel?: () => void;
 }
 
 const jointAreaOptions: Record<PhysioJointArea, string> = {
@@ -78,6 +80,8 @@ const conditionsByArea: Record<PhysioJointArea, Array<{ value: PhysioCondition; 
 export const FisioBatchUploadForm = ({
   onUpload,
   uploading,
+  onSuccess,
+  onCancel
 }: FisioBatchUploadFormProps) => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [selectedJointArea, setSelectedJointArea] = useState<PhysioJointArea>("knee");
@@ -150,6 +154,9 @@ export const FisioBatchUploadForm = ({
         await onUpload(exerciseData, file);
       }
       setSelectedFiles([]);
+      if (onSuccess) {
+        onSuccess();
+      }
       toast.success('Todos os arquivos foram enviados com sucesso!');
     } catch (error) {
       console.error('Erro no upload:', error);
