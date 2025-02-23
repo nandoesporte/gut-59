@@ -4,12 +4,14 @@ import { initMercadoPago } from "@mercadopago/sdk-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
+type PlanType = 'nutrition' | 'workout' | 'rehabilitation';
+
 // Initialize MercadoPago with public key
 initMercadoPago('APP_USR-64b85a56-267c-4056-9484-a2ff9e037db4', {
   locale: 'pt-BR'
 });
 
-export const usePaymentHandling = () => {
+export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [preferenceId, setPreferenceId] = useState<string | null>(null);
   const [hasPaid, setHasPaid] = useState(false);
@@ -21,7 +23,7 @@ export const usePaymentHandling = () => {
         const { data, error } = await supabase
           .from('payment_settings')
           .select('price')
-          .eq('plan_type', 'nutrition')
+          .eq('plan_type', planType)
           .eq('is_active', true)
           .single();
 
@@ -37,7 +39,7 @@ export const usePaymentHandling = () => {
     };
 
     fetchCurrentPrice();
-  }, []);
+  }, [planType]);
 
   const handlePaymentAndContinue = async () => {
     try {
@@ -53,11 +55,17 @@ export const usePaymentHandling = () => {
         throw new Error('Usuário não autenticado');
       }
 
+      const descriptions = {
+        nutrition: "Plano Alimentar Personalizado",
+        workout: "Plano de Treino Personalizado",
+        rehabilitation: "Plano de Reabilitação Personalizado"
+      };
+
       // Create payment payload with current price
       const payload = {
         userId: userData.user.id,
         amount: currentPrice,
-        description: "Plano Alimentar Personalizado"
+        description: descriptions[planType]
       };
 
       console.log('Enviando payload:', payload);

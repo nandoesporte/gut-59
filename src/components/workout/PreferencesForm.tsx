@@ -1,4 +1,3 @@
-
 import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -39,6 +38,13 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = React.useState(false);
   const [formData, setFormData] = React.useState<FormSchema | null>(null);
 
+  const {
+    isProcessingPayment,
+    hasPaid,
+    currentPrice,
+    handlePaymentAndContinue
+  } = usePaymentHandling('workout');
+
   const form = useForm<FormSchema>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -53,12 +59,6 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
     },
     mode: "onChange"
   });
-
-  const {
-    isProcessingPayment,
-    hasPaid,
-    handlePaymentAndContinue
-  } = usePaymentHandling();
 
   const handleSubmit = async (data: FormSchema) => {
     if (!hasPaid) {
@@ -131,7 +131,6 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
     }
   };
 
-  // Verificar se o formulário está válido
   const isValid = form.formState.isValid;
 
   return (
@@ -187,7 +186,7 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Valor: R$ 19,90
+              Valor: R$ {currentPrice.toFixed(2)}
             </p>
             <Button 
               onClick={handlePaymentProcess} 
