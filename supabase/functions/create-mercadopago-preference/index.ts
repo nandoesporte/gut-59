@@ -16,7 +16,11 @@ serve(async (req) => {
 
   try {
     const { userId, amount, description, notificationUrl } = await req.json();
-    console.log('Received request data:', { userId, amount, description, notificationUrl });
+    console.log('Request payload:', { userId, amount, description, notificationUrl });
+
+    if (!userId || !amount || !description) {
+      throw new Error('Missing required fields');
+    }
 
     const mercadopagoAccessToken = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN');
     if (!mercadopagoAccessToken) {
@@ -27,7 +31,7 @@ serve(async (req) => {
                     description.toLowerCase().includes('nutricional') ? 'nutrition' : 
                     'rehabilitation';
 
-    console.log('Determined plan type:', planType);
+    console.log('Plan type determined:', planType);
 
     const preference = {
       items: [{
@@ -49,9 +53,9 @@ serve(async (req) => {
       auto_return: 'approved'
     };
 
-    console.log('Sending preference to Mercado Pago:', preference);
+    console.log('Creating MercadoPago preference...');
 
-    const response = await fetch('https://api.mercadopago.com/checkout/preferences', {
+    const mpResponse = await fetch('https://api.mercadopago.com/checkout/preferences', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${mercadopagoAccessToken}`,
@@ -60,20 +64,19 @@ serve(async (req) => {
       body: JSON.stringify(preference)
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Mercado Pago API error:', {
-        status: response.status,
-        statusText: response.statusText,
+    if (!mpResponse.ok) {
+      const errorText = await mpResponse.text();
+      console.error('MercadoPago API error:', {
+        status: mpResponse.status,
+        statusText: mpResponse.statusText,
         body: errorText
       });
-      throw new Error(`Mercado Pago API error: ${response.status} ${response.statusText}`);
+      throw new Error(`MercadoPago API error: ${mpResponse.status} ${mpResponse.statusText}`);
     }
 
-    const mpResponse = await response.json();
-    console.log('Mercado Pago response:', mpResponse);
+    const mpData = await mpResponse.json();
+    console.log('MercadoPago preference created:', mpData);
 
-    // Create Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
@@ -81,28 +84,36 @@ serve(async (req) => {
       throw new Error('Missing Supabase configuration');
     }
 
+    console.log('Creating payment record in database...');
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Create payment record
-    const { error: paymentError } = await supabase
+    const paymentData = {
+      user_id: userId,
+      payment_id: mpData.id,
+      amount: amount,
+      status: 'pending',
+      plan_type: planType
+    };
+
+    console.log('Payment data to insert:', paymentData);
+
+    const { data: paymentRecord, error: paymentError } = await supabase
       .from('payments')
-      .insert({
-        user_id: userId,
-        payment_id: mpResponse.id,
-        amount: amount,
-        status: 'pending',
-        plan_type: planType
-      });
+      .insert(paymentData)
+      .select()
+      .single();
 
     if (paymentError) {
-      console.error('Error creating payment record:', paymentError);
-      throw new Error('Failed to create payment record');
+      console.error('Database error creating payment record:', paymentError);
+      throw new Error(`Failed to create payment record: ${paymentError.message}`);
     }
+
+    console.log('Payment record created successfully:', paymentRecord);
 
     return new Response(
       JSON.stringify({
-        preferenceId: mpResponse.id,
-        initPoint: mpResponse.init_point
+        preferenceId: mpData.id,
+        initPoint: mpData.init_point
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -111,9 +122,12 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Error creating preference:', error);
+    console.error('Function error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        details: error.stack 
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
