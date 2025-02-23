@@ -1,205 +1,130 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
 
-serve(async (req) => {
-  // Handle CORS
+// Handle CORS preflight requests
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const rawBody = await req.text();
-    console.log('Raw webhook body:', rawBody);
+    const payload = await req.json()
+    console.log('Received webhook payload:', payload)
 
-    let webhookData;
-    try {
-      webhookData = JSON.parse(rawBody);
-    } catch (e) {
-      console.error('Error parsing webhook data:', e);
-      throw new Error('Invalid JSON payload');
+    // Validate payload
+    if (!payload.data || !payload.type) {
+      throw new Error('Invalid webhook payload')
     }
 
-    console.log('Parsed webhook data:', webhookData);
+    // Only process 'payment' type notifications
+    if (payload.type !== 'payment') {
+      console.log('Ignoring non-payment webhook:', payload.type)
+      return new Response(
+        JSON.stringify({ success: true, message: 'Ignored non-payment webhook' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
-    // Handle merchant_order notifications
-    if (webhookData.topic === 'merchant_order' && webhookData.resource) {
-      try {
-        // Extract order ID from resource URL
-        const orderId = webhookData.resource.split('/').pop();
-        console.log('Extracted order ID:', orderId);
+    const paymentId = payload.data.id
+    console.log('Processing payment:', paymentId)
 
-        // Fetch order details from Mercado Pago API
-        const orderResponse = await fetch(webhookData.resource, {
-          headers: {
-            'Authorization': `Bearer ${Deno.env.get('MERCADOPAGO_ACCESS_TOKEN')}`
-          }
-        });
-
-        if (!orderResponse.ok) {
-          throw new Error('Failed to fetch order details');
+    // Create Supabase client
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
         }
+      }
+    )
 
-        const orderData = await orderResponse.json();
-        console.log('Order data:', orderData);
+    // Get payment details from our database
+    const { data: paymentData, error: paymentError } = await supabaseClient
+      .from('payments')
+      .select('*')
+      .eq('payment_id', paymentId)
+      .maybeSingle()
 
-        // Get associated payment ID and preference ID from the order
-        const paymentId = orderData.payments?.[0]?.id;
-        const preferenceId = orderData.preference_id;
+    if (paymentError) {
+      throw paymentError
+    }
 
-        if (!paymentId || !preferenceId) {
-          console.log('No payment or preference ID found in order');
-          return new Response(
-            JSON.stringify({ message: 'No payment or preference ID found in order' }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
+    if (!paymentData) {
+      throw new Error(`Payment not found: ${paymentId}`)
+    }
+
+    // Check payment status with MercadoPago
+    const mpResponse = await fetch(
+      `https://api.mercadopago.com/v1/payments/${paymentId}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get('MERCADOPAGO_ACCESS_TOKEN')}`
         }
+      }
+    )
 
-        console.log('Found payment ID:', paymentId, 'and preference ID:', preferenceId);
+    const mpPayment = await mpResponse.json()
+    console.log('MercadoPago payment status:', mpPayment.status)
 
-        // Initialize Supabase client
-        const supabaseClient = createClient(
-          Deno.env.get('SUPABASE_URL') ?? '',
-          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-          {
-            auth: {
-              autoRefreshToken: false,
-              persistSession: false
-            }
-          }
-        );
+    // Update payment status in our database
+    if (mpPayment.status === 'approved') {
+      const { error: updateError } = await supabaseClient
+        .from('payments')
+        .update({
+          status: 'completed',
+          updated_at: new Date().toISOString()
+        })
+        .eq('payment_id', paymentId)
 
-        // Get payment details from our database using preference_id
-        const { data: paymentData, error: paymentError } = await supabaseClient
-          .from('payments')
-          .select('user_id, plan_type, status')
-          .eq('payment_id', preferenceId)
-          .maybeSingle();
+      if (updateError) {
+        throw updateError
+      }
 
-        if (paymentError) {
-          console.error('Error fetching payment data:', paymentError);
-          throw paymentError;
-        }
+      // Create payment notification
+      const { error: notificationError } = await supabaseClient
+        .from('payment_notifications')
+        .insert({
+          user_id: paymentData.user_id,
+          payment_id: paymentId,
+          plan_type: paymentData.plan_type,
+          status: 'completed'
+        })
 
-        if (!paymentData) {
-          console.log('No payment data found for preference ID:', preferenceId);
-          return new Response(
-            JSON.stringify({ message: 'Payment not found in database' }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
+      if (notificationError) {
+        throw notificationError
+      }
 
-        console.log('Found payment data:', paymentData);
+      // Grant plan access
+      const { error: accessError } = await supabaseClient
+        .from('plan_access')
+        .insert({
+          user_id: paymentData.user_id,
+          plan_type: paymentData.plan_type,
+          payment_required: true,
+          is_active: true
+        })
 
-        // Check payment status
-        const paymentStatus = orderData.payments[0].status;
-        if (paymentStatus !== 'approved') {
-          console.log('Payment not approved:', paymentStatus);
-          return new Response(
-            JSON.stringify({ message: 'Payment not approved' }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-
-        // Update payment status in our database
-        const { error: updateError } = await supabaseClient
-          .from('payments')
-          .update({ 
-            status: 'completed',
-            // Store the actual payment ID from Mercado Pago as well
-            payment_id: paymentId.toString()
-          })
-          .eq('payment_id', preferenceId);
-
-        if (updateError) {
-          console.error('Error updating payment status:', updateError);
-          throw updateError;
-        }
-
-        console.log('Payment status updated successfully');
-
-        // Reset generation count for this plan type
-        const { error: countError } = await supabaseClient
-          .from('plan_generation_counts')
-          .upsert({
-            user_id: paymentData.user_id,
-            [`${paymentData.plan_type}_count`]: 0
-          });
-
-        if (countError) {
-          console.error('Error resetting generation count:', countError);
-          throw countError;
-        }
-
-        console.log('Generation count reset successfully');
-
-        // Disable payment requirement through plan_access update
-        const { error: accessError } = await supabaseClient
-          .from('plan_access')
-          .upsert({
-            user_id: paymentData.user_id,
-            plan_type: paymentData.plan_type,
-            payment_required: false,
-            is_active: true,
-            updated_at: new Date().toISOString()
-          });
-
-        if (accessError) {
-          console.error('Error updating plan access:', accessError);
-          throw accessError;
-        }
-
-        console.log('Plan access updated successfully');
-
-        // Create notification
-        const { error: notificationError } = await supabaseClient
-          .from('payment_notifications')
-          .insert({
-            user_id: paymentData.user_id,
-            payment_id: paymentId.toString(),
-            status: 'completed',
-            plan_type: paymentData.plan_type
-          });
-
-        if (notificationError) {
-          console.error('Error creating notification:', notificationError);
-          throw notificationError;
-        }
-
-        console.log('Payment notification created successfully');
-
-        return new Response(
-          JSON.stringify({ 
-            success: true,
-            message: 'Payment processed successfully'
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      } catch (error) {
-        console.error('Error processing merchant order:', error);
-        throw error;
+      if (accessError) {
+        throw accessError
       }
     }
 
-    // If we reach here, it's a notification we don't handle
     return new Response(
-      JSON.stringify({ 
-        received: true,
-        message: 'Notification received but not processed',
-        topic: webhookData.topic
-      }),
+      JSON.stringify({ success: true }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    )
 
   } catch (error) {
-    console.error('Error processing webhook:', error);
+    console.error('Error processing webhook:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400 
       }
-    );
+    )
   }
 })

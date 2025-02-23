@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
       throw new Error('Missing required fields')
     }
 
-    console.log('Processing request:', { userId, planType, disablePayment })
+    console.log('Processing grant-plan-access request:', { userId, planType, disablePayment })
 
     // Create Supabase client
     const supabaseClient = createClient(
@@ -29,65 +29,48 @@ Deno.serve(async (req) => {
       }
     )
 
-    // Get current plan access - using single() since we should only have one record per user/plan type
-    const { data: existingAccess, error: queryError } = await supabaseClient
+    // First, deactivate any existing active plan access records
+    const { error: deactivateError } = await supabaseClient
       .from('plan_access')
-      .select()
+      .update({
+        is_active: false,
+        updated_at: new Date().toISOString()
+      })
       .eq('user_id', userId)
       .eq('plan_type', planType)
-      .order('created_at', { ascending: false })
-      .limit(1)
+      .eq('is_active', true)
+
+    if (deactivateError) {
+      console.error('Error deactivating existing plans:', deactivateError)
+      throw deactivateError
+    }
+
+    // Create new plan access entry
+    console.log('Creating new plan access record:', {
+      userId,
+      planType,
+      disablePayment
+    })
+
+    const { data: newAccess, error: insertError } = await supabaseClient
+      .from('plan_access')
+      .insert({
+        user_id: userId,
+        plan_type: planType,
+        payment_required: !disablePayment,
+        is_active: true
+      })
+      .select()
       .single()
 
-    console.log('Current plan access:', existingAccess)
-
-    if (queryError && queryError.code !== 'PGRST116') {
-      throw queryError
+    if (insertError) {
+      throw insertError
     }
 
-    let result
-
-    if (existingAccess) {
-      // Update existing plan access
-      console.log('Updating existing plan access:', {
-        userId,
-        planType,
-        disablePayment
-      })
-
-      result = await supabaseClient
-        .from('plan_access')
-        .update({
-          payment_required: !disablePayment,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existingAccess.id) // Using the specific record ID
-        .select()
-    } else {
-      // Create new plan access entry
-      console.log('Creating new plan access:', {
-        userId,
-        planType,
-        disablePayment
-      })
-
-      result = await supabaseClient
-        .from('plan_access')
-        .insert({
-          user_id: userId,
-          plan_type: planType,
-          payment_required: !disablePayment,
-          is_active: true
-        })
-        .select()
-    }
-
-    if (result.error) {
-      throw result.error
-    }
+    console.log('Successfully created new plan access:', newAccess)
 
     return new Response(
-      JSON.stringify({ success: true }),
+      JSON.stringify({ success: true, data: newAccess }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200 
