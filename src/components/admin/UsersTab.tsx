@@ -24,7 +24,10 @@ export const UsersTab = () => {
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select(`
-          *,
+          id,
+          name,
+          age,
+          health_conditions,
           unread_messages:messages!messages_receiver_id_fkey(count)
         `)
         .neq('id', user.id)
@@ -35,7 +38,7 @@ export const UsersTab = () => {
       return profiles.map(profile => ({
         ...profile,
         unread_messages: profile.unread_messages?.[0]?.count || 0,
-        email: null // Add default email value
+        email: null
       }));
     },
   });
@@ -65,21 +68,22 @@ export const UsersTab = () => {
   };
 
   const handleViewDetails = async (user: User) => {
+    if (!user?.id) return;
+
     try {
-      // Get user's auth details to get email
-      const { data: authUser, error: authError } = await supabase
-        .from('auth.users')
-        .select('email')
+      // Get user's profile data
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
         .eq('id', user.id)
         .single();
 
-      if (authError) {
-        console.error('Error fetching user email:', authError);
-      }
+      if (profileError) throw profileError;
 
       setSelectedUser({
         ...user,
-        email: authUser?.email || null
+        ...profileData,
+        email: null // We don't have access to auth.users email
       });
       setShowDetails(true);
     } catch (error) {
@@ -89,7 +93,7 @@ export const UsersTab = () => {
   };
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !selectedUser) return;
+    if (!newMessage.trim() || !selectedUser?.id) return;
 
     try {
       setLoading(true);
@@ -126,7 +130,7 @@ export const UsersTab = () => {
         />
       )}
 
-      {selectedUser && (
+      {selectedUser && showDetails && (
         <UserDetailsDialog
           user={selectedUser}
           open={showDetails}

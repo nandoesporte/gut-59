@@ -4,6 +4,7 @@ export interface User {
   age: number | null;
   health_conditions: string | null;
   email: string | null;
+  unread_messages?: number;
 }
 
 export interface Symptom {

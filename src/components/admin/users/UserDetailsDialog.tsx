@@ -39,10 +39,9 @@ export const UserDetailsDialog = ({
   const [isNutritionPaymentRequired, setIsNutritionPaymentRequired] = useState(true);
   const [isDisablingPayment, setIsDisablingPayment] = useState(false);
 
-  // Load initial payment requirement status
   useEffect(() => {
     const loadPaymentStatus = async () => {
-      if (!user?.id) return;
+      if (!user?.id || !open) return;
 
       try {
         const { data } = await supabase
@@ -60,9 +59,7 @@ export const UserDetailsDialog = ({
       }
     };
 
-    if (open) {
-      loadPaymentStatus();
-    }
+    loadPaymentStatus();
   }, [open, user?.id]);
 
   const handleTogglePaymentRequirement = async () => {
@@ -97,7 +94,6 @@ export const UserDetailsDialog = ({
     }
   };
 
-  // Don't render if no user is provided
   if (!user) {
     return null;
   }
@@ -138,7 +134,7 @@ export const UserDetailsDialog = ({
               <Switch
                 checked={isNutritionPaymentRequired}
                 onCheckedChange={handleTogglePaymentRequirement}
-                disabled={isDisablingPayment}
+                disabled={isDisablingPayment || !user.id}
               />
             </div>
           </div>
