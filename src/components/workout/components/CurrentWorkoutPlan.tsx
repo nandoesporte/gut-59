@@ -9,6 +9,10 @@ interface CurrentWorkoutPlanProps {
 }
 
 export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
+  if (!plan || !plan.workout_sessions) {
+    return null;
+  }
+
   return (
     <div className="space-y-6">
       <Card className="bg-white shadow-lg">
@@ -33,7 +37,7 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
         </CardHeader>
       </Card>
 
-      {plan.workout_sessions?.map((session) => (
+      {plan.workout_sessions.map((session) => (
         <Card key={session.id} className="overflow-hidden bg-white shadow-lg transition-all hover:shadow-xl">
           <CardHeader className="p-6 bg-gradient-to-r from-primary-500 to-primary-600">
             <h4 className="text-xl font-semibold text-white flex items-center gap-2">
@@ -49,60 +53,59 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
               </div>
 
               <div className="space-y-8">
-                {session.session_exercises?.map((exerciseSession) => {
-                  const exercise = exerciseSession.exercise;
-                  return (
-                    <div 
-                      key={exerciseSession.id}
-                      className="bg-gray-50 rounded-lg p-6 transition-all hover:shadow-md"
-                    >
-                      <div className="flex flex-col md:flex-row gap-6">
-                        {exercise?.gif_url && (
-                          <div className="w-full md:w-64 h-64 rounded-lg overflow-hidden bg-white shadow-inner">
-                            <img 
-                              src={exercise.gif_url} 
-                              alt={exercise.name}
-                              className="w-full h-full object-cover"
-                              loading="lazy"
-                            />
-                          </div>
-                        )}
-                        <div className="flex-grow">
-                          <h6 className="text-lg font-medium text-gray-900 mb-4">
-                            {exercise?.name}
-                          </h6>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="bg-white p-4 rounded-lg shadow-sm">
-                              <span className="text-sm text-gray-500 block mb-1">Séries</span>
-                              <span className="text-lg font-semibold text-primary-600">
-                                {exerciseSession.sets}
-                              </span>
-                            </div>
-                            <div className="bg-white p-4 rounded-lg shadow-sm">
-                              <span className="text-sm text-gray-500 block mb-1">Repetições</span>
-                              <span className="text-lg font-semibold text-primary-600">
-                                {exerciseSession.reps}
-                              </span>
-                            </div>
-                            <div className="bg-white p-4 rounded-lg shadow-sm">
-                              <span className="text-sm text-gray-500 block mb-1">
-                                <Clock className="w-4 h-4 inline-block mr-1" />
-                                Descanso
-                              </span>
-                              <span className="text-lg font-semibold text-primary-600">
-                                {exerciseSession.rest_time_seconds}s
-                              </span>
-                            </div>
-                          </div>
-                          
-                          {exercise?.description && (
-                            <p className="text-sm text-gray-500 mt-4">{exercise.description}</p>
-                          )}
+                {session.session_exercises?.map((exerciseSession) => (
+                  <div 
+                    key={exerciseSession.id}
+                    className="bg-gray-50 rounded-lg p-6 transition-all hover:shadow-md"
+                  >
+                    <div className="flex flex-col md:flex-row gap-6">
+                      {exerciseSession.exercise?.gif_url && (
+                        <div className="w-full md:w-64 h-64 rounded-lg overflow-hidden bg-white shadow-inner">
+                          <img 
+                            src={exerciseSession.exercise.gif_url} 
+                            alt={exerciseSession.exercise.name}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
                         </div>
+                      )}
+                      <div className="flex-grow">
+                        <h6 className="text-lg font-medium text-gray-900 mb-4">
+                          {exerciseSession.exercise?.name}
+                        </h6>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="bg-white p-4 rounded-lg shadow-sm">
+                            <span className="text-sm text-gray-500 block mb-1">Séries</span>
+                            <span className="text-lg font-semibold text-primary-600">
+                              {exerciseSession.sets}
+                            </span>
+                          </div>
+                          <div className="bg-white p-4 rounded-lg shadow-sm">
+                            <span className="text-sm text-gray-500 block mb-1">Repetições</span>
+                            <span className="text-lg font-semibold text-primary-600">
+                              {exerciseSession.reps}
+                            </span>
+                          </div>
+                          <div className="bg-white p-4 rounded-lg shadow-sm">
+                            <span className="text-sm text-gray-500 block mb-1">
+                              <Clock className="w-4 h-4 inline-block mr-1" />
+                              Descanso
+                            </span>
+                            <span className="text-lg font-semibold text-primary-600">
+                              {exerciseSession.rest_time_seconds}s
+                            </span>
+                          </div>
+                        </div>
+                        
+                        {exerciseSession.exercise?.description && (
+                          <p className="text-sm text-gray-500 mt-4">
+                            {exerciseSession.exercise.description}
+                          </p>
+                        )}
                       </div>
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
               </div>
 
               <div className="bg-primary-50 p-4 rounded-lg mt-6">

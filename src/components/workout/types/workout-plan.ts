@@ -1,23 +1,25 @@
 
-export interface Exercise {
+interface Exercise {
+  id: string;
   name: string;
+  gif_url?: string;
+  description?: string;
+}
+
+interface SessionExercise {
+  id: string;
   sets: number;
   reps: number;
   rest_time_seconds: number;
-  gifUrl?: string;
-  weight_recommendation?: {
-    beginner: string;
-    intermediate: string;
-    advanced: string;
-  };
-  notes?: string;
+  exercise: Exercise;
 }
 
 export interface WorkoutSession {
+  id: string;
   day_number: number;
   warmup_description: string;
   cooldown_description: string;
-  exercises: Exercise[];
+  session_exercises: SessionExercise[];
 }
 
 export interface WorkoutPlan {
@@ -27,5 +29,4 @@ export interface WorkoutPlan {
   start_date: string;
   end_date: string;
   workout_sessions: WorkoutSession[];
-  user_fitness_level: "beginner" | "intermediate" | "advanced";
 }
