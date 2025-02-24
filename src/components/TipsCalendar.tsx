@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { Lock, Unlock, Check } from "lucide-react";
@@ -118,10 +117,9 @@ const TipsCalendar = () => {
         tip.id === tipId ? { ...tip, isRead: true } : tip
       ));
 
-      // Adiciona pontos quando o usuário confirma a leitura
       addTransaction({
         amount: 1,
-        type: 'daily_tip_read',
+        type: 'daily_tip',
         description: `Desafio do dia ${tipId} concluído`
       });
       
