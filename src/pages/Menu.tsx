@@ -52,20 +52,11 @@ const Menu = () => {
             formData={formData}
             onInputChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
             onCalculate={async () => {
-              return new Promise<void>(async (resolve, reject) => {
-                try {
-                  const success = await handleCalculateCalories();
-                  if (success) {
-                    setCurrentStep(2);
-                    resolve();
-                  } else {
-                    reject(new Error("Falha ao calcular calorias"));
-                  }
-                } catch (error) {
-                  toast.error("Por favor, preencha todos os campos corretamente.");
-                  reject(error);
-                }
-              });
+              const success = await handleCalculateCalories();
+              if (!success) {
+                throw new Error("Falha ao calcular calorias");
+              }
+              setCurrentStep(2);
             }}
             calorieNeeds={calorieNeeds}
           />
