@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +12,7 @@ export const useMenuController = () => {
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [dietaryPreferences, setDietaryPreferences] = useState<DietaryPreferences | null>(null);
   const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<CalorieCalculatorForm>({
     weight: "",
     height: "",
@@ -21,7 +23,7 @@ export const useMenuController = () => {
   });
 
   const protocolFoods = useProtocolFoods();
-  const { loading, calorieNeeds, calculateCalories } = useCalorieCalculator();
+  const { calorieNeeds, calculateCalories } = useCalorieCalculator();
   const { selectedFoods, totalCalories, handleFoodSelection, calculateTotalCalories } = useFoodSelection();
 
   useEffect(() => {
@@ -35,40 +37,40 @@ export const useMenuController = () => {
       return;
     }
 
-    const calories = await calculateCalories(formData, selectedLevel);
-    if (calories) {
-      setCurrentStep(2);
+    try {
+      const calories = await calculateCalories(formData, selectedLevel);
+      if (calories) {
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Erro ao calcular calorias:', error);
+      toast.error("Erro ao calcular as calorias necessárias");
+      return false;
     }
   };
 
   const handleDietaryPreferences = async (preferences: DietaryPreferences) => {    
     const toastId = toast.loading("Gerando seu plano alimentar personalizado...");
+    setLoading(true);
     
     try {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) {
-        toast.dismiss(toastId);
-        toast.error("Usuário não autenticado");
-        return;
+        throw new Error("Usuário não autenticado");
       }
 
       // Validações iniciais
       if (!calorieNeeds || calorieNeeds <= 0) {
-        toast.dismiss(toastId);
-        toast.error("Necessidade calórica inválida");
-        return;
+        throw new Error("Necessidade calórica inválida");
       }
 
       if (!selectedFoods || selectedFoods.length === 0) {
-        toast.dismiss(toastId);
-        toast.error("Por favor, selecione pelo menos um alimento");
-        return;
+        throw new Error("Selecione pelo menos um alimento");
       }
 
       if (!formData.goal || !formData.weight || !formData.height || !formData.age) {
-        toast.dismiss(toastId);
-        toast.error("Por favor, preencha todos os dados do formulário");
-        return;
+        throw new Error("Dados do formulário incompletos");
       }
 
       // Preparar dados dos alimentos
@@ -86,7 +88,7 @@ export const useMenuController = () => {
           food_group_id: food.food_group_id
         }));
 
-      // Gerar plano alimentar usando o prompt configurado
+      // Gerar plano alimentar
       const { data: generatedPlan, error: generateError } = await supabase.functions.invoke(
         'generate-meal-plan',
         {
@@ -157,10 +159,9 @@ export const useMenuController = () => {
         throw new Error('Falha ao salvar cardápio');
       }
 
-      // Only change step after meal plan is set and saved
-      setCurrentStep(4);
       toast.dismiss(toastId);
       toast.success("Cardápio personalizado gerado com sucesso!");
+      return true;
 
     } catch (error) {
       console.error('Erro completo:', error);
@@ -176,6 +177,9 @@ export const useMenuController = () => {
           stack: error.stack
         });
       }
+      throw error;
+    } finally {
+      setLoading(false);
     }
   };
 

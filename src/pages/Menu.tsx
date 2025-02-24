@@ -31,7 +31,7 @@ const Menu = () => {
   const renderStep = () => {
     if (loading && currentStep !== 1.5) {
       return (
-        <div className="flex justify-center">
+        <div className="flex justify-center items-center min-h-[400px]">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
       );
@@ -53,8 +53,10 @@ const Menu = () => {
             onInputChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
             onCalculate={async () => {
               try {
-                await handleCalculateCalories();
-                setCurrentStep(2);
+                const success = await handleCalculateCalories();
+                if (success) {
+                  setCurrentStep(2);
+                }
               } catch (error) {
                 toast.error("Por favor, preencha todos os campos corretamente.");
               }
@@ -84,8 +86,10 @@ const Menu = () => {
           <DietaryPreferencesForm
             onSubmit={async (preferences) => {
               try {
-                await handleDietaryPreferences(preferences);
-                setCurrentStep(4);
+                const success = await handleDietaryPreferences(preferences);
+                if (success) {
+                  setCurrentStep(4);
+                }
               } catch (error) {
                 console.error('Erro ao gerar plano:', error);
                 toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
@@ -95,16 +99,16 @@ const Menu = () => {
           />
         );
       case 4:
-        return (
+        return mealPlan ? (
           <div className="space-y-6">
-            {mealPlan && (
-              <MealPlanDisplay 
-                mealPlan={mealPlan} 
-                onRefresh={async () => {
-                  setCurrentStep(3); // Go back to dietary preferences to regenerate
-                }} 
-              />
-            )}
+            <MealPlanDisplay 
+              mealPlan={mealPlan} 
+              onRefresh={() => setCurrentStep(3)}
+            />
+          </div>
+        ) : (
+          <div className="flex justify-center items-center min-h-[400px]">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
         );
       default:
