@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Scale, Activity, Footprints, Dumbbell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GoalCards, Goal } from "./GoalCards";
+import { SelectCard } from "@/components/workout/components/SelectCard";
 
 export interface CalorieCalculatorForm {
   weight: string;
@@ -116,19 +117,25 @@ const CalorieCalculator = ({
                 />
               </div>
               <div>
-                <Label htmlFor="gender">Gênero</Label>
-                <Select
-                  value={formData.gender}
-                  onValueChange={(value) => onInputChange("gender", value)}
-                >
-                  <SelectTrigger id="gender" className="mt-1">
-                    <SelectValue placeholder="Selecione o gênero" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="male">Masculino</SelectItem>
-                    <SelectItem value="female">Feminino</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label>Gênero</Label>
+                <div className="grid grid-cols-2 gap-4 mt-1">
+                  <SelectCard
+                    selected={formData.gender === "male"}
+                    onClick={() => onInputChange("gender", "male")}
+                  >
+                    <div className="text-center">
+                      <span className="text-lg">Masculino</span>
+                    </div>
+                  </SelectCard>
+                  <SelectCard
+                    selected={formData.gender === "female"}
+                    onClick={() => onInputChange("gender", "female")}
+                  >
+                    <div className="text-center">
+                      <span className="text-lg">Feminino</span>
+                    </div>
+                  </SelectCard>
+                </div>
               </div>
             </div>
 

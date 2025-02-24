@@ -1,6 +1,7 @@
 
 import { Card } from "@/components/ui/card";
 import { CalorieCalculator, CalorieCalculatorForm } from "./CalorieCalculator";
+import { AlertDialog, AlertDialogContent } from "@/components/ui/alert-dialog";
 import { Loader2 } from "lucide-react";
 
 interface CalorieCalculatorStepProps {
@@ -24,21 +25,29 @@ export const CalorieCalculatorStep = ({
           Preencha seus dados para calcularmos suas necessidades calóricas
         </p>
       </div>
-      {calorieNeeds === null ? (
-        <CalorieCalculator
-          formData={formData}
-          onInputChange={onInputChange}
-          onCalculate={onCalculate}
-          calorieNeeds={calorieNeeds}
-        />
-      ) : (
-        <div className="flex flex-col items-center justify-center py-8 space-y-4">
-          <Loader2 className="w-8 h-8 animate-spin text-green-500" />
-          <p className="text-lg font-medium text-gray-700">
-            Gerando seu plano alimentar personalizado...
-          </p>
-        </div>
-      )}
+      
+      <AlertDialog open={calorieNeeds !== null}>
+        <AlertDialogContent className="bg-white p-6 sm:p-8 max-w-md mx-auto flex flex-col items-center justify-center space-y-4">
+          <Loader2 className="w-12 h-12 animate-spin text-green-500" />
+          <div className="text-center">
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">
+              Gerando seu plano alimentar personalizado...
+            </h3>
+            <p className="text-gray-600">
+              Este processo pode levar de 1 a 2 minutos.
+              <br />
+              Por favor, aguarde enquanto preparamos seu cardápio.
+            </p>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <CalorieCalculator
+        formData={formData}
+        onInputChange={onInputChange}
+        onCalculate={onCalculate}
+        calorieNeeds={calorieNeeds}
+      />
     </div>
   );
 };
