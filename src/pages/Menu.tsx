@@ -58,7 +58,10 @@ const Menu = () => {
                 onInputChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
                 onCalculate={async () => {
                   try {
-                    await handleCalculateCalories();
+                    const success = await handleCalculateCalories();
+                    if (success) {
+                      toast.success("Calorias calculadas com sucesso!");
+                    }
                   } catch (error) {
                     console.error('Erro ao calcular calorias:', error);
                     toast.error("Erro ao calcular calorias. Tente novamente.");
@@ -91,23 +94,38 @@ const Menu = () => {
                 Restrições e Preferências
               </h2>
               <DietaryPreferencesForm
-                onSubmit={async (preferences: DietaryPreferences) => {
-                  try {
-                    const result = await handleDietaryPreferences(preferences).catch(error => {
-                      console.error('Erro detalhado:', error);
-                      return false;
-                    });
-                    
-                    if (!result) {
-                      toast.error("Não foi possível gerar o plano alimentar. Tente novamente.");
-                    }
-                  } catch (error) {
-                    console.error('Erro ao gerar plano:', error);
-                    toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
-                  }
-                }}
+                onSubmit={(preferences: DietaryPreferences) => {}}
                 onBack={() => {}}
               />
+              {selectedFoods.length > 0 && (
+                <div className="mt-6">
+                  <button
+                    onClick={async () => {
+                      try {
+                        const result = await handleDietaryPreferences({
+                          hasAllergies: false,
+                          allergies: [],
+                          dietaryRestrictions: [],
+                          trainingTime: null
+                        }).catch(error => {
+                          console.error('Erro detalhado:', error);
+                          return false;
+                        });
+                        
+                        if (!result) {
+                          toast.error("Não foi possível gerar o plano alimentar. Tente novamente.");
+                        }
+                      } catch (error) {
+                        console.error('Erro ao gerar plano:', error);
+                        toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
+                      }
+                    }}
+                    className="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded transition-colors"
+                  >
+                    Gerar Plano Alimentar
+                  </button>
+                </div>
+              )}
             </Card>
 
             {/* Etapa 4: Exibição do Plano */}
