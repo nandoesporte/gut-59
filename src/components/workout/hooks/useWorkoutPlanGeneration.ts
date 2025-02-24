@@ -51,12 +51,22 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
 
   const verifyAccess = async (userId: string) => {
     try {
-      const { data: settings } = await supabase
+      console.log("Verificando acesso para usuário:", userId);
+
+      const { data: settings, error: settingsError } = await supabase
         .from('payment_settings')
         .select('is_active, price')
         .eq('plan_type', 'workout')
         .single();
 
+      if (settingsError) {
+        console.error("Erro ao buscar configurações de pagamento:", settingsError);
+        throw new Error("Erro ao verificar configurações de pagamento");
+      }
+
+      console.log("Configurações de pagamento:", settings);
+
+      // Se o pagamento não estiver ativo, permite acesso
       if (!settings?.is_active) {
         return { hasAccess: true };
       }
@@ -74,6 +84,8 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
         throw new Error("Erro ao verificar acesso ao plano");
       }
 
+      console.log("Resposta da verificação de acesso:", grantData);
+
       return {
         hasAccess: !grantData?.requiresPayment,
         price: settings.price,
@@ -81,7 +93,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       };
     } catch (error) {
       console.error("Erro na verificação de acesso:", error);
-      throw new Error("Erro ao verificar acesso ao plano");
+      throw new Error(error instanceof Error ? error.message : "Erro ao verificar acesso ao plano");
     }
   };
 
@@ -90,11 +102,18 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       setLoading(true);
       setError(null);
 
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError) {
+        console.error("Erro de autenticação:", authError);
+        throw new Error("Erro ao verificar autenticação");
+      }
+
       if (!user) {
         throw new Error("Usuário não autenticado");
       }
 
+      console.log("Iniciando verificação de acesso para usuário:", user.id);
       const accessResult = await verifyAccess(user.id);
       
       if (!accessResult.hasAccess) {
@@ -103,6 +122,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
         return;
       }
 
+      console.log("Acesso verificado, gerando plano com preferências:", preferences);
       const { data: response, error } = await supabase.functions.invoke('generate-workout-plan', {
         body: { preferences, userId: user.id }
       });
