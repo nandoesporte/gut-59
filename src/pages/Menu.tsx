@@ -62,7 +62,11 @@ const Menu = () => {
             onFoodSelection={handleFoodSelection}
             totalCalories={totalCalories}
             onBack={() => setCurrentStep(1.5)}
-            onConfirm={() => setCurrentStep(3)}
+            onConfirm={() => {
+              if (selectedFoods.length > 0) {
+                setCurrentStep(3);
+              }
+            }}
           />
         );
       case 3:
@@ -78,7 +82,9 @@ const Menu = () => {
             {mealPlan && (
               <MealPlanDisplay 
                 mealPlan={mealPlan} 
-                onRefresh={async () => Promise.resolve()} 
+                onRefresh={async () => {
+                  setCurrentStep(3); // Go back to dietary preferences to regenerate
+                }} 
               />
             )}
           </div>
