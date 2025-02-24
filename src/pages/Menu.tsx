@@ -58,6 +58,7 @@ const Menu = () => {
                 throw new Error("Falha ao calcular calorias");
               }
               setCurrentStep(2);
+              return Promise.resolve();
             }}
             calorieNeeds={calorieNeeds}
           />
@@ -88,8 +89,7 @@ const Menu = () => {
                 if (success) {
                   setCurrentStep(4);
                 }
-                // Explicitly return a Promise<void>
-                return new Promise<void>((resolve) => resolve());
+                return Promise.resolve();
               } catch (error) {
                 console.error('Erro ao gerar plano:', error);
                 toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
