@@ -87,15 +87,19 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
         .eq('user_id', user.id)
         .eq('plan_type', 'workout')
         .eq('is_active', true)
-        .single();
+        .order('created_at', { ascending: false })
+        .limit(1);
 
-      if (accessError && accessError.code !== 'PGRST116') { // Ignora erro de não encontrado
+      if (accessError) {
         console.error("Erro ao verificar acesso:", accessError);
         throw new Error("Erro ao verificar acesso ao plano");
       }
 
-      if (!accessData) {
-        // Se não tem acesso, tenta conceder via edge function
+      // Se não tem acesso ou não encontrou nenhum registro ativo
+      if (!accessData || accessData.length === 0) {
+        console.log("Nenhum acesso encontrado, tentando conceder acesso...");
+        
+        // Tenta conceder acesso via edge function
         const { data: grantData, error: grantError } = await supabase.functions.invoke('grant-plan-access', {
           body: { 
             userId: user.id, 
@@ -106,7 +110,7 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
 
         if (grantError) {
           console.error("Erro ao conceder acesso:", grantError);
-          throw grantError;
+          throw new Error("Erro ao conceder acesso ao plano de treino");
         }
 
         if (grantData?.requiresPayment) {
