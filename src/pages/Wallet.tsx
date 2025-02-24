@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import QRCode from 'qrcode';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 
 const transactionTypeInfo = {
   daily_tip: {
