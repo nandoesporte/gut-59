@@ -18,7 +18,6 @@ if (!supabaseUrl || !supabaseKey || !mercadopagoToken) {
 const supabase = createClient(supabaseUrl, supabaseKey)
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -27,14 +26,10 @@ serve(async (req) => {
     const notification = await req.json()
     console.log('Received webhook notification:', JSON.stringify(notification))
 
-    // Verificar se é uma notificação válida
     if (!notification.action || !notification.data || !notification.data.id) {
       console.error('Invalid notification format:', JSON.stringify(notification))
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: 'Invalid notification format' 
-        }),
+        JSON.stringify({ error: 'Invalid notification format' }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400 
@@ -42,38 +37,30 @@ serve(async (req) => {
       )
     }
 
-    // Se for uma atualização de pagamento
+    // Se for uma notificação de pagamento
     if (notification.action === 'payment.updated' || notification.action === 'payment.created') {
-      const paymentId = notification.data.id.toString()
-      console.log('Processing payment notification for ID:', paymentId)
+      const mpPaymentId = notification.data.id.toString()
+      console.log('Mercado Pago payment ID:', mpPaymentId)
 
       try {
-        // Buscar detalhes do pagamento na API do Mercado Pago
-        const apiUrl = `https://api.mercadopago.com/v1/payments/${paymentId}`
-        console.log('Fetching payment details from:', apiUrl)
-        
-        const mpResponse = await fetch(apiUrl, {
-          headers: {
-            'Authorization': `Bearer ${mercadopagoToken}`,
-            'Content-Type': 'application/json'
+        // Buscar detalhes do pagamento no Mercado Pago
+        const mpResponse = await fetch(
+          `https://api.mercadopago.com/v1/payments/${mpPaymentId}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${mercadopagoToken}`,
+              'Content-Type': 'application/json'
+            }
           }
-        })
-
-        console.log('MercadoPago API response status:', mpResponse.status)
+        )
 
         if (!mpResponse.ok) {
           const errorData = await mpResponse.json()
-          console.error('MercadoPago API error details:', JSON.stringify(errorData))
+          console.error('Mercado Pago API error:', JSON.stringify(errorData))
           
-          // Se o pagamento não foi encontrado, retornamos 200 mas logamos o erro
           if (mpResponse.status === 404) {
-            console.log('Payment not found in MercadoPago, will try again later')
             return new Response(
-              JSON.stringify({ 
-                success: true, 
-                message: 'Payment not found in Mercado Pago, will retry later',
-                details: errorData
-              }),
+              JSON.stringify({ message: 'Payment not found in Mercado Pago' }),
               { 
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 status: 200 
@@ -85,31 +72,29 @@ serve(async (req) => {
         }
 
         const paymentData = await mpResponse.json()
-        console.log('Payment details from MercadoPago:', JSON.stringify(paymentData))
+        console.log('Payment data from Mercado Pago:', JSON.stringify(paymentData))
 
-        // Verificar se o pagamento foi aprovado
+        // Verificamos se é um pagamento aprovado
         if (paymentData.status === 'approved') {
-          // Buscar o pagamento no banco de dados usando a referência externa
-          const { data: paymentRecords, error: fetchError } = await supabase
+          const preferenceId = paymentData.external_reference || paymentData.preference_id
+          console.log('Looking for payment with reference:', preferenceId)
+
+          // Buscar o registro de pagamento correspondente
+          const { data: payments, error: queryError } = await supabase
             .from('payments')
             .select('*')
-            .eq('payment_id', paymentData.external_reference)
-            .order('created_at', { ascending: false })
-            .limit(1)
+            .eq('payment_id', preferenceId)
+            .maybeSingle()
 
-          if (fetchError) {
-            console.error('Error fetching payment record:', fetchError)
-            throw fetchError
+          if (queryError) {
+            console.error('Error querying payment:', queryError)
+            throw queryError
           }
 
-          if (!paymentRecords || paymentRecords.length === 0) {
-            console.warn('Payment record not found in database. External reference:', paymentData.external_reference)
+          if (!payments) {
+            console.log('No payment record found for reference:', preferenceId)
             return new Response(
-              JSON.stringify({ 
-                success: true, 
-                message: 'Payment approved but no matching record found in database',
-                external_reference: paymentData.external_reference
-              }),
+              JSON.stringify({ message: 'Payment record not found' }),
               { 
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 status: 200 
@@ -117,65 +102,66 @@ serve(async (req) => {
             )
           }
 
-          const paymentRecord = paymentRecords[0]
-          console.log('Found matching payment record:', JSON.stringify(paymentRecord))
-
-          // Atualizar status do pagamento
+          // Atualizar status do pagamento para completed
           const { error: updateError } = await supabase
             .from('payments')
-            .update({ 
-              status: 'completed',
-              updated_at: new Date().toISOString()
-            })
-            .eq('payment_id', paymentData.external_reference)
+            .update({ status: 'completed' })
+            .eq('payment_id', preferenceId)
 
           if (updateError) {
-            console.error('Error updating payment status:', updateError)
+            console.error('Error updating payment:', updateError)
             throw updateError
           }
-
-          console.log('Payment status updated successfully')
 
           // Criar notificação de pagamento
           const { error: notifyError } = await supabase
             .from('payment_notifications')
             .insert({
-              user_id: paymentRecord.user_id,
-              payment_id: paymentData.external_reference,
+              user_id: payments.user_id,
+              payment_id: preferenceId,
               status: 'completed',
-              plan_type: paymentRecord.plan_type
+              plan_type: payments.plan_type
             })
 
           if (notifyError) {
-            console.error('Error creating payment notification:', notifyError)
+            console.error('Error creating notification:', notifyError)
             throw notifyError
           }
 
-          console.log('Payment notification created successfully')
-
-          // Liberar acesso ao plano diretamente
-          const { error: accessError } = await supabase
+          // Verificar se já existe acesso ao plano
+          const { data: existingAccess, error: accessCheckError } = await supabase
             .from('plan_access')
-            .insert({
-              user_id: paymentRecord.user_id,
-              plan_type: paymentRecord.plan_type,
-              payment_required: false,
-              is_active: true
-            })
+            .select('*')
+            .eq('user_id', payments.user_id)
+            .eq('plan_type', payments.plan_type)
+            .eq('is_active', true)
+            .maybeSingle()
 
-          if (accessError) {
-            console.error('Error granting plan access:', accessError)
-            throw accessError
+          if (accessCheckError) {
+            console.error('Error checking plan access:', accessCheckError)
+            throw accessCheckError
           }
 
-          console.log('Plan access granted successfully')
+          // Se não existe acesso, criar novo
+          if (!existingAccess) {
+            const { error: accessError } = await supabase
+              .from('plan_access')
+              .insert({
+                user_id: payments.user_id,
+                plan_type: payments.plan_type,
+                payment_required: false,
+                is_active: true
+              })
 
+            if (accessError) {
+              console.error('Error granting plan access:', accessError)
+              throw accessError
+            }
+          }
+
+          console.log('Payment processed successfully')
           return new Response(
-            JSON.stringify({ 
-              success: true, 
-              message: 'Payment processed successfully',
-              external_reference: paymentData.external_reference
-            }),
+            JSON.stringify({ message: 'Payment processed successfully' }),
             { 
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: 200 
@@ -183,14 +169,10 @@ serve(async (req) => {
           )
         }
 
-        // Se o pagamento não está aprovado, apenas logamos e retornamos sucesso
-        console.log(`Payment ${paymentId} status is ${paymentData.status}, no action needed`)
+        // Se pagamento não está aprovado, apenas logamos
+        console.log(`Payment ${mpPaymentId} status: ${paymentData.status}`)
         return new Response(
-          JSON.stringify({ 
-            success: true, 
-            message: `Payment status is ${paymentData.status}, no action needed`,
-            payment_id: paymentId
-          }),
+          JSON.stringify({ message: `Payment status: ${paymentData.status}` }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200 
@@ -199,26 +181,13 @@ serve(async (req) => {
 
       } catch (error) {
         console.error('Error processing payment:', error)
-        return new Response(
-          JSON.stringify({ 
-            success: false, 
-            message: error instanceof Error ? error.message : 'Unknown error',
-            payment_id: paymentId
-          }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 500 
-          }
-        )
+        throw error
       }
     }
 
-    // Se chegou aqui, é uma notificação que não precisamos processar
+    // Notificação processada mas nenhuma ação necessária
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: 'Notification received but no action needed' 
-      }),
+      JSON.stringify({ message: 'Notification acknowledged' }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200 
@@ -226,11 +195,10 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Error processing webhook:', error)
+    console.error('Webhook error:', error)
     return new Response(
       JSON.stringify({ 
-        success: false, 
-        message: error instanceof Error ? error.message : 'Unknown error' 
+        error: error instanceof Error ? error.message : 'Unknown error'
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
