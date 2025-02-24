@@ -88,9 +88,15 @@ const Menu = () => {
           <DietaryPreferencesForm
             onSubmit={async (preferences: DietaryPreferences) => {
               try {
-                const success = await handleDietaryPreferences(preferences);
-                if (success) {
+                const result = await handleDietaryPreferences(preferences).catch(error => {
+                  console.error('Erro detalhado:', error);
+                  return false;
+                });
+                
+                if (result) {
                   setCurrentStep(4);
+                } else {
+                  toast.error("Não foi possível gerar o plano alimentar. Tente novamente.");
                 }
               } catch (error) {
                 console.error('Erro ao gerar plano:', error);
