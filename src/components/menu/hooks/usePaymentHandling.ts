@@ -151,15 +151,18 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
         return;
       }
 
-      // Verificar acesso específico do usuário
+      // Verificar acesso específico do usuário - pegando apenas o registro mais recente
       const { data: planAccess, error: accessError } = await supabase
         .from('plan_access')
-        .select('payment_required')
+        .select('payment_required, created_at')
         .eq('user_id', userData.user.id)
         .eq('plan_type', planType)
-        .maybeSingle();
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
 
-      if (accessError) {
+      if (accessError && accessError.code !== 'PGRST116') {
         console.error('Erro ao verificar acesso do usuário:', accessError);
         throw new Error('Erro ao verificar acesso do usuário');
       }
