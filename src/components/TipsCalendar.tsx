@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from 'react';
 import { Card } from "@/components/ui/card";
-import { Lock, Unlock } from "lucide-react";
+import { Lock, Unlock, Check } from "lucide-react";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -10,7 +10,9 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { useWallet } from "@/hooks/useWallet";
 
 interface DailyTip {
@@ -25,6 +27,7 @@ interface Tip {
   content: string;
   isUnlocked: boolean;
   theme: string;
+  isRead?: boolean;
 }
 
 const themes = [
@@ -52,6 +55,7 @@ const TipsCalendar = () => {
         const savedTips = localStorage.getItem('monthlyTips');
         const currentMonth = new Date().getMonth();
         const savedMonth = localStorage.getItem('tipsMonth');
+        const readTips = JSON.parse(localStorage.getItem('readTips') || '[]');
 
         if (!savedTips || savedMonth !== currentMonth.toString()) {
           const { data, error } = await supabase
@@ -69,7 +73,8 @@ const TipsCalendar = () => {
               id: index + 1,
               content: tipData?.content || `Dica do dia ${index + 1}`,
               isUnlocked: index + 1 <= currentDay,
-              theme: tipData?.theme || themes[Math.floor(Math.random() * themes.length)].name
+              theme: tipData?.theme || themes[Math.floor(Math.random() * themes.length)].name,
+              isRead: readTips.includes(index + 1)
             };
           });
 
@@ -77,7 +82,12 @@ const TipsCalendar = () => {
           localStorage.setItem('tipsMonth', currentMonth.toString());
           setTips(newTips);
         } else {
-          setTips(JSON.parse(savedTips));
+          const savedTipsData = JSON.parse(savedTips);
+          const updatedTips = savedTipsData.map((tip: Tip) => ({
+            ...tip,
+            isRead: readTips.includes(tip.id)
+          }));
+          setTips(updatedTips);
         }
       } catch (error) {
         console.error('Erro ao carregar dicas:', error);
@@ -86,7 +96,8 @@ const TipsCalendar = () => {
         const currentDay = new Date().getDate();
         const fallbackTips = defaultTips.map((tip, index) => ({
           ...tip,
-          isUnlocked: index + 1 <= currentDay
+          isUnlocked: index + 1 <= currentDay,
+          isRead: false
         }));
         setTips(fallbackTips);
       } finally {
@@ -97,24 +108,38 @@ const TipsCalendar = () => {
     loadTips();
   }, []);
 
-  useEffect(() => {
-    if (tips.length > 0) {
-      localStorage.setItem('monthlyTips', JSON.stringify(tips));
-    }
-  }, [tips]);
+  const markTipAsRead = (tipId: number) => {
+    const readTips = JSON.parse(localStorage.getItem('readTips') || '[]');
+    if (!readTips.includes(tipId)) {
+      readTips.push(tipId);
+      localStorage.setItem('readTips', JSON.stringify(readTips));
+      
+      setTips(tips.map(tip => 
+        tip.id === tipId ? { ...tip, isRead: true } : tip
+      ));
 
-  const getThemeColor = (theme: string) => {
-    return themes.find(t => t.name === theme)?.color || themes[0].color;
+      // Adiciona pontos quando o usuário confirma a leitura
+      addTransaction({
+        amount: 1,
+        type: 'daily_tip_read',
+        description: `Desafio do dia ${tipId} concluído`
+      });
+      
+      toast.success('Atividade concluída com sucesso!');
+    }
+    setSelectedTip(null);
   };
 
   const handleTipClick = (tip: Tip) => {
     if (tip.isUnlocked) {
       setSelectedTip(tip);
-      addTransaction({
-        amount: 1,
-        type: 'daily_tip',
-        description: `Desafio do dia ${tip.id}`
-      });
+      if (!tip.isRead) {
+        addTransaction({
+          amount: 1,
+          type: 'daily_tip',
+          description: `Desafio do dia ${tip.id}`
+        });
+      }
     }
   };
 
@@ -149,10 +174,12 @@ const TipsCalendar = () => {
                 <span className="text-xs font-semibold mb-1 text-slate-700">Dia {tip.id}</span>
                 {!tip.isUnlocked ? (
                   <Lock className="w-4 h-4 text-slate-500" />
+                ) : tip.isRead ? (
+                  <Check className="w-4 h-4 text-green-600" />
                 ) : (
                   <Unlock className="w-4 h-4 text-teal-600" />
                 )}
-                {tip.isUnlocked && (
+                {tip.isUnlocked && !tip.isRead && (
                   <div className="absolute inset-0 bg-gradient-to-br from-white/90 to-white/95 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-2 flex items-center justify-center">
                     <p className="text-xs font-medium text-slate-600">
                       Clique para ver o desafio
@@ -182,10 +209,26 @@ const TipsCalendar = () => {
               {selectedTip?.content}
             </p>
           </div>
+          <DialogFooter className="sm:justify-between">
+            <span className="text-sm text-slate-500">
+              {selectedTip?.isRead ? 'Atividade já concluída' : 'Marque como concluído após ler'}
+            </span>
+            <Button
+              onClick={() => selectedTip && markTipAsRead(selectedTip.id)}
+              disabled={selectedTip?.isRead}
+              className="bg-green-500 hover:bg-green-600"
+            >
+              {selectedTip?.isRead ? 'Concluído' : 'Confirmar Leitura'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
   );
+};
+
+const getThemeColor = (theme: string) => {
+  return themes.find(t => t.name === theme)?.color || themes[0].color;
 };
 
 export default TipsCalendar;
