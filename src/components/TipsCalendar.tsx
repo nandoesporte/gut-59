@@ -9,7 +9,7 @@ import { toast } from "sonner";
 interface DailyTip {
   id: number;
   content: string;
-  theme: string;
+  theme: string | null;
   created_at: string;
 }
 
@@ -111,11 +111,11 @@ const TipsCalendar = () => {
   }
 
   return (
-    <div className="w-full px-4 py-6">
+    <div className="w-full px-4 py-6 bg-white rounded-lg shadow-sm">
       <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">
         Dicas Diárias do Mês
       </h2>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-7 lg:grid-cols-10 gap-2">
         {tips.map((tip) => (
           <motion.div
             key={tip.id}
@@ -124,36 +124,24 @@ const TipsCalendar = () => {
             transition={{ duration: 0.3 }}
           >
             <Card
-              className={`relative h-32 sm:h-40 ${getThemeColor(tip.theme)} 
-                transition-all duration-300 cursor-pointer overflow-hidden
-                ${tip.isUnlocked ? 'shadow-lg' : 'opacity-80 shadow'}`}
+              className={`relative w-full aspect-square ${getThemeColor(tip.theme)} 
+                transition-all duration-300 cursor-pointer overflow-hidden group
+                ${tip.isUnlocked ? 'shadow-md hover:shadow-lg' : 'opacity-80 shadow'}`}
             >
-              <div className="absolute inset-0 p-3 flex flex-col">
-                <div className="flex justify-between items-start">
-                  <span className="text-sm font-semibold">
-                    Dia {tip.id}
-                  </span>
-                  {!tip.isUnlocked && (
-                    <Lock className="w-4 h-4 text-gray-600" />
-                  )}
-                  {tip.isUnlocked && (
-                    <Unlock className="w-4 h-4 text-green-600" />
-                  )}
-                </div>
-                {tip.isUnlocked ? (
-                  <p className="mt-2 text-sm leading-tight text-gray-700">
-                    {tip.content}
-                  </p>
+              <div className="absolute inset-0 p-2 flex flex-col items-center justify-center">
+                <span className="text-xs font-semibold mb-1">{tip.id}</span>
+                {!tip.isUnlocked ? (
+                  <Lock className="w-4 h-4 text-gray-600" />
                 ) : (
-                  <div className="flex items-center justify-center h-full">
-                    <p className="text-sm text-gray-500">
-                      Disponível dia {tip.id}
+                  <Unlock className="w-4 h-4 text-green-600" />
+                )}
+                {tip.isUnlocked && (
+                  <div className="absolute inset-0 bg-white/95 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-2 flex items-center justify-center">
+                    <p className="text-xs leading-tight text-gray-700 text-center">
+                      {tip.content}
                     </p>
                   </div>
                 )}
-                <span className="absolute bottom-2 right-2 text-xs text-gray-500 italic">
-                  {tip.theme}
-                </span>
               </div>
             </Card>
           </motion.div>
