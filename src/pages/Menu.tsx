@@ -9,6 +9,7 @@ import { MealPlanHistory } from "@/components/menu/MealPlanHistory";
 import { MenuHeader } from "@/components/menu/MenuHeader";
 import { useMenuController } from "@/components/menu/MenuController";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 const Menu = () => {
   const {
@@ -50,7 +51,14 @@ const Menu = () => {
           <CalorieCalculatorStep
             formData={formData}
             onInputChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
-            onCalculate={handleCalculateCalories}
+            onCalculate={async () => {
+              try {
+                await handleCalculateCalories();
+                setCurrentStep(2);
+              } catch (error) {
+                toast.error("Por favor, preencha todos os campos corretamente.");
+              }
+            }}
             calorieNeeds={calorieNeeds}
           />
         );
@@ -63,16 +71,26 @@ const Menu = () => {
             totalCalories={totalCalories}
             onBack={() => setCurrentStep(1.5)}
             onConfirm={() => {
-              if (selectedFoods.length > 0) {
-                setCurrentStep(3);
+              if (selectedFoods.length === 0) {
+                toast.error("Selecione pelo menos um alimento");
+                return;
               }
+              setCurrentStep(3);
             }}
           />
         );
       case 3:
         return (
           <DietaryPreferencesForm
-            onSubmit={handleDietaryPreferences}
+            onSubmit={async (preferences) => {
+              try {
+                await handleDietaryPreferences(preferences);
+                setCurrentStep(4);
+              } catch (error) {
+                console.error('Erro ao gerar plano:', error);
+                toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
+              }
+            }}
             onBack={() => setCurrentStep(2)}
           />
         );
