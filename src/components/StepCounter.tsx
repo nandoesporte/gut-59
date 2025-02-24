@@ -6,6 +6,7 @@ import { Activity, LineChart, User, Loader } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Capacitor } from '@capacitor/core';
+import { REWARDS } from '@/constants/rewards';
 
 interface StepData {
   steps: number;
@@ -72,7 +73,6 @@ const StepCounter = () => {
     try {
       console.log(isReconnecting ? "Tentando reconectar..." : "Iniciando acelerômetro...");
 
-      // Primeiro, vamos verificar se o dispositivo possui acelerômetro
       const platform = Capacitor.getPlatform();
       console.log("Plataforma:", platform);
 
@@ -85,9 +85,7 @@ const StepCounter = () => {
         }
         
         try {
-          // @ts-ignore - DeviceMotionEvent.requestPermission() é específico para iOS
           if (typeof DeviceMotionEvent.requestPermission === 'function') {
-            // @ts-ignore
             const permission = await DeviceMotionEvent.requestPermission();
             if (permission !== 'granted') {
               toast.error("Permissão para o acelerômetro negada.");
@@ -100,7 +98,6 @@ const StepCounter = () => {
         }
       }
 
-      // Remove listeners antigos para evitar duplicação
       await Motion.removeAllListeners();
 
       return new Promise<boolean>((resolve) => {
@@ -129,7 +126,6 @@ const StepCounter = () => {
           }
         });
 
-        // Timeout após 5 segundos
         timeoutId = setTimeout(async () => {
           if (!initialized) {
             console.log('Timeout na inicialização do acelerômetro');
@@ -199,7 +195,8 @@ const StepCounter = () => {
     let lastStepTime = Date.now();
     let lastMagnitude = 0;
     let smoothedMagnitude = 0;
-    const alpha = 0.8; // Fator de suavização
+    let lastRewardedStepCount = 0;
+    const alpha = 0.8;
     let steps = stepData.steps;
 
     const startStepCounting = async () => {
@@ -214,7 +211,6 @@ const StepCounter = () => {
           const { x, y, z } = event.acceleration;
           const magnitude = Math.sqrt(x * x + y * y + z * z);
           
-          // Aplicar filtro de suavização
           smoothedMagnitude = alpha * smoothedMagnitude + (1 - alpha) * magnitude;
           
           const now = Date.now();
@@ -224,14 +220,23 @@ const StepCounter = () => {
               (now - lastStepTime) > MIN_TIME_BETWEEN_STEPS) {
             steps++;
             lastStepTime = now;
+            
+            if (Math.floor(steps / REWARDS.STEPS_THRESHOLD) > Math.floor(lastRewardedStepCount / REWARDS.STEPS_THRESHOLD)) {
+              addTransaction({
+                amount: REWARDS.STEPS_GOAL,
+                type: 'steps_reward',
+                description: `${REWARDS.STEPS_THRESHOLD} passos completados`
+              });
+              toast.success(`Parabéns! Você completou ${REWARDS.STEPS_THRESHOLD} passos! +${REWARDS.STEPS_GOAL} FITs`);
+              lastRewardedStepCount = steps;
+            }
+            
             setStepData(calculateMetrics(steps));
-            console.log('Passo detectado:', { magnitude: smoothedMagnitude, totalSteps: steps });
           }
 
           lastMagnitude = smoothedMagnitude;
         });
 
-        console.log('Sistema de contagem de passos iniciado');
       } catch (error) {
         console.error('Erro ao iniciar contagem:', error);
         setSensorSupported(false);

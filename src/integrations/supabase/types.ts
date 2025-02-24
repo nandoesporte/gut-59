@@ -2135,6 +2135,11 @@ export type Database = {
         | "workout_plan"
         | "physio_plan"
         | "transfer"
+        | "steps_reward"
+        | "water_reward"
+        | "meal_plan_generation"
+        | "workout_plan_generation"
+        | "rehab_plan_generation"
       workout_goal: "lose_weight" | "maintain" | "gain_mass"
     }
     CompositeTypes: {

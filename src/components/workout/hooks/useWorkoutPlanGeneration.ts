@@ -1,9 +1,9 @@
-
 import { useState, useEffect } from "react";
 import { WorkoutPreferences } from "../types";
 import { WorkoutPlan } from "../types/workout-plan";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { REWARDS } from '@/constants/rewards';
 
 export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
   const [loading, setLoading] = useState(true);
@@ -135,7 +135,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
     }
   };
 
-  const generateWorkoutPlan = async () => {
+  const generatePlan = async () => {
     try {
       console.log("Iniciando geração do plano de treino");
       setLoading(true);
@@ -184,8 +184,14 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       }
 
       console.log("Plano gerado com sucesso");
+      await addTransaction({
+        amount: REWARDS.WORKOUT_PLAN,
+        type: 'workout_plan_generation',
+        description: 'Geração de plano de treino'
+      });
+      
       setWorkoutPlan(response);
-      toast.success("Plano de treino gerado com sucesso!");
+      toast.success(`Plano de treino gerado com sucesso! +${REWARDS.WORKOUT_PLAN} FITs`);
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : "Erro ao gerar plano de treino";
       console.error("Erro no processo de geração do plano:", error);
@@ -197,8 +203,24 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
     }
   };
 
+  const addTransaction = async (transaction: any) => {
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .insert(transaction)
+        .select();
+
+      if (error) {
+        console.error("Erro ao adicionar transação:", error);
+        throw error;
+      }
+    } catch (error) {
+      console.error("Erro ao adicionar transação:", error);
+    }
+  };
+
   useEffect(() => {
-    generateWorkoutPlan();
+    generatePlan();
     fetchProgressData();
   }, []);
 
@@ -207,6 +229,6 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
     error,
     workoutPlan,
     progressData,
-    generateWorkoutPlan
+    generatePlan
   };
 };

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,6 +6,8 @@ import { CalorieCalculatorForm, activityLevels } from "./CalorieCalculator";
 import { useProtocolFoods } from "./hooks/useProtocolFoods";
 import { useCalorieCalculator } from "./hooks/useCalorieCalculator";
 import { useFoodSelection } from "./hooks/useFoodSelection";
+import { useWallet } from "@/hooks/useWallet";
+import { REWARDS } from '@/constants/rewards';
 
 export const useMenuController = () => {
   const [currentStep, setCurrentStep] = useState<number>(1);
@@ -25,6 +26,7 @@ export const useMenuController = () => {
   const protocolFoods = useProtocolFoods();
   const { calorieNeeds, calculateCalories } = useCalorieCalculator();
   const { selectedFoods, totalCalories, handleFoodSelection, calculateTotalCalories } = useFoodSelection();
+  const { addTransaction } = useWallet();
 
   useEffect(() => {
     calculateTotalCalories(protocolFoods);
@@ -122,6 +124,17 @@ export const useMenuController = () => {
         toast.dismiss(toastId);
         toast.error('Plano alimentar não gerado corretamente');
         return false;
+      }
+
+      if (generatedPlan?.mealPlan) {
+        await addTransaction({
+          amount: REWARDS.MEAL_PLAN,
+          type: 'meal_plan',
+          description: 'Geração de plano alimentar'
+        });
+        
+        toast.dismiss(toastId);
+        toast.success(`Cardápio personalizado gerado com sucesso! +${REWARDS.MEAL_PLAN} FITs`);
       }
 
       setMealPlan(generatedPlan.mealPlan);

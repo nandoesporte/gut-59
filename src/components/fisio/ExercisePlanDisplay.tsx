@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { FisioPreferences } from "./types";
@@ -8,6 +7,8 @@ import { RotateCcw } from "lucide-react";
 import { WorkoutLoadingState } from "../workout/components/WorkoutLoadingState";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { REWARDS } from '@/constants/rewards';
+import { useWallet } from "@/hooks/useWallet";
 
 interface ExercisePlanDisplayProps {
   preferences: FisioPreferences;
@@ -15,6 +16,7 @@ interface ExercisePlanDisplayProps {
 }
 
 export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDisplayProps) => {
+  const { addTransaction } = useWallet();
   const [loading, setLoading] = useState(true);
   const [rehabPlan, setRehabPlan] = useState<RehabPlan | null>(null);
 
@@ -35,8 +37,16 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
       if (error) throw error;
       if (!response) throw new Error("Nenhum plano foi gerado");
 
-      setRehabPlan(response);
-      toast.success("Plano de reabilitação gerado com sucesso!");
+      if (response) {
+        await addTransaction({
+          amount: REWARDS.REHAB_PLAN,
+          type: 'rehab_plan_generation',
+          description: 'Geração de plano de reabilitação'
+        });
+        
+        setRehabPlan(response);
+        toast.success(`Plano de reabilitação gerado com sucesso! +${REWARDS.REHAB_PLAN} FITs`);
+      }
     } catch (error: any) {
       console.error("Erro ao gerar plano:", error);
       toast.error(error.message || "Erro ao gerar plano de reabilitação");

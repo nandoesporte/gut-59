@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,6 +7,7 @@ import { Droplets, Plus, Calculator } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { WaterGoalSettings } from "./WaterGoalSettings";
 import 'react-circular-progressbar/dist/styles.css';
+import { REWARDS } from '@/constants/rewards';
 
 const WATER_INCREMENT_ML = 200;
 
@@ -129,9 +129,15 @@ export const WaterTracker = () => {
 
       if (error) throw error;
 
+      await addTransaction({
+        amount: REWARDS.WATER_INTAKE,
+        type: 'water_reward',
+        description: `Registro de ${WATER_INCREMENT_ML}ml de água`
+      });
+
       toast({
         title: "Água registrada",
-        description: `${WATER_INCREMENT_ML}ml de água registrados com sucesso.`,
+        description: `${WATER_INCREMENT_ML}ml de água registrados com sucesso. +${REWARDS.WATER_INTAKE} FITs`,
       });
 
       await loadDailyWaterIntake();

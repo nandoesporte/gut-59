@@ -1,0 +1,10 @@
+
+export const REWARDS = {
+  DAILY_TIP: 1,
+  WATER_INTAKE: 2,
+  STEPS_GOAL: 10,
+  MEAL_PLAN: 10,
+  WORKOUT_PLAN: 10,
+  REHAB_PLAN: 10,
+  STEPS_THRESHOLD: 8000
+} as const;
