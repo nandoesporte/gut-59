@@ -34,15 +34,12 @@ export const useMenuController = () => {
     const selectedLevel = activityLevels.find(level => level.value === formData.activityLevel);
     if (!selectedLevel) {
       toast.error("Por favor, selecione um nível de atividade");
-      return;
+      return false;
     }
 
     try {
       const calories = await calculateCalories(formData, selectedLevel);
-      if (calories) {
-        return true;
-      }
-      return false;
+      return calories !== null;
     } catch (error) {
       console.error('Erro ao calcular calorias:', error);
       toast.error("Erro ao calcular as calorias necessárias");
@@ -57,23 +54,29 @@ export const useMenuController = () => {
     try {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) {
-        throw new Error("Usuário não autenticado");
+        toast.dismiss(toastId);
+        toast.error("Usuário não autenticado");
+        return false;
       }
 
-      // Validações iniciais
       if (!calorieNeeds || calorieNeeds <= 0) {
-        throw new Error("Necessidade calórica inválida");
+        toast.dismiss(toastId);
+        toast.error("Necessidade calórica inválida");
+        return false;
       }
 
       if (!selectedFoods || selectedFoods.length === 0) {
-        throw new Error("Selecione pelo menos um alimento");
+        toast.dismiss(toastId);
+        toast.error("Selecione pelo menos um alimento");
+        return false;
       }
 
       if (!formData.goal || !formData.weight || !formData.height || !formData.age) {
-        throw new Error("Dados do formulário incompletos");
+        toast.dismiss(toastId);
+        toast.error("Dados do formulário incompletos");
+        return false;
       }
 
-      // Preparar dados dos alimentos
       const selectedFoodsDetails = protocolFoods
         .filter(food => selectedFoods.includes(food.id))
         .map(food => ({
@@ -88,7 +91,6 @@ export const useMenuController = () => {
           food_group_id: food.food_group_id
         }));
 
-      // Gerar plano alimentar
       const { data: generatedPlan, error: generateError } = await supabase.functions.invoke(
         'generate-meal-plan',
         {
@@ -111,17 +113,20 @@ export const useMenuController = () => {
 
       if (generateError) {
         console.error('Erro na edge function:', generateError);
-        throw new Error(generateError.message || 'Falha ao gerar cardápio');
+        toast.dismiss(toastId);
+        toast.error(generateError.message || 'Falha ao gerar cardápio');
+        return false;
       }
 
       if (!generatedPlan?.mealPlan) {
-        throw new Error('Plano alimentar não gerado corretamente');
+        toast.dismiss(toastId);
+        toast.error('Plano alimentar não gerado corretamente');
+        return false;
       }
 
-      // Set the meal plan state
       setMealPlan(generatedPlan.mealPlan);
+      setDietaryPreferences(preferences);
 
-      // Save dietary preferences
       const { error: dietaryError } = await supabase
         .from('dietary_preferences')
         .upsert({
@@ -133,13 +138,10 @@ export const useMenuController = () => {
         });
 
       if (dietaryError) {
-        console.error('Erro ao salvar preferências alimentares:', dietaryError);
-        throw new Error('Falha ao salvar preferências alimentares');
+        console.error('Erro ao salvar preferências:', dietaryError);
+        // Não retornamos false aqui pois o plano já foi gerado
       }
 
-      setDietaryPreferences(preferences);
-
-      // Save the meal plan to the database
       const { error: saveError } = await supabase
         .from('meal_plans')
         .insert({
@@ -156,7 +158,7 @@ export const useMenuController = () => {
 
       if (saveError) {
         console.error('Erro ao salvar cardápio:', saveError);
-        throw new Error('Falha ao salvar cardápio');
+        // Não retornamos false aqui pois o plano já foi gerado
       }
 
       toast.dismiss(toastId);
@@ -166,18 +168,8 @@ export const useMenuController = () => {
     } catch (error) {
       console.error('Erro completo:', error);
       toast.dismiss(toastId);
-      const errorMessage = error instanceof Error ? error.message : "Erro ao gerar cardápio";
-      toast.error(errorMessage);
-      
-      if (error instanceof Error) {
-        console.error('Stack trace:', error.stack);
-        console.error('Error details:', {
-          name: error.name,
-          message: error.message,
-          stack: error.stack
-        });
-      }
-      throw error;
+      toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
+      return false;
     } finally {
       setLoading(false);
     }
