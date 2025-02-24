@@ -4,8 +4,10 @@ import { WorkoutPlan } from "../types/workout-plan";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { REWARDS } from '@/constants/rewards';
+import { useWallet } from "@/hooks/useWallet";
 
 export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
+  const { addTransaction } = useWallet();
   const [loading, setLoading] = useState(true);
   const [workoutPlan, setWorkoutPlan] = useState<WorkoutPlan | null>(null);
   const [progressData, setProgressData] = useState<any[]>([]);
@@ -186,7 +188,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       console.log("Plano gerado com sucesso");
       await addTransaction({
         amount: REWARDS.WORKOUT_PLAN,
-        type: 'workout_plan_generation',
+        type: 'workout_plan',
         description: 'Geração de plano de treino'
       });
       
@@ -200,22 +202,6 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       setWorkoutPlan(null);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const addTransaction = async (transaction: any) => {
-    try {
-      const { data, error } = await supabase
-        .from('transactions')
-        .insert(transaction)
-        .select();
-
-      if (error) {
-        console.error("Erro ao adicionar transação:", error);
-        throw error;
-      }
-    } catch (error) {
-      console.error("Erro ao adicionar transação:", error);
     }
   };
 

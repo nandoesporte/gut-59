@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { FisioPreferences } from "./types";
@@ -40,7 +41,7 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
       if (response) {
         await addTransaction({
           amount: REWARDS.REHAB_PLAN,
-          type: 'rehab_plan_generation',
+          type: 'physio_plan',
           description: 'Geração de plano de reabilitação'
         });
         

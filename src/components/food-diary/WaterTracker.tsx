@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { WaterGoalSettings } from "./WaterGoalSettings";
 import 'react-circular-progressbar/dist/styles.css';
 import { REWARDS } from '@/constants/rewards';
+import { useWallet } from "@/hooks/useWallet";
 
 const WATER_INCREMENT_ML = 200;
 
@@ -17,6 +18,7 @@ interface Profile {
 
 export const WaterTracker = () => {
   const { toast } = useToast();
+  const { addTransaction } = useWallet();
   const [waterPercentage, setWaterPercentage] = useState(0);
   const [totalIntake, setTotalIntake] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
@@ -131,7 +133,7 @@ export const WaterTracker = () => {
 
       await addTransaction({
         amount: REWARDS.WATER_INTAKE,
-        type: 'water_reward',
+        type: 'water_intake',
         description: `Registro de ${WATER_INCREMENT_ML}ml de água`
       });
 

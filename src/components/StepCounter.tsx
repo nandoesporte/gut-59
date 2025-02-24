@@ -7,6 +7,16 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Capacitor } from '@capacitor/core';
 import { REWARDS } from '@/constants/rewards';
+import { useWallet } from "@/hooks/useWallet";
+
+declare global {
+  interface DeviceMotionEvent {
+    requestPermission?: () => Promise<'granted' | 'denied'>;
+  }
+  interface DeviceMotionEventConstructor {
+    requestPermission?: () => Promise<'granted' | 'denied'>;
+  }
+}
 
 interface StepData {
   steps: number;
@@ -31,6 +41,7 @@ const MAX_RECONNECT_ATTEMPTS = 3;
 const RECONNECT_DELAY = 1000;
 
 const StepCounter = () => {
+  const { addTransaction } = useWallet();
   const [stepData, setStepData] = useState<StepData>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     return saved ? JSON.parse(saved) : {
@@ -224,7 +235,7 @@ const StepCounter = () => {
             if (Math.floor(steps / REWARDS.STEPS_THRESHOLD) > Math.floor(lastRewardedStepCount / REWARDS.STEPS_THRESHOLD)) {
               addTransaction({
                 amount: REWARDS.STEPS_GOAL,
-                type: 'steps_reward',
+                type: 'steps',
                 description: `${REWARDS.STEPS_THRESHOLD} passos completados`
               });
               toast.success(`Parabéns! Você completou ${REWARDS.STEPS_THRESHOLD} passos! +${REWARDS.STEPS_GOAL} FITs`);
