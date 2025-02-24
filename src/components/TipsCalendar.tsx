@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { Lock, Unlock } from "lucide-react";
@@ -120,8 +121,8 @@ const TipsCalendar = () => {
 
   return (
     <div className="w-full px-4 py-6 bg-gradient-to-br from-slate-50 to-white rounded-lg shadow-sm border border-slate-200">
-      <h2 className="text-2xl font-bold text-center mb-6 text-slate-800">
-        Dicas Diárias do Mês
+      <h2 className="text-2xl font-bold text-center mb-6 text-blue-600">
+        Desafios Diários
       </h2>
       <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-7 lg:grid-cols-10 gap-2">
         {tips.map((tip) => (
@@ -147,7 +148,7 @@ const TipsCalendar = () => {
                 {tip.isUnlocked && (
                   <div className="absolute inset-0 bg-gradient-to-br from-white/90 to-white/95 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-2 flex items-center justify-center">
                     <p className="text-xs font-medium text-slate-600">
-                      Clique para ver a dica
+                      Clique para ver o desafio
                     </p>
                   </div>
                 )}
@@ -162,7 +163,7 @@ const TipsCalendar = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <span className="text-lg text-slate-800">
-                Dica do Dia {selectedTip?.id}
+                Desafio do Dia {selectedTip?.id}
               </span>
               <span className="text-sm text-slate-500 italic">
                 ({selectedTip?.theme})

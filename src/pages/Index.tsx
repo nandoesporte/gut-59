@@ -1,4 +1,3 @@
-
 import Profile from "@/components/Profile";
 import Messages from "@/components/Messages";
 import MessagesPersonal from "@/components/MessagesPersonal";
@@ -89,9 +88,6 @@ const Index = () => {
           </div>
         </>
       )}
-      <div className="w-full">
-        <FoodDiary />
-      </div>
       <div className="w-full">
         <TipsCalendar />
       </div>
