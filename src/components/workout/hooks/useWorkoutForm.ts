@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -24,12 +24,36 @@ export type FormSchema = z.infer<typeof formSchema>;
 export const useWorkoutForm = (onSubmit: (data: WorkoutPreferences) => void) => {
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [formData, setFormData] = useState<FormSchema | null>(null);
+  const [isPaymentEnabled, setIsPaymentEnabled] = useState(false);
   const {
     isProcessingPayment,
     hasPaid,
     currentPrice,
     handlePaymentAndContinue
   } = usePaymentHandling('workout');
+
+  useEffect(() => {
+    const checkPaymentSettings = async () => {
+      try {
+        const { data: settings, error } = await supabase
+          .from('payment_settings')
+          .select('is_active')
+          .eq('plan_type', 'workout')
+          .maybeSingle();
+
+        if (error) {
+          console.error('Erro ao verificar configurações de pagamento:', error);
+          return;
+        }
+
+        setIsPaymentEnabled(settings?.is_active ?? false);
+      } catch (error) {
+        console.error('Erro ao verificar configurações de pagamento:', error);
+      }
+    };
+
+    checkPaymentSettings();
+  }, []);
 
   const form = useForm<FormSchema>({
     resolver: zodResolver(formSchema),
@@ -46,7 +70,7 @@ export const useWorkoutForm = (onSubmit: (data: WorkoutPreferences) => void) => 
   });
 
   const handleSubmit = async (data: FormSchema) => {
-    if (!hasPaid) {
+    if (isPaymentEnabled && !hasPaid) {
       setFormData(data);
       setIsPaymentDialogOpen(true);
       return;
@@ -98,6 +122,7 @@ export const useWorkoutForm = (onSubmit: (data: WorkoutPreferences) => void) => 
     isProcessingPayment,
     currentPrice,
     handleSubmit,
-    handlePaymentProcess
+    handlePaymentProcess,
+    isPaymentEnabled
   };
 };
