@@ -6,6 +6,13 @@ import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+interface DailyTip {
+  id: number;
+  content: string;
+  theme: string;
+  created_at: string;
+}
+
 interface Tip {
   id: number;
   content: string;
@@ -19,6 +26,12 @@ const themes = [
   { name: 'bem-estar', color: 'bg-green-100 hover:bg-green-200' },
   { name: 'curiosidades', color: 'bg-purple-100 hover:bg-purple-200' },
 ];
+
+const defaultTips = Array.from({ length: 30 }, (_, i) => ({
+  id: i + 1,
+  content: `Dica do dia ${i + 1}`,
+  theme: themes[Math.floor(Math.random() * themes.length)].name
+}));
 
 const TipsCalendar = () => {
   const [tips, setTips] = useState<Tip[]>([]);
@@ -34,19 +47,24 @@ const TipsCalendar = () => {
 
         // Se não houver dicas salvas ou for um novo mês, gera novas dicas
         if (!savedTips || savedMonth !== currentMonth.toString()) {
-          const { data: tipsData, error } = await supabase
+          const { data, error } = await supabase
             .from('daily_tips')
-            .select('*')
-            .limit(30);
+            .select('*');
 
           if (error) throw error;
 
-          const newTips = Array.from({ length: 30 }, (_, index) => ({
-            id: index + 1,
-            content: tipsData?.[index]?.content || `Dica do dia ${index + 1}`,
-            isUnlocked: index + 1 <= new Date().getDate(),
-            theme: themes[Math.floor(Math.random() * themes.length)].name
-          }));
+          const tipsData = (data as DailyTip[]) || defaultTips;
+          const currentDay = new Date().getDate();
+
+          const newTips = Array.from({ length: 30 }, (_, index) => {
+            const tipData = tipsData[index % tipsData.length];
+            return {
+              id: index + 1,
+              content: tipData?.content || `Dica do dia ${index + 1}`,
+              isUnlocked: index + 1 <= currentDay,
+              theme: tipData?.theme || themes[Math.floor(Math.random() * themes.length)].name
+            };
+          });
 
           localStorage.setItem('monthlyTips', JSON.stringify(newTips));
           localStorage.setItem('tipsMonth', currentMonth.toString());
@@ -57,6 +75,14 @@ const TipsCalendar = () => {
       } catch (error) {
         console.error('Erro ao carregar dicas:', error);
         toast.error('Erro ao carregar as dicas do dia');
+        
+        // Fallback para dicas padrão em caso de erro
+        const currentDay = new Date().getDate();
+        const fallbackTips = defaultTips.map((tip, index) => ({
+          ...tip,
+          isUnlocked: index + 1 <= currentDay
+        }));
+        setTips(fallbackTips);
       } finally {
         setIsLoading(false);
       }
