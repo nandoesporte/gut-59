@@ -51,12 +51,13 @@ const Menu = () => {
           <CalorieCalculatorStep
             formData={formData}
             onInputChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
-            onCalculate={async () => {
-              const success = await handleCalculateCalories();
-              if (!success) {
-                throw new Error("Falha ao calcular calorias");
-              }
-              setCurrentStep(2);
+            onCalculate={() => {
+              return handleCalculateCalories().then(success => {
+                if (!success) {
+                  throw new Error("Falha ao calcular calorias");
+                }
+                setCurrentStep(2);
+              });
             }}
             calorieNeeds={calorieNeeds}
           />
