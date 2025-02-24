@@ -9,7 +9,10 @@ declare global {
   interface Window {
     DeviceMotionEvent: {
       requestPermission?: () => Promise<'granted' | 'denied'>;
-    } & DeviceMotionEventConstructor;
+    } & {
+      new(type: string, eventInitDict?: DeviceMotionEventInit): DeviceMotionEvent;
+      prototype: DeviceMotionEvent;
+    };
   }
 }
 
