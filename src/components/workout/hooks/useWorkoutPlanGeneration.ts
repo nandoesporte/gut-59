@@ -9,6 +9,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
   const [loading, setLoading] = useState(true);
   const [workoutPlan, setWorkoutPlan] = useState<WorkoutPlan | null>(null);
   const [progressData, setProgressData] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchProgressData = async () => {
     try {
@@ -30,7 +31,10 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
         .eq('user_id', user.id)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Erro ao buscar progresso:", error);
+        throw error;
+      }
 
       const formattedData = data.map(item => ({
         date: new Date(item.created_at).toLocaleDateString(),
@@ -41,37 +45,60 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       setProgressData(formattedData);
     } catch (error) {
       console.error("Erro ao buscar progresso:", error);
+      setError("Erro ao buscar dados de progresso");
     }
   };
 
-  const generateWorkoutPlan = async () => {
+  const verifyAccess = async (userId: string) => {
     try {
-      setLoading(true);
+      const { data: settings } = await supabase
+        .from('payment_settings')
+        .select('is_active, price')
+        .eq('plan_type', 'workout')
+        .single();
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast.error("Usuário não autenticado");
-        setLoading(false);
-        return;
+      if (!settings?.is_active) {
+        return { hasAccess: true };
       }
-
-      console.log("Chamando edge function com:", { preferences, userId: user.id });
 
       const { data: grantData, error: grantError } = await supabase.functions.invoke('grant-plan-access', {
         body: { 
-          userId: user.id, 
+          userId, 
           planType: 'workout',
           incrementCount: true
         }
       });
 
       if (grantError) {
-        console.error("Erro ao conceder acesso:", grantError);
-        throw new Error("Erro ao conceder acesso ao plano de treino");
+        console.error("Erro ao verificar acesso:", grantError);
+        throw new Error("Erro ao verificar acesso ao plano");
       }
 
-      if (grantData?.requiresPayment) {
-        toast.error(grantData.message || "Pagamento necessário para gerar novo plano");
+      return {
+        hasAccess: !grantData?.requiresPayment,
+        price: settings.price,
+        message: grantData?.message
+      };
+    } catch (error) {
+      console.error("Erro na verificação de acesso:", error);
+      throw new Error("Erro ao verificar acesso ao plano");
+    }
+  };
+
+  const generateWorkoutPlan = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error("Usuário não autenticado");
+      }
+
+      const accessResult = await verifyAccess(user.id);
+      
+      if (!accessResult.hasAccess) {
+        toast.error(accessResult.message || "Pagamento necessário para gerar novo plano");
         setLoading(false);
         return;
       }
@@ -89,11 +116,11 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
         throw new Error("Nenhum plano foi gerado");
       }
 
-      console.log("Plano gerado:", response);
       setWorkoutPlan(response);
       toast.success("Plano de treino gerado com sucesso!");
     } catch (error: any) {
       console.error("Erro ao gerar plano:", error);
+      setError(error.message || "Erro ao gerar plano de treino");
       toast.error(error.message || "Erro ao gerar plano de treino. Por favor, tente novamente.");
       setWorkoutPlan(null);
     } finally {
@@ -108,6 +135,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
 
   return {
     loading,
+    error,
     workoutPlan,
     progressData,
     generateWorkoutPlan
