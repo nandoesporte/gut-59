@@ -124,7 +124,13 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
   const handlePaymentAndContinue = async () => {
     try {
       setIsProcessingPayment(true);
-      
+
+      // Get user data
+      const { data: userData, error: authError } = await supabase.auth.getUser();
+      if (authError || !userData.user) {
+        throw new Error('Usuário não autenticado');
+      }
+
       // Verificar primeiro se o pagamento está habilitado
       const { data: paymentSettings, error: settingsError } = await supabase
         .from('payment_settings')
@@ -133,36 +139,63 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
         .single();
 
       if (settingsError) {
+        console.error('Erro ao verificar configuração de pagamento:', settingsError);
         throw new Error('Erro ao verificar configuração de pagamento');
       }
 
       // Se o pagamento não estiver ativo globalmente, permitir continuar sem pagamento
       if (!paymentSettings?.is_active) {
+        console.log('Pagamento não está ativo globalmente, permitindo acesso');
         setHasPaid(true);
         setShowConfirmation(true);
         return;
       }
 
       // Verificar acesso específico do usuário
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.id) {
-        throw new Error('Usuário não autenticado');
-      }
-
-      const { data: planAccess } = await supabase
+      const { data: planAccess, error: accessError } = await supabase
         .from('plan_access')
         .select('payment_required')
-        .eq('user_id', user.id)
+        .eq('user_id', userData.user.id)
         .eq('plan_type', planType)
         .maybeSingle();
 
+      if (accessError) {
+        console.error('Erro ao verificar acesso do usuário:', accessError);
+        throw new Error('Erro ao verificar acesso do usuário');
+      }
+
       // Se o usuário tiver acesso especial sem necessidade de pagamento
       if (planAccess && !planAccess.payment_required) {
+        console.log('Usuário tem acesso especial, permitindo acesso sem pagamento');
         setHasPaid(true);
         setShowConfirmation(true);
         return;
       }
 
+      // Verificar contagem de gerações
+      const { data: counts, error: countError } = await supabase
+        .from('plan_generation_counts')
+        .select('*')
+        .eq('user_id', userData.user.id)
+        .maybeSingle();
+
+      if (countError) {
+        console.error('Erro ao verificar contagem de gerações:', countError);
+        throw new Error('Erro ao verificar limite de gerações');
+      }
+
+      const countField = `${planType}_count`;
+      const currentCount = counts ? counts[countField] || 0 : 0;
+
+      // Se ainda tiver gerações gratuitas disponíveis
+      if (currentCount < 3) {
+        console.log('Usuário ainda tem gerações gratuitas disponíveis');
+        setHasPaid(true);
+        setShowConfirmation(true);
+        return;
+      }
+
+      // Se chegou aqui, precisa criar preferência de pagamento
       const { preferenceId: newPreferenceId, initPoint } = await createPaymentPreference(planType, currentPrice);
       setPreferenceId(newPreferenceId);
       
@@ -179,14 +212,6 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
       window.open(paymentUrl.toString(), '_blank');
 
     } catch (error: any) {
-      // Se o erro for que o pagamento não é necessário, permitir continuar
-      if (error.message === 'Pagamento não é necessário para este plano' ||
-          error.message === 'Pagamento não é necessário para este usuário') {
-        setHasPaid(true);
-        setShowConfirmation(true);
-        return;
-      }
-      
       console.error('Erro completo:', error);
       toast.error(error instanceof Error ? error.message : "Erro ao processar pagamento");
     } finally {
