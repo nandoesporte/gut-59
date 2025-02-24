@@ -1,3 +1,4 @@
+
 import Profile from "@/components/Profile";
 import Messages from "@/components/Messages";
 import MessagesPersonal from "@/components/MessagesPersonal";
@@ -8,6 +9,7 @@ import FoodDiary from "@/components/FoodDiary";
 import StepCounter from "@/components/StepCounter";
 import TipsCalendar from "@/components/TipsCalendar";
 import { useNavigate } from "react-router-dom";
+import { WaterTracker } from "@/components/food-diary/WaterTracker";
 
 const Index = () => {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -66,6 +68,9 @@ const Index = () => {
     <div className="space-y-8 flex flex-col items-center">
       <div className="w-full">
         <Profile />
+      </div>
+      <div className="w-full">
+        <WaterTracker />
       </div>
       <div className="w-full">
         <StepCounter />

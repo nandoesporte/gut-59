@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { Lock, Unlock } from "lucide-react";
@@ -128,7 +129,7 @@ const TipsCalendar = () => {
   return (
     <div className="w-full px-4 py-6 bg-gradient-to-br from-slate-50 to-white rounded-lg shadow-sm border border-slate-200">
       <h2 className="text-2xl font-bold text-center mb-6 text-primary-500">
-        Desafios Di��rios
+        Atividades Diárias
       </h2>
       <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-7 lg:grid-cols-10 gap-2">
         {tips.map((tip) => (
