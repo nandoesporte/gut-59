@@ -16,23 +16,19 @@ const formSchema = z.object({
   goal: z.enum(["lose_weight", "maintain", "gain_mass"]),
   activity_level: z.enum(["sedentary", "light", "moderate", "intense"]),
   preferred_exercise_types: z.array(z.enum(["strength", "cardio", "mobility"])).min(1, "Selecione pelo menos um tipo de exercício"),
-  training_location: z.enum(["gym", "home", "outdoors", "no_equipment"]),
+  training_location: z.enum(["gym", "home", "outdoors", "no_equipment"])
 });
 
 export type FormSchema = z.infer<typeof formSchema>;
 
-export const useWorkoutForm = (onSubmit: (data: WorkoutPreferences) => void, paymentRequired = true) => {
+export const useWorkoutForm = (onSubmit: (data: WorkoutPreferences) => void) => {
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [formData, setFormData] = useState<FormSchema | null>(null);
-  const [isGrantingAccess, setIsGrantingAccess] = useState(false);
-
   const {
     isProcessingPayment,
     hasPaid,
     currentPrice,
-    handlePaymentAndContinue,
-    showConfirmation,
-    setShowConfirmation
+    handlePaymentAndContinue
   } = usePaymentHandling('workout');
 
   const form = useForm<FormSchema>({
@@ -46,54 +42,17 @@ export const useWorkoutForm = (onSubmit: (data: WorkoutPreferences) => void, pay
       activity_level: "moderate",
       preferred_exercise_types: ["strength"],
       training_location: "gym",
-    },
-    mode: "onChange"
+    }
   });
 
-  const handleFormSubmit = async (data: FormSchema) => {
+  const handleSubmit = async (data: FormSchema) => {
+    if (!hasPaid) {
+      setFormData(data);
+      setIsPaymentDialogOpen(true);
+      return;
+    }
+
     try {
-      setIsGrantingAccess(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        toast.error("Usuário não autenticado");
-        return;
-      }
-
-      const { data: paymentSettings } = await supabase
-        .from('payment_settings')
-        .select('is_active')
-        .eq('plan_type', 'workout')
-        .single();
-
-      if (paymentSettings?.is_active && paymentRequired && !hasPaid) {
-        setFormData(data);
-        setIsPaymentDialogOpen(true);
-        return;
-      }
-
-      const { data: grantResponse, error: grantError } = await supabase.functions.invoke('grant-plan-access', {
-        body: {
-          userId: user.id,
-          planType: 'workout' as const
-        }
-      });
-
-      if (grantError) {
-        console.error('Erro ao liberar acesso ao plano:', grantError);
-        toast.error("Erro ao liberar acesso ao plano. Por favor, contate o suporte.");
-        return;
-      }
-
-      if (grantResponse?.requiresPayment && paymentRequired) {
-        if (grantResponse?.remainingGenerations !== undefined) {
-          toast.info(`Você tem mais ${grantResponse.remainingGenerations} gerações gratuitas disponíveis.`);
-        } else {
-          toast.info("Você atingiu o limite de gerações de plano gratuitas. Pagamento reativado.");
-          return;
-        }
-      }
-
       const workoutPreferences: WorkoutPreferences = {
         age: data.age,
         weight: data.weight,
@@ -113,13 +72,9 @@ export const useWorkoutForm = (onSubmit: (data: WorkoutPreferences) => void, pay
       };
 
       onSubmit(workoutPreferences);
-      toast.success("Plano de treino sendo gerado...");
-
-    } catch (error) {
-      console.error('Erro ao processar formulário:', error);
-      toast.error("Erro ao processar sua solicitação. Por favor, tente novamente.");
-    } finally {
-      setIsGrantingAccess(false);
+    } catch (error: any) {
+      console.error("Erro ao processar formulário:", error);
+      toast.error(error.message || "Erro ao processar suas preferências");
     }
   };
 
@@ -127,7 +82,7 @@ export const useWorkoutForm = (onSubmit: (data: WorkoutPreferences) => void, pay
     try {
       await handlePaymentAndContinue();
       if (formData) {
-        await handleFormSubmit(formData);
+        await handleSubmit(formData);
       }
       setIsPaymentDialogOpen(false);
     } catch (error) {
@@ -138,12 +93,11 @@ export const useWorkoutForm = (onSubmit: (data: WorkoutPreferences) => void, pay
 
   return {
     form,
-    isGrantingAccess,
     isPaymentDialogOpen,
     setIsPaymentDialogOpen,
     isProcessingPayment,
     currentPrice,
-    handleFormSubmit,
+    handleSubmit,
     handlePaymentProcess
   };
 };
