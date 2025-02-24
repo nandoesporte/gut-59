@@ -3,9 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Camera, LogOut } from "lucide-react";
+import { Camera, LogOut, Coins } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useNavigate } from "react-router-dom";
+import { useWallet } from "@/hooks/useWallet";
 
 const Profile = () => {
   const { toast } = useToast();
@@ -15,6 +16,7 @@ const Profile = () => {
   const [healthConditions, setHealthConditions] = useState("");
   const [loading, setLoading] = useState(false);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const { wallet } = useWallet();
 
   useEffect(() => {
     fetchProfile();
@@ -162,16 +164,27 @@ const Profile = () => {
   return (
     <Card className="w-full max-w-2xl mx-auto mt-2">
       <CardHeader className="relative">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleSignOut}
-          className="absolute right-6 top-6"
-        >
-          <LogOut className="w-4 h-4 mr-2" />
-          Sair
-        </Button>
-        <CardTitle className="text-2xl text-primary-500">Seu Perfil</CardTitle>
+        <div className="flex justify-between items-center">
+          <CardTitle className="text-2xl text-primary-500">Seu Perfil</CardTitle>
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              onClick={() => navigate('/wallet')}
+              className="flex items-center gap-2"
+            >
+              <Coins className="w-4 h-4" />
+              <span className="font-bold">{wallet?.balance || 0} FITs</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSignOut}
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Sair
+            </Button>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="flex flex-col items-center space-y-4">

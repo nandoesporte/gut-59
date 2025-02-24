@@ -1,0 +1,105 @@
+
+import { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useWallet } from '@/hooks/useWallet';
+import { formatDistanceToNow } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { Coins, ArrowUpCircle, CalendarDays, Droplets, Footprints } from 'lucide-react';
+
+const transactionTypeInfo = {
+  daily_tip: {
+    label: 'Dica Diária',
+    icon: CalendarDays,
+    color: 'text-blue-500'
+  },
+  water_intake: {
+    label: 'Registro de Água',
+    icon: Droplets,
+    color: 'text-cyan-500'
+  },
+  steps: {
+    label: 'Registro de Passos',
+    icon: Footprints,
+    color: 'text-green-500'
+  },
+  meal_plan: {
+    label: 'Plano Alimentar',
+    icon: ArrowUpCircle,
+    color: 'text-emerald-500'
+  },
+  workout_plan: {
+    label: 'Plano de Treino',
+    icon: ArrowUpCircle,
+    color: 'text-purple-500'
+  },
+  physio_plan: {
+    label: 'Plano de Fisioterapia',
+    icon: ArrowUpCircle,
+    color: 'text-indigo-500'
+  }
+};
+
+const Wallet = () => {
+  const { wallet, transactions, isLoading } = useWallet();
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-8 space-y-6">
+      <Card className="bg-gradient-to-br from-primary-500 to-primary-600">
+        <CardContent className="pt-6">
+          <div className="text-center text-white">
+            <Coins className="w-12 h-12 mx-auto mb-2" />
+            <h1 className="text-3xl font-bold mb-2">Seu Saldo</h1>
+            <p className="text-4xl font-bold">{wallet?.balance || 0} FITs</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Histórico de Transações</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {transactions?.map((transaction) => {
+            const typeInfo = transactionTypeInfo[transaction.transaction_type];
+            const Icon = typeInfo.icon;
+
+            return (
+              <div
+                key={transaction.id}
+                className="flex items-center justify-between p-4 bg-slate-50 rounded-lg"
+              >
+                <div className="flex items-center space-x-4">
+                  <div className={`p-2 rounded-full bg-white ${typeInfo.color}`}>
+                    <Icon className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="font-medium">{typeInfo.label}</p>
+                    <p className="text-sm text-slate-500">
+                      {formatDistanceToNow(new Date(transaction.created_at), {
+                        addSuffix: true,
+                        locale: ptBR
+                      })}
+                    </p>
+                  </div>
+                </div>
+                <p className="font-semibold text-primary-500">
+                  +{transaction.amount} FITs
+                </p>
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default Wallet;
