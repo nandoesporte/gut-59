@@ -90,18 +90,20 @@ const Menu = () => {
       case 3:
         return (
           <DietaryPreferencesForm
-            onSubmit={async (preferences: DietaryPreferences): Promise<void> => {
-              try {
-                const success = await handleDietaryPreferences(preferences);
-                if (success) {
-                  setCurrentStep(4);
+            onSubmit={async (preferences: DietaryPreferences) => {
+              return new Promise<void>(async (resolve, reject) => {
+                try {
+                  const success = await handleDietaryPreferences(preferences);
+                  if (success) {
+                    setCurrentStep(4);
+                  }
+                  resolve();
+                } catch (error) {
+                  console.error('Erro ao gerar plano:', error);
+                  toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
+                  reject(error);
                 }
-                return Promise.resolve();
-              } catch (error) {
-                console.error('Erro ao gerar plano:', error);
-                toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
-                throw error;
-              }
+              });
             }}
             onBack={() => setCurrentStep(2)}
           />
