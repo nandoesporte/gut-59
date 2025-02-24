@@ -249,26 +249,30 @@ const StepCounter = () => {
   const progress = (stepData.steps / STEPS_GOAL) * 100;
 
   return (
-    <Card className="w-full bg-[#1E1E1E] border border-white/10 shadow-lg">
+    <Card className="w-full bg-white shadow-lg">
       <CardContent className="p-6">
         <div className="flex flex-col space-y-6">
           <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-bold text-white">Atividade Diária</h2>
-            <div className="p-2 rounded-full bg-cyan-400/10">
-              <User className="w-8 h-8 text-cyan-400" />
-            </div>
+            <h2 className="text-2xl font-bold text-gray-800">Atividade Diária</h2>
+            <User className="w-8 h-8 text-primary" />
           </div>
           
           {!sensorSupported && (
-            <div className="p-4 bg-yellow-900/20 text-yellow-300 rounded-lg border border-yellow-400/20">
+            <div className="p-4 bg-yellow-50 text-yellow-800 rounded-lg">
               <p>Seu dispositivo não suporta ou não tem permissão para a contagem de passos.</p>
+              <p className="mt-2">Para usar esta função:</p>
+              <ul className="list-disc ml-6 mt-1">
+                <li>Use um dispositivo móvel com acelerômetro</li>
+                <li>Certifique-se que as permissões de movimento estejam ativadas nas configurações</li>
+                <li>Verifique se o aplicativo tem permissão para acessar os sensores do dispositivo</li>
+              </ul>
               <Button 
                 onClick={() => {
                   setSensorSupported(true);
                   setReconnectAttempts(0);
                   requestPermissions();
                 }}
-                className="mt-4 w-full bg-yellow-400/20 hover:bg-yellow-400/30 text-yellow-300"
+                className="mt-4 w-full"
                 variant="secondary"
               >
                 Tentar Novamente
@@ -281,7 +285,7 @@ const StepCounter = () => {
               <Button
                 onClick={requestPermissions}
                 disabled={isLoading}
-                className="w-full bg-cyan-400 hover:bg-cyan-500 text-[#1E1E1E]"
+                className="w-full"
               >
                 {isLoading ? (
                   <>
@@ -297,30 +301,30 @@ const StepCounter = () => {
           
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <span className="text-4xl font-bold text-cyan-400">
+              <span className="text-4xl font-bold text-primary">
                 {stepData.steps.toLocaleString()}
               </span>
-              <span className="text-gray-400">/ {STEPS_GOAL.toLocaleString()} passos</span>
+              <span className="text-gray-500">/ {STEPS_GOAL.toLocaleString()} passos</span>
             </div>
             
-            <Progress value={progress} className="h-3 bg-white/5" indicatorClassName="bg-cyan-400" />
+            <Progress value={progress} className="h-3" />
             
             <div className="grid grid-cols-2 gap-4 mt-4">
-              <div className="flex items-center space-x-3 bg-white/5 p-4 rounded-lg border border-white/10">
-                <Activity className="w-5 h-5 text-green-400" />
+              <div className="flex items-center space-x-3 bg-gray-50 p-4 rounded-lg">
+                <Activity className="w-5 h-5 text-green-500" />
                 <div>
-                  <p className="text-sm text-gray-400">Calorias</p>
-                  <p className="text-lg font-semibold text-white">
+                  <p className="text-sm text-gray-500">Calorias</p>
+                  <p className="text-lg font-semibold">
                     {Math.round(stepData.calories)} kcal
                   </p>
                 </div>
               </div>
               
-              <div className="flex items-center space-x-3 bg-white/5 p-4 rounded-lg border border-white/10">
-                <LineChart className="w-5 h-5 text-cyan-400" />
+              <div className="flex items-center space-x-3 bg-gray-50 p-4 rounded-lg">
+                <LineChart className="w-5 h-5 text-blue-500" />
                 <div>
-                  <p className="text-sm text-gray-400">Distância</p>
-                  <p className="text-lg font-semibold text-white">
+                  <p className="text-sm text-gray-500">Distância</p>
+                  <p className="text-lg font-semibold">
                     {stepData.distance.toFixed(2)} km
                   </p>
                 </div>

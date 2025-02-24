@@ -1,3 +1,4 @@
+
 import { ReactNode, useEffect, useState } from "react";
 import Navigation from "./Navigation";
 import { supabase } from "@/integrations/supabase/client";
@@ -79,6 +80,7 @@ const Layout = () => {
     fetchUser();
   }, []);
 
+  // Reset scroll position when route changes or page loads
   useEffect(() => {
     window.scrollTo({
       top: 0,
@@ -88,8 +90,8 @@ const Layout = () => {
   }, [location.pathname]);
 
   return (
-    <div className="min-h-screen bg-[#121212] text-white">
-      <header className="bg-[#1E1E1E]/70 backdrop-blur-lg shadow-lg fixed top-0 left-0 right-0 z-50 border-b border-white/10">
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white/70 backdrop-blur-lg shadow-sm fixed top-0 left-0 right-0 z-50 border-b border-gray-100">
         <div className="w-full px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-center relative">
           <div className="flex items-center gap-3">
             <img 
@@ -97,12 +99,12 @@ const Layout = () => {
               alt="Mais Saúde" 
               className="h-8 w-auto sm:h-10"
             />
-            <h1 className="text-xl sm:text-2xl font-bold text-cyan-400">
-              Exercita
+            <h1 className="text-xl sm:text-2xl font-bold text-primary-500">
+              Mais Saúde
             </h1>
           </div>
           {hasNewMessage && (
-            <div className="absolute top-4 right-4 w-3 h-3 bg-cyan-400 rounded-full animate-pulse" />
+            <div className="absolute top-4 right-4 w-3 h-3 bg-red-500 rounded-full animate-pulse" />
           )}
         </div>
       </header>
