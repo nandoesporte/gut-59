@@ -43,7 +43,8 @@ serve(async (req) => {
     console.log('Parsed webhook notification:', JSON.stringify(notification))
 
     // Validar a estrutura da notificação
-    if (!notification?.type || !notification?.data?.id) {
+    if ((!notification?.type && !notification?.topic) || 
+        (!notification?.data?.id && !notification?.resource)) {
       console.error('Invalid notification format:', JSON.stringify(notification))
       return new Response(
         JSON.stringify({ error: 'Invalid notification format' }),
@@ -54,32 +55,38 @@ serve(async (req) => {
       )
     }
 
-    // Se for uma notificação de pagamento
-    if (notification.type === 'payment') {
-      const mpPaymentId = notification.data.id.toString()
-      console.log('Processing payment notification for ID:', mpPaymentId)
+    // Tratar notificações de pagamento
+    if (notification.type === 'payment' || notification.topic === 'merchant_order') {
+      let paymentId: string
+      let resourceUrl: string
+
+      if (notification.type === 'payment') {
+        paymentId = notification.data.id.toString()
+        resourceUrl = `https://api.mercadopago.com/v1/payments/${paymentId}`
+      } else {
+        // Para merchant_order, extrair o ID da URL do recurso
+        const orderId = notification.resource.split('/').pop()
+        resourceUrl = `https://api.mercadopago.com/merchant_orders/${orderId}`
+      }
+
+      console.log('Processing notification with resource URL:', resourceUrl)
 
       try {
-        // Buscar detalhes do pagamento na API do Mercado Pago
-        const mpResponse = await fetch(
-          `https://api.mercadopago.com/v1/payments/${mpPaymentId}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${mercadopagoToken}`,
-              'Content-Type': 'application/json'
-            }
+        // Buscar detalhes do recurso na API do Mercado Pago
+        const mpResponse = await fetch(resourceUrl, {
+          headers: {
+            'Authorization': `Bearer ${mercadopagoToken}`,
+            'Content-Type': 'application/json'
           }
-        )
+        })
 
         if (!mpResponse.ok) {
           const errorData = await mpResponse.json()
           console.error('MercadoPago API error:', JSON.stringify(errorData))
           
-          // Se o pagamento não foi encontrado, aguardamos próxima notificação
           if (mpResponse.status === 404) {
-            console.log('Payment not found in MercadoPago, will retry later')
             return new Response(
-              JSON.stringify({ message: 'Payment not found, will retry' }),
+              JSON.stringify({ message: 'Resource not found, will retry' }),
               { 
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 status: 200 
@@ -87,15 +94,55 @@ serve(async (req) => {
             )
           }
 
-          throw new Error(`Failed to fetch payment details: ${mpResponse.status}`)
+          throw new Error(`Failed to fetch resource details: ${mpResponse.status}`)
         }
 
-        const paymentData = await mpResponse.json()
-        console.log('Payment data from MercadoPago:', JSON.stringify(paymentData))
+        const resourceData = await mpResponse.json()
+        console.log('Resource data from MercadoPago:', JSON.stringify(resourceData))
+
+        // Se for merchant_order, precisamos buscar o pagamento associado
+        if (notification.topic === 'merchant_order') {
+          const payments = resourceData.payments || []
+          // Procurar por um pagamento aprovado
+          const approvedPayment = payments.find(p => p.status === 'approved')
+          
+          if (!approvedPayment) {
+            console.log('No approved payment found in merchant order')
+            return new Response(
+              JSON.stringify({ message: 'No approved payment found' }),
+              { 
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200 
+              }
+            )
+          }
+
+          paymentId = approvedPayment.id.toString()
+          // Buscar detalhes do pagamento
+          const paymentResponse = await fetch(
+            `https://api.mercadopago.com/v1/payments/${paymentId}`,
+            {
+              headers: {
+                'Authorization': `Bearer ${mercadopagoToken}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          )
+
+          if (!paymentResponse.ok) {
+            throw new Error(`Failed to fetch payment details: ${paymentResponse.status}`)
+          }
+
+          const paymentData = await paymentResponse.json()
+          console.log('Payment data:', JSON.stringify(paymentData))
+
+          // Usar os dados do pagamento daqui em diante
+          resourceData = paymentData
+        }
 
         // Se o pagamento foi aprovado
-        if (paymentData.status === 'approved') {
-          const externalReference = paymentData.external_reference
+        if (resourceData.status === 'approved') {
+          const externalReference = resourceData.external_reference
           console.log('Looking for payment with external reference:', externalReference)
 
           // Buscar pagamento no nosso banco
@@ -208,11 +255,11 @@ serve(async (req) => {
         }
 
         // Se pagamento não está aprovado, apenas logamos
-        console.log(`Payment ${mpPaymentId} status is ${paymentData.status}`)
+        console.log(`Payment status is ${resourceData.status}`)
         return new Response(
           JSON.stringify({ 
-            message: `Payment status is ${paymentData.status}`,
-            payment_id: mpPaymentId 
+            message: `Payment status is ${resourceData.status}`,
+            payment_id: paymentId 
           }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -225,7 +272,7 @@ serve(async (req) => {
         return new Response(
           JSON.stringify({ 
             error: error instanceof Error ? error.message : 'Unknown error',
-            payment_id: mpPaymentId
+            resource: resourceUrl
           }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -239,7 +286,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         message: 'Notification received',
-        type: notification.type
+        type: notification.type || notification.topic
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
