@@ -249,23 +249,17 @@ const StepCounter = () => {
   const progress = (stepData.steps / STEPS_GOAL) * 100;
 
   return (
-    <Card className="w-full bg-white shadow-lg">
+    <Card className="w-full bg-card shadow-lg">
       <CardContent className="p-6">
         <div className="flex flex-col space-y-6">
           <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-bold text-gray-800">Atividade Diária</h2>
+            <h2 className="text-2xl font-bold text-card-foreground">Atividade Diária</h2>
             <User className="w-8 h-8 text-primary" />
           </div>
           
           {!sensorSupported && (
             <div className="p-4 bg-yellow-50 text-yellow-800 rounded-lg">
               <p>Seu dispositivo não suporta ou não tem permissão para a contagem de passos.</p>
-              <p className="mt-2">Para usar esta função:</p>
-              <ul className="list-disc ml-6 mt-1">
-                <li>Use um dispositivo móvel com acelerômetro</li>
-                <li>Certifique-se que as permissões de movimento estejam ativadas nas configurações</li>
-                <li>Verifique se o aplicativo tem permissão para acessar os sensores do dispositivo</li>
-              </ul>
               <Button 
                 onClick={() => {
                   setSensorSupported(true);
@@ -304,27 +298,27 @@ const StepCounter = () => {
               <span className="text-4xl font-bold text-primary">
                 {stepData.steps.toLocaleString()}
               </span>
-              <span className="text-gray-500">/ {STEPS_GOAL.toLocaleString()} passos</span>
+              <span className="text-muted-foreground">/ {STEPS_GOAL.toLocaleString()} passos</span>
             </div>
             
             <Progress value={progress} className="h-3" />
             
             <div className="grid grid-cols-2 gap-4 mt-4">
-              <div className="flex items-center space-x-3 bg-gray-50 p-4 rounded-lg">
+              <div className="flex items-center space-x-3 bg-muted p-4 rounded-lg">
                 <Activity className="w-5 h-5 text-green-500" />
                 <div>
-                  <p className="text-sm text-gray-500">Calorias</p>
-                  <p className="text-lg font-semibold">
+                  <p className="text-sm text-muted-foreground">Calorias</p>
+                  <p className="text-lg font-semibold text-card-foreground">
                     {Math.round(stepData.calories)} kcal
                   </p>
                 </div>
               </div>
               
-              <div className="flex items-center space-x-3 bg-gray-50 p-4 rounded-lg">
-                <LineChart className="w-5 h-5 text-blue-500" />
+              <div className="flex items-center space-x-3 bg-muted p-4 rounded-lg">
+                <LineChart className="w-5 h-5 text-primary" />
                 <div>
-                  <p className="text-sm text-gray-500">Distância</p>
-                  <p className="text-lg font-semibold">
+                  <p className="text-sm text-muted-foreground">Distância</p>
+                  <p className="text-lg font-semibold text-card-foreground">
                     {stepData.distance.toFixed(2)} km
                   </p>
                 </div>
