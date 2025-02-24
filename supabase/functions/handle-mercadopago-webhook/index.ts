@@ -85,18 +85,19 @@ serve(async (req) => {
         // Verificar se o pagamento foi aprovado
         if (paymentData.status === 'approved') {
           // Buscar o pagamento no banco de dados usando external_reference ou payment_id
-          const { data: paymentRecord, error: fetchError } = await supabase
+          const { data: paymentRecords, error: fetchError } = await supabase
             .from('payments')
             .select('*')
             .eq('payment_id', paymentData.external_reference || paymentId)
-            .single()
+            .order('created_at', { ascending: false })
+            .limit(1)
 
           if (fetchError) {
             console.error('Error fetching payment record:', fetchError)
             throw fetchError
           }
 
-          if (!paymentRecord) {
+          if (!paymentRecords || paymentRecords.length === 0) {
             console.warn('Payment record not found in database:', paymentId)
             return new Response(
               JSON.stringify({ 
@@ -109,6 +110,8 @@ serve(async (req) => {
               }
             )
           }
+
+          const paymentRecord = paymentRecords[0]
 
           // Atualizar status do pagamento
           const { error: updateError } = await supabase
@@ -182,6 +185,7 @@ serve(async (req) => {
           }
         )
       } catch (error) {
+        console.error('Error processing payment:', error)
         // Se for um erro de API do Mercado Pago, retornamos 200 para evitar retentativas
         if (error instanceof Error && error.message.includes('Failed to fetch payment details')) {
           return new Response(
