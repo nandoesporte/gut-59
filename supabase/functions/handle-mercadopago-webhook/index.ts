@@ -97,7 +97,7 @@ serve(async (req) => {
           throw new Error(`Failed to fetch resource details: ${mpResponse.status}`)
         }
 
-        const resourceData = await mpResponse.json()
+        let resourceData = await mpResponse.json()
         console.log('Resource data from MercadoPago:', JSON.stringify(resourceData))
 
         // Se for merchant_order, precisamos buscar o pagamento associado
@@ -133,11 +133,8 @@ serve(async (req) => {
             throw new Error(`Failed to fetch payment details: ${paymentResponse.status}`)
           }
 
-          const paymentData = await paymentResponse.json()
-          console.log('Payment data:', JSON.stringify(paymentData))
-
-          // Usar os dados do pagamento daqui em diante
-          resourceData = paymentData
+          resourceData = await paymentResponse.json()
+          console.log('Payment data:', JSON.stringify(resourceData))
         }
 
         // Se o pagamento foi aprovado
