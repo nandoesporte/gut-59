@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useCallback } from 'react';
 import { Motion, MotionEventResult } from '@capacitor/motion';
 import { Card, CardContent } from "@/components/ui/card";
@@ -5,6 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Activity, LineChart, User, Loader } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Platform } from '@capacitor/core';
 
 interface StepData {
   steps: number;
@@ -19,10 +21,10 @@ interface AccelerometerState {
 }
 
 const STEPS_GOAL = 10000;
-const STEP_LENGTH = 0.762;
+const STEP_LENGTH = 0.762; // metros
 const CALORIES_PER_STEP = 0.04;
 const ACCELERATION_THRESHOLD = 10;
-const MIN_TIME_BETWEEN_STEPS = 250;
+const MIN_TIME_BETWEEN_STEPS = 250; // milissegundos
 const STORAGE_KEY = 'stepCounter';
 const ACCELEROMETER_STATE_KEY = 'accelerometerState';
 const MAX_RECONNECT_ATTEMPTS = 3;
@@ -67,25 +69,53 @@ const StepCounter = () => {
 
   const startAccelerometer = useCallback(async (isReconnecting = false) => {
     if (isLoading) return false;
-    
+
     try {
       console.log(isReconnecting ? "Tentando reconectar..." : "Iniciando acelerômetro...");
-      
+
+      // Primeiro, vamos verificar se o dispositivo possui acelerômetro
+      const platform = Platform.getPlatform();
+      console.log("Plataforma:", platform);
+
+      if (platform === 'web') {
+        if (!window.DeviceMotionEvent) {
+          console.log("DeviceMotionEvent não suportado");
+          setSensorSupported(false);
+          toast.error("Seu dispositivo não suporta a detecção de movimento.");
+          return false;
+        }
+        
+        try {
+          // @ts-ignore - DeviceMotionEvent.requestPermission() é específico para iOS
+          if (typeof DeviceMotionEvent.requestPermission === 'function') {
+            // @ts-ignore
+            const permission = await DeviceMotionEvent.requestPermission();
+            if (permission !== 'granted') {
+              toast.error("Permissão para o acelerômetro negada.");
+              return false;
+            }
+          }
+        } catch (error) {
+          console.error("Erro ao solicitar permissão:", error);
+          return false;
+        }
+      }
+
       // Remove listeners antigos para evitar duplicação
       await Motion.removeAllListeners();
-      
+
       return new Promise<boolean>((resolve) => {
         let initialized = false;
         let timeoutId: number;
-        
+
         const initializeListener = Motion.addListener('accel', (event: MotionEventResult) => {
           if (!initialized && event?.acceleration) {
             const { x, y, z } = event.acceleration;
             console.log("Dados do acelerômetro:", { x, y, z });
-            
+
             initialized = true;
             clearTimeout(timeoutId);
-            
+
             setAccelerometerState(prev => ({
               isInitialized: true,
               hasPermission: true,
@@ -95,7 +125,7 @@ const StepCounter = () => {
             if (!isReconnecting) {
               toast.success("Acelerômetro conectado com sucesso!");
             }
-            
+
             resolve(true);
           }
         });
@@ -153,7 +183,6 @@ const StepCounter = () => {
 
         if (!success) {
           setReconnectAttempts(prev => prev + 1);
-          // Agenda próxima tentativa
           setTimeout(reconnect, RECONNECT_DELAY);
         } else {
           setReconnectAttempts(0);
@@ -170,6 +199,8 @@ const StepCounter = () => {
 
     let lastStepTime = Date.now();
     let lastMagnitude = 0;
+    let smoothedMagnitude = 0;
+    const alpha = 0.8; // Fator de suavização
     let steps = stepData.steps;
 
     const startStepCounting = async () => {
@@ -183,18 +214,22 @@ const StepCounter = () => {
           
           const { x, y, z } = event.acceleration;
           const magnitude = Math.sqrt(x * x + y * y + z * z);
+          
+          // Aplicar filtro de suavização
+          smoothedMagnitude = alpha * smoothedMagnitude + (1 - alpha) * magnitude;
+          
           const now = Date.now();
 
-          if (magnitude > ACCELERATION_THRESHOLD && 
-              magnitude > lastMagnitude && 
+          if (smoothedMagnitude > ACCELERATION_THRESHOLD && 
+              smoothedMagnitude > lastMagnitude && 
               (now - lastStepTime) > MIN_TIME_BETWEEN_STEPS) {
             steps++;
             lastStepTime = now;
             setStepData(calculateMetrics(steps));
-            console.log('Passo detectado:', { magnitude, totalSteps: steps });
+            console.log('Passo detectado:', { magnitude: smoothedMagnitude, totalSteps: steps });
           }
 
-          lastMagnitude = magnitude;
+          lastMagnitude = smoothedMagnitude;
         });
 
         console.log('Sistema de contagem de passos iniciado');

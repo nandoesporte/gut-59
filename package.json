@@ -13,6 +13,7 @@
   "dependencies": {
     "@capacitor/app": "^7.0.0",
     "@capacitor/app-launcher": "^7.0.0",
+    "@capacitor/core": "^7.0.1",
     "@capacitor/motion": "^7.0.0",
     "@hookform/resolvers": "^3.3.4",
     "@mercadopago/sdk-react": "^0.0.24",
