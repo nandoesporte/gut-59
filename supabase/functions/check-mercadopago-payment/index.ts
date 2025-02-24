@@ -1,111 +1,130 @@
 
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { corsHeaders } from '../_shared/cors.ts'
 
-// Handle CORS preflight requests
-Deno.serve(async (req) => {
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+const supabaseUrl = Deno.env.get('SUPABASE_URL')
+const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+const mercadopagoToken = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN')
+
+if (!supabaseUrl || !supabaseKey || !mercadopagoToken) {
+  throw new Error('Required environment variables are not set.')
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey)
+
+serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    const { paymentId } = await req.json()
-    
-    if (!paymentId) {
-      throw new Error('Payment ID is required')
-    }
+    const { paymentId, userId, planType } = await req.json()
+    console.log(`Checking payment status for ID: ${paymentId}, User: ${userId}, Plan: ${planType}`)
 
-    console.log('Checking payment status for ID:', paymentId)
-
-    // Create Supabase client
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    )
-
-    // First check in our database
-    const { data: paymentData, error: dbError } = await supabaseClient
+    // First check if payment is already completed in our database
+    const { data: paymentData } = await supabase
       .from('payments')
       .select('status')
       .eq('payment_id', paymentId)
+      .eq('status', 'completed')
       .maybeSingle()
 
-    if (dbError) {
-      throw dbError
-    }
-
-    if (paymentData?.status === 'completed') {
-      console.log('Payment already marked as completed in database')
+    if (paymentData) {
+      console.log('Payment already completed in database')
       return new Response(
         JSON.stringify({ isPaid: true }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Check with MercadoPago
-    console.log('Checking payment status with MercadoPago API')
+    // Then check payment notifications
+    const { data: notificationData } = await supabase
+      .from('payment_notifications')
+      .select('status')
+      .eq('payment_id', paymentId)
+      .eq('status', 'completed')
+      .maybeSingle()
+
+    if (notificationData) {
+      console.log('Payment completed according to notifications')
+      return new Response(
+        JSON.stringify({ isPaid: true }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // If not found in our system, check with Mercado Pago
     const mpResponse = await fetch(
-      `https://api.mercadopago.com/v1/payments/${paymentId}`,
+      `https://api.mercadopago.com/v1/payments/search?external_reference=${paymentId}`,
       {
         headers: {
-          'Authorization': `Bearer ${Deno.env.get('MERCADOPAGO_ACCESS_TOKEN')}`
+          'Authorization': `Bearer ${mercadopagoToken}`
         }
       }
     )
 
     if (!mpResponse.ok) {
-      const errorText = await mpResponse.text()
-      console.error('MercadoPago API error:', errorText)
-      throw new Error(`Failed to check payment status: ${mpResponse.statusText}`)
+      throw new Error(`Failed to check payment status: ${mpResponse.status}`)
     }
 
-    const mpPayment = await mpResponse.json()
-    console.log('MercadoPago payment data:', JSON.stringify(mpPayment, null, 2))
+    const mpData = await mpResponse.json()
+    console.log('MercadoPago response:', JSON.stringify(mpData))
 
-    const isPaid = mpPayment.status === 'approved'
-    
-    if (isPaid) {
-      console.log('Payment is approved')
-      // Update payment status in our database
-      const { error: updateError } = await supabaseClient
-        .from('payments')
-        .update({ 
-          status: 'completed',
-          updated_at: new Date().toISOString()
-        })
-        .eq('payment_id', paymentId)
+    if (mpData.results && mpData.results.length > 0) {
+      const payment = mpData.results[0]
+      const isPaid = payment.status === 'approved'
 
-      if (updateError) {
-        console.error('Error updating payment status:', updateError)
-        throw updateError
+      if (isPaid) {
+        // Update payment status
+        const { error: updateError } = await supabase
+          .from('payments')
+          .update({ status: 'completed' })
+          .eq('payment_id', paymentId)
+
+        if (updateError) {
+          console.error('Error updating payment status:', updateError)
+          throw updateError
+        }
+
+        // Create notification
+        const { error: notifyError } = await supabase
+          .from('payment_notifications')
+          .insert({
+            user_id: userId,
+            payment_id: paymentId,
+            status: 'completed',
+            plan_type: planType
+          })
+
+        if (notifyError) {
+          console.error('Error creating notification:', notifyError)
+          throw notifyError
+        }
       }
+
+      return new Response(
+        JSON.stringify({ isPaid }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     return new Response(
-      JSON.stringify({ 
-        isPaid,
-        status: mpPayment.status,
-        paymentId 
-      }),
+      JSON.stringify({ isPaid: false }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
-    console.error('Error checking payment:', error)
+    console.error('Error:', error)
     return new Response(
-      JSON.stringify({ 
-        error: error.message,
-        details: error.toString() 
-      }),
+      JSON.stringify({ error: error.message }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400 
+        status: 500 
       }
     )
   }

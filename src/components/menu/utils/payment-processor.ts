@@ -30,12 +30,10 @@ export const createPaymentPreference = async (
     throw new Error('Erro ao verificar configuração de pagamento');
   }
 
-  // Se o pagamento não estiver ativo globalmente, não criar preferência
   if (!paymentSettings?.is_active) {
     throw new Error('Pagamento não é necessário para este plano');
   }
 
-  // Verificar configuração específica do usuário
   const { data: planAccess, error: accessError } = await supabase
     .from('plan_access')
     .select('payment_required')
@@ -51,7 +49,6 @@ export const createPaymentPreference = async (
     throw new Error('Erro ao verificar acesso do usuário');
   }
 
-  // Se o usuário tiver acesso especial sem necessidade de pagamento
   if (planAccess && !planAccess.payment_required) {
     throw new Error('Pagamento não é necessário para este usuário');
   }
@@ -123,7 +120,21 @@ export const checkPaymentStatus = async (
   try {
     console.log('Verificando status do pagamento:', paymentId);
     
-    // Check payment status in our database first
+    // First check payment notifications
+    const { data: notifications } = await supabase
+      .from('payment_notifications')
+      .select('status')
+      .eq('payment_id', paymentId)
+      .eq('status', 'completed')
+      .maybeSingle();
+
+    if (notifications) {
+      console.log('Pagamento confirmado via notificação');
+      onSuccess();
+      return true;
+    }
+
+    // Then check payment status in database
     const { data: paymentData } = await supabase
       .from('payments')
       .select('status')
@@ -136,11 +147,15 @@ export const checkPaymentStatus = async (
       return true;
     }
 
-    // If not completed in database, check with Mercado Pago
+    // If not completed, check with Mercado Pago
     const { data: statusData, error: statusError } = await supabase.functions.invoke(
       'check-mercadopago-payment',
       {
-        body: { paymentId }
+        body: { 
+          paymentId,
+          userId,
+          planType 
+        }
       }
     );
 
@@ -166,17 +181,18 @@ export const checkPaymentStatus = async (
       const currentCount = countData ? countData[`${planType}_count`] : 0;
 
       // Grant plan access
-      const { error: grantError } = await supabase.functions.invoke('grant-plan-access', {
-        body: {
-          userId,
-          planType,
-          disablePayment: true
-        }
-      });
+      const { error: accessError } = await supabase
+        .from('plan_access')
+        .insert({
+          user_id: userId,
+          plan_type: planType,
+          payment_required: false,
+          is_active: true
+        });
 
-      if (grantError) {
-        console.error('Erro ao liberar acesso ao plano:', grantError);
-        throw grantError;
+      if (accessError) {
+        console.error('Erro ao liberar acesso ao plano:', accessError);
+        throw accessError;
       }
 
       console.log('Acesso ao plano liberado com sucesso');
