@@ -10,6 +10,9 @@ import StepCounter from "@/components/StepCounter";
 import TipsCalendar from "@/components/TipsCalendar";
 import { useNavigate } from "react-router-dom";
 import { WaterTracker } from "@/components/food-diary/WaterTracker";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { GraduationCap } from "lucide-react";
 
 const Index = () => {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -68,6 +71,19 @@ const Index = () => {
     <div className="space-y-8 flex flex-col items-center">
       <div className="w-full">
         <Profile />
+      </div>
+      <div className="w-full">
+        <Card className="p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <GraduationCap className="h-6 w-6 text-primary" />
+              <h2 className="text-lg font-semibold">Instruções</h2>
+            </div>
+            <Button onClick={() => navigate('/instructions')} variant="outline">
+              Ver Instruções
+            </Button>
+          </div>
+        </Card>
       </div>
       <div className="w-full">
         <WaterTracker />
