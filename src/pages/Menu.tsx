@@ -104,12 +104,14 @@ const Menu = () => {
         return mealPlan ? (
           <MealPlanDisplay 
             mealPlan={mealPlan} 
-            onRefresh={() => {
+            onRefresh={async () => {
               try {
                 setCurrentStep(3);
+                return Promise.resolve();
               } catch (error) {
                 console.error('Erro ao atualizar cardápio:', error);
                 toast.error("Erro ao atualizar o cardápio");
+                return Promise.reject(error);
               }
             }}
           />
