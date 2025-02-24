@@ -6,7 +6,7 @@ import { MessagesTab } from "@/components/admin/MessagesTab";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import FoodDiary from "@/components/FoodDiary";
-import StepCounter from "@/components/StepCounter";
+import { StepCounter } from "@/components/step-counter";
 import TipsCalendar from "@/components/TipsCalendar";
 import { useNavigate } from "react-router-dom";
 import { WaterTracker } from "@/components/food-diary/WaterTracker";

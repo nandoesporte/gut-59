@@ -4,12 +4,12 @@ import { Motion } from '@capacitor/motion';
 import { Capacitor } from '@capacitor/core';
 import { toast } from "sonner";
 
+// Update the type declaration to extend the window interface instead
 declare global {
-  interface DeviceMotionEvent {
-    requestPermission?: () => Promise<'granted' | 'denied'>;
-  }
-  interface DeviceMotionEventConstructor {
-    requestPermission?: () => Promise<'granted' | 'denied'>;
+  interface Window {
+    DeviceMotionEvent: {
+      requestPermission?: () => Promise<'granted' | 'denied'>;
+    } & DeviceMotionEventConstructor;
   }
 }
 
@@ -45,8 +45,8 @@ export const useAccelerometerPermission = ({
         }
         
         try {
-          if (typeof (DeviceMotionEvent as any).requestPermission === 'function') {
-            const permission = await (DeviceMotionEvent as any).requestPermission();
+          if (typeof window.DeviceMotionEvent.requestPermission === 'function') {
+            const permission = await window.DeviceMotionEvent.requestPermission();
             if (permission !== 'granted') {
               toast.error("Permissão para o acelerômetro negada.");
               return false;
