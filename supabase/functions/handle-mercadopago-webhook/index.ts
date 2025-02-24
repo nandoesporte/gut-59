@@ -62,7 +62,6 @@ serve(async (req) => {
           const errorData = await mpResponse.json()
           console.error('MercadoPago API error:', JSON.stringify(errorData))
           
-          // Se o pagamento não foi encontrado, retornamos 200 para evitar retentativas
           if (mpResponse.status === 404) {
             return new Response(
               JSON.stringify({ 
@@ -142,19 +141,15 @@ serve(async (req) => {
             throw notifyError
           }
 
-          console.log('Payment notification created successfully')
-
-          // Liberar acesso ao plano
-          const { error: accessError } = await supabase.functions.invoke(
-            'grant-plan-access',
-            {
-              body: {
-                userId: paymentRecord.user_id,
-                planType: paymentRecord.plan_type,
-                disablePayment: true
-              }
-            }
-          )
+          // Liberar acesso ao plano diretamente
+          const { error: accessError } = await supabase
+            .from('plan_access')
+            .insert({
+              user_id: paymentRecord.user_id,
+              plan_type: paymentRecord.plan_type,
+              payment_required: false,
+              is_active: true
+            })
 
           if (accessError) {
             console.error('Error granting plan access:', accessError)
@@ -184,9 +179,9 @@ serve(async (req) => {
             status: 200 
           }
         )
+
       } catch (error) {
         console.error('Error processing payment:', error)
-        // Se for um erro de API do Mercado Pago, retornamos 200 para evitar retentativas
         if (error instanceof Error && error.message.includes('Failed to fetch payment details')) {
           return new Response(
             JSON.stringify({ 
