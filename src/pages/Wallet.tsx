@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useWallet } from '@/hooks/useWallet';
@@ -9,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import QRCode from 'qrcode';
+import { toast } from 'react-toastify';
 
 const transactionTypeInfo = {
   daily_tip: {
@@ -58,6 +58,7 @@ const Wallet = () => {
   const handleCreateQRCode = async () => {
     const amount = parseInt(transferAmount);
     if (isNaN(amount) || amount <= 0) {
+      toast.error('Por favor, insira um valor válido');
       return;
     }
 
@@ -67,6 +68,7 @@ const Wallet = () => {
       setQrCodeDataUrl(qrCodeUrl);
     } catch (error) {
       console.error('Error creating QR code:', error);
+      toast.error('Erro ao criar QR Code');
     }
   };
 

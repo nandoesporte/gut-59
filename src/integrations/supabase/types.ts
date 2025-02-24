@@ -335,6 +335,8 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          qr_code_id: string | null
+          recipient_id: string | null
           transaction_type: Database["public"]["Enums"]["transaction_type"]
           wallet_id: string
         }
@@ -343,6 +345,8 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          qr_code_id?: string | null
+          recipient_id?: string | null
           transaction_type: Database["public"]["Enums"]["transaction_type"]
           wallet_id: string
         }
@@ -351,6 +355,8 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          qr_code_id?: string | null
+          recipient_id?: string | null
           transaction_type?: Database["public"]["Enums"]["transaction_type"]
           wallet_id?: string
         }
@@ -1658,6 +1664,36 @@ export type Database = {
           },
         ]
       }
+      transfer_qr_codes: {
+        Row: {
+          amount: number
+          created_at: string | null
+          creator_id: string
+          expires_at: string
+          id: string
+          used_at: string | null
+          used_by: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          creator_id: string
+          expires_at: string
+          id?: string
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          creator_id?: string
+          expires_at?: string
+          id?: string
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Relationships: []
+      }
       user_progress: {
         Row: {
           body_fat: number | null
@@ -2098,6 +2134,7 @@ export type Database = {
         | "meal_plan"
         | "workout_plan"
         | "physio_plan"
+        | "transfer"
       workout_goal: "lose_weight" | "maintain" | "gain_mass"
     }
     CompositeTypes: {

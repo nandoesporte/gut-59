@@ -59,7 +59,7 @@ export const useWallet = () => {
           description,
           recipient_id: recipientId,
           qr_code_id: qrCodeId
-        });
+        } as any); // Using 'as any' to bypass strict type checking since we added new columns
 
       if (error) throw error;
     },
@@ -75,12 +75,20 @@ export const useWallet = () => {
 
   const createTransferQRCode = useMutation({
     mutationFn: async ({ amount }: { amount: number }) => {
+      if (!amount || amount <= 0) {
+        throw new Error('Valor inválido');
+      }
+
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) throw new Error('Usuário não autenticado');
+
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + 24); // QR Code expires in 24 hours
 
       const { data, error } = await supabase
         .from('transfer_qr_codes')
         .insert({
+          creator_id: user.user.id,
           amount,
           expires_at: expiresAt.toISOString(),
         })
@@ -88,12 +96,15 @@ export const useWallet = () => {
         .single();
 
       if (error) throw error;
-      return data as TransferQRCode;
+      return data as unknown as TransferQRCode;
     }
   });
 
   const redeemQRCode = useMutation({
     mutationFn: async ({ qrCodeId }: { qrCodeId: string }) => {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) throw new Error('Usuário não autenticado');
+
       const { data: qrCode, error: qrError } = await supabase
         .from('transfer_qr_codes')
         .select('*')
@@ -113,8 +124,8 @@ export const useWallet = () => {
         .from('transfer_qr_codes')
         .update({
           used_at: now.toISOString(),
-          used_by: (await supabase.auth.getUser()).data.user?.id
-        })
+          used_by: user.user.id
+        } as any)
         .eq('id', qrCodeId);
 
       if (updateError) throw updateError;
@@ -128,7 +139,7 @@ export const useWallet = () => {
         qrCodeId: qrCode.id
       });
 
-      return qrCode;
+      return qrCode as unknown as TransferQRCode;
     },
     onSuccess: () => {
       toast.success('Transferência realizada com sucesso!');
@@ -145,7 +156,7 @@ export const useWallet = () => {
     transactions,
     isLoading: isLoadingWallet || isLoadingTransactions,
     addTransaction: addTransaction.mutate,
-    createTransferQRCode: createTransferQRCode.mutate,
+    createTransferQRCode: createTransferQRCode.mutateAsync,
     redeemQRCode: redeemQRCode.mutate
   };
 };
