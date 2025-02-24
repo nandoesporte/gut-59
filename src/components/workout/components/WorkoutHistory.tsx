@@ -1,8 +1,9 @@
 
 import React from 'react';
-import { Card } from '@/components/ui/card';
+import { Card, CardHeader, CardContent } from '@/components/ui/card';
+import { Badge } from "@/components/ui/badge";
 import { WorkoutPlan } from '../types/workout-plan';
-import { Download, FileText, Trash2 } from 'lucide-react';
+import { Calendar, Clock, Dumbbell, Download, Trash2 } from 'lucide-react';
 import { generateWorkoutPDF } from '../utils/pdf-generator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,7 +24,6 @@ const WorkoutHistory: React.FC<WorkoutHistoryProps> = ({ plans }) => {
       if (error) throw error;
       
       toast.success('Plano de treino excluído com sucesso');
-      // Força um reload da página para atualizar a lista
       window.location.reload();
     } catch (error) {
       console.error('Erro ao excluir plano:', error);
@@ -31,79 +31,152 @@ const WorkoutHistory: React.FC<WorkoutHistoryProps> = ({ plans }) => {
     }
   };
 
+  const getGoalText = (goal: string) => {
+    switch (goal) {
+      case 'lose_weight':
+        return 'Emagrecimento';
+      case 'gain_mass':
+        return 'Ganho de Massa';
+      default:
+        return 'Manutenção';
+    }
+  };
+
   return (
-    <div className="space-y-4">
-      <h2 className="text-2xl font-semibold mb-4">Histórico de Treinos</h2>
+    <div className="space-y-6">
+      <h2 className="text-2xl font-semibold">Histórico de Treinos</h2>
+      
       {plans.map((plan) => (
         <Accordion type="single" collapsible key={plan.id}>
           <AccordionItem value={plan.id}>
-            <Card className="p-4">
-              <div className="flex flex-col space-y-4">
-                <div className="flex justify-between items-start">
-                  <AccordionTrigger className="hover:no-underline">
-                    <div className="text-left">
-                      <h3 className="text-lg font-semibold">
-                        Plano de {plan.goal === 'lose_weight' ? 'Emagrecimento' : 
-                                 plan.goal === 'gain_mass' ? 'Ganho de Massa' : 
-                                 'Manutenção'}
-                      </h3>
-                      <p className="text-sm text-gray-600">
-                        Período: {new Date(plan.start_date).toLocaleDateString()} - {new Date(plan.end_date).toLocaleDateString()}
-                      </p>
+            <Card className="bg-white shadow-lg">
+              <CardHeader className="p-6 border-b">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                  <div>
+                    <h3 className="text-xl font-semibold">
+                      Plano de {getGoalText(plan.goal)}
+                    </h3>
+                    <div className="flex items-center gap-2 mt-2 text-gray-600">
+                      <Calendar className="w-4 h-4" />
+                      <span className="text-sm">
+                        {new Date(plan.start_date).toLocaleDateString('pt-BR')} até{" "}
+                        {new Date(plan.end_date).toLocaleDateString('pt-BR')}
+                      </span>
                     </div>
-                  </AccordionTrigger>
-                  <div className="flex gap-2">
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="bg-primary-50 text-primary-600">
+                      {getGoalText(plan.goal)}
+                    </Badge>
                     <button
-                      className="cursor-pointer hover:bg-gray-100 p-2 rounded-lg"
-                      onClick={() => generateWorkoutPDF(plan)}
+                      className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        generateWorkoutPDF(plan);
+                      }}
                     >
                       <Download className="h-5 w-5 text-gray-600" />
                     </button>
                     <button
-                      className="cursor-pointer hover:bg-red-100 p-2 rounded-lg"
-                      onClick={() => handleDelete(plan.id)}
+                      className="p-2 hover:bg-red-50 rounded-full transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(plan.id);
+                      }}
                     >
                       <Trash2 className="h-5 w-5 text-red-600" />
                     </button>
                   </div>
                 </div>
+              </CardHeader>
 
-                <AccordionContent>
-                  <div className="mt-4 space-y-6">
-                    {plan.workout_sessions?.map((session) => (
-                      <div key={session.id} className="border-t pt-4">
-                        <h4 className="font-semibold mb-2">Dia {session.day_number}</h4>
-                        
-                        {session.warmup_description && (
-                          <div className="mb-3">
-                            <p className="text-sm font-medium text-gray-700">Aquecimento:</p>
+              <AccordionTrigger className="w-full hover:no-underline px-6 py-2">
+                <span className="text-sm text-primary-600">Ver detalhes do treino</span>
+              </AccordionTrigger>
+
+              <AccordionContent>
+                <CardContent className="p-6">
+                  {plan.workout_sessions?.map((session) => (
+                    <Card key={session.id} className="overflow-hidden bg-white shadow-lg transition-all hover:shadow-xl mb-6 last:mb-0">
+                      <CardHeader className="p-6 bg-gradient-to-r from-primary-500 to-primary-600">
+                        <h4 className="text-xl font-semibold text-white flex items-center gap-2">
+                          <Dumbbell className="w-5 h-5" />
+                          Dia {session.day_number}
+                        </h4>
+                      </CardHeader>
+                      <CardContent className="p-6">
+                        <div className="space-y-6">
+                          <div className="bg-primary-50 p-4 rounded-lg">
+                            <h5 className="font-medium text-primary-700 mb-2">Aquecimento</h5>
                             <p className="text-sm text-gray-600">{session.warmup_description}</p>
                           </div>
-                        )}
 
-                        <div className="space-y-2">
-                          {session.session_exercises?.map((exercise) => (
-                            <div key={exercise.id} className="bg-gray-50 p-3 rounded-md">
-                              <p className="font-medium">{exercise.exercise?.name}</p>
-                              <p className="text-sm text-gray-600">
-                                {exercise.sets} séries x {exercise.reps} repetições
-                                {exercise.rest_time_seconds && ` - Descanso: ${exercise.rest_time_seconds}s`}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
+                          <div className="space-y-8">
+                            {session.session_exercises?.map((exerciseSession) => (
+                              <div 
+                                key={exerciseSession.id}
+                                className="bg-gray-50 rounded-lg p-6 transition-all hover:shadow-md"
+                              >
+                                <div className="flex flex-col md:flex-row gap-6">
+                                  {exerciseSession.exercise?.gif_url && (
+                                    <div className="w-full md:w-64 h-64 rounded-lg overflow-hidden bg-white shadow-inner">
+                                      <img 
+                                        src={exerciseSession.exercise.gif_url} 
+                                        alt={exerciseSession.exercise.name}
+                                        className="w-full h-full object-cover"
+                                        loading="lazy"
+                                      />
+                                    </div>
+                                  )}
+                                  <div className="flex-grow">
+                                    <h6 className="text-lg font-medium text-gray-900 mb-4">
+                                      {exerciseSession.exercise?.name}
+                                    </h6>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                      <div className="bg-white p-4 rounded-lg shadow-sm">
+                                        <span className="text-sm text-gray-500 block mb-1">Séries</span>
+                                        <span className="text-lg font-semibold text-primary-600">
+                                          {exerciseSession.sets}
+                                        </span>
+                                      </div>
+                                      <div className="bg-white p-4 rounded-lg shadow-sm">
+                                        <span className="text-sm text-gray-500 block mb-1">Repetições</span>
+                                        <span className="text-lg font-semibold text-primary-600">
+                                          {exerciseSession.reps}
+                                        </span>
+                                      </div>
+                                      <div className="bg-white p-4 rounded-lg shadow-sm">
+                                        <span className="text-sm text-gray-500 block mb-1">
+                                          <Clock className="w-4 h-4 inline-block mr-1" />
+                                          Descanso
+                                        </span>
+                                        <span className="text-lg font-semibold text-primary-600">
+                                          {exerciseSession.rest_time_seconds}s
+                                        </span>
+                                      </div>
+                                    </div>
+                                    
+                                    {exerciseSession.exercise?.description && (
+                                      <p className="text-sm text-gray-500 mt-4">
+                                        {exerciseSession.exercise.description}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
 
-                        {session.cooldown_description && (
-                          <div className="mt-3">
-                            <p className="text-sm font-medium text-gray-700">Desaquecimento:</p>
+                          <div className="bg-primary-50 p-4 rounded-lg mt-6">
+                            <h5 className="font-medium text-primary-700 mb-2">Volta à calma</h5>
                             <p className="text-sm text-gray-600">{session.cooldown_description}</p>
                           </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </AccordionContent>
-              </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </CardContent>
+              </AccordionContent>
             </Card>
           </AccordionItem>
         </Accordion>
