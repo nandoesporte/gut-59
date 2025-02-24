@@ -1,10 +1,15 @@
-
 import { useEffect, useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { Lock, Unlock } from "lucide-react";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface DailyTip {
   id: number;
@@ -21,10 +26,10 @@ interface Tip {
 }
 
 const themes = [
-  { name: 'saúde', color: 'bg-rose-100 hover:bg-rose-200' },
-  { name: 'produtividade', color: 'bg-blue-100 hover:bg-blue-200' },
-  { name: 'bem-estar', color: 'bg-green-100 hover:bg-green-200' },
-  { name: 'curiosidades', color: 'bg-purple-100 hover:bg-purple-200' },
+  { name: 'saúde', color: 'bg-cyan-50 hover:bg-cyan-100 border-cyan-200' },
+  { name: 'produtividade', color: 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200' },
+  { name: 'bem-estar', color: 'bg-teal-50 hover:bg-teal-100 border-teal-200' },
+  { name: 'curiosidades', color: 'bg-slate-50 hover:bg-slate-100 border-slate-200' },
 ];
 
 const defaultTips = Array.from({ length: 30 }, (_, i) => ({
@@ -36,16 +41,15 @@ const defaultTips = Array.from({ length: 30 }, (_, i) => ({
 const TipsCalendar = () => {
   const [tips, setTips] = useState<Tip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedTip, setSelectedTip] = useState<Tip | null>(null);
 
   useEffect(() => {
     const loadTips = async () => {
       try {
-        // Tenta carregar do localStorage primeiro
         const savedTips = localStorage.getItem('monthlyTips');
         const currentMonth = new Date().getMonth();
         const savedMonth = localStorage.getItem('tipsMonth');
 
-        // Se não houver dicas salvas ou for um novo mês, gera novas dicas
         if (!savedTips || savedMonth !== currentMonth.toString()) {
           const { data, error } = await supabase
             .from('daily_tips')
@@ -76,7 +80,6 @@ const TipsCalendar = () => {
         console.error('Erro ao carregar dicas:', error);
         toast.error('Erro ao carregar as dicas do dia');
         
-        // Fallback para dicas padrão em caso de erro
         const currentDay = new Date().getDate();
         const fallbackTips = defaultTips.map((tip, index) => ({
           ...tip,
@@ -92,7 +95,6 @@ const TipsCalendar = () => {
   }, []);
 
   useEffect(() => {
-    // Atualiza o localStorage sempre que as dicas mudarem
     if (tips.length > 0) {
       localStorage.setItem('monthlyTips', JSON.stringify(tips));
     }
@@ -100,6 +102,12 @@ const TipsCalendar = () => {
 
   const getThemeColor = (theme: string) => {
     return themes.find(t => t.name === theme)?.color || themes[0].color;
+  };
+
+  const handleTipClick = (tip: Tip) => {
+    if (tip.isUnlocked) {
+      setSelectedTip(tip);
+    }
   };
 
   if (isLoading) {
@@ -111,8 +119,8 @@ const TipsCalendar = () => {
   }
 
   return (
-    <div className="w-full px-4 py-6 bg-white rounded-lg shadow-sm">
-      <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">
+    <div className="w-full px-4 py-6 bg-gradient-to-br from-slate-50 to-white rounded-lg shadow-sm border border-slate-200">
+      <h2 className="text-2xl font-bold text-center mb-6 text-slate-800">
         Dicas Diárias do Mês
       </h2>
       <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-7 lg:grid-cols-10 gap-2">
@@ -124,21 +132,22 @@ const TipsCalendar = () => {
             transition={{ duration: 0.3 }}
           >
             <Card
+              onClick={() => handleTipClick(tip)}
               className={`relative w-full aspect-square ${getThemeColor(tip.theme)} 
-                transition-all duration-300 cursor-pointer overflow-hidden group
-                ${tip.isUnlocked ? 'shadow-md hover:shadow-lg' : 'opacity-80 shadow'}`}
+                transition-all duration-300 cursor-pointer overflow-hidden group border
+                ${tip.isUnlocked ? 'shadow-sm hover:shadow-md' : 'opacity-80'}`}
             >
               <div className="absolute inset-0 p-2 flex flex-col items-center justify-center">
-                <span className="text-xs font-semibold mb-1">{tip.id}</span>
+                <span className="text-xs font-semibold mb-1 text-slate-700">Dia {tip.id}</span>
                 {!tip.isUnlocked ? (
-                  <Lock className="w-4 h-4 text-gray-600" />
+                  <Lock className="w-4 h-4 text-slate-500" />
                 ) : (
-                  <Unlock className="w-4 h-4 text-green-600" />
+                  <Unlock className="w-4 h-4 text-teal-600" />
                 )}
                 {tip.isUnlocked && (
-                  <div className="absolute inset-0 bg-white/95 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-2 flex items-center justify-center">
-                    <p className="text-xs leading-tight text-gray-700 text-center">
-                      {tip.content}
+                  <div className="absolute inset-0 bg-gradient-to-br from-white/90 to-white/95 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-2 flex items-center justify-center">
+                    <p className="text-xs font-medium text-slate-600">
+                      Clique para ver a dica
                     </p>
                   </div>
                 )}
@@ -147,6 +156,26 @@ const TipsCalendar = () => {
           </motion.div>
         ))}
       </div>
+
+      <Dialog open={!!selectedTip} onOpenChange={() => setSelectedTip(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <span className="text-lg text-slate-800">
+                Dica do Dia {selectedTip?.id}
+              </span>
+              <span className="text-sm text-slate-500 italic">
+                ({selectedTip?.theme})
+              </span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="p-4 bg-gradient-to-br from-slate-50 to-white rounded-lg border border-slate-200">
+            <p className="text-slate-700 leading-relaxed">
+              {selectedTip?.content}
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
