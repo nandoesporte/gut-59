@@ -2,7 +2,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { FileText, Loader2, Trash2 } from "lucide-react";
-import { MealPlanItem } from "../types/meal-plan-history";
+import { MealPlanItem, weekDayNames } from "../types/meal-plan-history";
 import { 
   Accordion,
   AccordionContent,
@@ -22,16 +22,6 @@ interface MealPlanCardProps {
   isGeneratingPDF: boolean;
 }
 
-const dayNameMap: Record<string, string> = {
-  monday: "Segunda-feira",
-  tuesday: "Terça-feira",
-  wednesday: "Quarta-feira",
-  thursday: "Quinta-feira",
-  friday: "Sexta-feira",
-  saturday: "Sábado",
-  sunday: "Domingo"
-};
-
 export const MealPlanCard = ({
   plan,
   onDelete,
@@ -40,7 +30,7 @@ export const MealPlanCard = ({
   isGeneratingPDF,
 }: MealPlanCardProps) => {
   const renderDayPlan = (dayKey: string) => {
-    const dayPlan = plan.meal_plan.weeklyPlan[dayKey as keyof typeof plan.meal_plan.weeklyPlan];
+    const dayPlan = plan.plan_data.weeklyPlan[dayKey as keyof typeof plan.plan_data.weeklyPlan];
     if (!dayPlan) return null;
 
     return (
@@ -141,60 +131,60 @@ export const MealPlanCard = ({
           <CardContent className="p-6">
             <Tabs defaultValue="monday">
               <TabsList className="mb-6">
-                {Object.entries(dayNameMap).map(([day, dayName]) => (
+                {Object.entries(weekDayNames).map(([day, dayName]) => (
                   <TabsTrigger key={day} value={day}>
                     {dayName}
                   </TabsTrigger>
                 ))}
               </TabsList>
 
-              {Object.keys(dayNameMap).map(day => (
+              {Object.keys(weekDayNames).map(day => (
                 <TabsContent key={day} value={day}>
                   {renderDayPlan(day)}
                 </TabsContent>
               ))}
             </Tabs>
 
-            {plan.meal_plan.weeklyTotals && (
+            {plan.plan_data.weeklyTotals && (
               <Card className="p-6 mt-8 bg-primary/5">
                 <h3 className="text-lg font-semibold mb-4">Médias Semanais</h3>
                 <div className="grid grid-cols-5 gap-4 text-center">
                   <div>
                     <p className="text-sm text-gray-500">Calorias</p>
                     <p className="font-semibold">
-                      {Math.round(plan.meal_plan.weeklyTotals.averageCalories)} kcal
+                      {Math.round(plan.plan_data.weeklyTotals.averageCalories)} kcal
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Proteínas</p>
                     <p className="font-semibold">
-                      {Math.round(plan.meal_plan.weeklyTotals.averageProtein)}g
+                      {Math.round(plan.plan_data.weeklyTotals.averageProtein)}g
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Carboidratos</p>
                     <p className="font-semibold">
-                      {Math.round(plan.meal_plan.weeklyTotals.averageCarbs)}g
+                      {Math.round(plan.plan_data.weeklyTotals.averageCarbs)}g
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Gorduras</p>
                     <p className="font-semibold">
-                      {Math.round(plan.meal_plan.weeklyTotals.averageFats)}g
+                      {Math.round(plan.plan_data.weeklyTotals.averageFats)}g
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Fibras</p>
                     <p className="font-semibold">
-                      {Math.round(plan.meal_plan.weeklyTotals.averageFiber)}g
+                      {Math.round(plan.plan_data.weeklyTotals.averageFiber)}g
                     </p>
                   </div>
                 </div>
               </Card>
             )}
 
-            {plan.meal_plan.recommendations && (
-              <Recommendations recommendations={plan.meal_plan.recommendations} />
+            {plan.plan_data.recommendations && (
+              <Recommendations recommendations={plan.plan_data.recommendations} />
             )}
           </CardContent>
         </AccordionContent>

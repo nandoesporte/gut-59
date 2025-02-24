@@ -4,8 +4,9 @@ import { MealPlan } from "../types";
 export interface MealPlanItem {
   id: string;
   created_at: string;
-  plan_data: WeeklyMealPlan;
-  calories: number;
+  user_id: string;
+  plan_data: MealPlan;
+  active: boolean;
 }
 
 export interface WeeklyMealPlan {
@@ -21,12 +22,6 @@ export interface WeeklyMealPlan {
     preworkout: string;
     postworkout: string;
   };
-}
-
-export interface MealPlanHistoryProps {
-  isLoading: boolean;
-  historyPlans?: MealPlanItem[];
-  onRefresh: () => Promise<void>;
 }
 
 export const weekDayNames = {
