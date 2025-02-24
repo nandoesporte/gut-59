@@ -329,6 +329,41 @@ export type Database = {
         }
         Relationships: []
       }
+      fit_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string | null
+          id: string
+          transaction_type: Database["public"]["Enums"]["transaction_type"]
+          wallet_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          transaction_type: Database["public"]["Enums"]["transaction_type"]
+          wallet_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          transaction_type?: Database["public"]["Enums"]["transaction_type"]
+          wallet_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fit_transactions_wallet_id_fkey"
+            columns: ["wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       food_groups: {
         Row: {
           id: number
@@ -1740,6 +1775,30 @@ export type Database = {
         }
         Relationships: []
       }
+      wallets: {
+        Row: {
+          balance: number
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          balance?: number
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          balance?: number
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       water_intake: {
         Row: {
           amount_ml: number | null
@@ -2032,6 +2091,13 @@ export type Database = {
       plan_type: "workout" | "nutrition" | "rehabilitation"
       rehab_goal: "pain_relief" | "mobility" | "strength" | "return_to_sport"
       training_goal: "lose_weight" | "maintain" | "gain_mass"
+      transaction_type:
+        | "daily_tip"
+        | "water_intake"
+        | "steps"
+        | "meal_plan"
+        | "workout_plan"
+        | "physio_plan"
       workout_goal: "lose_weight" | "maintain" | "gain_mass"
     }
     CompositeTypes: {
