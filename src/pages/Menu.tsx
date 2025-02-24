@@ -10,6 +10,7 @@ import { MenuHeader } from "@/components/menu/MenuHeader";
 import { useMenuController } from "@/components/menu/MenuController";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import type { DietaryPreferences } from "@/components/menu/types";
 
 const Menu = () => {
   const {
@@ -89,20 +90,18 @@ const Menu = () => {
       case 3:
         return (
           <DietaryPreferencesForm
-            onSubmit={(preferences) => {
-              return new Promise<void>(async (resolve, reject) => {
-                try {
-                  const success = await handleDietaryPreferences(preferences);
-                  if (success) {
-                    setCurrentStep(4);
-                  }
-                  resolve();
-                } catch (error) {
-                  console.error('Erro ao gerar plano:', error);
-                  toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
-                  reject(error);
+            onSubmit={async (preferences: DietaryPreferences): Promise<void> => {
+              try {
+                const success = await handleDietaryPreferences(preferences);
+                if (success) {
+                  setCurrentStep(4);
                 }
-              });
+                return Promise.resolve();
+              } catch (error) {
+                console.error('Erro ao gerar plano:', error);
+                toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
+                throw error;
+              }
             }}
             onBack={() => setCurrentStep(2)}
           />
