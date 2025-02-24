@@ -4,15 +4,16 @@ import { Motion } from '@capacitor/motion';
 import { Capacitor } from '@capacitor/core';
 import { toast } from "sonner";
 
-// Update the type declaration to extend the window interface instead
 declare global {
   interface Window {
-    DeviceMotionEvent: {
+    DeviceMotionEvent: DeviceMotionEventConstructor & {
       requestPermission?: () => Promise<'granted' | 'denied'>;
-    } & {
-      new(type: string, eventInitDict?: DeviceMotionEventInit): DeviceMotionEvent;
-      prototype: DeviceMotionEvent;
     };
+  }
+  
+  interface DeviceMotionEventConstructor {
+    new(type: string, eventInitDict?: DeviceMotionEventInit): DeviceMotionEvent;
+    prototype: DeviceMotionEvent;
   }
 }
 
