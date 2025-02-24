@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from 'react';
 import { Motion, MotionEventResult } from '@capacitor/motion';
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,7 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { Activity, LineChart, User, Loader } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Platform } from '@capacitor/core';
+import { Capacitor } from '@capacitor/core';
 
 interface StepData {
   steps: number;
@@ -74,7 +73,7 @@ const StepCounter = () => {
       console.log(isReconnecting ? "Tentando reconectar..." : "Iniciando acelerômetro...");
 
       // Primeiro, vamos verificar se o dispositivo possui acelerômetro
-      const platform = Platform.getPlatform();
+      const platform = Capacitor.getPlatform();
       console.log("Plataforma:", platform);
 
       if (platform === 'web') {
