@@ -88,6 +88,7 @@ const Menu = () => {
                 if (success) {
                   setCurrentStep(4);
                 }
+                return Promise.resolve();
               } catch (error) {
                 console.error('Erro ao gerar plano:', error);
                 toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
