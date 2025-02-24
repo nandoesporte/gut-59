@@ -4,7 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useWallet } from '@/hooks/useWallet';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Coins, ArrowUpCircle, CalendarDays, Droplets, Footprints } from 'lucide-react';
+import { Coins, ArrowUpCircle, CalendarDays, Droplets, Footprints, QrCode, Send } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import QRCode from 'qrcode';
 
 const transactionTypeInfo = {
   daily_tip: {
@@ -36,11 +40,44 @@ const transactionTypeInfo = {
     label: 'Plano de Fisioterapia',
     icon: ArrowUpCircle,
     color: 'text-indigo-500'
+  },
+  transfer: {
+    label: 'Transferência',
+    icon: Send,
+    color: 'text-orange-500'
   }
 };
 
 const Wallet = () => {
-  const { wallet, transactions, isLoading } = useWallet();
+  const { wallet, transactions, isLoading, createTransferQRCode, redeemQRCode } = useWallet();
+  const [showTransferDialog, setShowTransferDialog] = useState(false);
+  const [showScanDialog, setShowScanDialog] = useState(false);
+  const [transferAmount, setTransferAmount] = useState('');
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
+
+  const handleCreateQRCode = async () => {
+    const amount = parseInt(transferAmount);
+    if (isNaN(amount) || amount <= 0) {
+      return;
+    }
+
+    try {
+      const qrCode = await createTransferQRCode({ amount });
+      const qrCodeUrl = await QRCode.toDataURL(qrCode.id);
+      setQrCodeDataUrl(qrCodeUrl);
+    } catch (error) {
+      console.error('Error creating QR code:', error);
+    }
+  };
+
+  const handleScanQRCode = async (qrCodeId: string) => {
+    try {
+      await redeemQRCode({ qrCodeId });
+      setShowScanDialog(false);
+    } catch (error) {
+      console.error('Error redeeming QR code:', error);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -58,6 +95,22 @@ const Wallet = () => {
             <Coins className="w-12 h-12 mx-auto mb-2" />
             <h1 className="text-3xl font-bold mb-2">Seu Saldo</h1>
             <p className="text-4xl font-bold">{wallet?.balance || 0} FITs</p>
+            <div className="flex justify-center gap-4 mt-4">
+              <Button 
+                variant="secondary" 
+                onClick={() => setShowTransferDialog(true)}
+              >
+                <QrCode className="w-4 h-4 mr-2" />
+                Criar QR Code
+              </Button>
+              <Button 
+                variant="secondary"
+                onClick={() => setShowScanDialog(true)}
+              >
+                <QrCode className="w-4 h-4 mr-2" />
+                Ler QR Code
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -98,6 +151,53 @@ const Wallet = () => {
           })}
         </CardContent>
       </Card>
+
+      {/* Transfer Dialog */}
+      <Dialog open={showTransferDialog} onOpenChange={setShowTransferDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Criar QR Code para Transferência</DialogTitle>
+            <DialogDescription>
+              Digite a quantidade de FITs que deseja transferir
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              type="number"
+              placeholder="Quantidade de FITs"
+              value={transferAmount}
+              onChange={(e) => setTransferAmount(e.target.value)}
+            />
+            <Button onClick={handleCreateQRCode} className="w-full">
+              Gerar QR Code
+            </Button>
+            {qrCodeDataUrl && (
+              <div className="flex justify-center">
+                <img src={qrCodeDataUrl} alt="QR Code" className="w-48 h-48" />
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Scan Dialog */}
+      <Dialog open={showScanDialog} onOpenChange={setShowScanDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ler QR Code</DialogTitle>
+            <DialogDescription>
+              Digite o código do QR Code para receber os FITs
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              type="text"
+              placeholder="Código do QR Code"
+              onChange={(e) => handleScanQRCode(e.target.value)}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
