@@ -52,13 +52,18 @@ const Menu = () => {
           <CalorieCalculatorStep
             formData={formData}
             onInputChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
-            onCalculate={async (): Promise<void> => {
-              const success = await handleCalculateCalories();
-              if (!success) {
-                throw new Error("Falha ao calcular calorias");
+            onCalculate={async () => {
+              try {
+                const success = await handleCalculateCalories();
+                if (success) {
+                  setCurrentStep(2);
+                } else {
+                  toast.error("Falha ao calcular calorias");
+                }
+              } catch (error) {
+                toast.error("Erro ao calcular calorias. Tente novamente.");
+                console.error(error);
               }
-              setCurrentStep(2);
-              return Promise.resolve();
             }}
             calorieNeeds={calorieNeeds}
           />
@@ -83,15 +88,18 @@ const Menu = () => {
       case 3:
         return (
           <DietaryPreferencesForm
-            onSubmit={async (preferences: DietaryPreferences): Promise<void> => {
-              const success = await handleDietaryPreferences(preferences);
-              if (success) {
-                setCurrentStep(4);
-                return Promise.resolve();
+            onSubmit={async (preferences: DietaryPreferences) => {
+              try {
+                const success = await handleDietaryPreferences(preferences);
+                if (success) {
+                  setCurrentStep(4);
+                } else {
+                  toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
+                }
+              } catch (error) {
+                toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
+                console.error('Erro ao gerar plano:', error);
               }
-              console.error('Erro ao gerar plano');
-              toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
-              return Promise.reject(new Error("Falha ao gerar plano alimentar"));
             }}
             onBack={() => setCurrentStep(2)}
           />
@@ -101,9 +109,13 @@ const Menu = () => {
           <div className="space-y-6">
             <MealPlanDisplay 
               mealPlan={mealPlan} 
-              onRefresh={async (): Promise<void> => {
-                setCurrentStep(3);
-                return Promise.resolve();
+              onRefresh={async () => {
+                try {
+                  setCurrentStep(3);
+                } catch (error) {
+                  console.error('Erro ao atualizar cardápio:', error);
+                  toast.error("Erro ao atualizar o cardápio");
+                }
               }}
             />
           </div>
