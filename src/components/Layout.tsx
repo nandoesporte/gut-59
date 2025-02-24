@@ -45,38 +45,14 @@ const Layout = ({ children }: LayoutProps) => {
           console.log('Notificação de pagamento recebida:', payload);
           
           if (payload.new.status === 'completed') {
-            // Buscar contagem de gerações atual
-            const checkGenerationCount = async () => {
-              const { data: countData } = await supabase
-                .from('plan_generation_counts')
-                .select(`${payload.new.plan_type}_count`)
-                .eq('user_id', user.id)
-                .single();
-
-              const currentCount = countData ? countData[`${payload.new.plan_type}_count`] || 0 : 0;
-              
-              if (currentCount >= 3) {
-                // Se já usou as 3 gerações, mostrar aviso
-                toast.warning("Você atingiu o limite de gerações do plano. Um novo pagamento será necessário.", {
-                  duration: 6000,
-                  style: {
-                    background: '#1A1F2C',
-                    color: '#FFFFFF',
-                  },
-                });
-              } else {
-                // Se ainda tem gerações disponíveis, mostrar sucesso
-                toast.success("Pagamento confirmado! Você tem direito a 3 gerações do plano.", {
-                  duration: 5000,
-                  style: {
-                    background: '#1A1F2C',
-                    color: '#FFFFFF',
-                  },
-                });
-              }
-            };
-
-            checkGenerationCount();
+            // Mostrar toast de sucesso
+            toast.success("Pagamento confirmado! Você tem direito a 3 gerações do plano.", {
+              duration: 5000,
+              style: {
+                background: '#1A1F2C',
+                color: '#FFFFFF',
+              },
+            });
 
             // Definir mensagem e mostrar diálogo de confirmação
             setPaymentMessage("Seu plano foi liberado! Você tem direito a 3 gerações.");
