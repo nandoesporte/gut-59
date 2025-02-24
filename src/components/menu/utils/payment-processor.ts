@@ -22,6 +22,7 @@ export const createPaymentPreference = async (
     .from('payment_settings')
     .select('is_active')
     .eq('plan_type', planType)
+    .eq('is_active', true)
     .single();
 
   if (settingsError) {
@@ -40,9 +41,12 @@ export const createPaymentPreference = async (
     .select('payment_required')
     .eq('user_id', userData.user.id)
     .eq('plan_type', planType)
-    .maybeSingle();
+    .eq('is_active', true)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
 
-  if (accessError) {
+  if (accessError && accessError.code !== 'PGRST116') {
     console.error('Erro ao verificar acesso do usuário:', accessError);
     throw new Error('Erro ao verificar acesso do usuário');
   }
@@ -197,4 +201,3 @@ export const checkPaymentStatus = async (
     return false;
   }
 };
-
