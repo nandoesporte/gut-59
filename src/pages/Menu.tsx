@@ -52,12 +52,13 @@ const Menu = () => {
           <CalorieCalculatorStep
             formData={formData}
             onInputChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
-            onCalculate={async () => {
-              const success = await handleCalculateCalories();
-              if (!success) {
-                throw new Error("Falha ao calcular calorias");
-              }
-              setCurrentStep(2);
+            onCalculate={(): Promise<void> => {
+              return handleCalculateCalories().then(success => {
+                if (!success) {
+                  throw new Error("Falha ao calcular calorias");
+                }
+                setCurrentStep(2);
+              });
             }}
             calorieNeeds={calorieNeeds}
           />
@@ -108,7 +109,13 @@ const Menu = () => {
           </div>
         );
       default:
-        return null;
+        return (
+          <div className="space-y-6">
+            <MenuHeader onStart={() => setCurrentStep(1.5)} />
+            <MealPlanHistory />
+            <InitialMenuContent onStartDiet={() => setCurrentStep(1.5)} />
+          </div>
+        );
     }
   };
 
