@@ -102,6 +102,27 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_tips: {
+        Row: {
+          content: string
+          created_at: string
+          id: number
+          theme: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: number
+          theme?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: number
+          theme?: string | null
+        }
+        Relationships: []
+      }
       dietary_preferences: {
         Row: {
           allergies: string[] | null
