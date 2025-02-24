@@ -58,6 +58,7 @@ const Menu = () => {
                 throw new Error("Falha ao calcular calorias");
               }
               setCurrentStep(2);
+              return Promise.resolve();
             }}
             calorieNeeds={calorieNeeds}
           />
@@ -86,11 +87,11 @@ const Menu = () => {
               const success = await handleDietaryPreferences(preferences);
               if (success) {
                 setCurrentStep(4);
-                return;
+                return Promise.resolve();
               }
               console.error('Erro ao gerar plano');
               toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
-              throw new Error("Falha ao gerar plano alimentar");
+              return Promise.reject(new Error("Falha ao gerar plano alimentar"));
             }}
             onBack={() => setCurrentStep(2)}
           />
@@ -100,7 +101,10 @@ const Menu = () => {
           <div className="space-y-6">
             <MealPlanDisplay 
               mealPlan={mealPlan} 
-              onRefresh={() => setCurrentStep(3)}
+              onRefresh={async (): Promise<void> => {
+                setCurrentStep(3);
+                return Promise.resolve();
+              }}
             />
           </div>
         ) : (
