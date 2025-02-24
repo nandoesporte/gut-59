@@ -52,12 +52,13 @@ const Menu = () => {
           <CalorieCalculatorStep
             formData={formData}
             onInputChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
-            onCalculate={async () => {
+            onCalculate={async (): Promise<void> => {
               const success = await handleCalculateCalories();
               if (!success) {
                 throw new Error("Falha ao calcular calorias");
               }
               setCurrentStep(2);
+              return Promise.resolve();
             }}
             calorieNeeds={calorieNeeds}
           />
@@ -82,13 +83,12 @@ const Menu = () => {
       case 3:
         return (
           <DietaryPreferencesForm
-            onSubmit={async (preferences: DietaryPreferences): Promise<void> => {
+            onSubmit={async (preferences: DietaryPreferences) => {
               try {
                 const success = await handleDietaryPreferences(preferences);
                 if (success) {
                   setCurrentStep(4);
                 }
-                return Promise.resolve();
               } catch (error) {
                 console.error('Erro ao gerar plano:', error);
                 toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
