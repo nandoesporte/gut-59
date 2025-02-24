@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import FoodDiary from "@/components/FoodDiary";
 import StepCounter from "@/components/StepCounter";
+import TipsCalendar from "@/components/TipsCalendar";
 import { useNavigate } from "react-router-dom";
 
 const Index = () => {
@@ -64,6 +65,9 @@ const Index = () => {
 
   return (
     <div className="space-y-8 flex flex-col items-center">
+      <div className="w-full">
+        <TipsCalendar />
+      </div>
       <div className="w-full">
         <Profile />
       </div>
