@@ -57,12 +57,10 @@ const Menu = () => {
                 const success = await handleCalculateCalories();
                 if (success) {
                   setCurrentStep(2);
-                } else {
-                  toast.error("Falha ao calcular calorias");
                 }
               } catch (error) {
+                console.error('Erro ao calcular calorias:', error);
                 toast.error("Erro ao calcular calorias. Tente novamente.");
-                console.error(error);
               }
             }}
             calorieNeeds={calorieNeeds}
@@ -93,12 +91,10 @@ const Menu = () => {
                 const success = await handleDietaryPreferences(preferences);
                 if (success) {
                   setCurrentStep(4);
-                } else {
-                  toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
                 }
               } catch (error) {
-                toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
                 console.error('Erro ao gerar plano:', error);
+                toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
               }
             }}
             onBack={() => setCurrentStep(2)}
@@ -106,19 +102,17 @@ const Menu = () => {
         );
       case 4:
         return mealPlan ? (
-          <div className="space-y-6">
-            <MealPlanDisplay 
-              mealPlan={mealPlan} 
-              onRefresh={async () => {
-                try {
-                  setCurrentStep(3);
-                } catch (error) {
-                  console.error('Erro ao atualizar cardápio:', error);
-                  toast.error("Erro ao atualizar o cardápio");
-                }
-              }}
-            />
-          </div>
+          <MealPlanDisplay 
+            mealPlan={mealPlan} 
+            onRefresh={() => {
+              try {
+                setCurrentStep(3);
+              } catch (error) {
+                console.error('Erro ao atualizar cardápio:', error);
+                toast.error("Erro ao atualizar o cardápio");
+              }
+            }}
+          />
         ) : (
           <div className="flex justify-center items-center min-h-[400px]">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
