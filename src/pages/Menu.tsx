@@ -57,7 +57,7 @@ const Menu = () => {
               <CalorieCalculatorStep
                 formData={formData}
                 onInputChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
-                onCalculate={async () => {
+                onCalculate={async (): Promise<void> => {
                   try {
                     const success = await handleCalculateCalories();
                     if (success) {
@@ -98,7 +98,7 @@ const Menu = () => {
               <div className={currentStep === 3 ? "" : "opacity-50"}>
                 <h2 className="text-xl font-semibold mb-4">3. Preferências Alimentares</h2>
                 <DietaryPreferencesForm
-                  onSubmit={async (preferences: DietaryPreferences) => {
+                  onSubmit={async (preferences: DietaryPreferences): Promise<void> => {
                     try {
                       const success = await handleDietaryPreferences(preferences);
                       if (success) {
@@ -119,7 +119,9 @@ const Menu = () => {
                 <h2 className="text-xl font-semibold mb-4">4. Seu Plano Alimentar</h2>
                 <MealPlanDisplay 
                   mealPlan={mealPlan} 
-                  onRefresh={() => setCurrentStep(3)}
+                  onRefresh={async (): Promise<void> => {
+                    setCurrentStep(3);
+                  }}
                 />
               </div>
             )}
