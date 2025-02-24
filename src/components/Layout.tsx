@@ -45,22 +45,41 @@ const Layout = ({ children }: LayoutProps) => {
           console.log('Notificação de pagamento recebida:', payload);
           
           if (payload.new.status === 'completed') {
-            // Toasts para diferentes tipos de plano
-            const planMessages = {
-              nutrition: "Seu plano nutricional foi liberado!",
-              workout: "Seu plano de treino foi liberado!",
-              rehabilitation: "Seu plano de reabilitação foi liberado!"
-            };
-            
-            const message = planMessages[payload.new.plan_type] || "Seu plano foi liberado!";
-            
-            toast.success("Pagamento confirmado!", {
-              description: message,
-              duration: 5000,
-            });
+            // Buscar contagem de gerações atual
+            const checkGenerationCount = async () => {
+              const { data: countData } = await supabase
+                .from('plan_generation_counts')
+                .select(`${payload.new.plan_type}_count`)
+                .eq('user_id', user.id)
+                .single();
 
-            // Atualizar estado para mostrar diálogo de confirmação
-            setPaymentMessage(message);
+              const currentCount = countData ? countData[`${payload.new.plan_type}_count`] || 0 : 0;
+              
+              if (currentCount >= 3) {
+                // Se já usou as 3 gerações, mostrar aviso
+                toast.warning("Você atingiu o limite de gerações do plano. Um novo pagamento será necessário.", {
+                  duration: 6000,
+                  style: {
+                    background: '#1A1F2C',
+                    color: '#FFFFFF',
+                  },
+                });
+              } else {
+                // Se ainda tem gerações disponíveis, mostrar sucesso
+                toast.success("Pagamento confirmado! Você tem direito a 3 gerações do plano.", {
+                  duration: 5000,
+                  style: {
+                    background: '#1A1F2C',
+                    color: '#FFFFFF',
+                  },
+                });
+              }
+            };
+
+            checkGenerationCount();
+
+            // Definir mensagem e mostrar diálogo de confirmação
+            setPaymentMessage("Seu plano foi liberado! Você tem direito a 3 gerações.");
             setShowPaymentConfirmation(true);
 
             // Reproduzir som de notificação
