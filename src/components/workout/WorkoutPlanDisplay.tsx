@@ -38,7 +38,10 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
   const fetchProgressData = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        toast.error("Usuário não autenticado");
+        return;
+      }
 
       const { data, error } = await supabase
         .from('workout_progress')
@@ -73,24 +76,44 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         toast.error("Usuário não autenticado");
+        setLoading(false);
         return;
       }
 
-      // Check plan access and increment generation count
-      const { data: accessData, error: accessError } = await supabase.functions.invoke('grant-plan-access', {
-        body: { 
-          userId: user.id, 
-          planType: 'workout',
-          incrementCount: true // This tells the function to increment the count
+      // Verificar acesso ao plano primeiro
+      const { data: accessData, error: accessError } = await supabase
+        .from('plan_access')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('plan_type', 'workout')
+        .eq('is_active', true)
+        .single();
+
+      if (accessError && accessError.code !== 'PGRST116') { // Ignora erro de não encontrado
+        console.error("Erro ao verificar acesso:", accessError);
+        throw new Error("Erro ao verificar acesso ao plano");
+      }
+
+      if (!accessData) {
+        // Se não tem acesso, tenta conceder via edge function
+        const { data: grantData, error: grantError } = await supabase.functions.invoke('grant-plan-access', {
+          body: { 
+            userId: user.id, 
+            planType: 'workout',
+            incrementCount: true
+          }
+        });
+
+        if (grantError) {
+          console.error("Erro ao conceder acesso:", grantError);
+          throw grantError;
         }
-      });
 
-      if (accessError) throw accessError;
-
-      if (accessData?.requiresPayment) {
-        toast.error(accessData.message || "Pagamento necessário para gerar novo plano");
-        setLoading(false);
-        return;
+        if (grantData?.requiresPayment) {
+          toast.error(grantData.message || "Pagamento necessário para gerar novo plano");
+          setLoading(false);
+          return;
+        }
       }
 
       console.log("Chamando edge function com:", { preferences, userId: user.id });
@@ -110,13 +133,7 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
 
       console.log("Plano gerado:", response);
       setWorkoutPlan(response);
-      
-      if (accessData?.remainingGenerations !== undefined) {
-        const plural = accessData.remainingGenerations === 1 ? "geração" : "gerações";
-        toast.success(`Plano gerado com sucesso! Você ainda tem ${accessData.remainingGenerations} ${plural} disponível${accessData.remainingGenerations === 1 ? '' : 'is'}.`);
-      } else {
-        toast.success("Plano de treino gerado com sucesso!");
-      }
+      toast.success("Plano de treino gerado com sucesso!");
     } catch (error: any) {
       console.error("Erro ao gerar plano:", error);
       toast.error(error.message || "Erro ao gerar plano de treino. Por favor, tente novamente.");
