@@ -57,6 +57,7 @@ const Menu = () => {
                   throw new Error("Falha ao calcular calorias");
                 }
                 setCurrentStep(2);
+                return Promise.resolve();
               });
             }}
             calorieNeeds={calorieNeeds}
