@@ -13,7 +13,6 @@ const Workout = () => {
   const [preferences, setPreferences] = useState<WorkoutPreferences | null>(null);
   const [historyPlans, setHistoryPlans] = useState<WorkoutPlan[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
-  const [paymentRequired, setPaymentRequired] = useState(true);
 
   const fetchWorkoutHistory = async () => {
     try {
@@ -70,7 +69,7 @@ const Workout = () => {
         <div className="max-w-4xl mx-auto space-y-8">
           {!preferences ? (
             <div className="transform transition-all duration-500 hover:scale-[1.01]">
-              <PreferencesForm onSubmit={setPreferences} paymentRequired={paymentRequired} />
+              <PreferencesForm onSubmit={setPreferences} />
             </div>
           ) : (
             <WorkoutPlanDisplay 
