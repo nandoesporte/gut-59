@@ -29,120 +29,108 @@ const Menu = () => {
     setFormData,
   } = useMenuController();
 
-  const renderStep = () => {
-    if (loading && currentStep !== 1.5) {
-      return (
-        <div className="flex justify-center items-center min-h-[400px]">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        </div>
-      );
-    }
-
-    switch (currentStep) {
-      case 1:
-        return (
-          <div className="space-y-6">
-            <MenuHeader onStart={() => setCurrentStep(1.5)} />
-            <MealPlanHistory />
-            <InitialMenuContent onStartDiet={() => setCurrentStep(1.5)} />
-          </div>
-        );
-      case 1.5:
-        return (
-          <CalorieCalculatorStep
-            formData={formData}
-            onInputChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
-            onCalculate={async () => {
-              try {
-                const success = await handleCalculateCalories();
-                if (success) {
-                  setCurrentStep(2);
-                }
-              } catch (error) {
-                console.error('Erro ao calcular calorias:', error);
-                toast.error("Erro ao calcular calorias. Tente novamente.");
-              }
-            }}
-            calorieNeeds={calorieNeeds}
-          />
-        );
-      case 2:
-        return (
-          <FoodSelector
-            protocolFoods={protocolFoods}
-            selectedFoods={selectedFoods}
-            onFoodSelection={handleFoodSelection}
-            totalCalories={totalCalories}
-            onBack={() => setCurrentStep(1.5)}
-            onConfirm={() => {
-              if (selectedFoods.length === 0) {
-                toast.error("Selecione pelo menos um alimento");
-                return;
-              }
-              setCurrentStep(3);
-            }}
-          />
-        );
-      case 3:
-        return (
-          <DietaryPreferencesForm
-            onSubmit={async (preferences: DietaryPreferences) => {
-              try {
-                const result = await handleDietaryPreferences(preferences).catch(error => {
-                  console.error('Erro detalhado:', error);
-                  return false;
-                });
-                
-                if (result) {
-                  setCurrentStep(4);
-                } else {
-                  toast.error("Não foi possível gerar o plano alimentar. Tente novamente.");
-                }
-              } catch (error) {
-                console.error('Erro ao gerar plano:', error);
-                toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
-              }
-            }}
-            onBack={() => setCurrentStep(2)}
-          />
-        );
-      case 4:
-        return mealPlan ? (
-          <MealPlanDisplay 
-            mealPlan={mealPlan} 
-            onRefresh={async () => {
-              try {
-                setCurrentStep(3);
-                return Promise.resolve();
-              } catch (error) {
-                console.error('Erro ao atualizar cardápio:', error);
-                toast.error("Erro ao atualizar o cardápio");
-                return Promise.reject(error);
-              }
-            }}
-          />
-        ) : (
-          <div className="flex justify-center items-center min-h-[400px]">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          </div>
-        );
-      default:
-        return (
-          <div className="space-y-6">
-            <MenuHeader onStart={() => setCurrentStep(1.5)} />
-            <MealPlanHistory />
-            <InitialMenuContent onStartDiet={() => setCurrentStep(1.5)} />
-          </div>
-        );
-    }
-  };
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
-      <div className="container mx-auto px-4 py-8 md:py-12">
-        <div className="max-w-4xl mx-auto">
-          <div className="space-y-6">
-            {renderStep()}
+    <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 py-8">
+      <div className="container mx-auto px-4">
+        <div className="max-w-4xl mx-auto space-y-8">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Monte sua Dieta Personalizada</h1>
+            <p className="text-gray-600">Siga as etapas abaixo para criar seu plano alimentar</p>
+          </div>
+
+          <div className="space-y-8">
+            {/* Etapa 1: Cálculo de Calorias */}
+            <Card className="p-6">
+              <h2 className="text-xl font-semibold mb-4 flex items-center">
+                <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">1</span>
+                Dados Básicos e Calorias
+              </h2>
+              <CalorieCalculatorStep
+                formData={formData}
+                onInputChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
+                onCalculate={async () => {
+                  try {
+                    await handleCalculateCalories();
+                  } catch (error) {
+                    console.error('Erro ao calcular calorias:', error);
+                    toast.error("Erro ao calcular calorias. Tente novamente.");
+                  }
+                }}
+                calorieNeeds={calorieNeeds}
+              />
+            </Card>
+
+            {/* Etapa 2: Seleção de Alimentos */}
+            <Card className={`p-6 ${!calorieNeeds ? 'opacity-50 pointer-events-none' : ''}`}>
+              <h2 className="text-xl font-semibold mb-4 flex items-center">
+                <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">2</span>
+                Preferências Alimentares
+              </h2>
+              <FoodSelector
+                protocolFoods={protocolFoods}
+                selectedFoods={selectedFoods}
+                onFoodSelection={handleFoodSelection}
+                totalCalories={totalCalories}
+                onBack={() => {}}
+                onConfirm={() => {}}
+              />
+            </Card>
+
+            {/* Etapa 3: Preferências Dietéticas */}
+            <Card className={`p-6 ${selectedFoods.length === 0 ? 'opacity-50 pointer-events-none' : ''}`}>
+              <h2 className="text-xl font-semibold mb-4 flex items-center">
+                <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">3</span>
+                Restrições e Preferências
+              </h2>
+              <DietaryPreferencesForm
+                onSubmit={async (preferences: DietaryPreferences) => {
+                  try {
+                    const result = await handleDietaryPreferences(preferences).catch(error => {
+                      console.error('Erro detalhado:', error);
+                      return false;
+                    });
+                    
+                    if (!result) {
+                      toast.error("Não foi possível gerar o plano alimentar. Tente novamente.");
+                    }
+                  } catch (error) {
+                    console.error('Erro ao gerar plano:', error);
+                    toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
+                  }
+                }}
+                onBack={() => {}}
+              />
+            </Card>
+
+            {/* Etapa 4: Exibição do Plano */}
+            {mealPlan && (
+              <Card className="p-6">
+                <h2 className="text-xl font-semibold mb-4 flex items-center">
+                  <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">4</span>
+                  Seu Plano Alimentar
+                </h2>
+                <MealPlanDisplay
+                  mealPlan={mealPlan}
+                  onRefresh={async () => {
+                    try {
+                      return Promise.resolve();
+                    } catch (error) {
+                      console.error('Erro ao atualizar cardápio:', error);
+                      toast.error("Erro ao atualizar o cardápio");
+                      return Promise.reject(error);
+                    }
+                  }}
+                />
+              </Card>
+            )}
           </div>
         </div>
       </div>
