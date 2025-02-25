@@ -1,61 +1,46 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
-// Definindo tipos básicos sem complexidade
-type TransactionType = 
-  | 'daily_tip'
-  | 'water_intake'
-  | 'steps'
-  | 'meal_plan'
-  | 'workout_plan'
-  | 'physio_plan'
-  | 'transfer';
+// Define tipos simples sem recursão ou dependências complexas
+type BasicTransactionType = string;
 
-// Interface simples para inserção de transação
-type TransactionCreate = {
+interface BasicTransaction {
   wallet_id: string;
   amount: number;
-  transaction_type: TransactionType;
+  transaction_type: BasicTransactionType;
   description?: string;
   recipient_id?: string;
   qr_code_id?: string;
-};
+}
 
-/**
- * Busca o ID do usuário pelo email
- */
 export async function findRecipientByEmail(email: string): Promise<string> {
-  const response = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .select('id')
     .eq('email', email)
-    .limit(1)
     .single();
   
-  if (response.error) {
-    throw new Error('Erro ao buscar usuário: ' + response.error.message);
+  if (error) {
+    throw new Error('Erro ao buscar usuário: ' + error.message);
   }
   
-  if (!response.data) {
+  if (!data) {
     throw new Error('Usuário não encontrado');
   }
 
-  return response.data.id;
+  return data.id;
 }
 
-/**
- * Cria uma transação na carteira
- */
 export async function createWalletTransaction(input: {
   walletId: string;
   amount: number;
-  type: TransactionType;
+  type: BasicTransactionType;
   description?: string;
   recipientId?: string;
   qrCodeId?: string;
 }): Promise<void> {
   // Transação do remetente
-  const senderTransaction: TransactionCreate = {
+  const senderTransaction: BasicTransaction = {
     wallet_id: input.walletId,
     amount: -input.amount,
     transaction_type: input.type,
@@ -75,20 +60,18 @@ export async function createWalletTransaction(input: {
 
   // Se houver destinatário, cria a transação correspondente
   if (input.recipientId) {
-    // Busca a carteira do destinatário
-    const recipientWallet = await supabase
+    const { data: recipientWallet, error: walletError } = await supabase
       .from('wallets')
       .select('id')
       .eq('user_id', input.recipientId)
       .single();
 
-    if (recipientWallet.error || !recipientWallet.data) {
+    if (walletError || !recipientWallet) {
       throw new Error('Carteira do destinatário não encontrada');
     }
 
-    // Transação do destinatário
-    const recipientTransaction: TransactionCreate = {
-      wallet_id: recipientWallet.data.id,
+    const recipientTransaction: BasicTransaction = {
+      wallet_id: recipientWallet.id,
       amount: input.amount,
       transaction_type: input.type,
       description: input.description || 'Transferência recebida',
@@ -96,7 +79,6 @@ export async function createWalletTransaction(input: {
       qr_code_id: input.qrCodeId
     };
 
-    // Insere a transação do destinatário
     const { error: recipientError } = await supabase
       .from('fit_transactions')
       .insert(recipientTransaction);
