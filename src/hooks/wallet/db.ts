@@ -1,10 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { TransactionType } from '@/types/wallet';
-import type { Database } from '@/integrations/supabase/types';
-
-type Profile = Database['public']['Tables']['profiles']['Row'];
-type Wallet = Database['public']['Tables']['wallets']['Row'];
 
 interface TransactionInsert {
   wallet_id: string;
@@ -15,13 +11,21 @@ interface TransactionInsert {
   qr_code_id?: string;
 }
 
+interface ProfileResult {
+  id: string;
+}
+
+interface WalletResult {
+  id: string;
+}
+
 export async function findRecipientByEmail(email: string): Promise<string> {
   const { data, error } = await supabase
     .from('profiles')
     .select('id')
     .eq('email', email)
     .limit(1)
-    .single();
+    .single() as { data: ProfileResult | null; error: any };
   
   if (error) throw error;
   if (!data) {
@@ -65,7 +69,7 @@ export async function createWalletTransaction(params: {
       .select('id')
       .eq('user_id', params.recipientId)
       .limit(1)
-      .single();
+      .single() as { data: WalletResult | null; error: any };
 
     if (walletError) {
       console.error('Erro ao buscar carteira do destinatário:', walletError);
