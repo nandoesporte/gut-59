@@ -48,9 +48,9 @@ export const DietaryPreferencesForm = ({ onSubmit, onBack }: DietaryPreferencesF
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSubmit(preferences);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault(); // Previne o comportamento padrão do formulário
+    onSubmit(preferences); // Chama a função onSubmit com as preferências
   };
 
   return (
