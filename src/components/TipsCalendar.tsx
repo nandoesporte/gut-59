@@ -4,6 +4,7 @@ import { Lock, Unlock, Check } from "lucide-react";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { REWARDS } from "@/constants/rewards";
 import {
   Dialog,
   DialogContent,

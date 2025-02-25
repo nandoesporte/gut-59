@@ -247,15 +247,17 @@ const StepCounter = () => {
 
             if (currentStepThresholdCount > lastRewardedThresholdCount) {
               console.log(`Atingiu ${REWARDS.STEPS_THRESHOLD} passos! Adicionando recompensa...`);
-              addTransaction({
-                amount: REWARDS.STEPS_GOAL,
-                type: 'steps',
-                description: `${REWARDS.STEPS_THRESHOLD} passos completados`
-              }).catch(error => {
+              try {
+                addTransaction({
+                  amount: REWARDS.STEPS_GOAL,
+                  type: 'steps',
+                  description: `${REWARDS.STEPS_THRESHOLD} passos completados`
+                });
+                lastRewardedStepCount = steps;
+                toast.success(`Parabéns! Você completou ${REWARDS.STEPS_THRESHOLD} passos! +${REWARDS.STEPS_GOAL} FITs`);
+              } catch (error) {
                 console.error('Erro ao adicionar recompensa:', error);
-              });
-              lastRewardedStepCount = steps;
-              toast.success(`Parabéns! Você completou ${REWARDS.STEPS_THRESHOLD} passos! +${REWARDS.STEPS_GOAL} FITs`);
+              }
             }
             
             setStepData(calculateMetrics(steps));
