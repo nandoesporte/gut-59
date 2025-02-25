@@ -2,19 +2,27 @@
 import { supabase } from '@/integrations/supabase/client';
 import { TransactionType } from '@/types/wallet';
 
-export async function findRecipientByEmail(email: string): Promise<string> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('email', email)
-    .maybeSingle();
+type ProfileResult = {
+  id: string;
+}
 
-  if (error) throw error;
-  if (!data) {
+type WalletResult = {
+  id: string;
+}
+
+export async function findRecipientByEmail(email: string): Promise<string> {
+  const result = await supabase
+    .from('profiles')
+    .select<string, ProfileResult>('id')
+    .eq('email', email)
+    .single();
+
+  if (result.error) throw result.error;
+  if (!result.data) {
     throw new Error('Usuário não encontrado');
   }
   
-  return data.id;
+  return result.data.id;
 }
 
 export async function createWalletTransaction(params: {
@@ -41,20 +49,21 @@ export async function createWalletTransaction(params: {
 
   // If there's a recipient, create transaction for them (positive amount)
   if (params.recipientId) {
-    const { data: recipientWallet } = await supabase
+    const result = await supabase
       .from('wallets')
-      .select('id')
+      .select<string, WalletResult>('id')
       .eq('user_id', params.recipientId)
       .single();
 
-    if (!recipientWallet) {
+    if (result.error) throw result.error;
+    if (!result.data) {
       throw new Error('Carteira do destinatário não encontrada');
     }
 
     const { error: recipientError } = await supabase
       .from('fit_transactions')
       .insert({
-        wallet_id: recipientWallet.id,
+        wallet_id: result.data.id,
         amount: params.amount, // Positive amount for recipient
         transaction_type: params.type,
         description: params.description || 'Transferência recebida',
