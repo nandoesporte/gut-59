@@ -10,8 +10,6 @@ import { useFoodSelection } from "./hooks/useFoodSelection";
 import { useWallet } from "@/hooks/useWallet";
 import { REWARDS } from '@/constants/rewards';
 import { Database } from "@/integrations/supabase/types";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { WorkoutLoadingState } from "../workout/components/WorkoutLoadingState";
 
 type ActivityLevel = Database["public"]["Enums"]["activity_level"];
 
@@ -176,7 +174,7 @@ export const useMenuController = () => {
         }));
 
       // Chamar a edge function com o prompt do agente
-      const { data: generatedPlan, error: generateError } = await supabase.functions.invoke(
+      const { data: response, error: planError } = await supabase.functions.invoke(
         'generate-meal-plan',
         {
           body: {
@@ -197,20 +195,20 @@ export const useMenuController = () => {
         }
       );
 
-      if (generateError) {
-        console.error('Erro na edge function:', generateError);
+      if (planError) {
+        console.error('Erro ao gerar plano:', planError);
         setShowLoadingDialog(false);
-        toast.error(generateError.message || 'Falha ao gerar cardápio');
+        toast.error(planError.message || "Erro ao gerar plano de treino");
         return false;
       }
 
-      if (!generatedPlan?.mealPlan) {
+      if (!response?.mealPlan) {
         setShowLoadingDialog(false);
         toast.error('Plano alimentar não gerado corretamente');
         return false;
       }
 
-      if (generatedPlan?.mealPlan) {
+      if (response?.mealPlan) {
         await addTransaction({
           amount: REWARDS.MEAL_PLAN,
           type: 'meal_plan',
@@ -220,7 +218,7 @@ export const useMenuController = () => {
         toast.success(`Cardápio personalizado gerado com sucesso! +${REWARDS.MEAL_PLAN} FITs`);
       }
 
-      setMealPlan(generatedPlan.mealPlan);
+      setMealPlan(response.mealPlan);
       setDietaryPreferences(preferences);
       setCurrentStep(4);
 
@@ -244,7 +242,7 @@ export const useMenuController = () => {
         .from('meal_plans')
         .insert({
           user_id: userData.user.id,
-          plan_data: generatedPlan.mealPlan,
+          plan_data: response.mealPlan,
           calories: calorieNeeds,
           dietary_preferences: {
             hasAllergies: preferences.hasAllergies || false,
@@ -281,7 +279,6 @@ export const useMenuController = () => {
     formData,
     loading,
     showLoadingDialog,
-    setShowLoadingDialog, // Added this to the return object
     handleCalculateCalories,
     handleFoodSelection,
     handleDietaryPreferences,

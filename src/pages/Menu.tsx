@@ -28,7 +28,6 @@ const Menu = () => {
     formData,
     loading,
     showLoadingDialog,
-    setShowLoadingDialog,  // Added this destructured value
     handleCalculateCalories,
     handleFoodSelection,
     handleDietaryPreferences,
@@ -41,14 +40,6 @@ const Menu = () => {
   const foodSelectorRef = useRef<HTMLDivElement>(null);
   const preferencesRef = useRef<HTMLDivElement>(null);
   const planRef = useRef<HTMLDivElement>(null);
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
 
   const scrollToNextSection = (nextStep: number) => {
     let ref;
@@ -87,9 +78,10 @@ const Menu = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 py-8">
-      <Dialog open={showLoadingDialog}>
-        <DialogContent className="sm:max-w-md">
-          <div className="flex flex-col items-center justify-center space-y-4">
+      {/* Loading Dialog */}
+      <Dialog open={showLoadingDialog} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-md" showClose={false}>
+          <div className="flex flex-col items-center justify-center space-y-4 p-4">
             <WorkoutLoadingState message="Gerando seu plano alimentar personalizado..." />
           </div>
         </DialogContent>
