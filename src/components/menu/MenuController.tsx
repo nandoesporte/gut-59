@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -50,35 +51,32 @@ export const useMenuController = () => {
   };
 
   const handleDietaryPreferences = async (preferences: DietaryPreferences) => {    
+    // Apenas define loading como true após a validação inicial
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) {
+      toast.error("Usuário não autenticado");
+      return false;
+    }
+
+    if (!calorieNeeds || calorieNeeds <= 0) {
+      toast.error("Necessidade calórica inválida");
+      return false;
+    }
+
+    if (!selectedFoods || selectedFoods.length === 0) {
+      toast.error("Selecione pelo menos um alimento");
+      return false;
+    }
+
+    if (!formData.goal || !formData.weight || !formData.height || !formData.age) {
+      toast.error("Dados do formulário incompletos");
+      return false;
+    }
+
     const toastId = toast.loading("Gerando seu plano alimentar personalizado...");
     setLoading(true);
     
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) {
-        toast.dismiss(toastId);
-        toast.error("Usuário não autenticado");
-        return false;
-      }
-
-      if (!calorieNeeds || calorieNeeds <= 0) {
-        toast.dismiss(toastId);
-        toast.error("Necessidade calórica inválida");
-        return false;
-      }
-
-      if (!selectedFoods || selectedFoods.length === 0) {
-        toast.dismiss(toastId);
-        toast.error("Selecione pelo menos um alimento");
-        return false;
-      }
-
-      if (!formData.goal || !formData.weight || !formData.height || !formData.age) {
-        toast.dismiss(toastId);
-        toast.error("Dados do formulário incompletos");
-        return false;
-      }
-
       const selectedFoodsDetails = protocolFoods
         .filter(food => selectedFoods.includes(food.id))
         .map(food => ({
@@ -133,51 +131,47 @@ export const useMenuController = () => {
           description: 'Geração de plano alimentar'
         });
         
+        setMealPlan(generatedPlan.mealPlan);
+        setDietaryPreferences(preferences);
+
+        const { error: dietaryError } = await supabase
+          .from('dietary_preferences')
+          .upsert({
+            user_id: userData.user.id,
+            has_allergies: preferences.hasAllergies || false,
+            allergies: preferences.allergies || [],
+            dietary_restrictions: preferences.dietaryRestrictions || [],
+            training_time: preferences.trainingTime || null
+          });
+
+        if (dietaryError) {
+          console.error('Erro ao salvar preferências:', dietaryError);
+        }
+
+        const { error: saveError } = await supabase
+          .from('meal_plans')
+          .insert({
+            user_id: userData.user.id,
+            plan_data: generatedPlan.mealPlan,
+            calories: calorieNeeds,
+            dietary_preferences: {
+              hasAllergies: preferences.hasAllergies || false,
+              allergies: preferences.allergies || [],
+              dietaryRestrictions: preferences.dietaryRestrictions || [],
+              training_time: preferences.trainingTime || null
+            }
+          });
+
+        if (saveError) {
+          console.error('Erro ao salvar cardápio:', saveError);
+        }
+
         toast.dismiss(toastId);
         toast.success(`Cardápio personalizado gerado com sucesso! +${REWARDS.MEAL_PLAN} FITs`);
+        return true;
       }
 
-      setMealPlan(generatedPlan.mealPlan);
-      setDietaryPreferences(preferences);
-
-      const { error: dietaryError } = await supabase
-        .from('dietary_preferences')
-        .upsert({
-          user_id: userData.user.id,
-          has_allergies: preferences.hasAllergies || false,
-          allergies: preferences.allergies || [],
-          dietary_restrictions: preferences.dietaryRestrictions || [],
-          training_time: preferences.trainingTime || null
-        });
-
-      if (dietaryError) {
-        console.error('Erro ao salvar preferências:', dietaryError);
-        // Não retornamos false aqui pois o plano já foi gerado
-      }
-
-      const { error: saveError } = await supabase
-        .from('meal_plans')
-        .insert({
-          user_id: userData.user.id,
-          plan_data: generatedPlan.mealPlan,
-          calories: calorieNeeds,
-          dietary_preferences: {
-            hasAllergies: preferences.hasAllergies || false,
-            allergies: preferences.allergies || [],
-            dietaryRestrictions: preferences.dietaryRestrictions || [],
-            training_time: preferences.trainingTime || null
-          }
-        });
-
-      if (saveError) {
-        console.error('Erro ao salvar cardápio:', saveError);
-        // Não retornamos false aqui pois o plano já foi gerado
-      }
-
-      toast.dismiss(toastId);
-      toast.success("Cardápio personalizado gerado com sucesso!");
-      return true;
-
+      return false;
     } catch (error) {
       console.error('Erro completo:', error);
       toast.dismiss(toastId);
