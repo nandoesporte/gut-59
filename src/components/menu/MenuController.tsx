@@ -9,6 +9,9 @@ import { useCalorieCalculator } from "./hooks/useCalorieCalculator";
 import { useFoodSelection } from "./hooks/useFoodSelection";
 import { useWallet } from "@/hooks/useWallet";
 import { REWARDS } from '@/constants/rewards';
+import { Database } from "@/integrations/supabase/types";
+
+type ActivityLevel = Database["public"]["Enums"]["activity_level"];
 
 export const useMenuController = () => {
   const [currentStep, setCurrentStep] = useState<number>(1);
@@ -76,21 +79,23 @@ export const useMenuController = () => {
         return false;
       }
 
+      // Converte o activity_level para o tipo correto
+      const activityLevel = formData.activityLevel as ActivityLevel;
+      
       const { error } = await supabase
         .from('nutrition_preferences')
         .upsert({
-          activity_level: formData.activityLevel,
+          user_id: userData.user.id,
+          activity_level: activityLevel,
           age: Number(formData.age),
           gender: formData.gender,
           goal: formData.goal === "lose" ? "lose_weight" : formData.goal === "gain" ? "gain_mass" : "maintain",
           height: Number(formData.height),
           weight: Number(formData.weight),
-          dietary_preferences: [],
           calories_needed: calorieNeeds,
-          selected_foods: selectedFoods,
-          updated_at: new Date().toISOString()
-        })
-        .eq('user_id', userData.user.id);
+          updated_at: new Date().toISOString(),
+          selected_foods: selectedFoods
+        });
 
       if (error) {
         console.error('Erro ao salvar seleção de alimentos:', error);
