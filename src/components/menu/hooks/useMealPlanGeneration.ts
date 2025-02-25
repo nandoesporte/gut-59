@@ -51,7 +51,7 @@ export const generateMealPlan = async ({
 
     toastId = toast.loading("Gerando seu plano alimentar personalizado...");
 
-    const { data: generatedPlan, error: generateError } = await supabase.functions.invoke(
+    const { data: response, error: generateError } = await supabase.functions.invoke(
       'generate-meal-plan',
       {
         body: {
@@ -71,9 +71,12 @@ export const generateMealPlan = async ({
       }
     );
 
-    if (generateError || !generatedPlan?.mealPlan) {
+    if (generateError || !response?.mealPlan) {
+      console.error('Erro ao gerar plano:', generateError);
       throw new Error(generateError?.message || 'Falha ao gerar cardápio');
     }
+
+    console.log('Resposta da Edge Function:', response);
 
     await addTransaction({
       amount: REWARDS.MEAL_PLAN,
@@ -81,48 +84,56 @@ export const generateMealPlan = async ({
       description: 'Geração de plano alimentar'
     });
 
-    await saveMealPlanData(userData.id, generatedPlan.mealPlan, userData.dailyCalories, preferences);
+    await saveMealPlanData(userData.id, response.mealPlan, userData.dailyCalories, preferences);
 
     toast.dismiss(toastId);
     toast.success(`Cardápio personalizado gerado com sucesso! +${REWARDS.MEAL_PLAN} FITs`);
 
-    return generatedPlan.mealPlan;
+    return response.mealPlan;
   } catch (error) {
     if (toastId) toast.dismiss(toastId);
+    console.error('Erro na geração do plano:', error);
     throw error;
   }
 };
 
 const saveMealPlanData = async (userId: string, mealPlan: any, calories: number, preferences: DietaryPreferences) => {
-  const { error: dietaryError } = await supabase
-    .from('dietary_preferences')
-    .upsert({
-      user_id: userId,
-      has_allergies: preferences.hasAllergies || false,
-      allergies: preferences.allergies || [],
-      dietary_restrictions: preferences.dietaryRestrictions || [],
-      training_time: preferences.trainingTime || null
-    });
-
-  if (dietaryError) {
-    console.error('Erro ao salvar preferências:', dietaryError);
-  }
-
-  const { error: saveError } = await supabase
-    .from('meal_plans')
-    .insert({
-      user_id: userId,
-      plan_data: mealPlan,
-      calories: calories,
-      dietary_preferences: {
-        hasAllergies: preferences.hasAllergies || false,
+  try {
+    const { error: dietaryError } = await supabase
+      .from('dietary_preferences')
+      .upsert({
+        user_id: userId,
+        has_allergies: preferences.hasAllergies || false,
         allergies: preferences.allergies || [],
-        dietaryRestrictions: preferences.dietaryRestrictions || [],
+        dietary_restrictions: preferences.dietaryRestrictions || [],
         training_time: preferences.trainingTime || null
-      }
-    });
+      });
 
-  if (saveError) {
-    console.error('Erro ao salvar cardápio:', saveError);
+    if (dietaryError) {
+      console.error('Erro ao salvar preferências:', dietaryError);
+      throw dietaryError;
+    }
+
+    const { error: saveError } = await supabase
+      .from('meal_plans')
+      .insert({
+        user_id: userId,
+        plan_data: mealPlan,
+        calories: calories,
+        dietary_preferences: {
+          hasAllergies: preferences.hasAllergies || false,
+          allergies: preferences.allergies || [],
+          dietaryRestrictions: preferences.dietaryRestrictions || [],
+          training_time: preferences.trainingTime || null
+        }
+      });
+
+    if (saveError) {
+      console.error('Erro ao salvar cardápio:', saveError);
+      throw saveError;
+    }
+  } catch (error) {
+    console.error('Erro ao salvar dados do plano:', error);
+    throw error;
   }
 };

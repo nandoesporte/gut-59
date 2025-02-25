@@ -54,6 +54,10 @@ export const useMenuController = () => {
 
     try {
       const calories = await calculateCalories(formData, selectedLevel);
+      if (calories) {
+        toast.success("Calorias calculadas com sucesso!");
+        setCurrentStep(2);
+      }
       return calories !== null;
     } catch (error) {
       console.error('Erro ao calcular calorias:', error);
@@ -106,8 +110,14 @@ export const useMenuController = () => {
         addTransaction: addTransactionAsync
       });
 
+      if (!generatedMealPlan) {
+        throw new Error('Plano alimentar não foi gerado corretamente');
+      }
+
+      console.log('Plano gerado:', generatedMealPlan);
       setMealPlan(generatedMealPlan);
       setDietaryPreferences(preferences);
+      setCurrentStep(4);
       return true;
 
     } catch (error) {
