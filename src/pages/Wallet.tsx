@@ -98,7 +98,7 @@ const Wallet = () => {
 
   const handleScanQRCode = async (qrCodeId: string) => {
     try {
-      await redeemQRCode({ qrCodeId });
+      await redeemQRCode(qrCodeId);
       setShowScanDialog(false);
     } catch (error) {
       console.error('Error redeeming QR code:', error);

@@ -20,6 +20,10 @@ type EmailTransferInput = {
   description?: string;
 };
 
+type QRCodeInput = {
+  amount: number;
+};
+
 export const useWallet = () => {
   const queryClient = useQueryClient();
 
@@ -138,7 +142,7 @@ export const useWallet = () => {
 
   // Mutation simplificada para criar QR Code
   const createQRCode = useMutation({
-    mutationFn: async (amount: number) => {
+    mutationFn: async (input: QRCodeInput) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuário não autenticado');
 
@@ -149,7 +153,7 @@ export const useWallet = () => {
         .from('transfer_qr_codes')
         .insert({
           creator_id: user.id,
-          amount,
+          amount: input.amount,
           expires_at: expiresAt.toISOString(),
         })
         .select()
@@ -206,7 +210,7 @@ export const useWallet = () => {
     transactions: transactionsQuery.data,
     isLoading: walletQuery.isLoading || transactionsQuery.isLoading,
     addTransaction: addTransaction.mutate,
-    createTransferQRCode: createQRCode.mutateAsync,
+    createTransferQRCode: createQRCode.mutate,
     redeemQRCode: redeemQRCode.mutate,
     transferByEmail: emailTransfer.mutate
   };
