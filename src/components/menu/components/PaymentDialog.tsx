@@ -8,7 +8,7 @@ interface PaymentDialogProps {
   onOpenChange: (open: boolean) => void;
   onPayment: () => Promise<void>;
   isProcessing: boolean;
-  currentPrice: number;
+  currentPrice?: number;
 }
 
 export const PaymentDialog = ({
@@ -16,17 +16,17 @@ export const PaymentDialog = ({
   onOpenChange,
   onPayment,
   isProcessing,
-  currentPrice = 19.90 // Valor padrão caso não seja fornecido
+  currentPrice = 19.90
 }: PaymentDialogProps) => {
-  const displayPrice = currentPrice ? currentPrice.toFixed(2) : "19.90";
+  const displayPrice = currentPrice?.toFixed(2) || "19.90";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Pagamento do Plano de Treino</DialogTitle>
+          <DialogTitle>Pagamento do Plano Alimentar</DialogTitle>
           <DialogDescription>
-            Para gerar seu plano de treino personalizado, é necessário realizar o pagamento.
+            Para gerar seu plano alimentar personalizado, é necessário realizar o pagamento.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
