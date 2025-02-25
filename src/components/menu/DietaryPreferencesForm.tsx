@@ -20,7 +20,6 @@ export const DietaryPreferencesForm = ({ onSubmit, onBack }: DietaryPreferencesF
   });
 
   const handleAllergiesChange = (checked: boolean) => {
-    console.log("Alterando status de alergias:", checked);
     setPreferences(prev => ({
       ...prev,
       hasAllergies: checked,
@@ -29,45 +28,33 @@ export const DietaryPreferencesForm = ({ onSubmit, onBack }: DietaryPreferencesF
   };
 
   const handleAllergiesInput = (value: string) => {
-    console.log("Atualizando lista de alergias:", value);
     setPreferences(prev => ({
       ...prev,
-      allergies: value.split(',').map(item => item.trim()).filter(Boolean)
+      allergies: value.split(',').map(item => item.trim())
     }));
   };
 
   const handleRestrictionsInput = (value: string) => {
-    console.log("Atualizando restrições alimentares:", value);
     setPreferences(prev => ({
       ...prev,
-      dietaryRestrictions: value.split(',').map(item => item.trim()).filter(Boolean)
+      dietaryRestrictions: value.split(',').map(item => item.trim())
     }));
   };
 
   const handleTimeChange = (value: string) => {
-    console.log("Atualizando horário de treino:", value);
     setPreferences(prev => ({
       ...prev,
-      trainingTime: value || null
+      trainingTime: value
     }));
   };
 
-  const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Formulário submetido com preferências:", preferences);
-    try {
-      onSubmit(preferences);
-    } catch (error) {
-      console.error("Erro ao submeter preferências:", error);
-    }
+    onSubmit(preferences);
   };
 
   return (
-    <form 
-      onSubmit={handleFormSubmit} 
-      className="space-y-6"
-      data-testid="dietary-preferences-form"
-    >
+    <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-4">
         <h3 className="text-lg font-semibold">Preferências Alimentares</h3>
         
@@ -130,19 +117,11 @@ export const DietaryPreferencesForm = ({ onSubmit, onBack }: DietaryPreferencesF
       </div>
 
       <div className="flex flex-col sm:flex-row justify-between gap-4">
-        <Button 
-          type="button" 
-          variant="outline" 
-          onClick={onBack}
-          className="w-full sm:w-auto"
-        >
+        <Button type="button" variant="outline" onClick={onBack} className="w-full sm:w-auto">
           Voltar
         </Button>
-        <Button 
-          type="submit"
-          className="w-full sm:w-auto bg-green-500 hover:bg-green-600"
-        >
-          Gerar Plano
+        <Button type="submit" className="w-full sm:w-auto bg-green-500 hover:bg-green-600">
+          Continuar
         </Button>
       </div>
     </form>

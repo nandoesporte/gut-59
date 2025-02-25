@@ -584,7 +584,6 @@ export type Database = {
           activity_level: Database["public"]["Enums"]["activity_level"]
           age: number
           allergies: string[] | null
-          calories_needed: number | null
           created_at: string | null
           dietary_preferences: string[] | null
           gender: string
@@ -594,7 +593,6 @@ export type Database = {
             | null
           height: number
           id: string
-          selected_foods: string[] | null
           updated_at: string | null
           user_id: string
           weight: number
@@ -603,7 +601,6 @@ export type Database = {
           activity_level: Database["public"]["Enums"]["activity_level"]
           age: number
           allergies?: string[] | null
-          calories_needed?: number | null
           created_at?: string | null
           dietary_preferences?: string[] | null
           gender: string
@@ -613,7 +610,6 @@ export type Database = {
             | null
           height: number
           id?: string
-          selected_foods?: string[] | null
           updated_at?: string | null
           user_id: string
           weight: number
@@ -622,7 +618,6 @@ export type Database = {
           activity_level?: Database["public"]["Enums"]["activity_level"]
           age?: number
           allergies?: string[] | null
-          calories_needed?: number | null
           created_at?: string | null
           dietary_preferences?: string[] | null
           gender?: string
@@ -632,7 +627,6 @@ export type Database = {
             | null
           height?: number
           id?: string
-          selected_foods?: string[] | null
           updated_at?: string | null
           user_id?: string
           weight?: number

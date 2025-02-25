@@ -40,14 +40,14 @@ const MealSection = ({
   selectedFoods: string[];
   onFoodSelection: (foodId: string) => void;
 }) => (
-  <Card className="p-6 space-y-4 shadow-lg hover:shadow-xl transition-shadow w-full">
+  <Card className="p-6 space-y-4 shadow-lg hover:shadow-xl transition-shadow">
     <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
       <div className="bg-green-50 p-2 rounded-lg">
         {icon}
       </div>
       <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
     </div>
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
       {foods.map((food) => (
         <Button
           key={food.id}
@@ -75,7 +75,7 @@ export const FoodSelector = ({
   onBack,
   onConfirm,
 }: FoodSelectorProps) => {
-  const { isProcessingPayment, hasPaid, handlePaymentAndContinue } = usePaymentHandling('nutrition');
+  const { isProcessingPayment, hasPaid, handlePaymentAndContinue } = usePaymentHandling();
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [paymentRequired, setPaymentRequired] = useState(true);
 
@@ -87,7 +87,7 @@ export const FoodSelector = ({
           .from('payment_settings')
           .select('is_active')
           .eq('plan_type', 'nutrition')
-          .maybeSingle();
+          .single();
 
         if (settingsError) {
           console.error('Erro ao verificar configurações de pagamento:', settingsError);
@@ -109,7 +109,6 @@ export const FoodSelector = ({
           .select('payment_required')
           .eq('user_id', user.id)
           .eq('plan_type', 'nutrition')
-          .eq('is_active', true)
           .maybeSingle();
 
         // Se o usuário tiver acesso especial sem necessidade de pagamento
@@ -142,10 +141,10 @@ export const FoodSelector = ({
   const dinnerFoods = protocolFoods.filter(food => food.food_group_id === 4);
 
   return (
-    <div className="w-full space-y-8">
+    <div className="space-y-8 max-w-4xl mx-auto p-4">
       <div className="text-center space-y-3">
         <h2 className="text-2xl font-semibold text-gray-900">Opções de Preferência dos Alimentos</h2>
-        <p className="text-gray-600">
+        <p className="text-gray-600 max-w-2xl mx-auto">
           Selecione suas opções preferidas de alimentos para cada refeição. A IA utilizará suas escolhas para gerar um cardápio personalizado e balanceado.
         </p>
       </div>
@@ -178,7 +177,7 @@ export const FoodSelector = ({
         </Dialog>
       )}
 
-      <div className="space-y-6 w-full">
+      <div className="space-y-6">
         <MealSection
           title="Café da manhã"
           icon={<Coffee className="h-6 w-6 text-green-600" />}
@@ -212,8 +211,8 @@ export const FoodSelector = ({
         />
       </div>
 
-      <div className="sticky bottom-0 bg-white border-t pt-4 mt-8 w-full">
-        <div className="flex justify-between gap-4">
+      <div className="sticky bottom-0 bg-white border-t pt-4 mt-8">
+        <div className="flex justify-between gap-4 max-w-4xl mx-auto">
           <Button 
             variant="outline" 
             onClick={onBack}
@@ -223,7 +222,7 @@ export const FoodSelector = ({
           </Button>
           <Button 
             onClick={handleConfirm}
-            className="flex-1 bg-green-500 hover:bg-green-600 text-white"
+            className="flex-1 bg-green-500 hover:bg-green-600 text-white max-w-md"
           >
             Confirmar Seleção ({selectedFoods.length} alimentos)
           </Button>

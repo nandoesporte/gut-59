@@ -11,17 +11,17 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
-interface PaymentConfirmationDialogProps {
+type PaymentConfirmationDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   message: string;
-}
+};
 
-export function PaymentConfirmationDialog({
+export const PaymentConfirmationDialog: React.FC<PaymentConfirmationDialogProps> = ({
   open,
   onOpenChange,
-  message
-}: PaymentConfirmationDialogProps) {
+  message,
+}) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px] bg-white dark:bg-gray-900">
@@ -53,4 +53,4 @@ export function PaymentConfirmationDialog({
       </DialogContent>
     </Dialog>
   );
-}
+};
