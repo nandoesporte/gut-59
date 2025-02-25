@@ -24,23 +24,23 @@ type QRCodeInput = {
   amount: number;
 };
 
-type Profile = {
+// Explicitly define the profile data structure
+interface ProfileData {
   id: string;
-  email: string;
-};
+}
 
-// Separate DB operations using explicit types
+// Separate DB operations using explicit types and simpler queries
 async function findRecipientByEmail(email: string): Promise<string> {
-  const result = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .select('id')
     .eq('email', email)
-    .single();
+    .limit(1) as { data: ProfileData[] | null; error: any };
 
-  if (result.error) throw result.error;
-  if (!result.data) throw new Error('Usuário não encontrado');
+  if (error) throw error;
+  if (!data?.length) throw new Error('Usuário não encontrado');
   
-  return result.data.id;
+  return data[0].id;
 }
 
 async function createWalletTransaction(
