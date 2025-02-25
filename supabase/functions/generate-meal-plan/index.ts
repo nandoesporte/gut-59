@@ -7,8 +7,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const DEEPSEEK_API_KEY = Deno.env.get('DEEPSEEK_API_KEY');
-const DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions";
+const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -19,8 +19,8 @@ serve(async (req) => {
     const { userData, selectedFoods, dietaryPreferences, agentPrompt } = await req.json();
     console.log("Received request data:", { userData, selectedFoods, dietaryPreferences });
 
-    if (!DEEPSEEK_API_KEY) {
-      throw new Error("Missing DeepSeek API key");
+    if (!OPENAI_API_KEY) {
+      throw new Error("Missing OpenAI API key");
     }
 
     // Prepare context for the model
@@ -30,7 +30,7 @@ serve(async (req) => {
       preferences: dietaryPreferences,
     };
 
-    // Format the system prompt for DeepSeek
+    // Format the system prompt for OpenAI
     const systemPrompt = `You are a professional nutritionist AI. Create a personalized meal plan following these exact rules:
 1. Response MUST be a valid JSON object
 2. Follow this EXACT format without any additional text:
@@ -75,37 +75,37 @@ Available foods: ${JSON.stringify(selectedFoods)}
 Dietary preferences: ${JSON.stringify(dietaryPreferences)}
 Additional instructions: ${agentPrompt}`;
 
-    console.log("Sending request to DeepSeek API...");
+    console.log("Sending request to OpenAI API...");
     
-    const response = await fetch(DEEPSEEK_API_URL, {
+    const response = await fetch(OPENAI_API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${DEEPSEEK_API_KEY}`,
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "deepseek-chat",
+        model: "gpt-4o-mini",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
         ],
         temperature: 0.7,
         max_tokens: 4000,
-        stream: false
+        response_format: { type: "json_object" }
       })
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("DeepSeek API error response:", errorText);
-      throw new Error(`DeepSeek API error: ${response.status} - ${response.statusText}`);
+      console.error("OpenAI API error response:", errorText);
+      throw new Error(`OpenAI API error: ${response.status} - ${response.statusText}`);
     }
 
     const data = await response.json();
-    console.log("DeepSeek API response:", JSON.stringify(data));
+    console.log("OpenAI API response:", JSON.stringify(data));
 
     if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-      throw new Error("Invalid response structure from DeepSeek API");
+      throw new Error("Invalid response structure from OpenAI API");
     }
 
     const generatedContent = data.choices[0].message.content;
