@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Transaction, TransactionType, Wallet, TransferQRCode } from '@/types/wallet';
 import { toast } from 'sonner';
 
-// Simplified type definitions
+// Simplified type definitions without inheritance
 type TransactionInput = {
   amount: number;
   type: TransactionType;
@@ -24,36 +24,41 @@ type QRCodeInput = {
   amount: number;
 };
 
-// Helper functions to simplify mutation logic
-const createTransaction = async (input: TransactionInput, walletId: string) => {
-  let finalRecipientId = input.recipientId;
+// Separate DB operation functions
+async function findRecipientByEmail(email: string): Promise<string> {
+  const { data: recipientUser, error: userError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('email', email)
+    .maybeSingle();
 
-  if (input.recipientEmail) {
-    const { data: recipientUser, error: userError } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('email', input.recipientEmail)
-      .maybeSingle();
+  if (userError) throw userError;
+  if (!recipientUser) throw new Error('Usuário não encontrado');
+  
+  return recipientUser.id;
+}
 
-    if (userError) throw userError;
-    if (!recipientUser) throw new Error('Usuário não encontrado');
-    
-    finalRecipientId = recipientUser.id;
-  }
-
+async function insertTransaction(
+  walletId: string, 
+  amount: number,
+  type: TransactionType,
+  description?: string,
+  recipientId?: string,
+  qrCodeId?: string
+) {
   const { error } = await supabase
     .from('fit_transactions')
     .insert({
       wallet_id: walletId,
-      amount: input.amount,
-      transaction_type: input.type,
-      description: input.description,
-      recipient_id: finalRecipientId,
-      qr_code_id: input.qrCodeId
+      amount,
+      transaction_type: type,
+      description,
+      recipient_id: recipientId,
+      qr_code_id: qrCodeId
     });
 
   if (error) throw error;
-};
+}
 
 export const useWallet = () => {
   const queryClient = useQueryClient();
@@ -108,7 +113,20 @@ export const useWallet = () => {
   const addTransaction = useMutation({
     mutationFn: async (input: TransactionInput) => {
       if (!walletQuery.data?.id) throw new Error('Wallet not initialized');
-      await createTransaction(input, walletQuery.data.id);
+      
+      let finalRecipientId = input.recipientId;
+      if (input.recipientEmail) {
+        finalRecipientId = await findRecipientByEmail(input.recipientEmail);
+      }
+
+      await insertTransaction(
+        walletQuery.data.id,
+        input.amount,
+        input.type,
+        input.description,
+        finalRecipientId,
+        input.qrCodeId
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['wallet'] });
@@ -118,18 +136,23 @@ export const useWallet = () => {
 
   const emailTransfer = useMutation({
     mutationFn: async (input: EmailTransferInput) => {
-      if (!walletQuery.data?.balance || walletQuery.data.balance < input.amount) {
+      if (!walletQuery.data?.id) throw new Error('Wallet not initialized');
+      if (!walletQuery.data.balance || walletQuery.data.balance < input.amount) {
         throw new Error('Saldo insuficiente');
       }
 
-      if (!walletQuery.data?.id) throw new Error('Wallet not initialized');
-
-      await createTransaction({
-        amount: -input.amount,
-        type: 'transfer',
-        description: input.description || 'Transferência por email',
-        recipientEmail: input.email
-      }, walletQuery.data.id);
+      const recipientId = await findRecipientByEmail(input.email);
+      await insertTransaction(
+        walletQuery.data.id,
+        -input.amount,
+        'transfer',
+        input.description || 'Transferência por email',
+        recipientId
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['wallet'] });
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
     }
   });
 
@@ -183,13 +206,14 @@ export const useWallet = () => {
 
       if (updateError) throw updateError;
 
-      await createTransaction({
-        amount: qrCode.amount,
-        type: 'transfer',
-        description: 'Transferência via QR Code',
-        recipientId: qrCode.creator_id,
-        qrCodeId: qrCode.id
-      }, walletQuery.data.id);
+      await insertTransaction(
+        walletQuery.data.id,
+        qrCode.amount,
+        'transfer',
+        'Transferência via QR Code',
+        qrCode.creator_id,
+        qrCode.id
+      );
 
       return qrCode;
     },
