@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -69,17 +70,19 @@ export const useMenuController = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      const insertData = {
-        plan_data: generatedMealPlan,
+      const insertData = [{
+        plan_data: JSON.parse(JSON.stringify(generatedMealPlan)),
         active: true,
-        calories: calorieNeeds,
-        dietary_preferences: dietaryPreferences,
-        user_id: user.id
-      };
+        calories: calorieNeeds || 0,
+        dietary_preferences: dietaryPreferences ? JSON.parse(JSON.stringify(dietaryPreferences)) : null,
+        user_id: user.id,
+        training_time: dietaryPreferences?.trainingTime || null,
+        macros: null
+      }];
 
       const { error } = await supabase
         .from('meal_plans')
-        .insert([insertData]);
+        .insert(insertData);
 
       if (error) throw error;
 
