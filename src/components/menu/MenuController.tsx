@@ -34,6 +34,11 @@ export const useMenuController = () => {
   }, [selectedFoods, protocolFoods]);
 
   const handleCalculateCalories = async () => {
+    if (!formData.weight || !formData.height || !formData.age || !formData.goal) {
+      toast.error("Por favor, preencha todos os campos obrigatórios");
+      return false;
+    }
+
     const selectedLevel = activityLevels.find(level => level.value === formData.activityLevel);
     if (!selectedLevel) {
       toast.error("Por favor, selecione um nível de atividade");
@@ -43,7 +48,6 @@ export const useMenuController = () => {
     try {
       const calories = await calculateCalories(formData, selectedLevel);
       if (calories !== null) {
-        setCurrentStep(2);
         return true;
       }
       return false;
