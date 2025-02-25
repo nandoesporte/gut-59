@@ -121,7 +121,7 @@ export const DietaryPreferencesForm = ({ onSubmit, onBack }: DietaryPreferencesF
           Voltar
         </Button>
         <Button type="submit" className="w-full sm:w-auto bg-green-500 hover:bg-green-600">
-          Continuar
+          Gerar Plano
         </Button>
       </div>
     </form>

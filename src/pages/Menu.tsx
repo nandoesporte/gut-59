@@ -12,6 +12,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import type { DietaryPreferences } from "@/components/menu/types";
 import { Button } from "@/components/ui/button";
+import { useRef } from "react";
 
 const Menu = () => {
   const {
@@ -31,6 +32,12 @@ const Menu = () => {
     saveFoodSelection,
   } = useMenuController();
 
+  // Refs para cada seção
+  const calculatorRef = useRef<HTMLDivElement>(null);
+  const foodSelectorRef = useRef<HTMLDivElement>(null);
+  const preferencesRef = useRef<HTMLDivElement>(null);
+  const planRef = useRef<HTMLDivElement>(null);
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -39,15 +46,38 @@ const Menu = () => {
     );
   }
 
+  const scrollToNextSection = (nextStep: number) => {
+    let ref;
+    switch (nextStep) {
+      case 2:
+        ref = foodSelectorRef;
+        break;
+      case 3:
+        ref = preferencesRef;
+        break;
+      case 4:
+        ref = planRef;
+        break;
+      default:
+        ref = calculatorRef;
+    }
+
+    ref.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   const handleNextStep = () => {
     if (currentStep < 4) {
-      setCurrentStep(currentStep + 1);
+      const nextStep = currentStep + 1;
+      setCurrentStep(nextStep);
+      scrollToNextSection(nextStep);
     }
   };
 
   const handlePreviousStep = () => {
     if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
+      const prevStep = currentStep - 1;
+      setCurrentStep(prevStep);
+      scrollToNextSection(prevStep);
     }
   };
 
@@ -62,7 +92,7 @@ const Menu = () => {
 
           <div className="space-y-8">
             {/* Etapa 1: Cálculo de Calorias */}
-            <Card className={`p-6 ${currentStep !== 1 ? 'opacity-50' : ''}`}>
+            <Card className={`p-6 ${currentStep !== 1 ? 'opacity-50' : ''}`} ref={calculatorRef}>
               <h2 className="text-xl font-semibold mb-4 flex items-center">
                 <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">1</span>
                 Dados Básicos e Calorias
@@ -88,7 +118,7 @@ const Menu = () => {
 
             {/* Etapa 2: Seleção de Alimentos */}
             {currentStep >= 2 && calorieNeeds && (
-              <Card className="p-6">
+              <Card className="p-6" ref={foodSelectorRef}>
                 <h2 className="text-xl font-semibold mb-4 flex items-center">
                   <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">2</span>
                   Preferências Alimentares
@@ -117,7 +147,7 @@ const Menu = () => {
 
             {/* Etapa 3: Preferências Dietéticas */}
             {currentStep >= 3 && selectedFoods.length > 0 && (
-              <Card className="p-6">
+              <Card className="p-6" ref={preferencesRef}>
                 <h2 className="text-xl font-semibold mb-4 flex items-center">
                   <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">3</span>
                   Restrições e Preferências
@@ -133,7 +163,7 @@ const Menu = () => {
 
             {/* Etapa 4: Exibição do Plano */}
             {mealPlan && currentStep === 4 && (
-              <Card className="p-6">
+              <Card className="p-6" ref={planRef}>
                 <h2 className="text-xl font-semibold mb-4 flex items-center">
                   <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">4</span>
                   Seu Plano Alimentar
