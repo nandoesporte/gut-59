@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -123,6 +122,31 @@ export const useMenuController = () => {
       if (!userData.user) {
         setShowLoadingDialog(false);
         toast.error("Usuário não autenticado");
+        return false;
+      }
+
+      // Buscar preferências nutricionais existentes
+      const { data: existingPreferences } = await supabase
+        .from('nutrition_preferences')
+        .select('*')
+        .eq('user_id', userData.user.id)
+        .maybeSingle();
+
+      // Atualizar preferências nutricionais com as novas informações dietéticas
+      const { error: nutritionError } = await supabase
+        .from('nutrition_preferences')
+        .upsert({
+          ...existingPreferences,
+          user_id: userData.user.id,
+          allergies: preferences.allergies || [],
+          dietary_preferences: preferences.dietaryRestrictions || [],
+          updated_at: new Date().toISOString()
+        });
+
+      if (nutritionError) {
+        console.error('Erro ao salvar preferências nutricionais:', nutritionError);
+        setShowLoadingDialog(false);
+        toast.error("Erro ao salvar preferências nutricionais");
         return false;
       }
 
