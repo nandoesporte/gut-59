@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import type { DietaryPreferences, MealPlan } from "./types";
+import type { DietaryPreferences, MealPlan, NutritionPreference } from "./types";
 import { CalorieCalculatorForm, activityLevels } from "./CalorieCalculator";
 import { useProtocolFoods } from "./hooks/useProtocolFoods";
 import { useCalorieCalculator } from "./hooks/useCalorieCalculator";
@@ -82,20 +82,22 @@ export const useMenuController = () => {
       // Converte o activity_level para o tipo correto
       const activityLevel = formData.activityLevel as ActivityLevel;
       
+      const nutritionPreference: NutritionPreference = {
+        user_id: userData.user.id,
+        activity_level: activityLevel,
+        age: Number(formData.age),
+        gender: formData.gender,
+        goal: formData.goal === "lose" ? "lose_weight" : formData.goal === "gain" ? "gain_mass" : "maintain",
+        height: Number(formData.height),
+        weight: Number(formData.weight),
+        calories_needed: calorieNeeds,
+        updated_at: new Date().toISOString(),
+        selected_foods: selectedFoods
+      };
+
       const { error } = await supabase
         .from('nutrition_preferences')
-        .upsert({
-          user_id: userData.user.id,
-          activity_level: activityLevel,
-          age: Number(formData.age),
-          gender: formData.gender,
-          goal: formData.goal === "lose" ? "lose_weight" : formData.goal === "gain" ? "gain_mass" : "maintain",
-          height: Number(formData.height),
-          weight: Number(formData.weight),
-          calories_needed: calorieNeeds,
-          updated_at: new Date().toISOString(),
-          selected_foods: selectedFoods
-        });
+        .upsert(nutritionPreference);
 
       if (error) {
         console.error('Erro ao salvar seleção de alimentos:', error);

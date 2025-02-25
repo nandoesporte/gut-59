@@ -92,3 +92,16 @@ export interface MealPlan {
     timing: string[];
   };
 }
+
+export interface NutritionPreference {
+  user_id: string;
+  activity_level: "sedentary" | "light" | "moderate" | "intense";
+  age: number;
+  gender: string;
+  goal: "maintain" | "lose_weight" | "gain_mass";
+  height: number;
+  weight: number;
+  calories_needed: number;
+  updated_at: string;
+  selected_foods: string[];
+}
