@@ -1,15 +1,26 @@
-
 import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Transaction, TransactionType, Wallet, TransferQRCode } from '@/types/wallet';
 import { toast } from 'sonner';
 
-// Define transaction parameters type separately
-type TransactionParams = {
+// Define tipos base para evitar recursão de tipos
+type BaseTransactionParams = {
   amount: number;
   type: TransactionType;
   description?: string;
+};
+
+type EmailTransferParams = BaseTransactionParams & {
+  recipientEmail: string;
+};
+
+type QRCodeTransferParams = BaseTransactionParams & {
+  recipientId: string;
+  qrCodeId: string;
+};
+
+type TransactionParams = BaseTransactionParams & {
   recipientId?: string;
   recipientEmail?: string;
   qrCodeId?: string;
@@ -72,7 +83,7 @@ export const useWallet = () => {
     enabled: !!wallet?.id,
   });
 
-  // Separate transaction creation function to avoid mutation nesting
+  // Função auxiliar para criar transação
   const createTransaction = async (params: TransactionParams) => {
     if (!wallet) throw new Error('Wallet not initialized');
 
@@ -111,7 +122,8 @@ export const useWallet = () => {
     }
   };
 
-  const addTransaction = useMutation({
+  // Mutation simplificada para adicionar transação
+  const addTransaction = useMutation<void, Error, TransactionParams>({
     mutationFn: createTransaction,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['wallet'] });
@@ -123,19 +135,12 @@ export const useWallet = () => {
     }
   });
 
-  const transferByEmail = useMutation({
-    mutationFn: async ({ amount, email, description }: { amount: number; email: string; description?: string }) => {
-      if (!amount || amount <= 0) {
-        throw new Error('Valor inválido');
-      }
-
-      if (!email) {
-        throw new Error('Email do destinatário é obrigatório');
-      }
-
-      if (!wallet || wallet.balance < amount) {
-        throw new Error('Saldo insuficiente');
-      }
+  // Mutation simplificada para transferência por email
+  const transferByEmail = useMutation<void, Error, { amount: number; email: string; description?: string }>({
+    mutationFn: async ({ amount, email, description }) => {
+      if (!amount || amount <= 0) throw new Error('Valor inválido');
+      if (!email) throw new Error('Email do destinatário é obrigatório');
+      if (!wallet || wallet.balance < amount) throw new Error('Saldo insuficiente');
 
       await createTransaction({
         amount: -amount,
@@ -151,11 +156,10 @@ export const useWallet = () => {
     }
   });
 
-  const createTransferQRCode = useMutation({
-    mutationFn: async ({ amount }: { amount: number }) => {
-      if (!amount || amount <= 0) {
-        throw new Error('Valor inválido');
-      }
+  // Mutation simplificada para criar QR Code
+  const createTransferQRCode = useMutation<TransferQRCode, Error, { amount: number }>({
+    mutationFn: async ({ amount }) => {
+      if (!amount || amount <= 0) throw new Error('Valor inválido');
 
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) throw new Error('Usuário não autenticado');
@@ -178,8 +182,9 @@ export const useWallet = () => {
     }
   });
 
-  const redeemQRCode = useMutation({
-    mutationFn: async ({ qrCodeId }: { qrCodeId: string }) => {
+  // Mutation simplificada para resgatar QR Code
+  const redeemQRCode = useMutation<TransferQRCode, Error, { qrCodeId: string }>({
+    mutationFn: async ({ qrCodeId }) => {
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) throw new Error('Usuário não autenticado');
 
@@ -193,9 +198,7 @@ export const useWallet = () => {
       if (qrError || !qrCode) throw new Error('QR Code inválido ou já utilizado');
 
       const now = new Date();
-      if (new Date(qrCode.expires_at) < now) {
-        throw new Error('QR Code expirado');
-      }
+      if (new Date(qrCode.expires_at) < now) throw new Error('QR Code expirado');
 
       const { error: updateError } = await supabase
         .from('transfer_qr_codes')
