@@ -11,33 +11,22 @@ export type CreateTransactionInput = {
   qrCodeId?: string;
 };
 
-type ProfileResponse = {
-  id: string;
-  email?: string;
-};
-
-type WalletResponse = {
-  id: string;
-  user_id: string;
-  balance: number;
-};
-
 export async function findRecipientByEmail(email: string): Promise<string> {
-  const { data, error } = await supabase
+  const result = await supabase
     .from('profiles')
-    .select('id, email')
+    .select('id')
     .eq('email', email)
-    .maybeSingle() as { data: ProfileResponse | null; error: any };
+    .limit(1);
   
-  if (error) {
-    throw new Error('Erro ao buscar usuário: ' + error.message);
+  if (result.error) {
+    throw new Error('Erro ao buscar usuário: ' + result.error.message);
   }
   
-  if (!data) {
+  if (!result.data?.[0]) {
     throw new Error('Usuário não encontrado');
   }
 
-  return data.id;
+  return result.data[0].id;
 }
 
 export async function createWalletTransaction(input: CreateTransactionInput): Promise<void> {
@@ -52,25 +41,25 @@ export async function createWalletTransaction(input: CreateTransactionInput): Pr
 
   const { error: senderError } = await supabase
     .from('fit_transactions')
-    .insert(senderTransaction);
+    .insert([senderTransaction]);
 
   if (senderError) {
     throw new Error('Erro ao criar transação do remetente: ' + senderError.message);
   }
 
   if (input.recipientId) {
-    const { data: recipientWallet, error: walletError } = await supabase
+    const walletResult = await supabase
       .from('wallets')
-      .select('id, user_id, balance')
+      .select('id')
       .eq('user_id', input.recipientId)
-      .maybeSingle() as { data: WalletResponse | null; error: any };
+      .limit(1);
 
-    if (walletError || !recipientWallet) {
+    if (walletResult.error || !walletResult.data?.[0]) {
       throw new Error('Carteira do destinatário não encontrada');
     }
 
     const recipientTransaction = {
-      wallet_id: recipientWallet.id,
+      wallet_id: walletResult.data[0].id,
       amount: input.amount,
       transaction_type: input.type,
       description: input.description || 'Transferência recebida',
@@ -80,7 +69,7 @@ export async function createWalletTransaction(input: CreateTransactionInput): Pr
 
     const { error: recipientError } = await supabase
       .from('fit_transactions')
-      .insert(recipientTransaction);
+      .insert([recipientTransaction]);
 
     if (recipientError) {
       throw new Error('Erro ao criar transação do destinatário: ' + recipientError.message);
