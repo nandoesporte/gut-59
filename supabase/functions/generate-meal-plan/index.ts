@@ -30,8 +30,51 @@ serve(async (req) => {
       .map(food => `${food.name} (${food.calories} kcal, P:${food.protein}g, C:${food.carbs}g, G:${food.fats}g)`)
       .join("\n");
 
-    // Construir o prompt completo
+    // Construir o prompt completo com instruções específicas para formato JSON
     const fullPrompt = `
+Gere um plano alimentar semanal no formato JSON seguindo esta estrutura exata:
+
+{
+  "weeklyPlan": {
+    "monday": {
+      "dayName": "Segunda-feira",
+      "meals": {
+        "breakfast": {
+          "description": "Café da Manhã",
+          "foods": [{"name": "string", "portion": number, "unit": "string", "details": "string"}],
+          "calories": number,
+          "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number}
+        },
+        "morningSnack": { /* mesma estrutura */ },
+        "lunch": { /* mesma estrutura */ },
+        "afternoonSnack": { /* mesma estrutura */ },
+        "dinner": { /* mesma estrutura */ }
+      },
+      "dailyTotals": {
+        "calories": number,
+        "protein": number,
+        "carbs": number,
+        "fats": number,
+        "fiber": number
+      }
+    },
+    /* repetir para tuesday, wednesday, thursday, friday, saturday, sunday */
+  },
+  "weeklyTotals": {
+    "averageCalories": number,
+    "averageProtein": number,
+    "averageCarbs": number,
+    "averageFats": number,
+    "averageFiber": number
+  },
+  "recommendations": {
+    "general": "string",
+    "preworkout": "string",
+    "postworkout": "string",
+    "timing": ["string"]
+  }
+}
+
 ${agentPrompt}
 
 DADOS DO USUÁRIO:
@@ -51,9 +94,14 @@ ${trainingTimeText}
 ALIMENTOS DISPONÍVEIS:
 ${foodsListText}
 
-Por favor, gere um plano alimentar completo seguindo todas as instruções acima.`;
+IMPORTANTE: 
+1. Use APENAS os alimentos da lista fornecida
+2. Mantenha as calorias diárias próximas ao valor calculado
+3. Distribua as refeições considerando o horário de treino
+4. Retorne APENAS o JSON, sem texto adicional
+5. Siga EXATAMENTE a estrutura JSON fornecida
+`;
 
-    // Fazer a chamada para o GPT-4
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -61,11 +109,12 @@ Por favor, gere um plano alimentar completo seguindo todas as instruções acima
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4", // Mudando para o modelo correto
+        model: "gpt-3.5-turbo-1106", // Usando o modelo mais recente com JSON mode
+        response_format: { type: "json_object" }, // Força resposta em JSON
         messages: [
           {
             role: "system",
-            content: "Você é um nutricionista especializado em criar planos alimentares personalizados. Você deve gerar planos detalhados considerando as necessidades específicas de cada pessoa e retornar no formato JSON que corresponda à estrutura MealPlan."
+            content: "Você é um nutricionista especializado que SEMPRE retorna planos alimentares em JSON válido seguindo exatamente a estrutura fornecida."
           },
           {
             role: "user",
