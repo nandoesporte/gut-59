@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { TransactionType } from '@/types/wallet';
+import { PostgrestSingleResponse } from '@supabase/supabase-js';
 
 interface TransactionInsert {
   wallet_id: string;
@@ -11,31 +12,20 @@ interface TransactionInsert {
   qr_code_id?: string;
 }
 
-// Explicitly define the shape of the data we expect
-interface UserProfile {
-  id: string;
-  email?: string;
-}
-
-interface UserWallet {
-  id: string;
-  user_id: string;
-}
-
 export async function findRecipientByEmail(email: string): Promise<string> {
-  const { data, error } = await supabase
+  const result: PostgrestSingleResponse<{ id: string }> = await supabase
     .from('profiles')
     .select('id')
     .eq('email', email)
     .limit(1)
-    .maybeSingle() as { data: UserProfile | null, error: any };
+    .maybeSingle();
   
-  if (error) throw error;
-  if (!data) {
+  if (result.error) throw result.error;
+  if (!result.data) {
     throw new Error('Usuário não encontrado');
   }
   
-  return data.id;
+  return result.data.id;
 }
 
 export async function createWalletTransaction(params: {
@@ -67,27 +57,27 @@ export async function createWalletTransaction(params: {
   if (params.recipientId) {
     console.log('Buscando carteira do destinatário:', params.recipientId);
     
-    const { data: recipientWallet, error: walletError } = await supabase
+    const recipientResult: PostgrestSingleResponse<{ id: string }> = await supabase
       .from('wallets')
       .select('id')
       .eq('user_id', params.recipientId)
       .limit(1)
-      .maybeSingle() as { data: UserWallet | null, error: any };
+      .maybeSingle();
 
-    if (walletError) {
-      console.error('Erro ao buscar carteira do destinatário:', walletError);
-      throw walletError;
+    if (recipientResult.error) {
+      console.error('Erro ao buscar carteira do destinatário:', recipientResult.error);
+      throw recipientResult.error;
     }
 
-    if (!recipientWallet) {
+    if (!recipientResult.data) {
       console.error('Carteira do destinatário não encontrada');
       throw new Error('Carteira do destinatário não encontrada');
     }
 
-    console.log('Carteira do destinatário encontrada:', recipientWallet.id);
+    console.log('Carteira do destinatário encontrada:', recipientResult.data.id);
 
     const recipientTransactionData: TransactionInsert = {
-      wallet_id: recipientWallet.id,
+      wallet_id: recipientResult.data.id,
       amount: params.amount,
       transaction_type: params.type,
       description: params.description || 'Transferência recebida',
