@@ -58,6 +58,47 @@ export const useMenuController = () => {
     }
   };
 
+  const saveFoodSelection = async () => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) {
+        toast.error("Usuário não autenticado");
+        return false;
+      }
+
+      if (!calorieNeeds || calorieNeeds <= 0) {
+        toast.error("Necessidade calórica inválida");
+        return false;
+      }
+
+      if (!selectedFoods || selectedFoods.length === 0) {
+        toast.error("Selecione pelo menos um alimento");
+        return false;
+      }
+
+      const { error } = await supabase
+        .from('nutrition_preferences')
+        .upsert({
+          user_id: userData.user.id,
+          selected_foods: selectedFoods,
+          calories_needed: calorieNeeds,
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) {
+        console.error('Erro ao salvar seleção de alimentos:', error);
+        toast.error("Erro ao salvar sua seleção de alimentos");
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Erro ao salvar seleção de alimentos:', error);
+      toast.error("Erro ao processar sua seleção");
+      return false;
+    }
+  };
+
   const handleDietaryPreferences = async (preferences: DietaryPreferences) => {    
     const toastId = toast.loading("Gerando seu plano alimentar personalizado...");
     setLoading(true);
@@ -208,5 +249,6 @@ export const useMenuController = () => {
     handleFoodSelection,
     handleDietaryPreferences,
     setFormData,
+    saveFoodSelection,
   };
 };

@@ -28,6 +28,7 @@ const Menu = () => {
     handleFoodSelection,
     handleDietaryPreferences,
     setFormData,
+    saveFoodSelection,
   } = useMenuController();
 
   if (loading) {
@@ -98,12 +99,17 @@ const Menu = () => {
                   onFoodSelection={handleFoodSelection}
                   totalCalories={totalCalories}
                   onBack={handlePreviousStep}
-                  onConfirm={() => {
+                  onConfirm={async () => {
                     if (selectedFoods.length === 0) {
                       toast.error("Selecione pelo menos um alimento");
                       return;
                     }
-                    handleNextStep();
+                    
+                    const success = await saveFoodSelection();
+                    if (success) {
+                      toast.success("Alimentos registrados com sucesso!");
+                      handleNextStep();
+                    }
                   }}
                 />
               </Card>
