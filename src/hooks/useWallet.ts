@@ -13,7 +13,6 @@ export const useWallet = () => {
     isLoading: walletQuery.isLoading || transactionsQuery.isLoading,
     addTransaction: mutations.addTransaction.mutate,
     createTransferQRCode: mutations.createQRCode.mutateAsync,
-    redeemQRCode: mutations.redeemQRCode.mutate,
-    transferByEmail: mutations.emailTransfer.mutate
+    redeemQRCode: mutations.redeemQRCode.mutate
   };
 };

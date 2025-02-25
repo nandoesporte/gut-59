@@ -20,25 +20,6 @@ type DbTransaction = {
   qr_code_id?: string | null;
 }
 
-export async function findRecipientByEmail(email: string): Promise<string> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('email', email)
-    .limit(1)
-    .single();
-  
-  if (error) {
-    throw new Error('Erro ao buscar usuário: ' + error.message);
-  }
-  
-  if (!data) {
-    throw new Error('Usuário não encontrado');
-  }
-
-  return data.id;
-}
-
 export async function createWalletTransaction(input: CreateTransactionInput): Promise<void> {
   const senderTransaction: DbTransaction = {
     wallet_id: input.walletId,

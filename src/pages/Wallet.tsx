@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useWallet } from '@/hooks/useWallet';
@@ -50,12 +49,10 @@ const transactionTypeInfo = {
 };
 
 const Wallet = () => {
-  const { wallet, transactions, isLoading, createTransferQRCode, redeemQRCode, transferByEmail } = useWallet();
+  const { wallet, transactions, isLoading, createTransferQRCode, redeemQRCode } = useWallet();
   const [showTransferDialog, setShowTransferDialog] = useState(false);
-  const [showEmailTransferDialog, setShowEmailTransferDialog] = useState(false);
   const [showScanDialog, setShowScanDialog] = useState(false);
   const [transferAmount, setTransferAmount] = useState('');
-  const [recipientEmail, setRecipientEmail] = useState('');
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
 
   const handleCreateQRCode = async () => {
@@ -74,28 +71,6 @@ const Wallet = () => {
     } catch (error) {
       console.error('Error creating QR code:', error);
       toast.error('Erro ao criar QR Code');
-    }
-  };
-
-  const handleEmailTransfer = async () => {
-    const amount = parseInt(transferAmount);
-    if (isNaN(amount) || amount <= 0) {
-      toast.error('Por favor, insira um valor válido');
-      return;
-    }
-
-    try {
-      await transferByEmail({ 
-        amount, 
-        email: recipientEmail,
-        description: 'Transferência por email'
-      });
-      setShowEmailTransferDialog(false);
-      setTransferAmount('');
-      setRecipientEmail('');
-    } catch (error) {
-      console.error('Error sending transfer:', error);
-      toast.error('Erro ao enviar transferência');
     }
   };
 
@@ -140,13 +115,6 @@ const Wallet = () => {
                 <QrCode className="w-4 h-4 mr-2" />
                 Ler QR Code
               </Button>
-              <Button 
-                variant="secondary"
-                onClick={() => setShowEmailTransferDialog(true)}
-              >
-                <Mail className="w-4 h-4 mr-2" />
-                Enviar por Email
-              </Button>
             </div>
           </div>
         </CardContent>
@@ -156,7 +124,7 @@ const Wallet = () => {
         <CardHeader>
           <CardTitle>Histórico de Transações</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent>
           {transactions?.map((transaction) => {
             const typeInfo = transactionTypeInfo[transaction.transaction_type];
             const Icon = typeInfo.icon;
@@ -213,35 +181,6 @@ const Wallet = () => {
                 <img src={qrCodeDataUrl} alt="QR Code" className="w-48 h-48" />
               </div>
             )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Email Transfer Dialog */}
-      <Dialog open={showEmailTransferDialog} onOpenChange={setShowEmailTransferDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Transferir FITs por Email</DialogTitle>
-            <DialogDescription>
-              Digite o email do destinatário e a quantidade de FITs
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Input
-              type="email"
-              placeholder="Email do destinatário"
-              value={recipientEmail}
-              onChange={(e) => setRecipientEmail(e.target.value)}
-            />
-            <Input
-              type="number"
-              placeholder="Quantidade de FITs"
-              value={transferAmount}
-              onChange={(e) => setTransferAmount(e.target.value)}
-            />
-            <Button onClick={handleEmailTransfer} className="w-full">
-              Enviar FITs
-            </Button>
           </div>
         </DialogContent>
       </Dialog>
