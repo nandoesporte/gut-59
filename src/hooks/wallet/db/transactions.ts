@@ -21,15 +21,11 @@ type DbTransactionInsert = {
 };
 
 export async function findRecipientByEmail(email: string): Promise<string> {
-  type ProfileResult = {
-    id: string;
-  };
-
   const { data, error } = await supabase
     .from('profiles')
-    .select<'id', ProfileResult>('id')
+    .select('id')
     .eq('email', email)
-    .maybeSingle();
+    .single();
   
   if (error) {
     throw new Error('Erro ao buscar usuário: ' + error.message);
@@ -61,15 +57,11 @@ export async function createWalletTransaction(input: CreateTransactionInput): Pr
   }
 
   if (input.recipientId) {
-    type WalletResult = {
-      id: string;
-    };
-
     const { data: recipientWallet, error: walletError } = await supabase
       .from('wallets')
-      .select<'id', WalletResult>('id')
+      .select('id')
       .eq('user_id', input.recipientId)
-      .maybeSingle();
+      .single();
 
     if (walletError || !recipientWallet) {
       throw new Error('Carteira do destinatário não encontrada');
