@@ -11,13 +11,42 @@ export const useWallet = () => {
   const { data: wallet, isLoading: isLoadingWallet } = useQuery({
     queryKey: ['wallet'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('wallets')
-        .select('*')
-        .single();
+      try {
+        // Get current user
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError) throw userError;
+        if (!user) throw new Error('No user found');
 
-      if (error) throw error;
-      return data as Wallet;
+        // Try to get existing wallet
+        const { data: existingWallet, error: walletError } = await supabase
+          .from('wallets')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+
+        if (walletError && walletError.code !== 'PGRST116') {
+          throw walletError;
+        }
+
+        // If wallet doesn't exist, create one
+        if (!existingWallet) {
+          const { data: newWallet, error: createError } = await supabase
+            .from('wallets')
+            .insert([
+              { user_id: user.id, balance: 0 }
+            ])
+            .select()
+            .single();
+
+          if (createError) throw createError;
+          return newWallet as Wallet;
+        }
+
+        return existingWallet as Wallet;
+      } catch (error) {
+        console.error('Error fetching/creating wallet:', error);
+        throw error;
+      }
     },
   });
 
@@ -32,6 +61,7 @@ export const useWallet = () => {
       if (error) throw error;
       return data as Transaction[];
     },
+    enabled: !!wallet, // Only fetch transactions if wallet exists
   });
 
   const addTransaction = useMutation({
@@ -48,20 +78,34 @@ export const useWallet = () => {
       recipientId?: string;
       qrCodeId?: string;
     }) => {
-      if (!wallet) throw new Error('Wallet not found');
+      try {
+        if (!wallet) throw new Error('Wallet not initialized');
 
-      const { error } = await supabase
-        .from('fit_transactions')
-        .insert({
-          wallet_id: wallet.id,
-          amount,
-          transaction_type: type,
-          description,
-          recipient_id: recipientId,
-          qr_code_id: qrCodeId
-        } as any); // Using 'as any' to bypass strict type checking since we added new columns
+        // First, update the wallet balance
+        const { error: updateError } = await supabase
+          .from('wallets')
+          .update({ balance: wallet.balance + amount })
+          .eq('id', wallet.id);
 
-      if (error) throw error;
+        if (updateError) throw updateError;
+
+        // Then, create the transaction record
+        const { error: transactionError } = await supabase
+          .from('fit_transactions')
+          .insert({
+            wallet_id: wallet.id,
+            amount,
+            transaction_type: type,
+            description,
+            recipient_id: recipientId,
+            qr_code_id: qrCodeId
+          });
+
+        if (transactionError) throw transactionError;
+      } catch (error) {
+        console.error('Transaction error:', error);
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['wallet'] });
@@ -125,7 +169,7 @@ export const useWallet = () => {
         .update({
           used_at: now.toISOString(),
           used_by: user.user.id
-        } as any)
+        })
         .eq('id', qrCodeId);
 
       if (updateError) throw updateError;
