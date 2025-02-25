@@ -20,12 +20,24 @@ type DbTransactionInsert = {
   qr_code_id?: string;
 };
 
+// Define specific database types
+type Profile = {
+  id: string;
+  email?: string;
+};
+
+type Wallet = {
+  id: string;
+  user_id: string;
+};
+
 export async function findRecipientByEmail(email: string): Promise<string> {
   const { data, error } = await supabase
     .from('profiles')
     .select('id')
     .eq('email', email)
-    .single();
+    .returns<Profile>()
+    .maybeSingle();
   
   if (error) {
     throw new Error('Erro ao buscar usuário: ' + error.message);
@@ -61,7 +73,8 @@ export async function createWalletTransaction(input: CreateTransactionInput): Pr
       .from('wallets')
       .select('id')
       .eq('user_id', input.recipientId)
-      .single();
+      .returns<Wallet>()
+      .maybeSingle();
 
     if (walletError || !recipientWallet) {
       throw new Error('Carteira do destinatário não encontrada');
