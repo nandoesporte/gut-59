@@ -21,13 +21,10 @@ type DbTransactionInsert = {
   qr_code_id?: string;
 };
 
-type DbProfile = Database['public']['Tables']['profiles']['Row'];
-type DbWallet = Database['public']['Tables']['wallets']['Row'];
-
 export async function findRecipientByEmail(email: string): Promise<string> {
   const { data, error } = await supabase
     .from('profiles')
-    .select<'*', DbProfile>('*')
+    .select('id')
     .eq('email', email)
     .single();
   
@@ -63,7 +60,7 @@ export async function createWalletTransaction(input: CreateTransactionInput): Pr
   if (input.recipientId) {
     const { data: recipientWallet, error: walletError } = await supabase
       .from('wallets')
-      .select<'*', DbWallet>('*')
+      .select('id')
       .eq('user_id', input.recipientId)
       .single();
 
