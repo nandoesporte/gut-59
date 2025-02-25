@@ -15,7 +15,7 @@ interface Wallet {
 export async function findRecipientByEmail(email: string): Promise<string> {
   const { data: usersData, error: usersError } = await supabase
     .from('profiles')
-    .select<'id', Profile>('id')
+    .select('id')
     .eq('email', email)
     .maybeSingle();
   
@@ -58,7 +58,7 @@ export async function createWalletTransaction(params: {
     
     const { data: recipientWallet, error: walletError } = await supabase
       .from('wallets')
-      .select<'id', Wallet>('id')
+      .select('id')
       .eq('user_id', params.recipientId)
       .maybeSingle();
 
