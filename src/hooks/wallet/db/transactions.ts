@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { TransactionType } from '@/types/wallet';
+import { Database } from '@/integrations/supabase/types';
 
 export type CreateTransactionInput = {
   walletId: string;
@@ -20,10 +21,13 @@ type DbTransactionInsert = {
   qr_code_id?: string;
 };
 
+type DbProfile = Database['public']['Tables']['profiles']['Row'];
+type DbWallet = Database['public']['Tables']['wallets']['Row'];
+
 export async function findRecipientByEmail(email: string): Promise<string> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id')
+    .select<'*', DbProfile>('*')
     .eq('email', email)
     .single();
   
@@ -59,7 +63,7 @@ export async function createWalletTransaction(input: CreateTransactionInput): Pr
   if (input.recipientId) {
     const { data: recipientWallet, error: walletError } = await supabase
       .from('wallets')
-      .select('id')
+      .select<'*', DbWallet>('*')
       .eq('user_id', input.recipientId)
       .single();
 
