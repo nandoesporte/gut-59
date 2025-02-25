@@ -11,28 +11,20 @@ interface TransactionInsert {
   qr_code_id?: string;
 }
 
-interface ProfileResult {
-  id: string;
-}
-
-interface WalletResult {
-  id: string;
-}
-
 export async function findRecipientByEmail(email: string): Promise<string> {
-  const { data, error } = await supabase
+  const result = await supabase
     .from('profiles')
     .select('id')
     .eq('email', email)
     .limit(1)
-    .single() as { data: ProfileResult | null; error: any };
+    .single();
   
-  if (error) throw error;
-  if (!data) {
+  if (result.error) throw result.error;
+  if (!result.data) {
     throw new Error('Usuário não encontrado');
   }
   
-  return data.id;
+  return result.data.id;
 }
 
 export async function createWalletTransaction(params: {
@@ -64,27 +56,27 @@ export async function createWalletTransaction(params: {
   if (params.recipientId) {
     console.log('Buscando carteira do destinatário:', params.recipientId);
     
-    const { data: wallet, error: walletError } = await supabase
+    const result = await supabase
       .from('wallets')
       .select('id')
       .eq('user_id', params.recipientId)
       .limit(1)
-      .single() as { data: WalletResult | null; error: any };
+      .single();
 
-    if (walletError) {
-      console.error('Erro ao buscar carteira do destinatário:', walletError);
-      throw walletError;
+    if (result.error) {
+      console.error('Erro ao buscar carteira do destinatário:', result.error);
+      throw result.error;
     }
 
-    if (!wallet) {
+    if (!result.data) {
       console.error('Carteira do destinatário não encontrada');
       throw new Error('Carteira do destinatário não encontrada');
     }
 
-    console.log('Carteira do destinatário encontrada:', wallet.id);
+    console.log('Carteira do destinatário encontrada:', result.data.id);
 
     const recipientTransactionData: TransactionInsert = {
-      wallet_id: wallet.id,
+      wallet_id: result.data.id,
       amount: params.amount,
       transaction_type: params.type,
       description: params.description || 'Transferência recebida',
