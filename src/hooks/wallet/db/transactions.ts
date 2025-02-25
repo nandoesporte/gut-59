@@ -11,15 +11,15 @@ export type CreateTransactionInput = {
   qrCodeId?: string;
 };
 
-interface Profile {
+type ProfileResponse = {
   id: string;
 }
 
-interface Wallet {
+type WalletResponse = {
   id: string;
 }
 
-interface DbTransaction {
+type DbTransaction = {
   wallet_id: string;
   amount: number;
   transaction_type: TransactionType;
@@ -29,21 +29,22 @@ interface DbTransaction {
 }
 
 export async function findRecipientByEmail(email: string): Promise<string> {
-  const { data, error } = await supabase
+  const result = await supabase
     .from('profiles')
     .select('id')
     .eq('email', email)
-    .limit(1);
+    .limit(1)
+    .returns<ProfileResponse[]>();
   
-  if (error) {
-    throw new Error('Erro ao buscar usuário: ' + error.message);
+  if (result.error) {
+    throw new Error('Erro ao buscar usuário: ' + result.error.message);
   }
   
-  if (!data?.[0]) {
+  if (!result.data?.[0]) {
     throw new Error('Usuário não encontrado');
   }
 
-  return data[0].id;
+  return result.data[0].id;
 }
 
 export async function createWalletTransaction(input: CreateTransactionInput): Promise<void> {
@@ -65,18 +66,19 @@ export async function createWalletTransaction(input: CreateTransactionInput): Pr
   }
 
   if (input.recipientId) {
-    const { data: walletData, error: walletError } = await supabase
+    const result = await supabase
       .from('wallets')
       .select('id')
       .eq('user_id', input.recipientId)
-      .limit(1);
+      .limit(1)
+      .returns<WalletResponse[]>();
 
-    if (walletError || !walletData?.[0]) {
+    if (result.error || !result.data?.[0]) {
       throw new Error('Carteira do destinatário não encontrada');
     }
 
     const recipientTransaction: DbTransaction = {
-      wallet_id: walletData[0].id,
+      wallet_id: result.data[0].id,
       amount: input.amount,
       transaction_type: input.type,
       description: input.description || 'Transferência recebida',
