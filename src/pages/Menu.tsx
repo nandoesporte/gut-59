@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import type { DietaryPreferences } from "@/components/menu/types";
 import { Button } from "@/components/ui/button";
 import { useRef } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog";
 import { WorkoutLoadingState } from "@/components/workout/components/WorkoutLoadingState";
 
 const Menu = () => {
@@ -80,7 +80,7 @@ const Menu = () => {
     <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 py-8">
       {/* Loading Dialog */}
       <Dialog open={showLoadingDialog} onOpenChange={() => {}}>
-        <DialogContent className="sm:max-w-md" showClose={false}>
+        <DialogContent className="sm:max-w-md">
           <div className="flex flex-col items-center justify-center space-y-4 p-4">
             <WorkoutLoadingState message="Gerando seu plano alimentar personalizado..." />
           </div>
