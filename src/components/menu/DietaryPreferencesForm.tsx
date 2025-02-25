@@ -50,6 +50,7 @@ export const DietaryPreferencesForm = ({ onSubmit, onBack }: DietaryPreferencesF
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault(); // Previne o comportamento padrão do formulário
+    console.log("Formulário submetido com preferências:", preferences);
     onSubmit(preferences); // Chama a função onSubmit com as preferências atuais
   };
 
@@ -117,10 +118,18 @@ export const DietaryPreferencesForm = ({ onSubmit, onBack }: DietaryPreferencesF
       </div>
 
       <div className="flex flex-col sm:flex-row justify-between gap-4">
-        <Button type="button" variant="outline" onClick={onBack} className="w-full sm:w-auto">
+        <Button 
+          type="button" 
+          variant="outline" 
+          onClick={onBack} 
+          className="w-full sm:w-auto"
+        >
           Voltar
         </Button>
-        <Button type="submit" className="w-full sm:w-auto bg-green-500 hover:bg-green-600">
+        <Button 
+          type="submit"
+          className="w-full sm:w-auto bg-green-500 hover:bg-green-600"
+        >
           Gerar Plano
         </Button>
       </div>
