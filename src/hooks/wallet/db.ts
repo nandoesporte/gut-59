@@ -2,15 +2,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { TransactionType } from '@/types/wallet';
 
-interface BasicTransaction {
-  wallet_id: string;
-  amount: number;
-  transaction_type: TransactionType;
-  description?: string;
-  recipient_id?: string;
-  qr_code_id?: string;
-}
-
 export async function findRecipientByEmail(email: string): Promise<string> {
   const { data, error } = await supabase
     .from('profiles')
@@ -38,7 +29,7 @@ export async function createWalletTransaction(input: {
   qrCodeId?: string;
 }): Promise<void> {
   // Transação do remetente
-  const senderTransaction: BasicTransaction = {
+  const senderTransaction = {
     wallet_id: input.walletId,
     amount: -input.amount,
     transaction_type: input.type,
@@ -68,7 +59,7 @@ export async function createWalletTransaction(input: {
       throw new Error('Carteira do destinatário não encontrada');
     }
 
-    const recipientTransaction: BasicTransaction = {
+    const recipientTransaction = {
       wallet_id: recipientWallet.id,
       amount: input.amount,
       transaction_type: input.type,
