@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -51,6 +52,7 @@ export const useMenuController = () => {
     try {
       const calories = await calculateCalories(formData, selectedLevel);
       if (calories !== null) {
+        await saveFoodSelection(); // Salva as informações iniciais
         return true;
       }
       return false;
@@ -118,6 +120,8 @@ export const useMenuController = () => {
     setLoading(true);
     
     try {
+      console.log("Iniciando geração do plano alimentar...");
+      
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) {
         setShowLoadingDialog(false);
@@ -126,27 +130,38 @@ export const useMenuController = () => {
       }
 
       // Buscar preferências nutricionais existentes
-      const { data: existingPreferences } = await supabase
+      const { data: existingPreferences, error: preferencesError } = await supabase
         .from('nutrition_preferences')
         .select('*')
         .eq('user_id', userData.user.id)
         .maybeSingle();
 
-      // Atualizar preferências nutricionais com as novas informações dietéticas
-      const { error: nutritionError } = await supabase
+      if (preferencesError) {
+        console.error('Erro ao buscar preferências:', preferencesError);
+        toast.error("Erro ao buscar suas preferências");
+        return false;
+      }
+
+      if (!existingPreferences) {
+        toast.error("Por favor, complete as etapas anteriores primeiro");
+        return false;
+      }
+
+      // Salvar preferências dietéticas
+      const { error: updateError } = await supabase
         .from('nutrition_preferences')
         .upsert({
           ...existingPreferences,
           user_id: userData.user.id,
           allergies: preferences.allergies || [],
           dietary_preferences: preferences.dietaryRestrictions || [],
+          training_time: preferences.trainingTime,
           updated_at: new Date().toISOString()
         });
 
-      if (nutritionError) {
-        console.error('Erro ao salvar preferências nutricionais:', nutritionError);
-        setShowLoadingDialog(false);
-        toast.error("Erro ao salvar preferências nutricionais");
+      if (updateError) {
+        console.error('Erro ao salvar preferências:', updateError);
+        toast.error("Erro ao salvar preferências");
         return false;
       }
 
@@ -160,29 +175,11 @@ export const useMenuController = () => {
 
       if (promptError || !agentPrompt) {
         console.error('Erro ao buscar prompt do agente:', promptError);
-        setShowLoadingDialog(false);
         toast.error("Erro ao carregar configurações do agente nutricional");
         return false;
       }
 
-      if (!calorieNeeds || calorieNeeds <= 0) {
-        setShowLoadingDialog(false);
-        toast.error("Necessidade calórica inválida");
-        return false;
-      }
-
-      if (!selectedFoods || selectedFoods.length === 0) {
-        setShowLoadingDialog(false);
-        toast.error("Selecione pelo menos um alimento");
-        return false;
-      }
-
-      if (!formData.goal || !formData.weight || !formData.height || !formData.age) {
-        setShowLoadingDialog(false);
-        toast.error("Dados do formulário incompletos");
-        return false;
-      }
-
+      // Preparar dados para a geração do plano
       const selectedFoodsDetails = protocolFoods
         .filter(food => selectedFoods.includes(food.id))
         .map(food => ({
@@ -197,7 +194,9 @@ export const useMenuController = () => {
           food_group_id: food.food_group_id
         }));
 
-      // Chamar a edge function com o prompt do agente
+      console.log("Chamando edge function generate-meal-plan...");
+      
+      // Chamar a edge function para gerar o plano
       const { data: response, error: planError } = await supabase.functions.invoke(
         'generate-meal-plan',
         {
@@ -208,7 +207,7 @@ export const useMenuController = () => {
               age: Number(formData.age),
               gender: formData.gender,
               activityLevel: formData.activityLevel,
-              goal: formData.goal === "lose" ? "lose_weight" : formData.goal === "gain" ? "gain_weight" : "maintain",
+              goal: formData.goal === "lose" ? "lose_weight" : formData.goal === "gain" ? "gain_mass" : "maintain",
               userId: userData.user.id,
               dailyCalories: calorieNeeds
             },
@@ -221,17 +220,20 @@ export const useMenuController = () => {
 
       if (planError) {
         console.error('Erro ao gerar plano:', planError);
-        setShowLoadingDialog(false);
-        toast.error(planError.message || "Erro ao gerar plano de treino");
+        toast.error("Erro ao gerar plano alimentar. Tente novamente.");
         return false;
       }
 
       if (!response?.mealPlan) {
-        setShowLoadingDialog(false);
         toast.error('Plano alimentar não gerado corretamente');
         return false;
       }
 
+      setMealPlan(response.mealPlan);
+      setDietaryPreferences(preferences);
+      setCurrentStep(4);
+
+      // Adicionar transação de FITs
       if (response?.mealPlan) {
         await addTransaction({
           amount: REWARDS.MEAL_PLAN,
@@ -240,25 +242,6 @@ export const useMenuController = () => {
         });
         
         toast.success(`Cardápio personalizado gerado com sucesso! +${REWARDS.MEAL_PLAN} FITs`);
-      }
-
-      setMealPlan(response.mealPlan);
-      setDietaryPreferences(preferences);
-      setCurrentStep(4);
-
-      // Salvar preferências dietéticas
-      const { error: dietaryError } = await supabase
-        .from('dietary_preferences')
-        .upsert({
-          user_id: userData.user.id,
-          has_allergies: preferences.hasAllergies || false,
-          allergies: preferences.allergies || [],
-          dietary_restrictions: preferences.dietaryRestrictions || [],
-          training_time: preferences.trainingTime || null
-        });
-
-      if (dietaryError) {
-        console.error('Erro ao salvar preferências:', dietaryError);
       }
 
       // Salvar plano gerado
