@@ -3,12 +3,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { TransactionType } from '@/types/wallet';
 import { Database } from '@/integrations/supabase/types';
 
-type ProfilesResponse = Database['public']['Tables']['profiles']['Row'];
+type Profile = Database['public']['Tables']['profiles']['Row'];
 
 export async function findRecipientByEmail(email: string): Promise<string> {
   const { data, error } = await supabase
     .from('profiles')
-    .select<'profiles', ProfilesResponse>('id')
+    .select()
     .eq('email', email)
     .limit(1);
 
@@ -17,7 +17,7 @@ export async function findRecipientByEmail(email: string): Promise<string> {
     throw new Error('Usuário não encontrado');
   }
   
-  return data[0].id;
+  return (data[0] as Profile).id;
 }
 
 export async function createWalletTransaction(params: {
