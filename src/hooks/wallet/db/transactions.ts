@@ -31,7 +31,7 @@ interface DbTransaction {
 export async function findRecipientByEmail(email: string): Promise<string> {
   const { data, error } = await supabase
     .from('profiles')
-    .select<'*', Profile>('id')
+    .select('id')
     .eq('email', email)
     .limit(1);
   
@@ -58,7 +58,7 @@ export async function createWalletTransaction(input: CreateTransactionInput): Pr
 
   const { error: senderError } = await supabase
     .from('fit_transactions')
-    .insert<DbTransaction>([senderTransaction]);
+    .insert([senderTransaction]);
 
   if (senderError) {
     throw new Error('Erro ao criar transação do remetente: ' + senderError.message);
@@ -67,7 +67,7 @@ export async function createWalletTransaction(input: CreateTransactionInput): Pr
   if (input.recipientId) {
     const { data: walletData, error: walletError } = await supabase
       .from('wallets')
-      .select<'*', Wallet>('id')
+      .select('id')
       .eq('user_id', input.recipientId)
       .limit(1);
 
@@ -86,7 +86,7 @@ export async function createWalletTransaction(input: CreateTransactionInput): Pr
 
     const { error: recipientError } = await supabase
       .from('fit_transactions')
-      .insert<DbTransaction>([recipientTransaction]);
+      .insert([recipientTransaction]);
 
     if (recipientError) {
       throw new Error('Erro ao criar transação do destinatário: ' + recipientError.message);
