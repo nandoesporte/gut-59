@@ -10,9 +10,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { supabase } from '@/integrations/supabase/client';
 
 const transferSchema = z.object({
-  recipientIdentifier: z.string()
-    .min(11, 'Digite um CPF ou telefone válido')
-    .max(14, 'Digite um CPF ou telefone válido'),
+  recipientEmail: z.string()
+    .email('Digite um email válido'),
   amount: z.number()
     .min(1, 'O valor mínimo é 1 FIT')
     .max(1000000, 'Valor máximo excedido'),
@@ -27,7 +26,7 @@ export function TransferForm() {
   const form = useForm<TransferFormValues>({
     resolver: zodResolver(transferSchema),
     defaultValues: {
-      recipientIdentifier: '',
+      recipientEmail: '',
       amount: 0,
       description: ''
     }
@@ -37,11 +36,18 @@ export function TransferForm() {
     try {
       setIsLoading(true);
 
-      // First, verify if the recipient exists by CPF or phone number
+      // Get current user's wallet
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('Usuário não autenticado');
+        return;
+      }
+
+      // First, verify if the recipient exists by email
       const { data: recipient, error: recipientError } = await supabase
         .from('profiles')
         .select('id')
-        .or(`phone_number.eq.${values.recipientIdentifier},cpf.eq.${values.recipientIdentifier}`)
+        .eq('id', (await supabase.auth.getUser(values.recipientEmail)).data.user?.id)
         .maybeSingle();
 
       if (recipientError || !recipient) {
@@ -49,10 +55,9 @@ export function TransferForm() {
         return;
       }
 
-      // Get current user's wallet
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast.error('Usuário não autenticado');
+      // Prevent self-transfer
+      if (recipient.id === user.id) {
+        toast.error('Você não pode transferir FITs para você mesmo');
         return;
       }
 
@@ -86,12 +91,16 @@ export function TransferForm() {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <FormField
           control={form.control}
-          name="recipientIdentifier"
+          name="recipientEmail"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>CPF ou Telefone do Destinatário</FormLabel>
+              <FormLabel>Email do Destinatário</FormLabel>
               <FormControl>
-                <Input placeholder="000.000.000-00 ou (00) 00000-0000" {...field} />
+                <Input 
+                  type="email" 
+                  placeholder="email@exemplo.com" 
+                  {...field} 
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
