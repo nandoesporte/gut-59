@@ -21,9 +21,13 @@ type DbTransactionInsert = {
 };
 
 export async function findRecipientByEmail(email: string): Promise<string> {
+  type ProfileResult = {
+    id: string;
+  };
+
   const { data, error } = await supabase
     .from('profiles')
-    .select('id')
+    .select<'id', ProfileResult>('id')
     .eq('email', email)
     .maybeSingle();
   
@@ -57,9 +61,13 @@ export async function createWalletTransaction(input: CreateTransactionInput): Pr
   }
 
   if (input.recipientId) {
+    type WalletResult = {
+      id: string;
+    };
+
     const { data: recipientWallet, error: walletError } = await supabase
       .from('wallets')
-      .select('id')
+      .select<'id', WalletResult>('id')
       .eq('user_id', input.recipientId)
       .maybeSingle();
 
