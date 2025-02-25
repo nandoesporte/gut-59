@@ -46,13 +46,24 @@ export function TransferForm() {
       // Get the sender's wallet
       const { data: senderWallet, error: senderWalletError } = await supabase
         .from('wallets')
-        .select('id')
+        .select('id, balance')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
-      if (senderWalletError || !senderWallet) {
+      if (senderWalletError) {
         console.error('Sender wallet error:', senderWalletError);
         toast.error('Erro ao acessar sua carteira');
+        return;
+      }
+
+      if (!senderWallet) {
+        toast.error('Você ainda não possui uma carteira');
+        return;
+      }
+
+      // Verify if sender has enough balance
+      if (senderWallet.balance < values.amount) {
+        toast.error('Saldo insuficiente para realizar a transferência');
         return;
       }
 
@@ -61,9 +72,15 @@ export function TransferForm() {
         .from('profiles')
         .select('id, email')
         .eq('email', values.recipientEmail)
-        .single();
+        .maybeSingle();
 
-      if (profileError || !recipientProfile) {
+      if (profileError) {
+        console.error('Profile error:', profileError);
+        toast.error('Erro ao buscar destinatário');
+        return;
+      }
+
+      if (!recipientProfile) {
         toast.error('Destinatário não encontrado');
         return;
       }
@@ -79,13 +96,24 @@ export function TransferForm() {
         .from('wallets')
         .select('id')
         .eq('user_id', recipientProfile.id)
-        .single();
+        .maybeSingle();
 
-      if (recipientWalletError || !recipientWallet) {
+      if (recipientWalletError) {
         console.error('Recipient wallet error:', recipientWalletError);
-        toast.error('Carteira do destinatário não encontrada');
+        toast.error('Erro ao acessar carteira do destinatário');
         return;
       }
+
+      if (!recipientWallet) {
+        toast.error('O destinatário ainda não possui uma carteira');
+        return;
+      }
+
+      console.log('Processing transfer:', {
+        sender_wallet_id: senderWallet.id,
+        recipient_wallet_id: recipientWallet.id,
+        transfer_amount: values.amount
+      });
 
       // Process the transfer using the RPC function
       const { error: transferError } = await supabase.rpc('process_transfer', {
