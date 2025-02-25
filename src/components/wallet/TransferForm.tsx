@@ -35,13 +35,20 @@ export function TransferForm() {
   const onSubmit = async (values: TransferFormValues) => {
     try {
       setIsLoading(true);
+      console.log('Starting transfer process with values:', values);
 
       // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) {
+        console.error('Auth error:', userError);
+        toast.error('Erro de autenticação');
+        return;
+      }
       if (!user) {
         toast.error('Usuário não autenticado');
         return;
       }
+      console.log('Current user:', user.id);
 
       // Get the sender's wallet
       const { data: senderWallet, error: senderWalletError } = await supabase
@@ -49,6 +56,8 @@ export function TransferForm() {
         .select('id, balance')
         .eq('user_id', user.id)
         .maybeSingle();
+
+      console.log('Sender wallet query result:', { senderWallet, senderWalletError });
 
       if (senderWalletError) {
         console.error('Sender wallet error:', senderWalletError);
@@ -63,6 +72,7 @@ export function TransferForm() {
 
       // Verify if sender has enough balance
       if (senderWallet.balance < values.amount) {
+        console.log('Insufficient balance:', { balance: senderWallet.balance, requested: values.amount });
         toast.error('Saldo insuficiente para realizar a transferência');
         return;
       }
@@ -73,6 +83,8 @@ export function TransferForm() {
         .select('id, email')
         .eq('email', values.recipientEmail)
         .maybeSingle();
+
+      console.log('Recipient profile query result:', { recipientProfile, profileError });
 
       if (profileError) {
         console.error('Profile error:', profileError);
@@ -98,6 +110,8 @@ export function TransferForm() {
         .eq('user_id', recipientProfile.id)
         .maybeSingle();
 
+      console.log('Recipient wallet query result:', { recipientWallet, recipientWalletError });
+
       if (recipientWalletError) {
         console.error('Recipient wallet error:', recipientWalletError);
         toast.error('Erro ao acessar carteira do destinatário');
@@ -109,19 +123,22 @@ export function TransferForm() {
         return;
       }
 
-      console.log('Processing transfer:', {
-        sender_wallet_id: senderWallet.id,
-        recipient_wallet_id: recipientWallet.id,
-        transfer_amount: values.amount
-      });
-
-      // Process the transfer using the RPC function
-      const { error: transferError } = await supabase.rpc('process_transfer', {
+      const transferParams = {
         sender_wallet_id: senderWallet.id,
         recipient_wallet_id: recipientWallet.id,
         transfer_amount: values.amount,
         description: values.description || 'Transferência de FITs'
-      });
+      };
+      
+      console.log('Calling process_transfer with params:', transferParams);
+
+      // Process the transfer using the RPC function
+      const { data: transferData, error: transferError } = await supabase.rpc(
+        'process_transfer',
+        transferParams
+      );
+
+      console.log('Transfer result:', { transferData, transferError });
 
       if (transferError) {
         console.error('Transfer error:', transferError);
