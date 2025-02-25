@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useCallback } from 'react';
 import { Motion, MotionEventResult } from '@capacitor/motion';
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,12 +10,20 @@ import { Capacitor } from '@capacitor/core';
 import { REWARDS } from '@/constants/rewards';
 import { useWallet } from "@/hooks/useWallet";
 
+// Corrigindo a definição de tipos para o DeviceMotionEvent
+interface DeviceMotionEventWithPermission extends DeviceMotionEvent {
+  requestPermission?: () => Promise<'granted' | 'denied'>;
+}
+
+interface DeviceMotionEventConstructorWithPermission {
+  new(type: string, eventInitDict?: DeviceMotionEventInit): DeviceMotionEvent;
+  prototype: DeviceMotionEvent;
+  requestPermission?: () => Promise<'granted' | 'denied'>;
+}
+
 declare global {
-  interface DeviceMotionEvent {
-    requestPermission?: () => Promise<'granted' | 'denied'>;
-  }
-  interface DeviceMotionEventConstructor {
-    requestPermission?: () => Promise<'granted' | 'denied'>;
+  interface Window {
+    DeviceMotionEvent: DeviceMotionEventConstructorWithPermission;
   }
 }
 
@@ -96,8 +105,8 @@ const StepCounter = () => {
         }
         
         try {
-          if (typeof DeviceMotionEvent.requestPermission === 'function') {
-            const permission = await DeviceMotionEvent.requestPermission();
+          if (typeof window.DeviceMotionEvent.requestPermission === 'function') {
+            const permission = await window.DeviceMotionEvent.requestPermission();
             if (permission !== 'granted') {
               toast.error("Permissão para o acelerômetro negada.");
               return false;
