@@ -43,6 +43,19 @@ export function TransferForm() {
         return;
       }
 
+      // Get the sender's wallet
+      const { data: senderWallet, error: senderWalletError } = await supabase
+        .from('wallets')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (senderWalletError || !senderWallet) {
+        console.error('Sender wallet error:', senderWalletError);
+        toast.error('Erro ao acessar sua carteira');
+        return;
+      }
+
       // First get the recipient's profile by email
       const { data: recipientProfile, error: profileError } = await supabase
         .from('profiles')
@@ -61,10 +74,23 @@ export function TransferForm() {
         return;
       }
 
+      // Get the recipient's wallet
+      const { data: recipientWallet, error: recipientWalletError } = await supabase
+        .from('wallets')
+        .select('id')
+        .eq('user_id', recipientProfile.id)
+        .single();
+
+      if (recipientWalletError || !recipientWallet) {
+        console.error('Recipient wallet error:', recipientWalletError);
+        toast.error('Carteira do destinatário não encontrada');
+        return;
+      }
+
       // Process the transfer using the RPC function
       const { error: transferError } = await supabase.rpc('process_transfer', {
-        sender_wallet_id: user.id,
-        recipient_wallet_id: recipientProfile.id,
+        sender_wallet_id: senderWallet.id,
+        recipient_wallet_id: recipientWallet.id,
         transfer_amount: values.amount,
         description: values.description || 'Transferência de FITs'
       });
