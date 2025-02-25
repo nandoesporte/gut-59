@@ -2,14 +2,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { TransactionType } from '@/types/wallet';
 
-interface ProfileResponse {
-  id: string;
-}
-
-interface WalletResponse {
-  id: string;
-}
-
 interface TransactionInsert {
   wallet_id: string;
   amount: number;
@@ -22,7 +14,7 @@ interface TransactionInsert {
 export async function findRecipientByEmail(email: string): Promise<string> {
   const { data: usersData, error: usersError } = await supabase
     .from('profiles')
-    .select<'*', ProfileResponse>('id')
+    .select('id')
     .eq('email', email)
     .maybeSingle();
   
@@ -65,7 +57,7 @@ export async function createWalletTransaction(params: {
     
     const { data: recipientWallet, error: walletError } = await supabase
       .from('wallets')
-      .select<'*', WalletResponse>('id')
+      .select('id')
       .eq('user_id', params.recipientId)
       .maybeSingle();
 
