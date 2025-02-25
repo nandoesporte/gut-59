@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { DietaryPreferences, ProtocolFood } from "../types";
 import { REWARDS } from '@/constants/rewards';
+import type { TransactionType } from "@/types/wallet";
 
 interface MealPlanGenerationProps {
   userData: {
@@ -17,7 +18,13 @@ interface MealPlanGenerationProps {
   };
   selectedFoods: ProtocolFood[];
   preferences: DietaryPreferences;
-  addTransaction: (params: { amount: number; type: string; description: string }) => Promise<void>;
+  addTransaction: (params: { 
+    amount: number; 
+    type: TransactionType; 
+    description?: string;
+    recipientId?: string;
+    qrCodeId?: string;
+  }) => Promise<void>;
 }
 
 export const generateMealPlan = async ({
