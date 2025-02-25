@@ -66,14 +66,7 @@ const Menu = () => {
               <CalorieCalculatorStep
                 formData={formData}
                 onInputChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
-                onCalculate={async () => {
-                  try {
-                    await handleCalculateCalories();
-                  } catch (error) {
-                    console.error('Erro ao calcular calorias:', error);
-                    toast.error("Erro ao calcular calorias. Tente novamente.");
-                  }
-                }}
+                onCalculate={handleCalculateCalories}
                 calorieNeeds={calorieNeeds}
               />
             </Card>
@@ -101,14 +94,7 @@ const Menu = () => {
                 Restrições e Preferências
               </h2>
               <DietaryPreferencesForm
-                onSubmit={async (preferences: DietaryPreferences) => {
-                  try {
-                    await handleDietaryPreferences(preferences);
-                  } catch (error) {
-                    console.error('Erro ao gerar plano:', error);
-                    toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
-                  }
-                }}
+                onSubmit={handleDietaryPreferences}
                 onBack={() => {}}
               />
             </Card>
