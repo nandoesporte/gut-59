@@ -75,7 +75,7 @@ export const FoodSelector = ({
   onBack,
   onConfirm,
 }: FoodSelectorProps) => {
-  const { isProcessingPayment, hasPaid, handlePaymentAndContinue } = usePaymentHandling();
+  const { isProcessingPayment, hasPaid, handlePaymentAndContinue } = usePaymentHandling('nutrition');
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [paymentRequired, setPaymentRequired] = useState(true);
 
@@ -87,7 +87,7 @@ export const FoodSelector = ({
           .from('payment_settings')
           .select('is_active')
           .eq('plan_type', 'nutrition')
-          .single();
+          .maybeSingle();
 
         if (settingsError) {
           console.error('Erro ao verificar configurações de pagamento:', settingsError);
@@ -109,6 +109,7 @@ export const FoodSelector = ({
           .select('payment_required')
           .eq('user_id', user.id)
           .eq('plan_type', 'nutrition')
+          .eq('is_active', true)
           .maybeSingle();
 
         // Se o usuário tiver acesso especial sem necessidade de pagamento
