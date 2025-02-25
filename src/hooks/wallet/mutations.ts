@@ -1,17 +1,19 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { TransferQRCode } from '@/types/wallet';
+import { TransferQRCode, TransactionType } from '@/types/wallet';
 import { toast } from 'sonner';
 import { TransactionInput, EmailTransferInput, QRCodeInput } from './types';
 
-// Database functions previously in db.ts
+// Database functions 
 async function findRecipientByEmail(email: string): Promise<string> {
+  type ProfileResponse = { id: string };
+  
   const { data, error } = await supabase
     .from('profiles')
     .select('id')
     .eq('email', email)
-    .maybeSingle<{ id: string }>();
+    .maybeSingle<ProfileResponse>();
   
   if (error) {
     throw new Error('Erro ao buscar usuário: ' + error.message);
@@ -27,14 +29,23 @@ async function findRecipientByEmail(email: string): Promise<string> {
 type CreateTransactionInput = {
   walletId: string;
   amount: number;
-  type: string;
+  type: TransactionType;
   description?: string;
   recipientId?: string;
   qrCodeId?: string;
 };
 
+type DbTransactionInsert = {
+  wallet_id: string;
+  amount: number;
+  transaction_type: TransactionType;
+  description?: string;
+  recipient_id?: string;
+  qr_code_id?: string;
+};
+
 async function createWalletTransaction(input: CreateTransactionInput): Promise<void> {
-  const senderTransaction = {
+  const senderTransaction: DbTransactionInsert = {
     wallet_id: input.walletId,
     amount: -input.amount,
     transaction_type: input.type,
@@ -45,24 +56,26 @@ async function createWalletTransaction(input: CreateTransactionInput): Promise<v
 
   const { error: senderError } = await supabase
     .from('fit_transactions')
-    .insert([senderTransaction]);
+    .insert(senderTransaction);
 
   if (senderError) {
     throw new Error('Erro ao criar transação do remetente: ' + senderError.message);
   }
 
   if (input.recipientId) {
+    type WalletResponse = { id: string };
+    
     const { data: recipientWallet, error: walletError } = await supabase
       .from('wallets')
       .select('id')
       .eq('user_id', input.recipientId)
-      .maybeSingle<{ id: string }>();
+      .maybeSingle<WalletResponse>();
 
     if (walletError || !recipientWallet) {
       throw new Error('Carteira do destinatário não encontrada');
     }
 
-    const recipientTransaction = {
+    const recipientTransaction: DbTransactionInsert = {
       wallet_id: recipientWallet.id,
       amount: input.amount,
       transaction_type: input.type,
@@ -73,7 +86,7 @@ async function createWalletTransaction(input: CreateTransactionInput): Promise<v
 
     const { error: recipientError } = await supabase
       .from('fit_transactions')
-      .insert([recipientTransaction]);
+      .insert(recipientTransaction);
 
     if (recipientError) {
       throw new Error('Erro ao criar transação do destinatário: ' + recipientError.message);
