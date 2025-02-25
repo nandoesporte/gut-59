@@ -1,19 +1,19 @@
 
-import { BrowserRouter } from 'react-router-dom';
-import { Routes, Route } from 'react-router-dom';
-import Layout from './components/Layout';
-import Index from './pages/Index';
-import Auth from './pages/Auth';
-import Admin from './pages/Admin';
-import Menu from './pages/Menu';
-import Progress from './pages/Progress';
-import Store from './pages/Store';
-import Workout from './pages/Workout';
-import Fisio from './pages/Fisio';
-import Trainer from './pages/Trainer';
-import Instructions from './pages/Instructions';
-import NotFound from './pages/NotFound';
-import Wallet from './pages/Wallet';
+import { BrowserRouter } from 'react-router-dom'
+import { Routes, Route } from 'react-router-dom'
+import Layout from './components/Layout'
+import Index from './pages/Index'
+import Auth from './pages/Auth'
+import Admin from './pages/Admin'
+import Menu from './pages/Menu'
+import Progress from './pages/Progress'
+import Store from './pages/Store'
+import Workout from './pages/Workout'
+import Fisio from './pages/Fisio'
+import Trainer from './pages/Trainer'
+import Instructions from './pages/Instructions'
+import NotFound from './pages/NotFound'
+import Wallet from './pages/Wallet'
 
 function App() {
   return (
@@ -35,7 +35,7 @@ function App() {
         </Route>
       </Routes>
     </BrowserRouter>
-  );
+  )
 }
 
-export default App;
+export default App
