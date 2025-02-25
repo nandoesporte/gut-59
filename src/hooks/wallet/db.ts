@@ -16,19 +16,19 @@ interface TransactionInsert {
 }
 
 export async function findRecipientByEmail(email: string): Promise<string> {
-  const result = await supabase
+  const { data, error } = await supabase
     .from('profiles')
-    .select<'id', Pick<Profile, 'id'>>('id')
+    .select('id')
     .eq('email', email)
     .limit(1)
-    .maybeSingle();
+    .single();
   
-  if (result.error) throw result.error;
-  if (!result.data) {
+  if (error) throw error;
+  if (!data) {
     throw new Error('Usuário não encontrado');
   }
   
-  return result.data.id;
+  return data.id;
 }
 
 export async function createWalletTransaction(params: {
@@ -60,27 +60,27 @@ export async function createWalletTransaction(params: {
   if (params.recipientId) {
     console.log('Buscando carteira do destinatário:', params.recipientId);
     
-    const result = await supabase
+    const { data: wallet, error: walletError } = await supabase
       .from('wallets')
-      .select<'id', Pick<Wallet, 'id'>>('id')
+      .select('id')
       .eq('user_id', params.recipientId)
       .limit(1)
-      .maybeSingle();
+      .single();
 
-    if (result.error) {
-      console.error('Erro ao buscar carteira do destinatário:', result.error);
-      throw result.error;
+    if (walletError) {
+      console.error('Erro ao buscar carteira do destinatário:', walletError);
+      throw walletError;
     }
 
-    if (!result.data) {
+    if (!wallet) {
       console.error('Carteira do destinatário não encontrada');
       throw new Error('Carteira do destinatário não encontrada');
     }
 
-    console.log('Carteira do destinatário encontrada:', result.data.id);
+    console.log('Carteira do destinatário encontrada:', wallet.id);
 
     const recipientTransactionData: TransactionInsert = {
-      wallet_id: result.data.id,
+      wallet_id: wallet.id,
       amount: params.amount,
       transaction_type: params.type,
       description: params.description || 'Transferência recebida',
