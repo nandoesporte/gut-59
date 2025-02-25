@@ -1,15 +1,11 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { TransactionType } from '@/types/wallet';
-import { Database } from '@/integrations/supabase/types';
-
-type Profile = Database['public']['Tables']['profiles']['Row'];
-type Wallet = Database['public']['Tables']['wallets']['Row'];
 
 export async function findRecipientByEmail(email: string): Promise<string> {
   const { data: usersData, error: usersError } = await supabase
     .from('profiles')
-    .select('id, email')
+    .select('id')
     .eq('email', email)
     .maybeSingle();
   
