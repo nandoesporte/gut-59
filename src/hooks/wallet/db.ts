@@ -1,33 +1,52 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { TransactionType } from '@/types/wallet';
 
-interface TransactionInsert {
+// Definindo tipos básicos sem complexidade
+type TransactionType = 
+  | 'daily_tip'
+  | 'water_intake'
+  | 'steps'
+  | 'meal_plan'
+  | 'workout_plan'
+  | 'physio_plan'
+  | 'transfer';
+
+// Interface simples para inserção de transação
+type TransactionCreate = {
   wallet_id: string;
   amount: number;
   transaction_type: TransactionType;
   description?: string;
   recipient_id?: string;
   qr_code_id?: string;
-}
+};
 
+/**
+ * Busca o ID do usuário pelo email
+ */
 export async function findRecipientByEmail(email: string): Promise<string> {
-  const result = await supabase
+  const response = await supabase
     .from('profiles')
     .select('id')
     .eq('email', email)
     .limit(1)
     .single();
   
-  if (result.error) throw result.error;
-  if (!result.data) {
-    throw new Error('Usuário não encontrado');
+  if (response.error) {
+    throw new Error('Erro ao buscar usuário: ' + response.error.message);
   }
   
-  return result.data.id;
+  if (!response.data) {
+    throw new Error('Usuário não encontrado');
+  }
+
+  return response.data.id;
 }
 
-export async function createWalletTransaction(params: {
+/**
+ * Cria uma transação na carteira
+ */
+export async function createWalletTransaction(input: {
   walletId: string;
   amount: number;
   type: TransactionType;
@@ -35,64 +54,55 @@ export async function createWalletTransaction(params: {
   recipientId?: string;
   qrCodeId?: string;
 }): Promise<void> {
-  const transactionData: TransactionInsert = {
-    wallet_id: params.walletId,
-    amount: -params.amount,
-    transaction_type: params.type,
-    description: params.description,
-    recipient_id: params.recipientId,
-    qr_code_id: params.qrCodeId
+  // Transação do remetente
+  const senderTransaction: TransactionCreate = {
+    wallet_id: input.walletId,
+    amount: -input.amount,
+    transaction_type: input.type,
+    description: input.description,
+    recipient_id: input.recipientId,
+    qr_code_id: input.qrCodeId
   };
 
+  // Insere a transação do remetente
   const { error: senderError } = await supabase
     .from('fit_transactions')
-    .insert(transactionData);
+    .insert(senderTransaction);
 
   if (senderError) {
-    console.error('Erro ao criar transação do remetente:', senderError);
-    throw senderError;
+    throw new Error('Erro ao criar transação do remetente: ' + senderError.message);
   }
 
-  if (params.recipientId) {
-    console.log('Buscando carteira do destinatário:', params.recipientId);
-    
-    const result = await supabase
+  // Se houver destinatário, cria a transação correspondente
+  if (input.recipientId) {
+    // Busca a carteira do destinatário
+    const recipientWallet = await supabase
       .from('wallets')
       .select('id')
-      .eq('user_id', params.recipientId)
-      .limit(1)
+      .eq('user_id', input.recipientId)
       .single();
 
-    if (result.error) {
-      console.error('Erro ao buscar carteira do destinatário:', result.error);
-      throw result.error;
-    }
-
-    if (!result.data) {
-      console.error('Carteira do destinatário não encontrada');
+    if (recipientWallet.error || !recipientWallet.data) {
       throw new Error('Carteira do destinatário não encontrada');
     }
 
-    console.log('Carteira do destinatário encontrada:', result.data.id);
-
-    const recipientTransactionData: TransactionInsert = {
-      wallet_id: result.data.id,
-      amount: params.amount,
-      transaction_type: params.type,
-      description: params.description || 'Transferência recebida',
-      recipient_id: params.recipientId,
-      qr_code_id: params.qrCodeId
+    // Transação do destinatário
+    const recipientTransaction: TransactionCreate = {
+      wallet_id: recipientWallet.data.id,
+      amount: input.amount,
+      transaction_type: input.type,
+      description: input.description || 'Transferência recebida',
+      recipient_id: input.recipientId,
+      qr_code_id: input.qrCodeId
     };
 
+    // Insere a transação do destinatário
     const { error: recipientError } = await supabase
       .from('fit_transactions')
-      .insert(recipientTransactionData);
+      .insert(recipientTransaction);
 
     if (recipientError) {
-      console.error('Erro ao criar transação do destinatário:', recipientError);
-      throw recipientError;
+      throw new Error('Erro ao criar transação do destinatário: ' + recipientError.message);
     }
-
-    console.log('Transação criada com sucesso para ambas as partes');
   }
 }
