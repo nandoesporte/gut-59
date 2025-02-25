@@ -29,6 +29,18 @@ export const useMenuController = () => {
   const { selectedFoods, totalCalories, handleFoodSelection, calculateTotalCalories } = useFoodSelection();
   const wallet = useWallet();
 
+  // Create a Promise-wrapped version of addTransaction
+  const addTransactionAsync = async (params: Parameters<typeof wallet.addTransaction>[0]) => {
+    return new Promise<void>((resolve, reject) => {
+      try {
+        wallet.addTransaction(params);
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  };
+
   useEffect(() => {
     calculateTotalCalories(protocolFoods);
   }, [selectedFoods, protocolFoods]);
@@ -91,7 +103,7 @@ export const useMenuController = () => {
         },
         selectedFoods: selectedFoodsData,
         preferences,
-        addTransaction: wallet.addTransaction
+        addTransaction: addTransactionAsync
       });
 
       setMealPlan(generatedMealPlan);
