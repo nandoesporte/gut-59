@@ -47,7 +47,7 @@ const MealSection = ({
       </div>
       <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
     </div>
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       {foods.map((food) => (
         <Button
           key={food.id}
@@ -141,7 +141,7 @@ export const FoodSelector = ({
   const dinnerFoods = protocolFoods.filter(food => food.food_group_id === 4);
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto p-4">
+    <div className="space-y-8 w-full">
       <div className="text-center space-y-3">
         <h2 className="text-2xl font-semibold text-gray-900">Opções de Preferência dos Alimentos</h2>
         <p className="text-gray-600 max-w-2xl mx-auto">
@@ -211,18 +211,18 @@ export const FoodSelector = ({
         />
       </div>
 
-      <div className="sticky bottom-0 bg-white border-t pt-4 mt-8">
-        <div className="flex justify-between gap-4 max-w-4xl mx-auto">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t py-4 px-4 md:px-8">
+        <div className="max-w-4xl mx-auto flex justify-between items-center gap-4">
           <Button 
             variant="outline" 
             onClick={onBack}
-            className="px-6"
+            className="shrink-0"
           >
             Voltar
           </Button>
           <Button 
             onClick={handleConfirm}
-            className="flex-1 bg-green-500 hover:bg-green-600 text-white max-w-md"
+            className="flex-1 bg-green-500 hover:bg-green-600 text-white max-w-sm"
           >
             Confirmar Seleção ({selectedFoods.length} alimentos)
           </Button>
