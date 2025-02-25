@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import type { DietaryPreferences, ProtocolFood } from "../types";
 import { REWARDS } from '@/constants/rewards';
 import type { TransactionType } from "@/types/wallet";
+import type { UseMutateAsyncFunction } from "@tanstack/react-query";
 
 interface MealPlanGenerationProps {
   userData: {
@@ -18,13 +19,13 @@ interface MealPlanGenerationProps {
   };
   selectedFoods: ProtocolFood[];
   preferences: DietaryPreferences;
-  addTransaction: (params: { 
-    amount: number; 
-    type: TransactionType; 
+  addTransaction: UseMutateAsyncFunction<void, Error, {
+    amount: number;
+    type: TransactionType;
     description?: string;
     recipientId?: string;
     qrCodeId?: string;
-  }) => Promise<void>;
+  }>;
 }
 
 export const generateMealPlan = async ({

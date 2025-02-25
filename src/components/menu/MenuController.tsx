@@ -91,7 +91,7 @@ export const useMenuController = () => {
         },
         selectedFoods: selectedFoodsData,
         preferences,
-        addTransaction
+        addTransaction: addTransaction.mutateAsync
       });
 
       setMealPlan(generatedMealPlan);
