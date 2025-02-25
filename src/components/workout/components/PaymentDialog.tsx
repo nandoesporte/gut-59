@@ -16,8 +16,10 @@ export const PaymentDialog = ({
   onOpenChange,
   onPayment,
   isProcessing,
-  currentPrice
+  currentPrice = 19.90 // Valor padrão caso não seja fornecido
 }: PaymentDialogProps) => {
+  const displayPrice = currentPrice ? currentPrice.toFixed(2) : "19.90";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -29,7 +31,7 @@ export const PaymentDialog = ({
         </DialogHeader>
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Valor: R$ {currentPrice.toFixed(2)}
+            Valor: R$ {displayPrice}
           </p>
           <Button 
             onClick={onPayment} 
