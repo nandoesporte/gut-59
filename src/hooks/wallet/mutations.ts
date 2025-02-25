@@ -11,12 +11,11 @@ export function useWalletMutations(walletId: string | undefined) {
     queryClient.invalidateQueries({ queryKey: ['transactions'] });
   };
 
-  const { addTransaction, emailTransfer } = useTransactionMutations(walletId, invalidateQueries);
+  const { addTransaction } = useTransactionMutations(walletId, invalidateQueries);
   const { createQRCode, redeemQRCode } = useQRCodeMutations(walletId, invalidateQueries);
 
   return {
     addTransaction,
-    emailTransfer,
     createQRCode,
     redeemQRCode
   };
