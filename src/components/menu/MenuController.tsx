@@ -128,9 +128,10 @@ export const useMenuController = () => {
       // Buscar o prompt do agente Nutri+
       const { data: agentPrompt, error: promptError } = await supabase
         .from('ai_agent_prompts')
-        .select('prompt_text')
-        .eq('agent_type', 'nutri_plus')
-        .single();
+        .select('prompt')
+        .eq('agent_type', 'meal_plan')
+        .eq('is_active', true)
+        .maybeSingle();
 
       if (promptError || !agentPrompt) {
         console.error('Erro ao buscar prompt do agente:', promptError);
@@ -188,7 +189,7 @@ export const useMenuController = () => {
             },
             selectedFoods: selectedFoodsDetails,
             dietaryPreferences: preferences,
-            agentPrompt: agentPrompt.prompt_text // Incluindo o prompt do agente
+            agentPrompt: agentPrompt.prompt // Corrigido para usar a coluna 'prompt'
           }
         }
       );
