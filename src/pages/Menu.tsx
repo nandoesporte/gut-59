@@ -65,6 +65,7 @@ const Menu = () => {
                       hasAllergies: false,
                       allergies: [],
                       dietaryRestrictions: [],
+                      trainingTime: null
                     });
                     toast.success("Plano atualizado com sucesso!");
                   } catch (error) {
