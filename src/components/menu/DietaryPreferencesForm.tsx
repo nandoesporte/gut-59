@@ -20,6 +20,7 @@ export const DietaryPreferencesForm = ({ onSubmit, onBack }: DietaryPreferencesF
   });
 
   const handleAllergiesChange = (checked: boolean) => {
+    console.log("Alterando status de alergias:", checked);
     setPreferences(prev => ({
       ...prev,
       hasAllergies: checked,
@@ -28,34 +29,45 @@ export const DietaryPreferencesForm = ({ onSubmit, onBack }: DietaryPreferencesF
   };
 
   const handleAllergiesInput = (value: string) => {
+    console.log("Atualizando lista de alergias:", value);
     setPreferences(prev => ({
       ...prev,
-      allergies: value.split(',').map(item => item.trim())
+      allergies: value.split(',').map(item => item.trim()).filter(Boolean)
     }));
   };
 
   const handleRestrictionsInput = (value: string) => {
+    console.log("Atualizando restrições alimentares:", value);
     setPreferences(prev => ({
       ...prev,
-      dietaryRestrictions: value.split(',').map(item => item.trim())
+      dietaryRestrictions: value.split(',').map(item => item.trim()).filter(Boolean)
     }));
   };
 
   const handleTimeChange = (value: string) => {
+    console.log("Atualizando horário de treino:", value);
     setPreferences(prev => ({
       ...prev,
-      trainingTime: value
+      trainingTime: value || null
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault(); // Previne o comportamento padrão do formulário
+  const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     console.log("Formulário submetido com preferências:", preferences);
-    onSubmit(preferences); // Chama a função onSubmit com as preferências atuais
+    try {
+      onSubmit(preferences);
+    } catch (error) {
+      console.error("Erro ao submeter preferências:", error);
+    }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form 
+      onSubmit={handleFormSubmit} 
+      className="space-y-6"
+      data-testid="dietary-preferences-form"
+    >
       <div className="space-y-4">
         <h3 className="text-lg font-semibold">Preferências Alimentares</h3>
         
@@ -121,7 +133,7 @@ export const DietaryPreferencesForm = ({ onSubmit, onBack }: DietaryPreferencesF
         <Button 
           type="button" 
           variant="outline" 
-          onClick={onBack} 
+          onClick={onBack}
           className="w-full sm:w-auto"
         >
           Voltar
