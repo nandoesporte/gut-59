@@ -10,7 +10,7 @@ import { ExerciseTypesField } from "./components/ExerciseTypesField";
 import { TrainingLocationField } from "./components/TrainingLocationField";
 import { WorkoutPreferences } from "./types";
 import { Dumbbell, ArrowRight } from "lucide-react";
-import { PaymentDialog } from "./components/PaymentDialog";
+import { PaymentDialog } from "@/components/menu/components/PaymentDialog";
 import { useWorkoutForm } from "./hooks/useWorkoutForm";
 import { toast } from "sonner";
 
