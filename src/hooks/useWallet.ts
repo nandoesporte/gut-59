@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Transaction, TransactionType, Wallet, TransferQRCode } from '@/types/wallet';
 import { toast } from 'sonner';
 
-// Define transaction parameters type separately to avoid deep nesting
+// Define transaction parameters type separately
 type TransactionParams = {
   amount: number;
   type: TransactionType;
@@ -72,49 +72,47 @@ export const useWallet = () => {
     enabled: !!wallet?.id,
   });
 
+  // Separate transaction creation function to avoid mutation nesting
+  const createTransaction = async (params: TransactionParams) => {
+    if (!wallet) throw new Error('Wallet not initialized');
+
+    let finalRecipientId = params.recipientId;
+
+    if (params.recipientEmail) {
+      const { data: recipientUser, error: userError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', params.recipientEmail)
+        .maybeSingle();
+
+      if (userError) throw userError;
+      if (!recipientUser) throw new Error('Usuário não encontrado');
+      
+      finalRecipientId = recipientUser.id;
+    }
+
+    const { error: transactionError } = await supabase
+      .from('fit_transactions')
+      .insert({
+        wallet_id: wallet.id,
+        amount: params.amount,
+        transaction_type: params.type,
+        description: params.description,
+        recipient_id: finalRecipientId,
+        qr_code_id: params.qrCodeId
+      });
+
+    if (transactionError) throw transactionError;
+
+    if (params.type !== 'transfer') {
+      toast.success(`Parabéns! Você ganhou ${params.amount} FITs!`, {
+        description: params.description || 'Continue assim!',
+      });
+    }
+  };
+
   const addTransaction = useMutation({
-    mutationFn: async (params: TransactionParams) => {
-      try {
-        if (!wallet) throw new Error('Wallet not initialized');
-
-        let finalRecipientId = params.recipientId;
-
-        if (params.recipientEmail) {
-          const { data: recipientUser, error: userError } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('email', params.recipientEmail)
-            .maybeSingle();
-
-          if (userError) throw userError;
-          if (!recipientUser) throw new Error('Usuário não encontrado');
-          
-          finalRecipientId = recipientUser.id;
-        }
-
-        const { error: transactionError } = await supabase
-          .from('fit_transactions')
-          .insert({
-            wallet_id: wallet.id,
-            amount: params.amount,
-            transaction_type: params.type,
-            description: params.description,
-            recipient_id: finalRecipientId,
-            qr_code_id: params.qrCodeId
-          });
-
-        if (transactionError) throw transactionError;
-
-        if (params.type !== 'transfer') {
-          toast.success(`Parabéns! Você ganhou ${params.amount} FITs!`, {
-            description: params.description || 'Continue assim!',
-          });
-        }
-      } catch (error) {
-        console.error('Transaction error:', error);
-        throw error;
-      }
-    },
+    mutationFn: createTransaction,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['wallet'] });
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
@@ -139,7 +137,7 @@ export const useWallet = () => {
         throw new Error('Saldo insuficiente');
       }
 
-      await addTransaction.mutateAsync({
+      await createTransaction({
         amount: -amount,
         type: 'transfer',
         description: description || 'Transferência por email',
@@ -209,7 +207,7 @@ export const useWallet = () => {
 
       if (updateError) throw updateError;
 
-      await addTransaction.mutateAsync({
+      await createTransaction({
         amount: qrCode.amount,
         type: 'transfer',
         description: 'Transferência via QR Code',
