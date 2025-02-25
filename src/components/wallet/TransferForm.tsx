@@ -36,7 +36,7 @@ export function TransferForm() {
     try {
       setIsLoading(true);
 
-      // Get current user's wallet
+      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         toast.error('Usuário não autenticado');
@@ -61,16 +61,13 @@ export function TransferForm() {
         return;
       }
 
-      // Create a fit transaction
-      const { error: transactionError } = await supabase
-        .from('fit_transactions')
-        .insert({
-          wallet_id: user.id,
-          amount: -values.amount,
-          transaction_type: 'transfer',
-          recipient_id: recipient.id,
-          description: values.description || 'Transferência de FITs'
-        });
+      // Create transaction records for both parties
+      const { error: transactionError } = await supabase.rpc('process_transfer', {
+        sender_wallet_id: user.id,
+        recipient_wallet_id: recipient.id,
+        transfer_amount: values.amount,
+        description: values.description || 'Transferência de FITs'
+      });
 
       if (transactionError) {
         throw transactionError;

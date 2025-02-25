@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useWallet } from '@/hooks/useWallet';
@@ -146,7 +147,7 @@ const Wallet = () => {
             return (
               <div
                 key={transaction.id}
-                className="flex items-center justify-between p-4 bg-slate-50 rounded-lg"
+                className="flex items-center justify-between p-4 bg-slate-50 rounded-lg mb-2"
               >
                 <div className="flex items-center space-x-4">
                   <div className={`p-2 rounded-full bg-white ${typeInfo.color}`}>
@@ -162,7 +163,7 @@ const Wallet = () => {
                     </p>
                   </div>
                 </div>
-                <p className="font-semibold text-primary-500">
+                <p className={`font-semibold ${transaction.amount > 0 ? 'text-green-500' : 'text-red-500'}`}>
                   {transaction.amount > 0 ? '+' : ''}{transaction.amount} FITs
                 </p>
               </div>
