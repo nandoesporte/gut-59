@@ -27,8 +27,7 @@ export const useMenuController = () => {
   const protocolFoods = useProtocolFoods();
   const { calorieNeeds, calculateCalories } = useCalorieCalculator();
   const { selectedFoods, totalCalories, handleFoodSelection, calculateTotalCalories } = useFoodSelection();
-  // Destructure the mutation object directly to get mutate
-  const { addTransaction: { mutate: addTransaction } } = useWallet();
+  const wallet = useWallet();
 
   useEffect(() => {
     calculateTotalCalories(protocolFoods);
@@ -92,7 +91,7 @@ export const useMenuController = () => {
         },
         selectedFoods: selectedFoodsData,
         preferences,
-        addTransaction
+        addTransaction: wallet.addTransaction
       });
 
       setMealPlan(generatedMealPlan);
