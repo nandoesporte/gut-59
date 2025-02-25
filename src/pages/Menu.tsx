@@ -10,7 +10,6 @@ import { MenuHeader } from "@/components/menu/MenuHeader";
 import { useMenuController } from "@/components/menu/MenuController";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import type { DietaryPreferences } from "@/components/menu/types";
 
 const Menu = () => {
   const {
@@ -56,71 +55,72 @@ const Menu = () => {
             <p className="text-gray-600">Siga as etapas abaixo para criar seu plano alimentar</p>
           </div>
 
-          <div className="space-y-8">
-            {/* Etapa 1: Cálculo de Calorias */}
-            <Card className="p-6">
-              <h2 className="text-xl font-semibold mb-4 flex items-center">
-                <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">1</span>
-                Dados Básicos e Calorias
-              </h2>
-              <CalorieCalculatorStep
-                formData={formData}
-                onInputChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
-                onCalculate={handleCalculateCalories}
-                calorieNeeds={calorieNeeds}
+          {mealPlan ? (
+            <div className="space-y-8">
+              <MealPlanDisplay
+                mealPlan={mealPlan}
+                onRefresh={async () => {
+                  try {
+                    await handleDietaryPreferences({
+                      hasAllergies: false,
+                      allergies: [],
+                      dietaryRestrictions: [],
+                    });
+                    toast.success("Plano atualizado com sucesso!");
+                  } catch (error) {
+                    console.error('Erro ao atualizar cardápio:', error);
+                    toast.error("Erro ao atualizar o cardápio");
+                  }
+                }}
               />
-            </Card>
 
-            {/* Etapa 2: Seleção de Alimentos */}
-            <Card className={`p-6 ${!calorieNeeds ? 'opacity-50 pointer-events-none' : ''}`}>
-              <h2 className="text-xl font-semibold mb-4 flex items-center">
-                <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">2</span>
-                Preferências Alimentares
-              </h2>
-              <FoodSelector
-                protocolFoods={protocolFoods}
-                selectedFoods={selectedFoods}
-                onFoodSelection={handleFoodSelection}
-                totalCalories={totalCalories}
-                onBack={() => {}}
-                onConfirm={() => {}}
-              />
-            </Card>
-
-            {/* Etapa 3: Preferências Dietéticas */}
-            <Card className={`p-6 ${selectedFoods.length === 0 ? 'opacity-50 pointer-events-none' : ''}`}>
-              <h2 className="text-xl font-semibold mb-4 flex items-center">
-                <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">3</span>
-                Restrições e Preferências
-              </h2>
-              <DietaryPreferencesForm
-                onSubmit={handleDietaryPreferences}
-                onBack={() => {}}
-              />
-            </Card>
-
-            {/* Etapa 4: Exibição do Plano */}
-            {mealPlan && (
+              <MealPlanHistory />
+            </div>
+          ) : (
+            <div className="space-y-8">
+              {/* Etapa 1: Cálculo de Calorias */}
               <Card className="p-6">
                 <h2 className="text-xl font-semibold mb-4 flex items-center">
-                  <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">4</span>
-                  Seu Plano Alimentar
+                  <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">1</span>
+                  Dados Básicos e Calorias
                 </h2>
-                <MealPlanDisplay
-                  mealPlan={mealPlan}
-                  onRefresh={async () => {
-                    try {
-                      return Promise.resolve();
-                    } catch (error) {
-                      console.error('Erro ao atualizar cardápio:', error);
-                      toast.error("Erro ao atualizar o cardápio");
-                      return Promise.reject(error);
-                    }
-                  }}
+                <CalorieCalculatorStep
+                  formData={formData}
+                  onInputChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
+                  onCalculate={handleCalculateCalories}
+                  calorieNeeds={calorieNeeds}
                 />
               </Card>
-            )}
-          </div>
+
+              {/* Etapa 2: Seleção de Alimentos */}
+              <Card className={`p-6 ${!calorieNeeds ? 'opacity-50 pointer-events-none' : ''}`}>
+                <h2 className="text-xl font-semibold mb-4 flex items-center">
+                  <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">2</span>
+                  Preferências Alimentares
+                </h2>
+                <FoodSelector
+                  protocolFoods={protocolFoods}
+                  selectedFoods={selectedFoods}
+                  onFoodSelection={handleFoodSelection}
+                  totalCalories={totalCalories}
+                  onBack={() => setCurrentStep(1)}
+                  onConfirm={() => setCurrentStep(3)}
+                />
+              </Card>
+
+              {/* Etapa 3: Preferências Dietéticas */}
+              <Card className={`p-6 ${selectedFoods.length === 0 ? 'opacity-50 pointer-events-none' : ''}`}>
+                <h2 className="text-xl font-semibold mb-4 flex items-center">
+                  <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">3</span>
+                  Restrições e Preferências
+                </h2>
+                <DietaryPreferencesForm
+                  onSubmit={handleDietaryPreferences}
+                  onBack={() => setCurrentStep(2)}
+                />
+              </Card>
+            </div>
+          )}
         </div>
       </div>
     </div>
