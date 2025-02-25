@@ -17,7 +17,7 @@ serve(async (req) => {
 
   try {
     const { userData, selectedFoods, dietaryPreferences, agentPrompt } = await req.json();
-    console.log("Received request data:", { userData, selectedFoods, dietaryPreferences });
+    console.log("Received request data:", JSON.stringify({ userData, selectedFoods, dietaryPreferences }));
 
     if (!DEEPSEEK_API_KEY) {
       throw new Error("Missing DeepSeek API key");
@@ -32,22 +32,32 @@ serve(async (req) => {
 
     // Modificar o prompt para garantir que a resposta seja em JSON
     const systemPrompt = `You are a professional nutritionist AI that creates personalized meal plans. 
-VERY IMPORTANT: You must ALWAYS respond with a valid JSON object following this exact format:
+VERY IMPORTANT RULES:
+1. You must ALWAYS respond with a valid JSON object.
+2. Your response must STRICTLY follow this exact format, no additional text or explanations allowed:
 {
   "weeklyPlan": {
     "monday": {
       "meals": {
         "breakfast": {
           "description": string,
-          "foods": Array<{ name: string, portion: number, unit: string, details: string }>,
+          "foods": [{ "name": string, "portion": number, "unit": string, "details": string }],
           "calories": number,
-          "macros": { protein: number, carbs: number, fats: number, fiber: number }
+          "macros": { "protein": number, "carbs": number, "fats": number, "fiber": number }
         },
-        // Same structure for morningSnack, lunch, afternoonSnack, dinner
+        "morningSnack": { same structure as breakfast },
+        "lunch": { same structure as breakfast },
+        "afternoonSnack": { same structure as breakfast },
+        "dinner": { same structure as breakfast }
       },
-      "dailyTotals": { calories: number, protein: number, carbs: number, fats: number, fiber: number }
+      "dailyTotals": { "calories": number, "protein": number, "carbs": number, "fats": number, "fiber": number }
     },
-    // Same structure for other days of the week
+    "tuesday": { same structure as monday },
+    "wednesday": { same structure as monday },
+    "thursday": { same structure as monday },
+    "friday": { same structure as monday },
+    "saturday": { same structure as monday },
+    "sunday": { same structure as monday }
   },
   "weeklyTotals": {
     "averageCalories": number,
@@ -72,42 +82,63 @@ VERY IMPORTANT: You must ALWAYS respond with a valid JSON object following this 
 
     console.log("Sending request to DeepSeek API...");
     
+    const requestBody = {
+      model: "deepseek-chat",
+      messages: [
+        {
+          role: "system",
+          content: systemPrompt
+        },
+        {
+          role: "user",
+          content: formattedPrompt
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 4000,
+      response_format: { type: "json_object" }
+    };
+
+    console.log("Request body:", JSON.stringify(requestBody, null, 2));
+
     const response = await fetch(DEEPSEEK_API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${DEEPSEEK_API_KEY}`,
       },
-      body: JSON.stringify({
-        model: "deepseek-chat",
-        messages: [
-          {
-            role: "system",
-            content: systemPrompt
-          },
-          {
-            role: "user",
-            content: formattedPrompt
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 4000,
-        response_format: { type: "json_object" }  // Force JSON response
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
-      throw new Error(`DeepSeek API error: ${response.statusText}`);
+      const errorText = await response.text();
+      console.error("DeepSeek API error response:", errorText);
+      throw new Error(`DeepSeek API error: ${response.status} - ${response.statusText}`);
     }
 
-    const data = await response.json();
-    console.log("DeepSeek API response received");
+    const responseText = await response.text();
+    console.log("Raw API response:", responseText);
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (error) {
+      console.error("Failed to parse API response as JSON:", error);
+      console.error("Response text:", responseText);
+      throw new Error("Invalid JSON response from API");
+    }
+
+    if (!data || !data.choices || !data.choices[0] || !data.choices[0].message) {
+      console.error("Unexpected API response structure:", data);
+      throw new Error("Invalid response structure from API");
+    }
 
     const generatedPlan = data.choices[0].message.content;
-    let mealPlan;
+    console.log("Generated plan (raw):", generatedPlan);
 
+    let mealPlan;
     try {
-      // Attempt to parse the response as JSON
+      // Attempt to parse the response as JSON if it's a string
       if (typeof generatedPlan === 'string') {
         mealPlan = JSON.parse(generatedPlan);
       } else {
@@ -116,14 +147,32 @@ VERY IMPORTANT: You must ALWAYS respond with a valid JSON object following this 
 
       // Validate the structure of the meal plan
       if (!mealPlan.weeklyPlan || !mealPlan.weeklyTotals || !mealPlan.recommendations) {
+        console.error("Invalid meal plan structure:", mealPlan);
         throw new Error("Invalid meal plan structure");
       }
 
+      // Validate that all required fields are present
+      const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+      const meals = ['breakfast', 'morningSnack', 'lunch', 'afternoonSnack', 'dinner'];
+      
+      for (const day of days) {
+        if (!mealPlan.weeklyPlan[day]) {
+          throw new Error(`Missing day: ${day}`);
+        }
+        for (const meal of meals) {
+          if (!mealPlan.weeklyPlan[day].meals[meal]) {
+            throw new Error(`Missing meal ${meal} for ${day}`);
+          }
+        }
+      }
+
     } catch (error) {
-      console.error("Error parsing meal plan:", error);
-      console.error("Received content:", generatedPlan);
-      throw new Error("Invalid meal plan format received from AI");
+      console.error("Error parsing or validating meal plan:", error);
+      console.error("Generated plan content:", generatedPlan);
+      throw new Error(`Invalid meal plan format: ${error.message}`);
     }
+
+    console.log("Successfully validated meal plan structure");
 
     return new Response(
       JSON.stringify({ mealPlan }),
@@ -133,7 +182,10 @@ VERY IMPORTANT: You must ALWAYS respond with a valid JSON object following this 
   } catch (error) {
     console.error("Error in generate-meal-plan:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        details: error.stack
+      }),
       { 
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
