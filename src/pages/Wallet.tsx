@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Input } from '@/components/ui/input';
 import QRCode from 'qrcode';
 import { toast } from 'sonner';
+import { TransferForm } from '@/components/wallet/TransferForm';
 
 const transactionTypeInfo = {
   daily_tip: {
@@ -105,20 +106,33 @@ const Wallet = () => {
                 variant="secondary" 
                 onClick={() => setShowTransferDialog(true)}
               >
-                <QrCode className="w-4 h-4 mr-2" />
-                Criar QR Code
+                <Send className="w-4 h-4 mr-2" />
+                Transferir FITs
               </Button>
               <Button 
                 variant="secondary"
                 onClick={() => setShowScanDialog(true)}
               >
                 <QrCode className="w-4 h-4 mr-2" />
-                Ler QR Code
+                QR Code
               </Button>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Transfer Dialog */}
+      <Dialog open={showTransferDialog} onOpenChange={setShowTransferDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Transferir FITs</DialogTitle>
+            <DialogDescription>
+              Envie FITs para outro usuário usando CPF ou telefone
+            </DialogDescription>
+          </DialogHeader>
+          <TransferForm />
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardHeader>
@@ -156,34 +170,6 @@ const Wallet = () => {
           })}
         </CardContent>
       </Card>
-
-      {/* Transfer Dialog */}
-      <Dialog open={showTransferDialog} onOpenChange={setShowTransferDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Criar QR Code para Transferência</DialogTitle>
-            <DialogDescription>
-              Digite a quantidade de FITs que deseja transferir
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Input
-              type="number"
-              placeholder="Quantidade de FITs"
-              value={transferAmount}
-              onChange={(e) => setTransferAmount(e.target.value)}
-            />
-            <Button onClick={handleCreateQRCode} className="w-full">
-              Gerar QR Code
-            </Button>
-            {qrCodeDataUrl && (
-              <div className="flex justify-center">
-                <img src={qrCodeDataUrl} alt="QR Code" className="w-48 h-48" />
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Scan Dialog */}
       <Dialog open={showScanDialog} onOpenChange={setShowScanDialog}>
