@@ -95,6 +95,7 @@ const Wallet = () => {
       setRecipientEmail('');
     } catch (error) {
       console.error('Error sending transfer:', error);
+      toast.error('Erro ao enviar transferência');
     }
   };
 
@@ -104,6 +105,7 @@ const Wallet = () => {
       setShowScanDialog(false);
     } catch (error) {
       console.error('Error redeeming QR code:', error);
+      toast.error('Erro ao resgatar QR Code');
     }
   };
 
@@ -179,7 +181,7 @@ const Wallet = () => {
                   </div>
                 </div>
                 <p className="font-semibold text-primary-500">
-                  +{transaction.amount} FITs
+                  {transaction.amount > 0 ? '+' : ''}{transaction.amount} FITs
                 </p>
               </div>
             );

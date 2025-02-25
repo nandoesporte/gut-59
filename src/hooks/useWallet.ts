@@ -4,31 +4,29 @@ import { supabase } from '@/integrations/supabase/client';
 import { Transaction, TransactionType, Wallet, TransferQRCode } from '@/types/wallet';
 import { toast } from 'sonner';
 
-// Basic type definitions without nesting
-interface BaseTransaction {
+// Simplified type definitions
+type TransactionInput = {
   amount: number;
   type: TransactionType;
   description?: string;
-}
-
-interface TransactionInput extends BaseTransaction {
   recipientId?: string;
   recipientEmail?: string;
   qrCodeId?: string;
-}
+};
 
-interface EmailTransferInput extends BaseTransaction {
-  email: string;
-}
-
-interface QRCodeInput {
+type EmailTransferInput = {
   amount: number;
-}
+  email: string;
+  description?: string;
+};
+
+type QRCodeInput = {
+  amount: number;
+};
 
 export const useWallet = () => {
   const queryClient = useQueryClient();
 
-  // Basic wallet query
   const walletQuery = useQuery({
     queryKey: ['wallet'],
     queryFn: async () => {
@@ -59,7 +57,6 @@ export const useWallet = () => {
     }
   });
 
-  // Transactions query
   const transactionsQuery = useQuery({
     queryKey: ['transactions', walletQuery.data?.id],
     queryFn: async () => {
@@ -77,7 +74,6 @@ export const useWallet = () => {
     enabled: !!walletQuery.data?.id
   });
 
-  // Basic mutation functions
   const addTransaction = useMutation({
     mutationFn: async (input: TransactionInput) => {
       if (!walletQuery.data) throw new Error('Wallet not initialized');
@@ -117,22 +113,22 @@ export const useWallet = () => {
   });
 
   const emailTransfer = useMutation({
-    mutationFn: async ({ amount, email, description }: EmailTransferInput) => {
-      if (!walletQuery.data?.balance || walletQuery.data.balance < amount) {
+    mutationFn: async (input: EmailTransferInput) => {
+      if (!walletQuery.data?.balance || walletQuery.data.balance < input.amount) {
         throw new Error('Saldo insuficiente');
       }
 
       return addTransaction.mutateAsync({
-        amount: -amount,
+        amount: -input.amount,
         type: 'transfer',
-        description: description || 'Transferência por email',
-        recipientEmail: email
+        description: input.description || 'Transferência por email',
+        recipientEmail: input.email
       });
     }
   });
 
   const createQRCode = useMutation({
-    mutationFn: async ({ amount }: QRCodeInput) => {
+    mutationFn: async (input: QRCodeInput) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuário não autenticado');
 
@@ -143,7 +139,7 @@ export const useWallet = () => {
         .from('transfer_qr_codes')
         .insert({
           creator_id: user.id,
-          amount,
+          amount: input.amount,
           expires_at: expiresAt.toISOString(),
         })
         .select()
