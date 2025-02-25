@@ -27,7 +27,6 @@ type QRCodeInput = {
 export const useWallet = () => {
   const queryClient = useQueryClient();
 
-  // Query para buscar a carteira
   const walletQuery = useQuery({
     queryKey: ['wallet'],
     queryFn: async () => {
@@ -58,7 +57,6 @@ export const useWallet = () => {
     }
   });
 
-  // Query para buscar transações
   const transactionsQuery = useQuery({
     queryKey: ['transactions', walletQuery.data?.id],
     queryFn: async () => {
@@ -76,7 +74,6 @@ export const useWallet = () => {
     enabled: !!walletQuery.data?.id
   });
 
-  // Função auxiliar para criar transação
   const createTransaction = async (input: TransactionInput) => {
     if (!walletQuery.data) throw new Error('Wallet not initialized');
 
@@ -107,24 +104,14 @@ export const useWallet = () => {
       });
   };
 
-  // Mutation simplificada para adicionar transação
   const addTransaction = useMutation({
-    mutationFn: async (input: TransactionInput) => {
-      await createTransaction(input);
-      
-      if (input.type !== 'transfer') {
-        toast.success(`Parabéns! Você ganhou ${input.amount} FITs!`, {
-          description: input.description || 'Continue assim!',
-        });
-      }
-    },
+    mutationFn: createTransaction,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['wallet'] });
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
     }
   });
 
-  // Mutation simplificada para transferência por email
   const emailTransfer = useMutation({
     mutationFn: async (input: EmailTransferInput) => {
       if (!walletQuery.data?.balance || walletQuery.data.balance < input.amount) {
@@ -140,9 +127,8 @@ export const useWallet = () => {
     }
   });
 
-  // Mutation simplificada para criar QR Code
   const createQRCode = useMutation({
-    mutationFn: async (input: QRCodeInput) => {
+    mutationFn: async (input: QRCodeInput): Promise<TransferQRCode> => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuário não autenticado');
 
@@ -164,7 +150,6 @@ export const useWallet = () => {
     }
   });
 
-  // Mutation simplificada para resgatar QR Code
   const redeemQRCode = useMutation({
     mutationFn: async (qrCodeId: string) => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -210,7 +195,7 @@ export const useWallet = () => {
     transactions: transactionsQuery.data,
     isLoading: walletQuery.isLoading || transactionsQuery.isLoading,
     addTransaction: addTransaction.mutate,
-    createTransferQRCode: createQRCode.mutate,
+    createTransferQRCode: createQRCode.mutateAsync,
     redeemQRCode: redeemQRCode.mutate,
     transferByEmail: emailTransfer.mutate
   };

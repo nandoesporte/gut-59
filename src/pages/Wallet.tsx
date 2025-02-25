@@ -67,8 +67,10 @@ const Wallet = () => {
 
     try {
       const qrCode = await createTransferQRCode({ amount });
-      const qrCodeUrl = await QRCode.toDataURL(qrCode.id);
-      setQrCodeDataUrl(qrCodeUrl);
+      if (qrCode) {
+        const qrCodeUrl = await QRCode.toDataURL(qrCode.id);
+        setQrCodeDataUrl(qrCodeUrl);
+      }
     } catch (error) {
       console.error('Error creating QR code:', error);
       toast.error('Erro ao criar QR Code');
