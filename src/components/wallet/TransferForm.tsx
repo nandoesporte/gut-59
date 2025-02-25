@@ -43,16 +43,26 @@ export function TransferForm() {
         return;
       }
 
-      // Get recipient by email
-      const { data: recipientUser, error: recipientError } = await supabase.auth.admin.getUserByEmail(values.recipientEmail);
-      
-      if (recipientError || !recipientUser) {
+      // Get recipient by email from profiles table
+      const { data: recipientProfile, error: recipientError } = await supabase
+        .from('wallets')
+        .select('id, user_id')
+        .eq('user_id', (
+          await supabase
+            .from('profiles')
+            .select('id')
+            .eq('email', values.recipientEmail)
+            .single()
+        ).data?.id)
+        .single();
+
+      if (recipientError || !recipientProfile) {
         toast.error('Destinatário não encontrado');
         return;
       }
 
       // Prevent self-transfer
-      if (recipientUser.id === user.id) {
+      if (recipientProfile.user_id === user.id) {
         toast.error('Você não pode transferir FITs para você mesmo');
         return;
       }
@@ -60,7 +70,7 @@ export function TransferForm() {
       // Process the transfer using the RPC function
       const { error: transferError } = await supabase.rpc('process_transfer', {
         sender_wallet_id: user.id,
-        recipient_wallet_id: recipientUser.id,
+        recipient_wallet_id: recipientProfile.user_id,
         transfer_amount: values.amount,
         description: values.description || 'Transferência de FITs'
       });
