@@ -11,12 +11,24 @@ interface TransactionInsert {
   qr_code_id?: string;
 }
 
+// Explicitly define the shape of the data we expect
+interface UserProfile {
+  id: string;
+  email?: string;
+}
+
+interface UserWallet {
+  id: string;
+  user_id: string;
+}
+
 export async function findRecipientByEmail(email: string): Promise<string> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('*')
+    .select('id')
     .eq('email', email)
-    .single();
+    .limit(1)
+    .maybeSingle() as { data: UserProfile | null, error: any };
   
   if (error) throw error;
   if (!data) {
@@ -57,9 +69,10 @@ export async function createWalletTransaction(params: {
     
     const { data: recipientWallet, error: walletError } = await supabase
       .from('wallets')
-      .select('*')
+      .select('id')
       .eq('user_id', params.recipientId)
-      .single();
+      .limit(1)
+      .maybeSingle() as { data: UserWallet | null, error: any };
 
     if (walletError) {
       console.error('Erro ao buscar carteira do destinatário:', walletError);
