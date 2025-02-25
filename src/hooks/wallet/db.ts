@@ -11,16 +11,11 @@ interface TransactionInsert {
   qr_code_id?: string;
 }
 
-interface ProfileSelect {
-  id: string;
-}
-
 export async function findRecipientByEmail(email: string): Promise<string> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id')
+    .select('*')
     .eq('email', email)
-    .returns<ProfileSelect>()
     .single();
   
   if (error) throw error;
@@ -62,9 +57,8 @@ export async function createWalletTransaction(params: {
     
     const { data: recipientWallet, error: walletError } = await supabase
       .from('wallets')
-      .select('id')
+      .select('*')
       .eq('user_id', params.recipientId)
-      .returns<{ id: string }>()
       .single();
 
     if (walletError) {
