@@ -37,6 +37,8 @@ export const generateMealPlan = async ({
   let toastId: string | number | undefined;
 
   try {
+    console.log('Iniciando processo de geração com preferências:', preferences);
+    
     const selectedFoodsDetails = selectedFoods.map(food => ({
       id: food.id,
       name: food.name,
@@ -84,7 +86,14 @@ export const generateMealPlan = async ({
       description: 'Geração de plano alimentar'
     });
 
-    await saveMealPlanData(userData.id, response.mealPlan, userData.dailyCalories, preferences);
+    // Salvar os dados do plano
+    try {
+      await saveMealPlanData(userData.id, response.mealPlan, userData.dailyCalories, preferences);
+      console.log('Dados do plano e preferências salvos com sucesso');
+    } catch (saveError) {
+      console.error('Erro ao salvar dados do plano:', saveError);
+      // Não vamos interromper o fluxo se falhar ao salvar, apenas logar o erro
+    }
 
     toast.dismiss(toastId);
     toast.success(`Cardápio personalizado gerado com sucesso! +${REWARDS.MEAL_PLAN} FITs`);
@@ -99,6 +108,9 @@ export const generateMealPlan = async ({
 
 const saveMealPlanData = async (userId: string, mealPlan: any, calories: number, preferences: DietaryPreferences) => {
   try {
+    console.log('Iniciando salvamento das preferências dietéticas:', preferences);
+    
+    // Salvar preferências dietéticas
     const { error: dietaryError } = await supabase
       .from('dietary_preferences')
       .upsert({
@@ -114,6 +126,9 @@ const saveMealPlanData = async (userId: string, mealPlan: any, calories: number,
       throw dietaryError;
     }
 
+    console.log('Preferências dietéticas salvas com sucesso');
+
+    // Salvar plano alimentar
     const { error: saveError } = await supabase
       .from('meal_plans')
       .insert({
@@ -132,6 +147,8 @@ const saveMealPlanData = async (userId: string, mealPlan: any, calories: number,
       console.error('Erro ao salvar cardápio:', saveError);
       throw saveError;
     }
+
+    console.log('Plano alimentar salvo com sucesso');
   } catch (error) {
     console.error('Erro ao salvar dados do plano:', error);
     throw error;

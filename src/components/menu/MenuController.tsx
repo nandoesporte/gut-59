@@ -89,10 +89,27 @@ export const useMenuController = () => {
       return false;
     }
 
+    console.log('Preferências alimentares recebidas:', preferences);
+    console.log('Alimentos selecionados:', selectedFoods);
+
     setLoading(true);
 
     try {
       const selectedFoodsData = protocolFoods.filter(food => selectedFoods.includes(food.id));
+      console.log('Dados dos alimentos selecionados:', selectedFoodsData);
+
+      // Verificar preferências existentes
+      const { data: existingPreferences, error: preferencesError } = await supabase
+        .from('dietary_preferences')
+        .select('*')
+        .eq('user_id', userData.user.id)
+        .single();
+
+      if (preferencesError && preferencesError.code !== 'PGRST116') {
+        console.error('Erro ao verificar preferências existentes:', preferencesError);
+      }
+
+      console.log('Preferências existentes:', existingPreferences);
       
       const generatedMealPlan = await generateMealPlan({
         userData: {
