@@ -4,60 +4,64 @@ import { supabase } from '@/integrations/supabase/client';
 import { Transaction, TransactionType, Wallet, TransferQRCode } from '@/types/wallet';
 import { toast } from 'sonner';
 
-// Simplified type definitions with explicit types
-type TransactionInput = {
+// Type definitions
+interface TransactionInput {
   amount: number;
   type: TransactionType;
   description?: string;
   recipientId?: string;
   recipientEmail?: string;
   qrCodeId?: string;
-};
+}
 
-type EmailTransferInput = {
+interface EmailTransferInput {
   amount: number;
   email: string;
   description?: string;
-};
+}
 
-type QRCodeInput = {
+interface QRCodeInput {
   amount: number;
+}
+
+// Helper function to fetch wallet
+const fetchWallet = async (): Promise<Wallet> => {
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError) throw userError;
+  if (!user) throw new Error('No user found');
+
+  const { data: existingWallet, error: walletError } = await supabase
+    .from('wallets')
+    .select('*')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (walletError) throw walletError;
+
+  if (!existingWallet) {
+    const { data: newWallet, error: createError } = await supabase
+      .from('wallets')
+      .insert([{ user_id: user.id, balance: 0 }])
+      .select()
+      .single();
+
+    if (createError) throw createError;
+    return newWallet as Wallet;
+  }
+
+  return existingWallet as Wallet;
 };
 
 export const useWallet = () => {
   const queryClient = useQueryClient();
 
-  const walletQuery = useQuery<Wallet, Error>({
+  // Basic queries
+  const walletQuery = useQuery({
     queryKey: ['wallet'],
-    queryFn: async () => {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!user) throw new Error('No user found');
-
-      const { data: existingWallet, error: walletError } = await supabase
-        .from('wallets')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (walletError) throw walletError;
-
-      if (!existingWallet) {
-        const { data: newWallet, error: createError } = await supabase
-          .from('wallets')
-          .insert([{ user_id: user.id, balance: 0 }])
-          .select()
-          .single();
-
-        if (createError) throw createError;
-        return newWallet as Wallet;
-      }
-
-      return existingWallet as Wallet;
-    }
+    queryFn: fetchWallet
   });
 
-  const transactionsQuery = useQuery<Transaction[], Error>({
+  const transactionsQuery = useQuery({
     queryKey: ['transactions', walletQuery.data?.id],
     queryFn: async () => {
       if (!walletQuery.data?.id) throw new Error('No wallet found');
@@ -74,6 +78,7 @@ export const useWallet = () => {
     enabled: !!walletQuery.data?.id
   });
 
+  // Transaction creation
   const createTransaction = async (input: TransactionInput): Promise<void> => {
     if (!walletQuery.data) throw new Error('Wallet not initialized');
 
@@ -106,7 +111,9 @@ export const useWallet = () => {
     if (error) throw error;
   };
 
-  const addTransaction = useMutation<void, Error, TransactionInput>({
+  // Mutations
+  const addTransaction = useMutation({
+    mutationKey: ['addTransaction'],
     mutationFn: createTransaction,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['wallet'] });
@@ -114,8 +121,9 @@ export const useWallet = () => {
     }
   });
 
-  const emailTransfer = useMutation<void, Error, EmailTransferInput>({
-    mutationFn: async (input) => {
+  const emailTransfer = useMutation({
+    mutationKey: ['emailTransfer'],
+    mutationFn: async (input: EmailTransferInput) => {
       if (!walletQuery.data?.balance || walletQuery.data.balance < input.amount) {
         throw new Error('Saldo insuficiente');
       }
@@ -129,8 +137,9 @@ export const useWallet = () => {
     }
   });
 
-  const createQRCode = useMutation<TransferQRCode, Error, QRCodeInput>({
-    mutationFn: async (input) => {
+  const createQRCode = useMutation({
+    mutationKey: ['createQRCode'],
+    mutationFn: async (input: QRCodeInput) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuário não autenticado');
 
@@ -152,8 +161,9 @@ export const useWallet = () => {
     }
   });
 
-  const redeemQRCode = useMutation<TransferQRCode, Error, string>({
-    mutationFn: async (qrCodeId) => {
+  const redeemQRCode = useMutation({
+    mutationKey: ['redeemQRCode'],
+    mutationFn: async (qrCodeId: string) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuário não autenticado');
 
