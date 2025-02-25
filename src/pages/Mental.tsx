@@ -5,14 +5,23 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Brain, Clock, Headphones, BookOpen, MessageCircle } from "lucide-react";
+import { Brain, Clock, Headphones, BookOpen, MessageCircle, Smile, SmilePlus, Frown, Meh, Angry } from "lucide-react";
 
 const Mental = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [mood, setMood] = useState('');
+  const [selectedEmotion, setSelectedEmotion] = useState('');
   const [isBreathing, setIsBreathing] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [breathingPhase, setBreathingPhase] = useState('');
+
+  const emotions = [
+    { id: 'happy', icon: <SmilePlus className="w-8 h-8" />, label: 'Muito Feliz', color: 'bg-[#F2FCE2]' },
+    { id: 'good', icon: <Smile className="w-8 h-8" />, label: 'Bem', color: 'bg-[#D3E4FD]' },
+    { id: 'neutral', icon: <Meh className="w-8 h-8" />, label: 'Neutro', color: 'bg-[#FEF7CD]' },
+    { id: 'sad', icon: <Frown className="w-8 h-8" />, label: 'Triste', color: 'bg-[#FFDEE2]' },
+    { id: 'angry', icon: <Angry className="w-8 h-8" />, label: 'Irritado', color: 'bg-[#FEC6A1]' },
+  ];
 
   const startBreathing = () => {
     setIsBreathing(true);
@@ -23,17 +32,16 @@ const Mental = () => {
       setSeconds(totalSeconds);
       
       // 4-7-8 Breathing pattern
-      const cycle = totalSeconds % 19; // 4 + 7 + 8 = 19 seconds per cycle
+      const cycle = totalSeconds % 19;
       if (cycle < 4) {
-        setBreathingPhase('Inspire (4s)');
+        setBreathingPhase('Inspire');
       } else if (cycle < 11) {
-        setBreathingPhase('Segure (7s)');
+        setBreathingPhase('Segure');
       } else {
-        setBreathingPhase('Expire (8s)');
+        setBreathingPhase('Expire');
       }
     }, 1000);
 
-    // Stop after 5 minutes
     setTimeout(() => {
       clearInterval(interval);
       setIsBreathing(false);
@@ -77,18 +85,24 @@ const Mental = () => {
             <CardHeader>
               <CardTitle>Técnicas de Respiração</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent>
               {!isBreathing ? (
-                <Button onClick={startBreathing} size="lg" className="w-full">
+                <Button onClick={startBreathing} size="lg" className="w-full bg-primary hover:bg-primary/90">
                   Iniciar Exercício 4-7-8
                 </Button>
               ) : (
-                <div className="text-center space-y-4">
-                  <div className="text-4xl font-bold text-primary animate-pulse">
-                    {breathingPhase}
+                <div className="flex flex-col items-center justify-center min-h-[300px] space-y-6">
+                  <div className={`w-32 h-32 md:w-40 md:h-40 rounded-full flex items-center justify-center 
+                    ${breathingPhase === 'Inspire' ? 'animate-scale-in bg-[#D3E4FD]' : 
+                      breathingPhase === 'Segure' ? 'bg-[#F2FCE2]' : 'animate-scale-out bg-[#FFDEE2]'}`}>
+                    <span className="text-2xl font-bold text-primary">{breathingPhase}</span>
                   </div>
-                  <div className="text-2xl">
+                  <div className="text-xl font-semibold">
                     {Math.floor(seconds / 60)}:{(seconds % 60).toString().padStart(2, '0')}
+                  </div>
+                  <div className="text-sm text-muted-foreground text-center">
+                    {breathingPhase === 'Inspire' ? '4 segundos' : 
+                     breathingPhase === 'Segure' ? '7 segundos' : '8 segundos'}
                   </div>
                 </div>
               )}
@@ -123,20 +137,46 @@ const Mental = () => {
             <CardHeader>
               <CardTitle>Diário de Emoções</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+                {emotions.map((emotion) => (
+                  <button
+                    key={emotion.id}
+                    onClick={() => setSelectedEmotion(emotion.id)}
+                    className={`p-4 rounded-xl transition-all transform hover:scale-105 ${emotion.color} 
+                      ${selectedEmotion === emotion.id ? 'ring-2 ring-primary' : ''}`}
+                  >
+                    <div className="flex flex-col items-center gap-2">
+                      {emotion.icon}
+                      <span className="text-sm font-medium">{emotion.label}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+
               <Calendar
                 mode="single"
                 selected={date}
                 onSelect={setDate}
-                className="rounded-md border"
+                className="rounded-lg border shadow-sm bg-card p-4"
+                classNames={{
+                  day_selected: "bg-primary text-primary-foreground hover:bg-primary/90",
+                  day_today: "bg-accent text-accent-foreground",
+                  day: "hover:bg-accent rounded-full transition-colors",
+                  cell: "text-center p-0",
+                  head_cell: "text-muted-foreground font-normal",
+                  nav_button: "hover:bg-accent rounded-full transition-colors",
+                  table: "w-full border-collapse",
+                }}
               />
+
               <div className="space-y-2">
                 <label className="text-sm font-medium">Como você está se sentindo hoje?</label>
                 <Textarea
                   placeholder="Escreva sobre suas emoções..."
                   value={mood}
                   onChange={(e) => setMood(e.target.value)}
-                  className="min-h-[150px]"
+                  className="min-h-[150px] resize-none"
                 />
                 <Button className="w-full">Salvar Registro</Button>
               </div>
