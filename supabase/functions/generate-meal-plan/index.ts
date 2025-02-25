@@ -17,47 +17,41 @@ serve(async (req) => {
 
   try {
     const { userData, selectedFoods, dietaryPreferences, agentPrompt } = await req.json();
-    console.log("Received request data:", JSON.stringify({ userData, selectedFoods, dietaryPreferences }));
+    console.log("Received request data:", { userData, selectedFoods, dietaryPreferences });
 
     if (!DEEPSEEK_API_KEY) {
       throw new Error("Missing DeepSeek API key");
     }
 
-    // Preparar o contexto para o modelo
+    // Prepare context for the model
     const context = {
       user: userData,
       foods: selectedFoods,
       preferences: dietaryPreferences,
     };
 
-    // Modificar o prompt para garantir que a resposta seja em JSON
-    const systemPrompt = `You are a professional nutritionist AI that creates personalized meal plans. 
-VERY IMPORTANT RULES:
-1. You must ALWAYS respond with a valid JSON object.
-2. Your response must STRICTLY follow this exact format, no additional text or explanations allowed:
+    // Format the system prompt for DeepSeek
+    const systemPrompt = `You are a professional nutritionist AI. Create a personalized meal plan following these exact rules:
+1. Response MUST be a valid JSON object
+2. Follow this EXACT format without any additional text:
+
 {
   "weeklyPlan": {
     "monday": {
       "meals": {
         "breakfast": {
-          "description": string,
-          "foods": [{ "name": string, "portion": number, "unit": string, "details": string }],
+          "description": "string",
+          "foods": [{"name": "string", "portion": number, "unit": "string", "details": "string"}],
           "calories": number,
-          "macros": { "protein": number, "carbs": number, "fats": number, "fiber": number }
+          "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number}
         },
-        "morningSnack": { same structure as breakfast },
-        "lunch": { same structure as breakfast },
-        "afternoonSnack": { same structure as breakfast },
-        "dinner": { same structure as breakfast }
+        "morningSnack": {"same structure as breakfast"},
+        "lunch": {"same structure as breakfast"},
+        "afternoonSnack": {"same structure as breakfast"},
+        "dinner": {"same structure as breakfast"}
       },
-      "dailyTotals": { "calories": number, "protein": number, "carbs": number, "fats": number, "fiber": number }
-    },
-    "tuesday": { same structure as monday },
-    "wednesday": { same structure as monday },
-    "thursday": { same structure as monday },
-    "friday": { same structure as monday },
-    "saturday": { same structure as monday },
-    "sunday": { same structure as monday }
+      "dailyTotals": {"calories": number, "protein": number, "carbs": number, "fats": number, "fiber": number}
+    }
   },
   "weeklyTotals": {
     "averageCalories": number,
@@ -67,47 +61,38 @@ VERY IMPORTANT RULES:
     "averageFiber": number
   },
   "recommendations": {
-    "general": string,
-    "preworkout": string,
-    "postworkout": string,
-    "timing": string[]
+    "general": "string",
+    "preworkout": "string",
+    "postworkout": "string",
+    "timing": ["string"]
   }
 }`;
 
-    // Formatar o prompt com os dados do usuário
-    const formattedPrompt = agentPrompt
-      .replace("{{user}}", JSON.stringify(context.user))
-      .replace("{{foods}}", JSON.stringify(context.foods))
-      .replace("{{preferences}}", JSON.stringify(context.preferences));
+    // Format the user prompt with context
+    const userPrompt = `Create a meal plan with these parameters:
+User info: ${JSON.stringify(userData)}
+Available foods: ${JSON.stringify(selectedFoods)}
+Dietary preferences: ${JSON.stringify(dietaryPreferences)}
+Additional instructions: ${agentPrompt}`;
 
     console.log("Sending request to DeepSeek API...");
     
-    const requestBody = {
-      model: "deepseek-chat",
-      messages: [
-        {
-          role: "system",
-          content: systemPrompt
-        },
-        {
-          role: "user",
-          content: formattedPrompt
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 4000,
-      response_format: { type: "json_object" }
-    };
-
-    console.log("Request body:", JSON.stringify(requestBody, null, 2));
-
     const response = await fetch(DEEPSEEK_API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${DEEPSEEK_API_KEY}`,
       },
-      body: JSON.stringify(requestBody),
+      body: JSON.stringify({
+        model: "deepseek-chat",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 4000,
+        stream: false
+      })
     });
 
     if (!response.ok) {
@@ -116,63 +101,49 @@ VERY IMPORTANT RULES:
       throw new Error(`DeepSeek API error: ${response.status} - ${response.statusText}`);
     }
 
-    const responseText = await response.text();
-    console.log("Raw API response:", responseText);
+    const data = await response.json();
+    console.log("DeepSeek API response:", JSON.stringify(data));
 
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch (error) {
-      console.error("Failed to parse API response as JSON:", error);
-      console.error("Response text:", responseText);
-      throw new Error("Invalid JSON response from API");
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      throw new Error("Invalid response structure from DeepSeek API");
     }
 
-    if (!data || !data.choices || !data.choices[0] || !data.choices[0].message) {
-      console.error("Unexpected API response structure:", data);
-      throw new Error("Invalid response structure from API");
-    }
-
-    const generatedPlan = data.choices[0].message.content;
-    console.log("Generated plan (raw):", generatedPlan);
+    const generatedContent = data.choices[0].message.content;
+    console.log("Generated content:", generatedContent);
 
     let mealPlan;
     try {
-      // Attempt to parse the response as JSON if it's a string
-      if (typeof generatedPlan === 'string') {
-        mealPlan = JSON.parse(generatedPlan);
+      if (typeof generatedContent === 'string') {
+        mealPlan = JSON.parse(generatedContent.trim());
       } else {
-        mealPlan = generatedPlan; // If it's already an object
+        mealPlan = generatedContent;
       }
 
-      // Validate the structure of the meal plan
+      // Validate meal plan structure
       if (!mealPlan.weeklyPlan || !mealPlan.weeklyTotals || !mealPlan.recommendations) {
         console.error("Invalid meal plan structure:", mealPlan);
-        throw new Error("Invalid meal plan structure");
+        throw new Error("Generated meal plan is missing required sections");
       }
 
-      // Validate that all required fields are present
-      const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-      const meals = ['breakfast', 'morningSnack', 'lunch', 'afternoonSnack', 'dinner'];
-      
-      for (const day of days) {
+      // Validate all days and meals
+      ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].forEach(day => {
         if (!mealPlan.weeklyPlan[day]) {
           throw new Error(`Missing day: ${day}`);
         }
-        for (const meal of meals) {
+
+        ['breakfast', 'morningSnack', 'lunch', 'afternoonSnack', 'dinner'].forEach(meal => {
           if (!mealPlan.weeklyPlan[day].meals[meal]) {
             throw new Error(`Missing meal ${meal} for ${day}`);
           }
-        }
-      }
+        });
+      });
 
+      console.log("Successfully validated meal plan structure");
     } catch (error) {
       console.error("Error parsing or validating meal plan:", error);
-      console.error("Generated plan content:", generatedPlan);
-      throw new Error(`Invalid meal plan format: ${error.message}`);
+      console.error("Generated content:", generatedContent);
+      throw new Error(`Failed to create valid meal plan: ${error.message}`);
     }
-
-    console.log("Successfully validated meal plan structure");
 
     return new Response(
       JSON.stringify({ mealPlan }),
