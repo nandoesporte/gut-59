@@ -1,21 +1,20 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { TransactionType } from '@/types/wallet';
-import { ProfileResponse } from './types';
 
 export async function findRecipientByEmail(email: string): Promise<string> {
-  const response = await supabase
+  const result = await supabase
     .from('profiles')
     .select('id')
     .eq('email', email)
-    .limit(1) as ProfileResponse;
+    .limit(1);
 
-  if (response.error) throw response.error;
-  if (!response.data || response.data.length === 0) {
+  if (result.error) throw result.error;
+  if (!result.data || result.data.length === 0) {
     throw new Error('Usuário não encontrado');
   }
   
-  return response.data[0].id;
+  return result.data[0].id;
 }
 
 export async function createWalletTransaction(params: {
