@@ -30,6 +30,40 @@ serve(async (req) => {
       preferences: dietaryPreferences,
     };
 
+    // Modificar o prompt para garantir que a resposta seja em JSON
+    const systemPrompt = `You are a professional nutritionist AI that creates personalized meal plans. 
+VERY IMPORTANT: You must ALWAYS respond with a valid JSON object following this exact format:
+{
+  "weeklyPlan": {
+    "monday": {
+      "meals": {
+        "breakfast": {
+          "description": string,
+          "foods": Array<{ name: string, portion: number, unit: string, details: string }>,
+          "calories": number,
+          "macros": { protein: number, carbs: number, fats: number, fiber: number }
+        },
+        // Same structure for morningSnack, lunch, afternoonSnack, dinner
+      },
+      "dailyTotals": { calories: number, protein: number, carbs: number, fats: number, fiber: number }
+    },
+    // Same structure for other days of the week
+  },
+  "weeklyTotals": {
+    "averageCalories": number,
+    "averageProtein": number,
+    "averageCarbs": number,
+    "averageFats": number,
+    "averageFiber": number
+  },
+  "recommendations": {
+    "general": string,
+    "preworkout": string,
+    "postworkout": string,
+    "timing": string[]
+  }
+}`;
+
     // Formatar o prompt com os dados do usuário
     const formattedPrompt = agentPrompt
       .replace("{{user}}", JSON.stringify(context.user))
@@ -49,7 +83,7 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: "You are a professional nutritionist AI that creates personalized meal plans."
+            content: systemPrompt
           },
           {
             role: "user",
@@ -57,7 +91,8 @@ serve(async (req) => {
           }
         ],
         temperature: 0.7,
-        max_tokens: 4000
+        max_tokens: 4000,
+        response_format: { type: "json_object" }  // Force JSON response
       }),
     });
 
@@ -72,9 +107,21 @@ serve(async (req) => {
     let mealPlan;
 
     try {
-      mealPlan = JSON.parse(generatedPlan);
+      // Attempt to parse the response as JSON
+      if (typeof generatedPlan === 'string') {
+        mealPlan = JSON.parse(generatedPlan);
+      } else {
+        mealPlan = generatedPlan; // If it's already an object
+      }
+
+      // Validate the structure of the meal plan
+      if (!mealPlan.weeklyPlan || !mealPlan.weeklyTotals || !mealPlan.recommendations) {
+        throw new Error("Invalid meal plan structure");
+      }
+
     } catch (error) {
       console.error("Error parsing meal plan:", error);
+      console.error("Received content:", generatedPlan);
       throw new Error("Invalid meal plan format received from AI");
     }
 
