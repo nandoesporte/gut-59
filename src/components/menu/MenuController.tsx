@@ -124,17 +124,18 @@ export const useMenuController = () => {
       
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) {
+        console.error('Usuário não autenticado');
         setShowLoadingDialog(false);
         toast.error("Usuário não autenticado");
         return false;
       }
 
-      // Buscar preferências nutricionais existentes
+      console.log("Buscando preferências nutricionais do usuário...");
       const { data: existingPreferences, error: preferencesError } = await supabase
         .from('nutrition_preferences')
         .select('*')
         .eq('user_id', userData.user.id)
-        .maybeSingle();
+        .single();
 
       if (preferencesError) {
         console.error('Erro ao buscar preferências:', preferencesError);
@@ -143,18 +144,19 @@ export const useMenuController = () => {
       }
 
       if (!existingPreferences) {
+        console.error('Preferências não encontradas');
         toast.error("Por favor, complete as etapas anteriores primeiro");
         return false;
       }
 
-      // Salvar preferências dietéticas
+      console.log("Salvando preferências dietéticas...");
       const { error: updateError } = await supabase
-        .from('nutrition_preferences')
+        .from('dietary_preferences')
         .upsert({
-          ...existingPreferences,
           user_id: userData.user.id,
-          allergies: preferences.allergies || [],
-          dietary_preferences: preferences.dietaryRestrictions || [],
+          has_allergies: preferences.hasAllergies,
+          allergies: preferences.allergies,
+          dietary_restrictions: preferences.dietaryRestrictions,
           training_time: preferences.trainingTime,
           updated_at: new Date().toISOString()
         });
@@ -165,13 +167,13 @@ export const useMenuController = () => {
         return false;
       }
 
-      // Buscar o prompt do agente Nutri+
+      console.log("Buscando prompt do agente...");
       const { data: agentPrompt, error: promptError } = await supabase
         .from('ai_agent_prompts')
         .select('prompt')
         .eq('agent_type', 'meal_plan')
         .eq('is_active', true)
-        .maybeSingle();
+        .single();
 
       if (promptError || !agentPrompt) {
         console.error('Erro ao buscar prompt do agente:', promptError);
@@ -180,6 +182,7 @@ export const useMenuController = () => {
       }
 
       // Preparar dados para a geração do plano
+      console.log("Preparando dados dos alimentos selecionados...");
       const selectedFoodsDetails = protocolFoods
         .filter(food => selectedFoods.includes(food.id))
         .map(food => ({
@@ -194,27 +197,30 @@ export const useMenuController = () => {
           food_group_id: food.food_group_id
         }));
 
-      console.log("Chamando edge function generate-meal-plan...");
+      console.log("Preparando payload para a edge function...");
+      const payload = {
+        userData: {
+          weight: Number(formData.weight),
+          height: Number(formData.height),
+          age: Number(formData.age),
+          gender: formData.gender,
+          activityLevel: formData.activityLevel,
+          goal: formData.goal === "lose" ? "lose_weight" : formData.goal === "gain" ? "gain_mass" : "maintain",
+          userId: userData.user.id,
+          dailyCalories: calorieNeeds
+        },
+        selectedFoods: selectedFoodsDetails,
+        dietaryPreferences: preferences,
+        agentPrompt: agentPrompt.prompt
+      };
+
+      console.log("Dados sendo enviados para a edge function:", JSON.stringify(payload, null, 2));
       
-      // Chamar a edge function para gerar o plano
+      console.log("Chamando edge function generate-meal-plan...");
       const { data: response, error: planError } = await supabase.functions.invoke(
         'generate-meal-plan',
         {
-          body: {
-            userData: {
-              weight: Number(formData.weight),
-              height: Number(formData.height),
-              age: Number(formData.age),
-              gender: formData.gender,
-              activityLevel: formData.activityLevel,
-              goal: formData.goal === "lose" ? "lose_weight" : formData.goal === "gain" ? "gain_mass" : "maintain",
-              userId: userData.user.id,
-              dailyCalories: calorieNeeds
-            },
-            selectedFoods: selectedFoodsDetails,
-            dietaryPreferences: preferences,
-            agentPrompt: agentPrompt.prompt
-          }
+          body: payload
         }
       );
 
@@ -224,14 +230,17 @@ export const useMenuController = () => {
         return false;
       }
 
+      console.log("Resposta da edge function:", JSON.stringify(response, null, 2));
+
       if (!response?.mealPlan) {
+        console.error('Plano alimentar não gerado corretamente');
         toast.error('Plano alimentar não gerado corretamente');
         return false;
       }
 
+      console.log("Salvando plano gerado...");
       setMealPlan(response.mealPlan);
       setDietaryPreferences(preferences);
-      setCurrentStep(4);
 
       // Adicionar transação de FITs
       if (response?.mealPlan) {
@@ -241,6 +250,7 @@ export const useMenuController = () => {
           description: 'Geração de plano alimentar'
         });
         
+        console.log("FITs adicionados com sucesso");
         toast.success(`Cardápio personalizado gerado com sucesso! +${REWARDS.MEAL_PLAN} FITs`);
       }
 
@@ -261,8 +271,10 @@ export const useMenuController = () => {
 
       if (saveError) {
         console.error('Erro ao salvar cardápio:', saveError);
+        // Não retornamos false aqui pois o plano já foi gerado com sucesso
       }
 
+      setCurrentStep(4);
       return true;
 
     } catch (error) {
