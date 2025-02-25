@@ -30,21 +30,25 @@ export const PaymentSettings = ({ user }: PaymentSettingsProps) => {
 
         if (settingsError) throw settingsError;
 
-        // Buscar configurações específicas do usuário
+        // Buscar configurações específicas do usuário mais recentes
         const { data: planAccess, error: accessError } = await supabase
           .from('plan_access')
           .select('plan_type, payment_required')
-          .eq('user_id', user.id);
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .order('created_at', { ascending: false });
 
         if (accessError) throw accessError;
 
         const updatedRequirements = paymentRequirements.map(req => {
           const globalSetting = paymentSettings?.find(s => s.plan_type === req.planType);
+          
+          // Pegar o acesso mais recente para este tipo de plano
           const userSetting = planAccess?.find(p => p.plan_type === req.planType);
           
-          // Payment is required if global setting is active and user doesn't have special access
-          const isRequired = globalSetting?.is_active && 
-            (!userSetting || userSetting.payment_required);
+          // Payment is required if global setting is active AND user doesn't have special access
+          const isRequired = globalSetting?.is_active !== false && 
+            (userSetting?.payment_required !== false);
 
           return {
             ...req,
@@ -73,26 +77,14 @@ export const PaymentSettings = ({ user }: PaymentSettingsProps) => {
         r.planType === planType ? { ...r, isDisabling: true } : r
       ));
 
-      // Atualizar configuração global de pagamento
-      const { error: updateSettingError } = await supabase
-        .from('payment_settings')
-        .upsert({
-          plan_type: planType,
-          is_active: !requirement.isRequired,
-          price: 19.90 // Mantém o preço padrão
-        }, {
-          onConflict: 'plan_type'
-        });
-
-      if (updateSettingError) throw updateSettingError;
-
-      // Primeiro, delete registros existentes para esse usuário e tipo de plano
+      // Primeiro, desativa todos os acessos anteriores para este tipo de plano
       await supabase
         .from('plan_access')
-        .delete()
+        .update({ is_active: false })
         .match({ 
           user_id: user.id, 
-          plan_type: planType 
+          plan_type: planType,
+          is_active: true
         });
 
       // Agora insere o novo registro de acesso do usuário
@@ -102,7 +94,9 @@ export const PaymentSettings = ({ user }: PaymentSettingsProps) => {
           user_id: user.id,
           plan_type: planType,
           payment_required: !requirement.isRequired,
-          is_active: true
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         });
 
       if (insertError) throw insertError;
