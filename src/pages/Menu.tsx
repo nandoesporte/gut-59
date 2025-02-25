@@ -1,3 +1,4 @@
+
 import { Card } from "@/components/ui/card";
 import { InitialMenuContent } from "@/components/menu/InitialMenuContent";
 import { CalorieCalculatorStep } from "@/components/menu/CalorieCalculatorStep";
@@ -27,6 +28,7 @@ const Menu = () => {
     formData,
     loading,
     showLoadingDialog,
+    setShowLoadingDialog,  // Added this destructured value
     handleCalculateCalories,
     handleFoodSelection,
     handleDietaryPreferences,
@@ -85,9 +87,11 @@ const Menu = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 py-8">
-      <Dialog open={showLoadingDialog} onOpenChange={setShowLoadingDialog}>
-        <DialogContent className="sm:max-w-md" hideClose>
-          <WorkoutLoadingState message="Gerando seu plano alimentar personalizado..." />
+      <Dialog open={showLoadingDialog}>
+        <DialogContent className="sm:max-w-md">
+          <div className="flex flex-col items-center justify-center space-y-4">
+            <WorkoutLoadingState message="Gerando seu plano alimentar personalizado..." />
+          </div>
         </DialogContent>
       </Dialog>
 
