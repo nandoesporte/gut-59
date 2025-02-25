@@ -1106,6 +1106,7 @@ export type Database = {
           age: number | null
           cpf: string | null
           daily_water_goal_ml: number | null
+          email: string | null
           health_conditions: string | null
           height: number | null
           id: string
@@ -1118,6 +1119,7 @@ export type Database = {
           age?: number | null
           cpf?: string | null
           daily_water_goal_ml?: number | null
+          email?: string | null
           health_conditions?: string | null
           height?: number | null
           id: string
@@ -1130,6 +1132,7 @@ export type Database = {
           age?: number | null
           cpf?: string | null
           daily_water_goal_ml?: number | null
+          email?: string | null
           health_conditions?: string | null
           height?: number | null
           id?: string
