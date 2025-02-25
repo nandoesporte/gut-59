@@ -84,7 +84,7 @@ Additional instructions: ${agentPrompt}`;
         "Authorization": `Bearer ${OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "gpt-4",  // Corrigido: usando o modelo gpt-4 em vez de gpt-4o-mini
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
