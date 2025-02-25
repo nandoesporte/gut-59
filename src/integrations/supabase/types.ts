@@ -1104,31 +1104,37 @@ export type Database = {
       profiles: {
         Row: {
           age: number | null
+          cpf: string | null
           daily_water_goal_ml: number | null
           health_conditions: string | null
           height: number | null
           id: string
           name: string | null
+          phone_number: string | null
           photo_url: string | null
           weight: number | null
         }
         Insert: {
           age?: number | null
+          cpf?: string | null
           daily_water_goal_ml?: number | null
           health_conditions?: string | null
           height?: number | null
           id: string
           name?: string | null
+          phone_number?: string | null
           photo_url?: string | null
           weight?: number | null
         }
         Update: {
           age?: number | null
+          cpf?: string | null
           daily_water_goal_ml?: number | null
           health_conditions?: string | null
           height?: number | null
           id?: string
           name?: string | null
+          phone_number?: string | null
           photo_url?: string | null
           weight?: number | null
         }
@@ -1700,6 +1706,36 @@ export type Database = {
         }
         Relationships: []
       }
+      transfer_requests: {
+        Row: {
+          amount: number
+          completed_at: string | null
+          created_at: string
+          id: string
+          recipient_identifier: string
+          sender_id: string
+          status: string
+        }
+        Insert: {
+          amount: number
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          recipient_identifier: string
+          sender_id: string
+          status?: string
+        }
+        Update: {
+          amount?: number
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          recipient_identifier?: string
+          sender_id?: string
+          status?: string
+        }
+        Relationships: []
+      }
       user_progress: {
         Row: {
           body_fat: number | null
@@ -2020,6 +2056,15 @@ export type Database = {
       has_role: {
         Args: {
           role: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: boolean
+      }
+      process_transfer: {
+        Args: {
+          sender_wallet_id: string
+          recipient_wallet_id: string
+          transfer_amount: number
+          description?: string
         }
         Returns: boolean
       }

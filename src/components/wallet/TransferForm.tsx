@@ -37,29 +37,38 @@ export function TransferForm() {
     try {
       setIsLoading(true);
 
-      // First, verify if the recipient exists
-      const { data: recipient } = await supabase
+      // First, verify if the recipient exists by CPF or phone number
+      const { data: recipient, error: recipientError } = await supabase
         .from('profiles')
         .select('id')
         .or(`phone_number.eq.${values.recipientIdentifier},cpf.eq.${values.recipientIdentifier}`)
-        .single();
+        .maybeSingle();
 
-      if (!recipient) {
+      if (recipientError || !recipient) {
         toast.error('Destinatário não encontrado');
         return;
       }
 
-      // Create transfer request
-      const { error: transferError } = await supabase
-        .from('transfer_requests')
+      // Get current user's wallet
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('Usuário não autenticado');
+        return;
+      }
+
+      // Create a fit transaction
+      const { error: transactionError } = await supabase
+        .from('fit_transactions')
         .insert({
-          recipient_identifier: values.recipientIdentifier,
-          amount: values.amount,
-          status: 'pending'
+          wallet_id: user.id,
+          amount: -values.amount,
+          transaction_type: 'transfer',
+          recipient_id: recipient.id,
+          description: values.description || 'Transferência de FITs'
         });
 
-      if (transferError) {
-        throw transferError;
+      if (transactionError) {
+        throw transactionError;
       }
 
       form.reset();
