@@ -37,6 +37,18 @@ const Menu = () => {
     );
   }
 
+  const handleNextStep = () => {
+    if (currentStep < 4) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const handlePreviousStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 py-8">
       <div className="container mx-auto px-4">
@@ -48,7 +60,7 @@ const Menu = () => {
 
           <div className="space-y-8">
             {/* Etapa 1: Cálculo de Calorias */}
-            <Card className="p-6">
+            <Card className={`p-6 ${currentStep !== 1 ? 'opacity-50' : ''}`}>
               <h2 className="text-xl font-semibold mb-4 flex items-center">
                 <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">1</span>
                 Dados Básicos e Calorias
@@ -61,6 +73,7 @@ const Menu = () => {
                     const success = await handleCalculateCalories();
                     if (success) {
                       toast.success("Calorias calculadas com sucesso!");
+                      handleNextStep();
                     }
                   } catch (error) {
                     console.error('Erro ao calcular calorias:', error);
@@ -72,7 +85,7 @@ const Menu = () => {
             </Card>
 
             {/* Etapa 2: Seleção de Alimentos */}
-            <Card className={`p-6 ${!calorieNeeds ? 'opacity-50 pointer-events-none' : ''}`}>
+            <Card className={`p-6 ${currentStep !== 2 ? 'opacity-50 pointer-events-none' : ''}`}>
               <h2 className="text-xl font-semibold mb-4 flex items-center">
                 <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">2</span>
                 Preferências Alimentares
@@ -82,54 +95,27 @@ const Menu = () => {
                 selectedFoods={selectedFoods}
                 onFoodSelection={handleFoodSelection}
                 totalCalories={totalCalories}
-                onBack={() => {}}
-                onConfirm={() => {}}
+                onBack={handlePreviousStep}
+                onConfirm={handleNextStep}
               />
             </Card>
 
             {/* Etapa 3: Preferências Dietéticas */}
-            <Card className={`p-6 ${selectedFoods.length === 0 ? 'opacity-50 pointer-events-none' : ''}`}>
+            <Card className={`p-6 ${currentStep !== 3 ? 'opacity-50 pointer-events-none' : ''}`}>
               <h2 className="text-xl font-semibold mb-4 flex items-center">
                 <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">3</span>
                 Restrições e Preferências
               </h2>
               <DietaryPreferencesForm
-                onSubmit={(preferences: DietaryPreferences) => {}}
-                onBack={() => {}}
+                onSubmit={(preferences: DietaryPreferences) => {
+                  handleDietaryPreferences(preferences);
+                }}
+                onBack={handlePreviousStep}
               />
-              {selectedFoods.length > 0 && (
-                <div className="mt-6">
-                  <button
-                    onClick={async () => {
-                      try {
-                        const result = await handleDietaryPreferences({
-                          hasAllergies: false,
-                          allergies: [],
-                          dietaryRestrictions: [],
-                          trainingTime: null
-                        }).catch(error => {
-                          console.error('Erro detalhado:', error);
-                          return false;
-                        });
-                        
-                        if (!result) {
-                          toast.error("Não foi possível gerar o plano alimentar. Tente novamente.");
-                        }
-                      } catch (error) {
-                        console.error('Erro ao gerar plano:', error);
-                        toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
-                      }
-                    }}
-                    className="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded transition-colors"
-                  >
-                    Gerar Plano Alimentar
-                  </button>
-                </div>
-              )}
             </Card>
 
             {/* Etapa 4: Exibição do Plano */}
-            {mealPlan && (
+            {mealPlan && currentStep === 4 && (
               <Card className="p-6">
                 <h2 className="text-xl font-semibold mb-4 flex items-center">
                   <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">4</span>

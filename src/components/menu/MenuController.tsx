@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,7 +42,11 @@ export const useMenuController = () => {
 
     try {
       const calories = await calculateCalories(formData, selectedLevel);
-      return calories !== null;
+      if (calories !== null) {
+        setCurrentStep(2);
+        return true;
+      }
+      return false;
     } catch (error) {
       console.error('Erro ao calcular calorias:', error);
       toast.error("Erro ao calcular as calorias necessárias");
@@ -139,6 +144,7 @@ export const useMenuController = () => {
 
       setMealPlan(generatedPlan.mealPlan);
       setDietaryPreferences(preferences);
+      setCurrentStep(4);
 
       const { error: dietaryError } = await supabase
         .from('dietary_preferences')
@@ -152,7 +158,6 @@ export const useMenuController = () => {
 
       if (dietaryError) {
         console.error('Erro ao salvar preferências:', dietaryError);
-        // Não retornamos false aqui pois o plano já foi gerado
       }
 
       const { error: saveError } = await supabase
@@ -171,11 +176,8 @@ export const useMenuController = () => {
 
       if (saveError) {
         console.error('Erro ao salvar cardápio:', saveError);
-        // Não retornamos false aqui pois o plano já foi gerado
       }
 
-      toast.dismiss(toastId);
-      toast.success("Cardápio personalizado gerado com sucesso!");
       return true;
 
     } catch (error) {
