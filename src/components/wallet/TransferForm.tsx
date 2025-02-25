@@ -55,20 +55,8 @@ export function TransferForm() {
         return;
       }
 
-      // Then get the recipient's wallet
-      const { data: recipientWallet, error: walletError } = await supabase
-        .from('wallets')
-        .select('id, user_id')
-        .eq('user_id', recipientProfile.id)
-        .single();
-
-      if (walletError || !recipientWallet) {
-        toast.error('Carteira do destinatário não encontrada');
-        return;
-      }
-
       // Prevent self-transfer
-      if (recipientWallet.user_id === user.id) {
+      if (recipientProfile.id === user.id) {
         toast.error('Você não pode transferir FITs para você mesmo');
         return;
       }
@@ -76,12 +64,13 @@ export function TransferForm() {
       // Process the transfer using the RPC function
       const { error: transferError } = await supabase.rpc('process_transfer', {
         sender_wallet_id: user.id,
-        recipient_wallet_id: recipientWallet.user_id,
+        recipient_wallet_id: recipientProfile.id,
         transfer_amount: values.amount,
         description: values.description || 'Transferência de FITs'
       });
 
       if (transferError) {
+        console.error('Transfer error:', transferError);
         if (transferError.message.includes('not enough balance')) {
           toast.error('Saldo insuficiente para realizar a transferência');
         } else {
