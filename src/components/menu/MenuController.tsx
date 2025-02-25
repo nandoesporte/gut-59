@@ -66,6 +66,31 @@ export const useMenuController = () => {
     }
   };
 
+  const saveMealPlanToDatabase = async (generatedMealPlan: MealPlan) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const { error } = await supabase
+        .from('meal_plans')
+        .insert({
+          user_id: user.id,
+          plan_data: generatedMealPlan,
+          active: true,
+          calories: calorieNeeds,
+          dietary_preferences: dietaryPreferences
+        });
+
+      if (error) throw error;
+
+      toast.success('Plano alimentar salvo com sucesso!');
+    } catch (error) {
+      console.error('Error saving meal plan:', error);
+      toast.error('Erro ao salvar o plano alimentar');
+      throw error;
+    }
+  };
+
   const handleDietaryPreferences = async (preferences: DietaryPreferences) => {    
     // Validações iniciais
     const { data: userData } = await supabase.auth.getUser();
@@ -130,6 +155,9 @@ export const useMenuController = () => {
       if (!generatedMealPlan) {
         throw new Error('Plano alimentar não foi gerado corretamente');
       }
+
+      // Save the meal plan to the database
+      await saveMealPlanToDatabase(generatedMealPlan);
 
       console.log('Plano gerado:', generatedMealPlan);
       setMealPlan(generatedMealPlan);
