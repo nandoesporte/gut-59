@@ -1,6 +1,6 @@
 
 import { Link, useLocation } from "react-router-dom";
-import { Home, LineChart, ShoppingBag, Settings, ScrollText, UtensilsCrossed, Dumbbell, Stethoscope } from "lucide-react";
+import { Home, LineChart, ShoppingBag, Settings, ScrollText, UtensilsCrossed, Dumbbell, Stethoscope, Brain } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -24,7 +24,7 @@ const Navigation = () => {
   }, []);
 
   return (
-    <nav className="bg-card shadow-lg fixed bottom-0 left-0 right-0 z-50 border-t border-border">
+    <nav className="bg-card/70 backdrop-blur-lg shadow-lg fixed bottom-0 left-0 right-0 z-50 border-t border-border">
       <div className="container mx-auto px-2 py-2">
         <div className="flex items-center justify-between">
           <NavLink
@@ -50,6 +50,12 @@ const Navigation = () => {
             icon={<Stethoscope className="w-6 h-6 md:w-7 md:h-7" />}
             text="Fisio"
             active={isActive("/fisio")}
+          />
+          <NavLink
+            to="/mental"
+            icon={<Brain className="w-6 h-6 md:w-7 md:h-7" />}
+            text="Psico"
+            active={isActive("/mental")}
           />
           <a
             href="https://katiasantin.com.br/loja"

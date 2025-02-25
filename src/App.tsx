@@ -14,6 +14,7 @@ import Trainer from './pages/Trainer'
 import Instructions from './pages/Instructions'
 import NotFound from './pages/NotFound'
 import Wallet from './pages/Wallet'
+import Mental from './pages/Mental'
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
           <Route path="trainer" element={<Trainer />} />
           <Route path="instructions" element={<Instructions />} />
           <Route path="wallet" element={<Wallet />} />
+          <Route path="mental" element={<Mental />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>
