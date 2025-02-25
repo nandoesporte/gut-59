@@ -4,18 +4,18 @@ import { TransactionType } from '@/types/wallet';
 import { ProfileResponse } from './types';
 
 export async function findRecipientByEmail(email: string): Promise<string> {
-  const { data, error } = await supabase
+  const response = await supabase
     .from('profiles')
     .select('id')
     .eq('email', email)
-    .limit(1);
+    .limit(1) as ProfileResponse;
 
-  if (error) throw error;
-  if (!data || data.length === 0) {
+  if (response.error) throw response.error;
+  if (!response.data || response.data.length === 0) {
     throw new Error('Usuário não encontrado');
   }
   
-  return data[0].id;
+  return response.data[0].id;
 }
 
 export async function createWalletTransaction(params: {
