@@ -1,7 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { TransactionType } from '@/types/wallet';
-import { PostgrestSingleResponse } from '@supabase/supabase-js';
+import type { Database } from '@/integrations/supabase/types';
 
 interface TransactionInsert {
   wallet_id: string;
@@ -13,19 +13,19 @@ interface TransactionInsert {
 }
 
 export async function findRecipientByEmail(email: string): Promise<string> {
-  const result: PostgrestSingleResponse<{ id: string }> = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .select('id')
     .eq('email', email)
     .limit(1)
     .maybeSingle();
   
-  if (result.error) throw result.error;
-  if (!result.data) {
+  if (error) throw error;
+  if (!data) {
     throw new Error('Usuário não encontrado');
   }
   
-  return result.data.id;
+  return data.id;
 }
 
 export async function createWalletTransaction(params: {
@@ -57,27 +57,27 @@ export async function createWalletTransaction(params: {
   if (params.recipientId) {
     console.log('Buscando carteira do destinatário:', params.recipientId);
     
-    const recipientResult: PostgrestSingleResponse<{ id: string }> = await supabase
+    const { data: recipientWallet, error: walletError } = await supabase
       .from('wallets')
       .select('id')
       .eq('user_id', params.recipientId)
       .limit(1)
       .maybeSingle();
 
-    if (recipientResult.error) {
-      console.error('Erro ao buscar carteira do destinatário:', recipientResult.error);
-      throw recipientResult.error;
+    if (walletError) {
+      console.error('Erro ao buscar carteira do destinatário:', walletError);
+      throw walletError;
     }
 
-    if (!recipientResult.data) {
+    if (!recipientWallet) {
       console.error('Carteira do destinatário não encontrada');
       throw new Error('Carteira do destinatário não encontrada');
     }
 
-    console.log('Carteira do destinatário encontrada:', recipientResult.data.id);
+    console.log('Carteira do destinatário encontrada:', recipientWallet.id);
 
     const recipientTransactionData: TransactionInsert = {
-      wallet_id: recipientResult.data.id,
+      wallet_id: recipientWallet.id,
       amount: params.amount,
       transaction_type: params.type,
       description: params.description || 'Transferência recebida',
