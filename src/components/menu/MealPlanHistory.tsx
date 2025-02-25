@@ -18,6 +18,24 @@ interface StoredMealPlan {
   calories: number;
 }
 
+interface RawMealPlan {
+  id: string;
+  created_at: string;
+  plan_data: unknown;
+  calories: number;
+}
+
+const validateMealPlan = (planData: unknown): planData is MealPlan => {
+  const plan = planData as MealPlan;
+  return !!(
+    plan &&
+    typeof plan === 'object' &&
+    'weeklyPlan' in plan &&
+    'weeklyTotals' in plan &&
+    'recommendations' in plan
+  );
+};
+
 export const MealPlanHistory = () => {
   const [plans, setPlans] = useState<StoredMealPlan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,7 +59,22 @@ export const MealPlanHistory = () => {
 
       if (error) throw error;
 
-      setPlans(data as StoredMealPlan[]);
+      // Type guard and transform the raw data
+      const validPlans = (data as RawMealPlan[]).reduce<StoredMealPlan[]>((acc, plan) => {
+        if (validateMealPlan(plan.plan_data)) {
+          acc.push({
+            id: plan.id,
+            created_at: plan.created_at,
+            plan_data: plan.plan_data as MealPlan,
+            calories: plan.calories,
+          });
+        } else {
+          console.error('Invalid meal plan data for plan:', plan.id);
+        }
+        return acc;
+      }, []);
+
+      setPlans(validPlans);
     } catch (error) {
       console.error('Error fetching meal plans:', error);
       toast.error('Erro ao carregar histórico de planos');
