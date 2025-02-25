@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Transaction, TransactionType, Wallet, TransferQRCode } from '@/types/wallet';
 import { toast } from 'sonner';
 
-// Simplified type definitions without inheritance
+// Simplified standalone types
 type TransactionInput = {
   amount: number;
   type: TransactionType;
@@ -24,28 +24,33 @@ type QRCodeInput = {
   amount: number;
 };
 
-// Separate DB operation functions
+type Profile = {
+  id: string;
+  email: string;
+};
+
+// Separate DB operations using explicit types
 async function findRecipientByEmail(email: string): Promise<string> {
-  const { data: recipientUser, error: userError } = await supabase
+  const result = await supabase
     .from('profiles')
     .select('id')
     .eq('email', email)
-    .maybeSingle();
+    .single();
 
-  if (userError) throw userError;
-  if (!recipientUser) throw new Error('Usuário não encontrado');
+  if (result.error) throw result.error;
+  if (!result.data) throw new Error('Usuário não encontrado');
   
-  return recipientUser.id;
+  return result.data.id;
 }
 
-async function insertTransaction(
+async function createWalletTransaction(
   walletId: string, 
   amount: number,
   type: TransactionType,
   description?: string,
   recipientId?: string,
   qrCodeId?: string
-) {
+): Promise<void> {
   const { error } = await supabase
     .from('fit_transactions')
     .insert({
@@ -70,7 +75,7 @@ export const useWallet = () => {
       if (userError) throw userError;
       if (!user) throw new Error('No user found');
 
-      const { data: existingWallet, error: walletError } = await supabase
+      const { data: wallet, error: walletError } = await supabase
         .from('wallets')
         .select('*')
         .eq('user_id', user.id)
@@ -78,7 +83,7 @@ export const useWallet = () => {
 
       if (walletError) throw walletError;
 
-      if (!existingWallet) {
+      if (!wallet) {
         const { data: newWallet, error: createError } = await supabase
           .from('wallets')
           .insert([{ user_id: user.id, balance: 0 }])
@@ -89,7 +94,7 @@ export const useWallet = () => {
         return newWallet as Wallet;
       }
 
-      return existingWallet as Wallet;
+      return wallet as Wallet;
     }
   });
 
@@ -119,7 +124,7 @@ export const useWallet = () => {
         finalRecipientId = await findRecipientByEmail(input.recipientEmail);
       }
 
-      await insertTransaction(
+      await createWalletTransaction(
         walletQuery.data.id,
         input.amount,
         input.type,
@@ -142,7 +147,7 @@ export const useWallet = () => {
       }
 
       const recipientId = await findRecipientByEmail(input.email);
-      await insertTransaction(
+      await createWalletTransaction(
         walletQuery.data.id,
         -input.amount,
         'transfer',
@@ -206,7 +211,7 @@ export const useWallet = () => {
 
       if (updateError) throw updateError;
 
-      await insertTransaction(
+      await createWalletTransaction(
         walletQuery.data.id,
         qrCode.amount,
         'transfer',
