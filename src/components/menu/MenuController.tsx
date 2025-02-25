@@ -125,6 +125,20 @@ export const useMenuController = () => {
         return false;
       }
 
+      // Buscar o prompt do agente Nutri+
+      const { data: agentPrompt, error: promptError } = await supabase
+        .from('ai_agent_prompts')
+        .select('prompt_text')
+        .eq('agent_type', 'nutri_plus')
+        .single();
+
+      if (promptError || !agentPrompt) {
+        console.error('Erro ao buscar prompt do agente:', promptError);
+        toast.dismiss(toastId);
+        toast.error("Erro ao carregar configurações do agente nutricional");
+        return false;
+      }
+
       if (!calorieNeeds || calorieNeeds <= 0) {
         toast.dismiss(toastId);
         toast.error("Necessidade calórica inválida");
@@ -157,6 +171,7 @@ export const useMenuController = () => {
           food_group_id: food.food_group_id
         }));
 
+      // Chamar a edge function com o prompt do agente
       const { data: generatedPlan, error: generateError } = await supabase.functions.invoke(
         'generate-meal-plan',
         {
@@ -172,7 +187,8 @@ export const useMenuController = () => {
               dailyCalories: calorieNeeds
             },
             selectedFoods: selectedFoodsDetails,
-            dietaryPreferences: preferences
+            dietaryPreferences: preferences,
+            agentPrompt: agentPrompt.prompt_text // Incluindo o prompt do agente
           }
         }
       );
@@ -205,6 +221,7 @@ export const useMenuController = () => {
       setDietaryPreferences(preferences);
       setCurrentStep(4);
 
+      // Salvar preferências dietéticas
       const { error: dietaryError } = await supabase
         .from('dietary_preferences')
         .upsert({
@@ -219,6 +236,7 @@ export const useMenuController = () => {
         console.error('Erro ao salvar preferências:', dietaryError);
       }
 
+      // Salvar plano gerado
       const { error: saveError } = await supabase
         .from('meal_plans')
         .insert({
