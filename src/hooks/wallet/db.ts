@@ -1,14 +1,23 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { TransactionType } from '@/types/wallet';
-import { User } from '@supabase/supabase-js';
+
+interface Profile {
+  id: string;
+  email?: string;
+}
+
+interface Wallet {
+  id: string;
+  user_id: string;
+}
 
 export async function findRecipientByEmail(email: string): Promise<string> {
   const { data: usersData, error: usersError } = await supabase
     .from('profiles')
-    .select('id')
+    .select<'id', Profile>('id')
     .eq('email', email)
-    .single();
+    .maybeSingle();
   
   if (usersError) throw usersError;
   if (!usersData) {
@@ -49,7 +58,7 @@ export async function createWalletTransaction(params: {
     
     const { data: recipientWallet, error: walletError } = await supabase
       .from('wallets')
-      .select('id')
+      .select<'id', Wallet>('id')
       .eq('user_id', params.recipientId)
       .maybeSingle();
 
