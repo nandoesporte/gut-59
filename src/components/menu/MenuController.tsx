@@ -281,6 +281,7 @@ export const useMenuController = () => {
     formData,
     loading,
     showLoadingDialog,
+    setShowLoadingDialog, // Added this to the return object
     handleCalculateCalories,
     handleFoodSelection,
     handleDietaryPreferences,
