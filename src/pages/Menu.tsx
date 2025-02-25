@@ -11,6 +11,7 @@ import { useMenuController } from "@/components/menu/MenuController";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import type { DietaryPreferences } from "@/components/menu/types";
+import { Button } from "@/components/ui/button";
 
 const Menu = () => {
   const {
@@ -85,34 +86,44 @@ const Menu = () => {
             </Card>
 
             {/* Etapa 2: Seleção de Alimentos */}
-            <Card className={`p-6 ${currentStep !== 2 ? 'opacity-50 pointer-events-none' : ''}`}>
-              <h2 className="text-xl font-semibold mb-4 flex items-center">
-                <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">2</span>
-                Preferências Alimentares
-              </h2>
-              <FoodSelector
-                protocolFoods={protocolFoods}
-                selectedFoods={selectedFoods}
-                onFoodSelection={handleFoodSelection}
-                totalCalories={totalCalories}
-                onBack={handlePreviousStep}
-                onConfirm={handleNextStep}
-              />
-            </Card>
+            {currentStep >= 2 && calorieNeeds && (
+              <Card className="p-6">
+                <h2 className="text-xl font-semibold mb-4 flex items-center">
+                  <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">2</span>
+                  Preferências Alimentares
+                </h2>
+                <FoodSelector
+                  protocolFoods={protocolFoods}
+                  selectedFoods={selectedFoods}
+                  onFoodSelection={handleFoodSelection}
+                  totalCalories={totalCalories}
+                  onBack={handlePreviousStep}
+                  onConfirm={() => {
+                    if (selectedFoods.length === 0) {
+                      toast.error("Selecione pelo menos um alimento");
+                      return;
+                    }
+                    handleNextStep();
+                  }}
+                />
+              </Card>
+            )}
 
             {/* Etapa 3: Preferências Dietéticas */}
-            <Card className={`p-6 ${currentStep !== 3 ? 'opacity-50 pointer-events-none' : ''}`}>
-              <h2 className="text-xl font-semibold mb-4 flex items-center">
-                <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">3</span>
-                Restrições e Preferências
-              </h2>
-              <DietaryPreferencesForm
-                onSubmit={(preferences: DietaryPreferences) => {
-                  handleDietaryPreferences(preferences);
-                }}
-                onBack={handlePreviousStep}
-              />
-            </Card>
+            {currentStep >= 3 && selectedFoods.length > 0 && (
+              <Card className="p-6">
+                <h2 className="text-xl font-semibold mb-4 flex items-center">
+                  <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">3</span>
+                  Restrições e Preferências
+                </h2>
+                <DietaryPreferencesForm
+                  onSubmit={(preferences: DietaryPreferences) => {
+                    handleDietaryPreferences(preferences);
+                  }}
+                  onBack={handlePreviousStep}
+                />
+              </Card>
+            )}
 
             {/* Etapa 4: Exibição do Plano */}
             {mealPlan && currentStep === 4 && (
