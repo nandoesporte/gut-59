@@ -31,8 +31,18 @@ const Menu = () => {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
+      <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-4">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <div className="text-center">
+          <h3 className="text-lg font-semibold text-gray-900">
+            Gerando seu plano alimentar personalizado...
+          </h3>
+          <p className="text-sm text-gray-500 mt-1">
+            Este processo pode levar de 1 a 2 minutos.
+            <br />
+            Por favor, aguarde enquanto preparamos seu cardápio.
+          </p>
+        </div>
       </div>
     );
   }
@@ -93,14 +103,7 @@ const Menu = () => {
               <DietaryPreferencesForm
                 onSubmit={async (preferences: DietaryPreferences) => {
                   try {
-                    const result = await handleDietaryPreferences(preferences).catch(error => {
-                      console.error('Erro detalhado:', error);
-                      return false;
-                    });
-                    
-                    if (!result) {
-                      toast.error("Não foi possível gerar o plano alimentar. Tente novamente.");
-                    }
+                    await handleDietaryPreferences(preferences);
                   } catch (error) {
                     console.error('Erro ao gerar plano:', error);
                     toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
