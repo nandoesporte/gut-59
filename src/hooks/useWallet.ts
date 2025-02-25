@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Transaction, TransactionType, Wallet, TransferQRCode } from '@/types/wallet';
@@ -25,24 +24,25 @@ type QRCodeInput = {
 };
 
 // Interface simples para o resultado da consulta de perfil
-interface Profile {
-  id: string;
-}
+type ProfileResponse = {
+  data: { id: string }[] | null;
+  error: any;
+};
 
 // Funções de banco de dados simplificadas
 async function findRecipientByEmail(email: string): Promise<string> {
-  const { data, error } = await supabase
+  const response = await supabase
     .from('profiles')
     .select('id')
     .eq('email', email)
-    .limit(1);
+    .limit(1) as ProfileResponse;
 
-  if (error) throw error;
-  if (!data || data.length === 0) {
+  if (response.error) throw response.error;
+  if (!response.data || response.data.length === 0) {
     throw new Error('Usuário não encontrado');
   }
   
-  return (data[0] as Profile).id;
+  return response.data[0].id;
 }
 
 async function createWalletTransaction(params: {
