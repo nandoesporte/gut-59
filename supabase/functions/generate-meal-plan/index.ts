@@ -53,7 +53,7 @@ ${foodsListText}
 
 Por favor, gere um plano alimentar completo seguindo todas as instruções acima.`;
 
-    // Fazer a chamada para o GPT-4 Mini
+    // Fazer a chamada para o GPT-4
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -61,11 +61,11 @@ Por favor, gere um plano alimentar completo seguindo todas as instruções acima
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "gpt-4", // Mudando para o modelo correto
         messages: [
           {
             role: "system",
-            content: "Você é um nutricionista especializado em criar planos alimentares personalizados. Você deve gerar planos detalhados considerando as necessidades específicas de cada pessoa."
+            content: "Você é um nutricionista especializado em criar planos alimentares personalizados. Você deve gerar planos detalhados considerando as necessidades específicas de cada pessoa e retornar no formato JSON que corresponda à estrutura MealPlan."
           },
           {
             role: "user",
@@ -76,31 +76,37 @@ Por favor, gere um plano alimentar completo seguindo todas as instruções acima
       }),
     });
 
-    const result = await response.json();
-    
     if (!response.ok) {
+      const result = await response.json();
+      console.error("OpenAI API error:", result);
       throw new Error(`OpenAI API error: ${JSON.stringify(result.error)}`);
     }
 
+    const result = await response.json();
     const generatedContent = result.choices[0].message.content;
 
-    // Processar e estruturar o plano alimentar gerado
-    // Aqui você pode adicionar lógica adicional para processar o texto gerado
-    // e formatá-lo na estrutura esperada do MealPlan
-
-    return new Response(
-      JSON.stringify({
-        mealPlan: generatedContent, // Você deve processar isso para corresponder à estrutura MealPlan
-      }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    try {
+      // Tentar fazer o parse do conteúdo gerado como JSON
+      const parsedPlan = JSON.parse(generatedContent);
+      
+      return new Response(
+        JSON.stringify({ mealPlan: parsedPlan }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    } catch (parseError) {
+      console.error("Error parsing GPT response:", parseError);
+      throw new Error("Formato de resposta inválido do GPT");
+    }
 
   } catch (error) {
     console.error("Error:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        details: "Houve um erro ao gerar o plano alimentar. Por favor, tente novamente."
+      }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
