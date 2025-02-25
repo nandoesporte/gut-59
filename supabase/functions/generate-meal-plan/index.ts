@@ -23,13 +23,6 @@ serve(async (req) => {
       throw new Error("Missing OpenAI API key");
     }
 
-    // Prepare context for the model
-    const context = {
-      user: userData,
-      foods: selectedFoods,
-      preferences: dietaryPreferences,
-    };
-
     // Format the system prompt for OpenAI
     const systemPrompt = `You are a professional nutritionist AI. Create a personalized meal plan following these exact rules:
 1. Response MUST be a valid JSON object
@@ -84,14 +77,13 @@ Additional instructions: ${agentPrompt}`;
         "Authorization": `Bearer ${OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "gpt-4",
+        model: "gpt-4o",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
         ],
         temperature: 0.7,
-        max_tokens: 10000,  // Aumentado de 4000 para 10000
-        response_format: { type: "json_object" }
+        max_tokens: 10000
       })
     });
 
