@@ -8,7 +8,7 @@ import { useProtocolFoods } from "./hooks/useProtocolFoods";
 import { useCalorieCalculator } from "./hooks/useCalorieCalculator";
 import { useFoodSelection } from "./hooks/useFoodSelection";
 import { useWallet } from "@/hooks/useWallet";
-import { REWARDS } from '@/constants/rewards';
+import { generateMealPlan } from "./hooks/useMealPlanGeneration";
 
 export const useMenuController = () => {
   const [currentStep, setCurrentStep] = useState<number>(1);
@@ -73,108 +73,33 @@ export const useMenuController = () => {
       return false;
     }
 
-    let toastId: string | number | undefined;
-    
+    setLoading(true);
+
     try {
-      const selectedFoodsDetails = protocolFoods
-        .filter(food => selectedFoods.includes(food.id))
-        .map(food => ({
-          id: food.id,
-          name: food.name,
-          calories: food.calories,
-          protein: food.protein || 0,
-          carbs: food.carbs || 0,
-          fats: food.fats || 0,
-          portion: food.portion || 100,
-          portionUnit: food.portionUnit || 'g',
-          food_group_id: food.food_group_id
-        }));
-
-      // Só mostra loading depois de preparar os dados
-      setLoading(true);
-      toastId = toast.loading("Gerando seu plano alimentar personalizado...");
-
-      const { data: generatedPlan, error: generateError } = await supabase.functions.invoke(
-        'generate-meal-plan',
-        {
-          body: {
-            userData: {
-              weight: Number(formData.weight),
-              height: Number(formData.height),
-              age: Number(formData.age),
-              gender: formData.gender,
-              activityLevel: formData.activityLevel,
-              goal: formData.goal === "lose" ? "lose_weight" : formData.goal === "gain" ? "gain_weight" : "maintain",
-              userId: userData.user.id,
-              dailyCalories: calorieNeeds
-            },
-            selectedFoods: selectedFoodsDetails,
-            dietaryPreferences: preferences
-          }
-        }
-      );
-
-      if (generateError) {
-        console.error('Erro na edge function:', generateError);
-        toast.dismiss(toastId);
-        toast.error(generateError.message || 'Falha ao gerar cardápio');
-        return false;
-      }
-
-      if (!generatedPlan?.mealPlan) {
-        toast.dismiss(toastId);
-        toast.error('Plano alimentar não gerado corretamente');
-        return false;
-      }
-
-      await addTransaction({
-        amount: REWARDS.MEAL_PLAN,
-        type: 'meal_plan',
-        description: 'Geração de plano alimentar'
-      });
+      const selectedFoodsData = protocolFoods.filter(food => selectedFoods.includes(food.id));
       
-      setMealPlan(generatedPlan.mealPlan);
+      const generatedMealPlan = await generateMealPlan({
+        userData: {
+          id: userData.user.id,
+          weight: Number(formData.weight),
+          height: Number(formData.height),
+          age: Number(formData.age),
+          gender: formData.gender,
+          activityLevel: formData.activityLevel,
+          goal: formData.goal,
+          dailyCalories: calorieNeeds
+        },
+        selectedFoods: selectedFoodsData,
+        preferences,
+        addTransaction
+      });
+
+      setMealPlan(generatedMealPlan);
       setDietaryPreferences(preferences);
-
-      const { error: dietaryError } = await supabase
-        .from('dietary_preferences')
-        .upsert({
-          user_id: userData.user.id,
-          has_allergies: preferences.hasAllergies || false,
-          allergies: preferences.allergies || [],
-          dietary_restrictions: preferences.dietaryRestrictions || [],
-          training_time: preferences.trainingTime || null
-        });
-
-      if (dietaryError) {
-        console.error('Erro ao salvar preferências:', dietaryError);
-      }
-
-      const { error: saveError } = await supabase
-        .from('meal_plans')
-        .insert({
-          user_id: userData.user.id,
-          plan_data: generatedPlan.mealPlan,
-          calories: calorieNeeds,
-          dietary_preferences: {
-            hasAllergies: preferences.hasAllergies || false,
-            allergies: preferences.allergies || [],
-            dietaryRestrictions: preferences.dietaryRestrictions || [],
-            training_time: preferences.trainingTime || null
-          }
-        });
-
-      if (saveError) {
-        console.error('Erro ao salvar cardápio:', saveError);
-      }
-
-      toast.dismiss(toastId);
-      toast.success(`Cardápio personalizado gerado com sucesso! +${REWARDS.MEAL_PLAN} FITs`);
       return true;
 
     } catch (error) {
       console.error('Erro completo:', error);
-      if (toastId) toast.dismiss(toastId);
       toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
       return false;
     } finally {
