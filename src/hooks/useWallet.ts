@@ -22,11 +22,9 @@ export const useWallet = () => {
           .from('wallets')
           .select('*')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
 
-        if (walletError && walletError.code !== 'PGRST116') {
-          throw walletError;
-        }
+        if (walletError) throw walletError;
 
         // If wallet doesn't exist, create one
         if (!existingWallet) {
@@ -51,17 +49,20 @@ export const useWallet = () => {
   });
 
   const { data: transactions, isLoading: isLoadingTransactions } = useQuery({
-    queryKey: ['transactions'],
+    queryKey: ['transactions', wallet?.id],
     queryFn: async () => {
+      if (!wallet?.id) throw new Error('No wallet found');
+
       const { data, error } = await supabase
         .from('fit_transactions')
         .select('*')
+        .eq('wallet_id', wallet.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       return data as Transaction[];
     },
-    enabled: !!wallet, // Only fetch transactions if wallet exists
+    enabled: !!wallet?.id,
   });
 
   const addTransaction = useMutation({
@@ -81,15 +82,7 @@ export const useWallet = () => {
       try {
         if (!wallet) throw new Error('Wallet not initialized');
 
-        // First, update the wallet balance
-        const { error: updateError } = await supabase
-          .from('wallets')
-          .update({ balance: wallet.balance + amount })
-          .eq('id', wallet.id);
-
-        if (updateError) throw updateError;
-
-        // Then, create the transaction record
+        // Create the transaction record first
         const { error: transactionError } = await supabase
           .from('fit_transactions')
           .insert({
@@ -140,7 +133,7 @@ export const useWallet = () => {
         .single();
 
       if (error) throw error;
-      return data as unknown as TransferQRCode;
+      return data as TransferQRCode;
     }
   });
 
@@ -154,7 +147,7 @@ export const useWallet = () => {
         .select('*')
         .eq('id', qrCodeId)
         .is('used_at', null)
-        .single();
+        .maybeSingle();
 
       if (qrError || !qrCode) throw new Error('QR Code inválido ou já utilizado');
 
@@ -183,7 +176,7 @@ export const useWallet = () => {
         qrCodeId: qrCode.id
       });
 
-      return qrCode as unknown as TransferQRCode;
+      return qrCode as TransferQRCode;
     },
     onSuccess: () => {
       toast.success('Transferência realizada com sucesso!');
