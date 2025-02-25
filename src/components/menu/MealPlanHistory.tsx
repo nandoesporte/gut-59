@@ -1,31 +1,21 @@
 
-import { useState, useEffect } from "react";
-import { Card } from "@/components/ui/card";
+import { useEffect, useState } from 'react';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { FileDown, Trash2 } from "lucide-react";
-import { generateMealPlanPDF } from "./utils/pdf-generator";
-import { MealPlan } from "./types";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { Card } from "@/components/ui/card";
+import { supabase } from '@/integrations/supabase/client';
+import { MealPlan } from './types';
+import { generateMealPlanPDF } from './utils/pdf-generator';
+import { toast } from 'sonner';
+import { Download, List, Trash2 } from 'lucide-react';
 
 interface StoredMealPlan {
   id: string;
   created_at: string;
-  user_id: string;
-  plan_data: string | MealPlan; // Can be string when coming from DB
-  active: boolean;
+  plan_data: MealPlan;
+  calories: number;
 }
 
 export const MealPlanHistory = () => {
@@ -51,15 +41,7 @@ export const MealPlanHistory = () => {
 
       if (error) throw error;
 
-      // Parse plan_data for each plan
-      const parsedPlans = (data || []).map(plan => ({
-        ...plan,
-        plan_data: typeof plan.plan_data === 'string' 
-          ? JSON.parse(plan.plan_data)
-          : plan.plan_data
-      }));
-
-      setPlans(parsedPlans);
+      setPlans(data as StoredMealPlan[]);
     } catch (error) {
       console.error('Error fetching meal plans:', error);
       toast.error('Erro ao carregar histórico de planos');
@@ -88,33 +70,20 @@ export const MealPlanHistory = () => {
 
   const handleDownload = async (plan: StoredMealPlan) => {
     try {
-      const planData = typeof plan.plan_data === 'string' 
-        ? JSON.parse(plan.plan_data) 
-        : plan.plan_data;
-      
-      await generateMealPlanPDF(planData as MealPlan);
+      await generateMealPlanPDF(plan.plan_data);
+      toast.success('PDF gerado com sucesso!');
     } catch (error) {
       console.error('Error generating PDF:', error);
       toast.error('Erro ao gerar PDF');
     }
   };
 
-  const getAverageCalories = (plan: StoredMealPlan) => {
-    try {
-      const planData = typeof plan.plan_data === 'string' 
-        ? JSON.parse(plan.plan_data) 
-        : plan.plan_data;
-      
-      return planData?.weeklyTotals?.averageCalories ?? 0;
-    } catch (error) {
-      console.error('Error parsing plan data:', error);
-      return 0;
-    }
-  };
-
   return (
     <div className="mt-12">
-      <h2 className="text-2xl font-semibold mb-6">Histórico de Planos Alimentares</h2>
+      <h2 className="text-2xl font-semibold mb-6 flex items-center gap-2">
+        <List className="w-6 h-6" />
+        Histórico de Planos Alimentares
+      </h2>
       
       {loading ? (
         <div className="text-center">Carregando histórico...</div>
@@ -132,7 +101,7 @@ export const MealPlanHistory = () => {
                     Plano gerado em {format(new Date(plan.created_at), "d 'de' MMMM 'de' yyyy", { locale: ptBR })}
                   </h3>
                   <p className="text-sm text-gray-500 mt-1">
-                    Média diária: {Math.round(getAverageCalories(plan))} kcal
+                    Média diária: {Math.round(plan.calories)} kcal
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -141,7 +110,7 @@ export const MealPlanHistory = () => {
                     size="sm"
                     onClick={() => handleDownload(plan)}
                   >
-                    <FileDown className="w-4 h-4 mr-2" />
+                    <Download className="w-4 h-4 mr-2" />
                     Baixar PDF
                   </Button>
                   <Button

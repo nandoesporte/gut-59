@@ -120,6 +120,9 @@ const Menu = () => {
                 />
               </Card>
             )}
+
+            {/* Histórico de Planos */}
+            <MealPlanHistory />
           </div>
         </div>
       </div>
