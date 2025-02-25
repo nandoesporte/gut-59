@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import type { DietaryPreferences } from "@/components/menu/types";
 import { Button } from "@/components/ui/button";
 import { useRef } from "react";
-import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { WorkoutLoadingState } from "@/components/workout/components/WorkoutLoadingState";
 
 const Menu = () => {
@@ -157,8 +157,11 @@ const Menu = () => {
                   Restrições e Preferências
                 </h2>
                 <DietaryPreferencesForm
-                  onSubmit={(preferences: DietaryPreferences) => {
-                    handleDietaryPreferences(preferences);
+                  onSubmit={async (preferences: DietaryPreferences) => {
+                    const success = await handleDietaryPreferences(preferences);
+                    if (success) {
+                      handleNextStep();
+                    }
                   }}
                   onBack={handlePreviousStep}
                 />
