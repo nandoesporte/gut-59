@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Transaction, TransactionType, Wallet, TransferQRCode } from '@/types/wallet';
 import { toast } from 'sonner';
 
-// Simplified standalone types
+// Tipos simplificados e sem recursão
 type TransactionInput = {
   amount: number;
   type: TransactionType;
@@ -24,42 +24,42 @@ type QRCodeInput = {
   amount: number;
 };
 
-// Explicitly define the profile data structure
-interface ProfileData {
+// Tipo simplificado para dados do perfil
+type ProfileResult = {
   id: string;
-}
+}[];
 
-// Separate DB operations using explicit types and simpler queries
+// Funções de banco de dados simplificadas com tipos explícitos
 async function findRecipientByEmail(email: string): Promise<string> {
-  const { data, error } = await supabase
+  const { data } = await supabase
     .from('profiles')
-    .select('id')
-    .eq('email', email)
-    .limit(1) as { data: ProfileData[] | null; error: any };
+    .select<'profiles', ProfileResult>('id')
+    .eq('email', email);
 
-  if (error) throw error;
-  if (!data?.length) throw new Error('Usuário não encontrado');
+  if (!data?.length) {
+    throw new Error('Usuário não encontrado');
+  }
   
   return data[0].id;
 }
 
-async function createWalletTransaction(
-  walletId: string, 
-  amount: number,
-  type: TransactionType,
-  description?: string,
-  recipientId?: string,
-  qrCodeId?: string
-): Promise<void> {
+async function createWalletTransaction(params: {
+  walletId: string;
+  amount: number;
+  type: TransactionType;
+  description?: string;
+  recipientId?: string;
+  qrCodeId?: string;
+}): Promise<void> {
   const { error } = await supabase
     .from('fit_transactions')
     .insert({
-      wallet_id: walletId,
-      amount,
-      transaction_type: type,
-      description,
-      recipient_id: recipientId,
-      qr_code_id: qrCodeId
+      wallet_id: params.walletId,
+      amount: params.amount,
+      transaction_type: params.type,
+      description: params.description,
+      recipient_id: params.recipientId,
+      qr_code_id: params.qrCodeId
     });
 
   if (error) throw error;
@@ -71,17 +71,14 @@ export const useWallet = () => {
   const walletQuery = useQuery({
     queryKey: ['wallet'],
     queryFn: async () => {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No user found');
 
-      const { data: wallet, error: walletError } = await supabase
+      const { data: wallet } = await supabase
         .from('wallets')
         .select('*')
         .eq('user_id', user.id)
         .maybeSingle();
-
-      if (walletError) throw walletError;
 
       if (!wallet) {
         const { data: newWallet, error: createError } = await supabase
@@ -103,13 +100,12 @@ export const useWallet = () => {
     queryFn: async () => {
       if (!walletQuery.data?.id) throw new Error('No wallet found');
 
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('fit_transactions')
         .select('*')
         .eq('wallet_id', walletQuery.data.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
       return data as Transaction[];
     },
     enabled: !!walletQuery.data?.id
@@ -124,14 +120,14 @@ export const useWallet = () => {
         finalRecipientId = await findRecipientByEmail(input.recipientEmail);
       }
 
-      await createWalletTransaction(
-        walletQuery.data.id,
-        input.amount,
-        input.type,
-        input.description,
-        finalRecipientId,
-        input.qrCodeId
-      );
+      await createWalletTransaction({
+        walletId: walletQuery.data.id,
+        amount: input.amount,
+        type: input.type,
+        description: input.description,
+        recipientId: finalRecipientId,
+        qrCodeId: input.qrCodeId
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['wallet'] });
@@ -147,13 +143,13 @@ export const useWallet = () => {
       }
 
       const recipientId = await findRecipientByEmail(input.email);
-      await createWalletTransaction(
-        walletQuery.data.id,
-        -input.amount,
-        'transfer',
-        input.description || 'Transferência por email',
+      await createWalletTransaction({
+        walletId: walletQuery.data.id,
+        amount: -input.amount,
+        type: 'transfer',
+        description: input.description || 'Transferência por email',
         recipientId
-      );
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['wallet'] });
@@ -211,14 +207,14 @@ export const useWallet = () => {
 
       if (updateError) throw updateError;
 
-      await createWalletTransaction(
-        walletQuery.data.id,
-        qrCode.amount,
-        'transfer',
-        'Transferência via QR Code',
-        qrCode.creator_id,
-        qrCode.id
-      );
+      await createWalletTransaction({
+        walletId: walletQuery.data.id,
+        amount: qrCode.amount,
+        type: 'transfer',
+        description: 'Transferência via QR Code',
+        recipientId: qrCode.creator_id,
+        qrCodeId: qrCode.id
+      });
 
       return qrCode;
     },
