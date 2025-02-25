@@ -1,7 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { TransactionType } from '@/types/wallet';
-import { Database } from '@/integrations/supabase/types';
 
 export type CreateTransactionInput = {
   walletId: string;
@@ -12,21 +11,23 @@ export type CreateTransactionInput = {
   qrCodeId?: string;
 };
 
-type DbTransactionInsert = {
-  wallet_id: string;
-  amount: number;
-  transaction_type: TransactionType;
-  description?: string;
-  recipient_id?: string;
-  qr_code_id?: string;
+type ProfileResponse = {
+  id: string;
+  email?: string;
+};
+
+type WalletResponse = {
+  id: string;
+  user_id: string;
+  balance: number;
 };
 
 export async function findRecipientByEmail(email: string): Promise<string> {
   const { data, error } = await supabase
     .from('profiles')
-    .select()
+    .select('id, email')
     .eq('email', email)
-    .maybeSingle();
+    .maybeSingle() as { data: ProfileResponse | null; error: any };
   
   if (error) {
     throw new Error('Erro ao buscar usuário: ' + error.message);
@@ -40,7 +41,7 @@ export async function findRecipientByEmail(email: string): Promise<string> {
 }
 
 export async function createWalletTransaction(input: CreateTransactionInput): Promise<void> {
-  const senderTransaction: DbTransactionInsert = {
+  const senderTransaction = {
     wallet_id: input.walletId,
     amount: -input.amount,
     transaction_type: input.type,
@@ -60,15 +61,15 @@ export async function createWalletTransaction(input: CreateTransactionInput): Pr
   if (input.recipientId) {
     const { data: recipientWallet, error: walletError } = await supabase
       .from('wallets')
-      .select()
+      .select('id, user_id, balance')
       .eq('user_id', input.recipientId)
-      .maybeSingle();
+      .maybeSingle() as { data: WalletResponse | null; error: any };
 
     if (walletError || !recipientWallet) {
       throw new Error('Carteira do destinatário não encontrada');
     }
 
-    const recipientTransaction: DbTransactionInsert = {
+    const recipientTransaction = {
       wallet_id: recipientWallet.id,
       amount: input.amount,
       transaction_type: input.type,
