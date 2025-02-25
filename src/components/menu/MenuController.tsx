@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,7 +28,6 @@ export const useMenuController = () => {
   const { selectedFoods, totalCalories, handleFoodSelection, calculateTotalCalories } = useFoodSelection();
   const wallet = useWallet();
 
-  // Create a Promise-wrapped version of addTransaction
   const addTransactionAsync = async (params: Parameters<typeof wallet.addTransaction>[0]) => {
     return new Promise<void>((resolve, reject) => {
       try {
@@ -71,15 +69,17 @@ export const useMenuController = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
+      const insertData = {
+        plan_data: generatedMealPlan,
+        active: true,
+        calories: calorieNeeds,
+        dietary_preferences: dietaryPreferences,
+        user_id: user.id
+      };
+
       const { error } = await supabase
         .from('meal_plans')
-        .insert({
-          user_id: user.id,
-          plan_data: generatedMealPlan,
-          active: true,
-          calories: calorieNeeds,
-          dietary_preferences: dietaryPreferences
-        });
+        .insert([insertData]);
 
       if (error) throw error;
 
@@ -92,7 +92,6 @@ export const useMenuController = () => {
   };
 
   const handleDietaryPreferences = async (preferences: DietaryPreferences) => {    
-    // Validações iniciais
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) {
       toast.error("Usuário não autenticado");
@@ -123,7 +122,6 @@ export const useMenuController = () => {
       const selectedFoodsData = protocolFoods.filter(food => selectedFoods.includes(food.id));
       console.log('Dados dos alimentos selecionados:', selectedFoodsData);
 
-      // Verificar preferências existentes
       const { data: existingPreferences, error: preferencesError } = await supabase
         .from('dietary_preferences')
         .select('*')
@@ -156,7 +154,6 @@ export const useMenuController = () => {
         throw new Error('Plano alimentar não foi gerado corretamente');
       }
 
-      // Save the meal plan to the database
       await saveMealPlanToDatabase(generatedMealPlan);
 
       console.log('Plano gerado:', generatedMealPlan);
