@@ -126,7 +126,7 @@ export const MealPlanHistory = () => {
         <div className="grid gap-4">
           {plans.map((plan) => (
             <Card key={plan.id} className="p-6">
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                   <h3 className="font-semibold">
                     Plano gerado em {format(new Date(plan.created_at), "d 'de' MMMM 'de' yyyy", { locale: ptBR })}
@@ -135,11 +135,12 @@ export const MealPlanHistory = () => {
                     Média diária: {Math.round(getAverageCalories(plan))} kcal
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 w-full sm:w-auto">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handleDownload(plan)}
+                    className="flex-1 sm:flex-none justify-center"
                   >
                     <FileDown className="w-4 h-4 mr-2" />
                     Baixar PDF
@@ -148,7 +149,7 @@ export const MealPlanHistory = () => {
                     variant="outline"
                     size="sm"
                     onClick={() => setDeleteId(plan.id)}
-                    className="text-red-500 hover:text-red-600"
+                    className="flex-1 sm:flex-none justify-center text-red-500 hover:text-red-600"
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
                     Excluir
