@@ -84,13 +84,13 @@ Additional instructions: ${agentPrompt}`;
         "Authorization": `Bearer ${OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "gpt-4",  // Corrigido: usando o modelo gpt-4 em vez de gpt-4o-mini
+        model: "gpt-4",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
         ],
         temperature: 0.7,
-        max_tokens: 4000,
+        max_tokens: 10000,  // Aumentado de 4000 para 10000
         response_format: { type: "json_object" }
       })
     });
