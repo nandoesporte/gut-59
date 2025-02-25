@@ -1,8 +1,19 @@
+
 import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Transaction, TransactionType, Wallet, TransferQRCode } from '@/types/wallet';
 import { toast } from 'sonner';
+
+// Define transaction parameters type separately to avoid deep nesting
+type TransactionParams = {
+  amount: number;
+  type: TransactionType;
+  description?: string;
+  recipientId?: string;
+  recipientEmail?: string;
+  qrCodeId?: string;
+};
 
 export const useWallet = () => {
   const queryClient = useQueryClient();
@@ -62,31 +73,17 @@ export const useWallet = () => {
   });
 
   const addTransaction = useMutation({
-    mutationFn: async ({ 
-      amount, 
-      type, 
-      description,
-      recipientId,
-      recipientEmail,
-      qrCodeId 
-    }: { 
-      amount: number; 
-      type: TransactionType; 
-      description?: string;
-      recipientId?: string;
-      recipientEmail?: string;
-      qrCodeId?: string;
-    }) => {
+    mutationFn: async (params: TransactionParams) => {
       try {
         if (!wallet) throw new Error('Wallet not initialized');
 
-        let finalRecipientId = recipientId;
+        let finalRecipientId = params.recipientId;
 
-        if (recipientEmail) {
+        if (params.recipientEmail) {
           const { data: recipientUser, error: userError } = await supabase
             .from('profiles')
             .select('id')
-            .eq('email', recipientEmail)
+            .eq('email', params.recipientEmail)
             .maybeSingle();
 
           if (userError) throw userError;
@@ -99,18 +96,18 @@ export const useWallet = () => {
           .from('fit_transactions')
           .insert({
             wallet_id: wallet.id,
-            amount,
-            transaction_type: type,
-            description,
+            amount: params.amount,
+            transaction_type: params.type,
+            description: params.description,
             recipient_id: finalRecipientId,
-            qr_code_id: qrCodeId
+            qr_code_id: params.qrCodeId
           });
 
         if (transactionError) throw transactionError;
 
-        if (type !== 'transfer') {
-          toast.success(`Parabéns! Você ganhou ${amount} FITs!`, {
-            description: description || 'Continue assim!',
+        if (params.type !== 'transfer') {
+          toast.success(`Parabéns! Você ganhou ${params.amount} FITs!`, {
+            description: params.description || 'Continue assim!',
           });
         }
       } catch (error) {
