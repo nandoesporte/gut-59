@@ -1,13 +1,11 @@
 
 import { supabase } from '@/integrations/supabase/client';
-
-// Define tipos simples sem recursão ou dependências complexas
-type BasicTransactionType = string;
+import { TransactionType } from '@/types/wallet';
 
 interface BasicTransaction {
   wallet_id: string;
   amount: number;
-  transaction_type: BasicTransactionType;
+  transaction_type: TransactionType;
   description?: string;
   recipient_id?: string;
   qr_code_id?: string;
@@ -34,7 +32,7 @@ export async function findRecipientByEmail(email: string): Promise<string> {
 export async function createWalletTransaction(input: {
   walletId: string;
   amount: number;
-  type: BasicTransactionType;
+  type: TransactionType;
   description?: string;
   recipientId?: string;
   qrCodeId?: string;
