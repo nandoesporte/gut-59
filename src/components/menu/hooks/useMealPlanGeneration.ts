@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import type { DietaryPreferences, ProtocolFood } from "../types";
 import { REWARDS } from '@/constants/rewards';
 import type { TransactionType } from "@/types/wallet";
-import type { UseMutateAsyncFunction } from "@tanstack/react-query";
+import type { UseMutateFunction } from "@tanstack/react-query";
 
 interface MealPlanGenerationProps {
   userData: {
@@ -19,7 +19,7 @@ interface MealPlanGenerationProps {
   };
   selectedFoods: ProtocolFood[];
   preferences: DietaryPreferences;
-  addTransaction: UseMutateAsyncFunction<void, Error, {
+  addTransaction: UseMutateFunction<void, Error, {
     amount: number;
     type: TransactionType;
     description?: string;
