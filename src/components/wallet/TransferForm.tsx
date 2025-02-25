@@ -43,34 +43,35 @@ export function TransferForm() {
         return;
       }
 
-      // First, verify if the recipient exists by email
-      const { data: recipient, error: recipientError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', (await supabase.auth.getUser(values.recipientEmail)).data.user?.id)
-        .maybeSingle();
-
-      if (recipientError || !recipient) {
+      // Get recipient by email
+      const { data: recipientUser, error: recipientError } = await supabase.auth.admin.getUserByEmail(values.recipientEmail);
+      
+      if (recipientError || !recipientUser) {
         toast.error('Destinatário não encontrado');
         return;
       }
 
       // Prevent self-transfer
-      if (recipient.id === user.id) {
+      if (recipientUser.id === user.id) {
         toast.error('Você não pode transferir FITs para você mesmo');
         return;
       }
 
-      // Create transaction records for both parties
-      const { error: transactionError } = await supabase.rpc('process_transfer', {
+      // Process the transfer using the RPC function
+      const { error: transferError } = await supabase.rpc('process_transfer', {
         sender_wallet_id: user.id,
-        recipient_wallet_id: recipient.id,
+        recipient_wallet_id: recipientUser.id,
         transfer_amount: values.amount,
         description: values.description || 'Transferência de FITs'
       });
 
-      if (transactionError) {
-        throw transactionError;
+      if (transferError) {
+        if (transferError.message.includes('not enough balance')) {
+          toast.error('Saldo insuficiente para realizar a transferência');
+        } else {
+          toast.error('Erro ao realizar transferência');
+        }
+        return;
       }
 
       form.reset();
