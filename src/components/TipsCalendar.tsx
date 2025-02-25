@@ -107,37 +107,35 @@ const TipsCalendar = () => {
     loadTips();
   }, []);
 
-  const markTipAsRead = (tipId: number) => {
-    const readTips = JSON.parse(localStorage.getItem('readTips') || '[]');
-    if (!readTips.includes(tipId)) {
-      readTips.push(tipId);
-      localStorage.setItem('readTips', JSON.stringify(readTips));
-      
-      setTips(tips.map(tip => 
-        tip.id === tipId ? { ...tip, isRead: true } : tip
-      ));
+  const markTipAsRead = async (tipId: number) => {
+    try {
+      const readTips = JSON.parse(localStorage.getItem('readTips') || '[]');
+      if (!readTips.includes(tipId)) {
+        readTips.push(tipId);
+        localStorage.setItem('readTips', JSON.stringify(readTips));
+        
+        setTips(tips.map(tip => 
+          tip.id === tipId ? { ...tip, isRead: true } : tip
+        ));
 
-      addTransaction({
-        amount: 1,
-        type: 'daily_tip',
-        description: `Desafio do dia ${tipId} concluído`
-      });
-      
-      toast.success('Atividade concluída com sucesso!');
+        await addTransaction({
+          amount: REWARDS.DAILY_TIP,
+          type: 'daily_tip',
+          description: `Dica do dia ${tipId} concluída`
+        });
+        
+        toast.success(`Dica concluída! +${REWARDS.DAILY_TIP} FITs`);
+      }
+      setSelectedTip(null);
+    } catch (error) {
+      console.error('Erro ao marcar dica como lida:', error);
+      toast.error('Erro ao registrar conclusão da dica');
     }
-    setSelectedTip(null);
   };
 
   const handleTipClick = (tip: Tip) => {
     if (tip.isUnlocked) {
       setSelectedTip(tip);
-      if (!tip.isRead) {
-        addTransaction({
-          amount: 1,
-          type: 'daily_tip',
-          description: `Desafio do dia ${tip.id}`
-        });
-      }
     }
   };
 

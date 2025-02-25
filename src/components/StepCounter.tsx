@@ -215,7 +215,7 @@ const StepCounter = () => {
     let lastStepTime = Date.now();
     let lastMagnitude = 0;
     let smoothedMagnitude = 0;
-    let lastRewardedStepCount = 0;
+    let lastRewardedStepCount = stepData.steps;
     const alpha = 0.8;
     let steps = stepData.steps;
 
@@ -240,15 +240,22 @@ const StepCounter = () => {
               (now - lastStepTime) > MIN_TIME_BETWEEN_STEPS) {
             steps++;
             lastStepTime = now;
-            
-            if (Math.floor(steps / REWARDS.STEPS_THRESHOLD) > Math.floor(lastRewardedStepCount / REWARDS.STEPS_THRESHOLD)) {
+
+            // Verificar se atingiu o limiar de passos para recompensa
+            const currentStepThresholdCount = Math.floor(steps / REWARDS.STEPS_THRESHOLD);
+            const lastRewardedThresholdCount = Math.floor(lastRewardedStepCount / REWARDS.STEPS_THRESHOLD);
+
+            if (currentStepThresholdCount > lastRewardedThresholdCount) {
+              console.log(`Atingiu ${REWARDS.STEPS_THRESHOLD} passos! Adicionando recompensa...`);
               addTransaction({
                 amount: REWARDS.STEPS_GOAL,
                 type: 'steps',
                 description: `${REWARDS.STEPS_THRESHOLD} passos completados`
+              }).catch(error => {
+                console.error('Erro ao adicionar recompensa:', error);
               });
-              toast.success(`Parabéns! Você completou ${REWARDS.STEPS_THRESHOLD} passos! +${REWARDS.STEPS_GOAL} FITs`);
               lastRewardedStepCount = steps;
+              toast.success(`Parabéns! Você completou ${REWARDS.STEPS_THRESHOLD} passos! +${REWARDS.STEPS_GOAL} FITs`);
             }
             
             setStepData(calculateMetrics(steps));
