@@ -79,11 +79,18 @@ export const useMenuController = () => {
       const { error } = await supabase
         .from('nutrition_preferences')
         .upsert({
-          user_id: userData.user.id,
-          selected_foods: selectedFoods,
+          activity_level: formData.activityLevel,
+          age: Number(formData.age),
+          gender: formData.gender,
+          goal: formData.goal === "lose" ? "lose_weight" : formData.goal === "gain" ? "gain_mass" : "maintain",
+          height: Number(formData.height),
+          weight: Number(formData.weight),
+          dietary_preferences: [],
           calories_needed: calorieNeeds,
+          selected_foods: selectedFoods,
           updated_at: new Date().toISOString()
-        });
+        })
+        .eq('user_id', userData.user.id);
 
       if (error) {
         console.error('Erro ao salvar seleção de alimentos:', error);
