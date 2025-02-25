@@ -127,33 +127,34 @@ export const MealPlanHistory = () => {
       ) : (
         <div className="grid gap-4">
           {plans.map((plan) => (
-            <Card key={plan.id} className="p-6">
-              <div className="flex justify-between items-center">
+            <Card key={plan.id} className="p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row justify-between gap-4 sm:items-center">
                 <div>
-                  <h3 className="font-semibold">
+                  <h3 className="font-semibold text-sm sm:text-base">
                     Plano gerado em {format(new Date(plan.created_at), "d 'de' MMMM 'de' yyyy", { locale: ptBR })}
                   </h3>
                   <p className="text-sm text-gray-500 mt-1">
                     Média diária: {Math.round(plan.calories)} kcal
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 w-full sm:w-auto">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handleDownload(plan)}
+                    className="flex-1 sm:flex-initial justify-center"
                   >
                     <Download className="w-4 h-4 mr-2" />
-                    Baixar PDF
+                    <span className="sm:inline">Baixar PDF</span>
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setDeleteId(plan.id)}
-                    className="text-red-500 hover:text-red-600"
+                    className="flex-1 sm:flex-initial justify-center text-red-500 hover:text-red-600"
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
-                    Excluir
+                    <span className="sm:inline">Excluir</span>
                   </Button>
                 </div>
               </div>
