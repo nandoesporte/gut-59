@@ -70,6 +70,13 @@ export const useMenuController = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
+      // First, make sure any existing meal plans are marked as inactive
+      await supabase
+        .from('meal_plans')
+        .update({ active: false })
+        .eq('user_id', user.id);
+
+      // Then insert the new meal plan
       const insertData = [{
         plan_data: JSON.parse(JSON.stringify(generatedMealPlan)),
         active: true,
@@ -116,55 +123,41 @@ export const useMenuController = () => {
       return false;
     }
 
-    console.log('Preferências alimentares recebidas:', preferences);
-    console.log('Alimentos selecionados:', selectedFoods);
-
     setLoading(true);
 
     try {
       const selectedFoodsData = protocolFoods.filter(food => selectedFoods.includes(food.id));
-      console.log('Dados dos alimentos selecionados:', selectedFoodsData);
-
-      const { data: existingPreferences, error: preferencesError } = await supabase
-        .from('dietary_preferences')
-        .select('*')
-        .eq('user_id', userData.user.id)
-        .single();
-
-      if (preferencesError && preferencesError.code !== 'PGRST116') {
-        console.error('Erro ao verificar preferências existentes:', preferencesError);
-      }
-
-      console.log('Preferências existentes:', existingPreferences);
       
-      const generatedMealPlan = await generateMealPlan({
-        userData: {
-          id: userData.user.id,
-          weight: Number(formData.weight),
-          height: Number(formData.height),
-          age: Number(formData.age),
-          gender: formData.gender,
-          activityLevel: formData.activityLevel,
-          goal: formData.goal,
-          dailyCalories: calorieNeeds
-        },
-        selectedFoods: selectedFoodsData,
-        preferences,
-        addTransaction: addTransactionAsync
+      // Call the edge function to generate the meal plan
+      const { data: generatedMealPlan, error } = await supabase.functions.invoke('generate-meal-plan', {
+        body: {
+          userData: {
+            id: userData.user.id,
+            weight: Number(formData.weight),
+            height: Number(formData.height),
+            age: Number(formData.age),
+            gender: formData.gender,
+            activityLevel: formData.activityLevel,
+            goal: formData.goal,
+            dailyCalories: calorieNeeds
+          },
+          selectedFoods: selectedFoodsData,
+          preferences
+        }
       });
 
-      if (!generatedMealPlan) {
-        throw new Error('Plano alimentar não foi gerado corretamente');
-      }
+      if (error) throw error;
+      if (!generatedMealPlan) throw new Error('Plano alimentar não foi gerado corretamente');
 
+      // Save the generated meal plan
       await saveMealPlanToDatabase(generatedMealPlan);
 
-      console.log('Plano gerado:', generatedMealPlan);
+      // Update the state with the new meal plan
       setMealPlan(generatedMealPlan);
       setDietaryPreferences(preferences);
       setCurrentStep(4);
-      return true;
 
+      return true;
     } catch (error) {
       console.error('Erro completo:', error);
       toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
