@@ -1,4 +1,3 @@
-
 import { Card } from "@/components/ui/card";
 import { InitialMenuContent } from "@/components/menu/InitialMenuContent";
 import { CalorieCalculatorStep } from "@/components/menu/CalorieCalculatorStep";
@@ -13,6 +12,8 @@ import { toast } from "sonner";
 import type { DietaryPreferences } from "@/components/menu/types";
 import { Button } from "@/components/ui/button";
 import { useRef } from "react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { WorkoutLoadingState } from "@/components/workout/components/WorkoutLoadingState";
 
 const Menu = () => {
   const {
@@ -25,6 +26,7 @@ const Menu = () => {
     mealPlan,
     formData,
     loading,
+    showLoadingDialog,
     handleCalculateCalories,
     handleFoodSelection,
     handleDietaryPreferences,
@@ -83,6 +85,12 @@ const Menu = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 py-8">
+      <Dialog open={showLoadingDialog} onOpenChange={setShowLoadingDialog}>
+        <DialogContent className="sm:max-w-md" hideClose>
+          <WorkoutLoadingState message="Gerando seu plano alimentar personalizado..." />
+        </DialogContent>
+      </Dialog>
+
       <div className="container mx-auto px-4">
         <div className="max-w-4xl mx-auto space-y-8">
           <div className="text-center mb-8">

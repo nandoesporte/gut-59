@@ -10,6 +10,8 @@ import { useFoodSelection } from "./hooks/useFoodSelection";
 import { useWallet } from "@/hooks/useWallet";
 import { REWARDS } from '@/constants/rewards';
 import { Database } from "@/integrations/supabase/types";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { WorkoutLoadingState } from "../workout/components/WorkoutLoadingState";
 
 type ActivityLevel = Database["public"]["Enums"]["activity_level"];
 
@@ -18,6 +20,7 @@ export const useMenuController = () => {
   const [dietaryPreferences, setDietaryPreferences] = useState<DietaryPreferences | null>(null);
   const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showLoadingDialog, setShowLoadingDialog] = useState(false);
   const [formData, setFormData] = useState<CalorieCalculatorForm>({
     weight: "",
     height: "",
@@ -114,13 +117,13 @@ export const useMenuController = () => {
   };
 
   const handleDietaryPreferences = async (preferences: DietaryPreferences) => {    
-    const toastId = toast.loading("Gerando seu plano alimentar personalizado...");
+    setShowLoadingDialog(true);
     setLoading(true);
     
     try {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) {
-        toast.dismiss(toastId);
+        setShowLoadingDialog(false);
         toast.error("Usuário não autenticado");
         return false;
       }
@@ -135,25 +138,25 @@ export const useMenuController = () => {
 
       if (promptError || !agentPrompt) {
         console.error('Erro ao buscar prompt do agente:', promptError);
-        toast.dismiss(toastId);
+        setShowLoadingDialog(false);
         toast.error("Erro ao carregar configurações do agente nutricional");
         return false;
       }
 
       if (!calorieNeeds || calorieNeeds <= 0) {
-        toast.dismiss(toastId);
+        setShowLoadingDialog(false);
         toast.error("Necessidade calórica inválida");
         return false;
       }
 
       if (!selectedFoods || selectedFoods.length === 0) {
-        toast.dismiss(toastId);
+        setShowLoadingDialog(false);
         toast.error("Selecione pelo menos um alimento");
         return false;
       }
 
       if (!formData.goal || !formData.weight || !formData.height || !formData.age) {
-        toast.dismiss(toastId);
+        setShowLoadingDialog(false);
         toast.error("Dados do formulário incompletos");
         return false;
       }
@@ -189,20 +192,20 @@ export const useMenuController = () => {
             },
             selectedFoods: selectedFoodsDetails,
             dietaryPreferences: preferences,
-            agentPrompt: agentPrompt.prompt // Corrigido para usar a coluna 'prompt'
+            agentPrompt: agentPrompt.prompt
           }
         }
       );
 
       if (generateError) {
         console.error('Erro na edge function:', generateError);
-        toast.dismiss(toastId);
+        setShowLoadingDialog(false);
         toast.error(generateError.message || 'Falha ao gerar cardápio');
         return false;
       }
 
       if (!generatedPlan?.mealPlan) {
-        toast.dismiss(toastId);
+        setShowLoadingDialog(false);
         toast.error('Plano alimentar não gerado corretamente');
         return false;
       }
@@ -214,7 +217,6 @@ export const useMenuController = () => {
           description: 'Geração de plano alimentar'
         });
         
-        toast.dismiss(toastId);
         toast.success(`Cardápio personalizado gerado com sucesso! +${REWARDS.MEAL_PLAN} FITs`);
       }
 
@@ -260,11 +262,11 @@ export const useMenuController = () => {
 
     } catch (error) {
       console.error('Erro completo:', error);
-      toast.dismiss(toastId);
       toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
       return false;
     } finally {
       setLoading(false);
+      setShowLoadingDialog(false);
     }
   };
 
@@ -278,6 +280,7 @@ export const useMenuController = () => {
     mealPlan,
     formData,
     loading,
+    showLoadingDialog,
     handleCalculateCalories,
     handleFoodSelection,
     handleDietaryPreferences,
