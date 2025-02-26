@@ -1,5 +1,4 @@
 
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -20,7 +19,7 @@ interface AgentPromptFormProps {
 
 // Schema de validação
 const formSchema = z.object({
-  agent_type: z.enum(['meal_plan', 'workout', 'physiotherapy'] as const),
+  agent_type: z.enum(['meal_plan', 'workout', 'physiotherapy', 'mental_health'] as const),
   name: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres'),
   description: z.string().nullable(),
   prompt: z.string().min(10, 'Prompt deve ter pelo menos 10 caracteres'),
