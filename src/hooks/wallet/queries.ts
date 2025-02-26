@@ -38,13 +38,22 @@ export function useWalletQuery() {
   });
 }
 
+interface TransactionWithProfiles extends Transaction {
+  sender_profile: {
+    email: string;
+  } | null;
+  recipient_profile: {
+    email: string;
+  } | null;
+}
+
 export function useTransactionsQuery(walletId: string | undefined) {
-  return useQuery({
+  return useQuery<TransactionWithProfiles[]>({
     queryKey: ['transactions', walletId],
     queryFn: async () => {
       if (!walletId) throw new Error('No wallet found');
 
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('fit_transactions')
         .select(`
           *,
@@ -54,10 +63,13 @@ export function useTransactionsQuery(walletId: string | undefined) {
         .eq('wallet_id', walletId)
         .order('created_at', { ascending: false });
 
-      return (data || []) as (Transaction & {
-        sender_profile: { email: string } | null;
-        recipient_profile: { email: string } | null;
-      })[];
+      if (error) throw error;
+
+      return (data || []).map(transaction => ({
+        ...transaction,
+        sender_profile: transaction.sender_profile ? { email: transaction.sender_profile.email } : null,
+        recipient_profile: transaction.recipient_profile ? { email: transaction.recipient_profile.email } : null
+      })) as TransactionWithProfiles[];
     },
     enabled: !!walletId
   });
