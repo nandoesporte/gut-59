@@ -1561,6 +1561,30 @@ export type Database = {
           },
         ]
       }
+      step_rewards: {
+        Row: {
+          created_at: string
+          id: string
+          reward_date: string
+          steps: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          reward_date?: string
+          steps: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          reward_date?: string
+          steps?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       symptoms: {
         Row: {
           created_at: string | null

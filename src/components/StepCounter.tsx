@@ -10,7 +10,11 @@ import { useWallet } from '@/hooks/useWallet';
 import { REWARDS } from '@/constants/rewards';
 
 interface StepReward {
+  id: string;
+  user_id: string;
+  steps: number;
   reward_date: string;
+  created_at: string;
 }
 
 const StepCounter = () => {
@@ -31,7 +35,7 @@ const StepCounter = () => {
 
       const { data } = await supabase
         .from('step_rewards')
-        .select('reward_date')
+        .select<'step_rewards', StepReward>('reward_date')
         .eq('user_id', user.id)
         .order('reward_date', { ascending: false })
         .limit(1)
@@ -143,7 +147,7 @@ const StepCounter = () => {
           user_id: user.id,
           steps: steps,
           reward_date: today
-        });
+        } as StepReward);
 
       if (rewardError) throw rewardError;
 
