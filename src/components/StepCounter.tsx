@@ -17,10 +17,16 @@ interface StepReward {
   created_at: string;
 }
 
+interface AccelerationData {
+  x: number;
+  y: number;
+  z: number;
+}
+
 const StepCounter = () => {
   const [steps, setSteps] = useState(0);
   const [goalSteps] = useState(10000);
-  const [lastAcceleration, setLastAcceleration] = useState({ x: 0, y: 0, z: 0 });
+  const [lastAcceleration, setLastAcceleration] = useState<AccelerationData>({ x: 0, y: 0, z: 0 });
   const [permission, setPermission] = useState<PermissionState | null>(null);
   const { addTransaction } = useWallet();
   const [lastRewardDate, setLastRewardDate] = useState<string | null>(null);
@@ -46,8 +52,8 @@ const StepCounter = () => {
     loadLastRewardDate();
   }, []);
 
-  const detectStep = (acceleration: DeviceAccelerationDict) => {
-    const threshold = 10; // Ajuste esse valor conforme necessário
+  const detectStep = (acceleration: AccelerationData) => {
+    const threshold = 10;
     const diff = Math.abs(acceleration.y - lastAcceleration.y);
     
     if (diff > threshold) {
