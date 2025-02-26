@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -32,6 +33,7 @@ const Mental = () => {
   const [breathingPhase, setBreathingPhase] = useState('');
   const [activeTab, setActiveTab] = useState('breathing');
   const [completedExercises, setCompletedExercises] = useState(0);
+  const [phaseCountdown, setPhaseCountdown] = useState(0);
   
   const { addTransaction } = useWallet();
 
@@ -96,6 +98,10 @@ const Mental = () => {
     let totalSeconds = 0;
     let currentPhaseSeconds = 0;
     
+    // Iniciar com a fase de inspiração
+    setBreathingPhase(BREATHING_PHASES.INHALE.label);
+    setPhaseCountdown(BREATHING_PHASES.INHALE.duration);
+    
     const interval = setInterval(() => {
       if (totalSeconds >= EXERCISE_DURATION) {
         clearInterval(interval);
@@ -103,6 +109,7 @@ const Mental = () => {
         setSeconds(0);
         setPhaseSeconds(0);
         setBreathingPhase('');
+        setPhaseCountdown(0);
         handleExerciseCompletion();
         return;
       }
@@ -118,16 +125,25 @@ const Mental = () => {
         if (breathingPhase !== BREATHING_PHASES.INHALE.label) {
           currentPhaseSeconds = 0;
           setBreathingPhase(BREATHING_PHASES.INHALE.label);
+          setPhaseCountdown(BREATHING_PHASES.INHALE.duration);
+        } else {
+          setPhaseCountdown(BREATHING_PHASES.INHALE.duration - currentPhaseSeconds);
         }
       } else if (cycle < BREATHING_PHASES.INHALE.duration + BREATHING_PHASES.HOLD.duration) {
         if (breathingPhase !== BREATHING_PHASES.HOLD.label) {
           currentPhaseSeconds = 0;
           setBreathingPhase(BREATHING_PHASES.HOLD.label);
+          setPhaseCountdown(BREATHING_PHASES.HOLD.duration);
+        } else {
+          setPhaseCountdown(BREATHING_PHASES.HOLD.duration - (currentPhaseSeconds - BREATHING_PHASES.INHALE.duration));
         }
       } else {
         if (breathingPhase !== BREATHING_PHASES.EXHALE.label) {
           currentPhaseSeconds = 0;
           setBreathingPhase(BREATHING_PHASES.EXHALE.label);
+          setPhaseCountdown(BREATHING_PHASES.EXHALE.duration);
+        } else {
+          setPhaseCountdown(BREATHING_PHASES.EXHALE.duration - (currentPhaseSeconds - BREATHING_PHASES.INHALE.duration - BREATHING_PHASES.HOLD.duration));
         }
       }
       
@@ -138,13 +154,9 @@ const Mental = () => {
   };
 
   const getCurrentPhaseProgress = () => {
-    const phaseDuration = breathingPhase === BREATHING_PHASES.INHALE.label 
-      ? BREATHING_PHASES.INHALE.duration 
-      : breathingPhase === BREATHING_PHASES.HOLD.label 
-        ? BREATHING_PHASES.HOLD.duration 
-        : BREATHING_PHASES.EXHALE.duration;
-
-    return (phaseSeconds / phaseDuration) * 100;
+    const phaseDuration = getCurrentPhaseDuration();
+    if (!phaseDuration) return 0;
+    return ((phaseDuration - phaseCountdown) / phaseDuration) * 100;
   };
 
   const getOverallProgress = () => {
@@ -226,12 +238,12 @@ const Mental = () => {
                 <div className="flex flex-col items-center justify-center space-y-6">
                   <div 
                     className={`w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 rounded-full flex flex-col items-center justify-center transition-all duration-500 shadow-lg relative
-                      ${breathingPhase === 'Inspire' ? 'animate-scale-in bg-[#D3E4FD]' : 
-                        breathingPhase === 'Segure' ? 'bg-[#F2FCE2]' : 'animate-scale-out bg-[#FFDEE2]'}`}
+                      ${breathingPhase === BREATHING_PHASES.INHALE.label ? 'animate-scale-in bg-[#D3E4FD]' : 
+                        breathingPhase === BREATHING_PHASES.HOLD.label ? 'bg-[#F2FCE2]' : 'animate-scale-out bg-[#FFDEE2]'}`}
                   >
                     <span className="text-xl sm:text-2xl font-bold text-primary mb-2">{breathingPhase}</span>
                     <span className="text-3xl sm:text-4xl font-bold text-primary">
-                      {getCurrentPhaseDuration() - phaseSeconds}
+                      {phaseCountdown}
                     </span>
                     <svg className="absolute inset-0 w-full h-full -rotate-90">
                       <circle
