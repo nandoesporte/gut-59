@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { Footprints } from 'lucide-react';
+import { Footprints, Activity, MapPin } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useWallet } from '@/hooks/useWallet';
 import { REWARDS } from '@/constants/rewards';
@@ -170,34 +170,73 @@ const StepCounter = () => {
   const today = new Date().toISOString().split('T')[0];
   const canReceiveReward = lastRewardDate !== today && steps > 0;
 
+  // Cálculos estimados para calorias e distância
+  const calories = Math.round(steps * 0.05); // Estimativa simples: 0.05 calorias por passo
+  const distance = ((steps * 0.762) / 1000).toFixed(2); // Média de 76.2cm por passo, convertido para km
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+    <Card className="bg-gradient-to-br from-primary-50 to-white border-none shadow-lg">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-primary-600">
           <Footprints className="w-6 h-6" />
-          Contador de Passos
+          Atividade Diária
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6">
         {!sensorState.supported ? (
           <div className="text-center text-muted-foreground">
             Seu dispositivo não suporta o contador de passos
           </div>
         ) : sensorState.permission !== 'granted' ? (
-          <Button onClick={requestPermission} className="w-full">
-            Permitir Acesso ao Sensor
+          <Button 
+            onClick={requestPermission} 
+            className="w-full bg-primary hover:bg-primary-600 text-white"
+          >
+            Permitir contagem de passos
           </Button>
         ) : (
           <>
-            <div className="text-center">
-              <span className="text-4xl font-bold">{steps}</span>
-              <span className="text-muted-foreground"> / {goalSteps} passos</span>
+            <div className="text-center space-y-2">
+              <span className="text-6xl font-bold text-primary-600">
+                {steps.toLocaleString()}
+              </span>
+              <div className="text-sm text-muted-foreground">
+                / {goalSteps.toLocaleString()} passos
+              </div>
             </div>
-            <Progress value={progress} className="w-full" />
+            
+            <Progress 
+              value={progress} 
+              className="h-2 w-full bg-primary-100"
+              indicatorClassName="bg-primary"
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white p-4 rounded-xl shadow-sm">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                  <Activity className="w-4 h-4" />
+                  Calorias
+                </div>
+                <div className="text-lg font-semibold text-primary-600">
+                  {calories} kcal
+                </div>
+              </div>
+              
+              <div className="bg-white p-4 rounded-xl shadow-sm">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                  <MapPin className="w-4 h-4" />
+                  Distância
+                </div>
+                <div className="text-lg font-semibold text-primary-600">
+                  {distance} km
+                </div>
+              </div>
+            </div>
+
             <Button
               onClick={handleRewardSteps}
               disabled={!canReceiveReward}
-              className="w-full"
+              className="w-full bg-primary hover:bg-primary-600 text-white"
             >
               {lastRewardDate === today
                 ? 'Recompensa já recebida hoje'
