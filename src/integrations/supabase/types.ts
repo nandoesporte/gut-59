@@ -552,6 +552,48 @@ export type Database = {
         }
         Relationships: []
       }
+      mental_resources: {
+        Row: {
+          content: string | null
+          created_at: string
+          description: string | null
+          display_order: number
+          id: string
+          phone_number: string | null
+          resource_type: Database["public"]["Enums"]["resource_type"]
+          status: string | null
+          title: string
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          phone_number?: string | null
+          resource_type: Database["public"]["Enums"]["resource_type"]
+          status?: string | null
+          title: string
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          phone_number?: string | null
+          resource_type?: Database["public"]["Enums"]["resource_type"]
+          status?: string | null
+          title?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: []
+      }
       mental_videos: {
         Row: {
           created_at: string
@@ -2297,6 +2339,7 @@ export type Database = {
         | "elbow_hand"
       plan_type: "workout" | "nutrition" | "rehabilitation"
       rehab_goal: "pain_relief" | "mobility" | "strength" | "return_to_sport"
+      resource_type: "emergency_contact" | "educational_content" | "useful_link"
       training_goal: "lose_weight" | "maintain" | "gain_mass"
       transaction_type:
         | "daily_tip"

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,23 +8,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Phone, BookOpen, Link2 } from "lucide-react";
-
-interface MentalResource {
-  id: string;
-  title: string;
-  description?: string;
-  content?: string;
-  resource_type: 'emergency_contact' | 'educational_content' | 'useful_link';
-  display_order: number;
-  status: string;
-  phone_number?: string;
-  url?: string;
-}
+import type { MentalResource, NewMentalResource } from "./types";
 
 export const MentalResourcesTab = () => {
   const [resources, setResources] = useState<MentalResource[]>([]);
   const [loading, setLoading] = useState(true);
-  const [newResource, setNewResource] = useState<Partial<MentalResource>>({
+  const [newResource, setNewResource] = useState<NewMentalResource>({
     title: '',
     description: '',
     resource_type: 'emergency_contact',
