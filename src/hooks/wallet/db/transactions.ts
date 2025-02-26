@@ -30,11 +30,16 @@ export async function createWalletTransaction(input: CreateTransactionInput): Pr
     qr_code_id: input.qrCodeId || null
   };
 
+  console.log('Criando transação com valores:', transaction);
+
   const { error } = await supabase
     .from('fit_transactions')
     .insert([transaction]);
 
   if (error) {
+    console.error('Erro na transação:', error);
     throw new Error('Error creating transaction: ' + error.message);
   }
+
+  console.log('Transação criada com sucesso');
 }

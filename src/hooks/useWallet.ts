@@ -7,11 +7,11 @@ export const useWallet = () => {
   const transactionsQuery = useTransactionsQuery(walletQuery.data?.id);
   const mutations = useWalletMutations(walletQuery.data?.id);
 
+  // Remover o Math.max aqui pois ele está forçando o saldo a zero
   return {
     wallet: walletQuery.data ? {
       ...walletQuery.data,
-      // Garantir que o saldo nunca seja negativo e que seja um número
-      balance: Math.max(0, walletQuery.data.balance || 0)
+      balance: walletQuery.data.balance
     } : null,
     transactions: transactionsQuery.data,
     isLoading: walletQuery.isLoading || transactionsQuery.isLoading,

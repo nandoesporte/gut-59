@@ -10,11 +10,13 @@ export function useWalletQuery() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No user found');
 
-      const { data: wallet } = await supabase
+      const { data: wallet, error } = await supabase
         .from('wallets')
         .select('*')
         .eq('user_id', user.id)
         .maybeSingle();
+
+      if (error) throw error;
 
       if (!wallet) {
         const { data: newWallet, error: createError } = await supabase
@@ -24,16 +26,11 @@ export function useWalletQuery() {
           .single();
 
         if (createError) throw createError;
-        return {
-          ...newWallet,
-          balance: Math.max(0, newWallet.balance)
-        } as Wallet;
+        return newWallet as Wallet;
       }
 
-      return {
-        ...wallet,
-        balance: Math.max(0, wallet.balance)
-      } as Wallet;
+      console.log('Saldo atual:', wallet.balance);
+      return wallet as Wallet;
     }
   });
 }
