@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Progress } from "@/components/ui/progress";
 import { Brain, Clock, Headphones, BookOpen, MessageCircle, Smile, SmilePlus, Frown, Meh, Angry, Coins } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useWallet } from '@/hooks/useWallet';
@@ -14,154 +13,11 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { MentalHealthResources } from '@/components/mental/MentalHealthResources';
 
-const BREATHING_PHASES = {
-  INHALE: { duration: 4, label: 'Inspire' },
-  HOLD: { duration: 7, label: 'Segure' },
-  EXHALE: { duration: 8, label: 'Expire' },
-};
-
-const EXERCISE_DURATION = 60; // 1 minuto
-const DAILY_REWARD_LIMIT = 5;
-
 const Mental = () => {
   const [date] = useState<Date>(new Date());
   const [mood, setMood] = useState('');
   const [selectedEmotion, setSelectedEmotion] = useState('');
-  const [isBreathing, setIsBreathing] = useState(false);
-  const [seconds, setSeconds] = useState(0);
-  const [phaseSeconds, setPhaseSeconds] = useState(0);
-  const [breathingPhase, setBreathingPhase] = useState('');
   const [activeTab, setActiveTab] = useState('breathing');
-  const [completedExercises, setCompletedExercises] = useState(0);
-  const [phaseCountdown, setPhaseCountdown] = useState(0);
-  
-  const { addTransaction } = useWallet();
-
-  const getCurrentPhaseDuration = () => {
-    switch (breathingPhase) {
-      case BREATHING_PHASES.INHALE.label:
-        return BREATHING_PHASES.INHALE.duration;
-      case BREATHING_PHASES.HOLD.label:
-        return BREATHING_PHASES.HOLD.duration;
-      case BREATHING_PHASES.EXHALE.label:
-        return BREATHING_PHASES.EXHALE.duration;
-      default:
-        return 0;
-    }
-  };
-
-  useEffect(() => {
-    checkDailyExercises();
-  }, []);
-
-  const checkDailyExercises = async () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const { data, error } = await supabase
-      .from('fit_transactions')
-      .select('count')
-      .eq('transaction_type', 'breathing_exercise')
-      .gte('created_at', today.toISOString())
-      .single();
-
-    if (!error && data) {
-      setCompletedExercises(data.count);
-    }
-  };
-
-  const handleExerciseCompletion = async () => {
-    if (completedExercises >= DAILY_REWARD_LIMIT) {
-      toast.info('Você já atingiu o limite diário de recompensas para este exercício');
-      return;
-    }
-
-    try {
-      await addTransaction({
-        amount: 1,
-        type: 'breathing_exercise',
-        description: 'Exercício de respiração completado'
-      });
-      
-      setCompletedExercises(prev => prev + 1);
-      toast.success('Parabéns! Você ganhou 1 FIT pelo exercício de respiração', {
-        icon: <Coins className="w-4 h-4" />
-      });
-    } catch (error) {
-      console.error('Erro ao adicionar recompensa:', error);
-      toast.error('Erro ao adicionar recompensa');
-    }
-  };
-
-  const startBreathing = () => {
-    setIsBreathing(true);
-    let totalSeconds = 0;
-    let currentPhaseSeconds = 0;
-    
-    // Iniciar com a fase de inspiração
-    setBreathingPhase(BREATHING_PHASES.INHALE.label);
-    setPhaseCountdown(BREATHING_PHASES.INHALE.duration);
-    
-    const interval = setInterval(() => {
-      if (totalSeconds >= EXERCISE_DURATION) {
-        clearInterval(interval);
-        setIsBreathing(false);
-        setSeconds(0);
-        setPhaseSeconds(0);
-        setBreathingPhase('');
-        setPhaseCountdown(0);
-        handleExerciseCompletion();
-        return;
-      }
-
-      totalSeconds++;
-      currentPhaseSeconds++;
-      setSeconds(totalSeconds);
-      
-      // Ciclo de 19 segundos (4+7+8)
-      const cycle = totalSeconds % 19;
-      
-      if (cycle < BREATHING_PHASES.INHALE.duration) {
-        if (breathingPhase !== BREATHING_PHASES.INHALE.label) {
-          currentPhaseSeconds = 0;
-          setBreathingPhase(BREATHING_PHASES.INHALE.label);
-          setPhaseCountdown(BREATHING_PHASES.INHALE.duration);
-        } else {
-          setPhaseCountdown(BREATHING_PHASES.INHALE.duration - currentPhaseSeconds);
-        }
-      } else if (cycle < BREATHING_PHASES.INHALE.duration + BREATHING_PHASES.HOLD.duration) {
-        if (breathingPhase !== BREATHING_PHASES.HOLD.label) {
-          currentPhaseSeconds = 0;
-          setBreathingPhase(BREATHING_PHASES.HOLD.label);
-          setPhaseCountdown(BREATHING_PHASES.HOLD.duration);
-        } else {
-          setPhaseCountdown(BREATHING_PHASES.HOLD.duration - (currentPhaseSeconds - BREATHING_PHASES.INHALE.duration));
-        }
-      } else {
-        if (breathingPhase !== BREATHING_PHASES.EXHALE.label) {
-          currentPhaseSeconds = 0;
-          setBreathingPhase(BREATHING_PHASES.EXHALE.label);
-          setPhaseCountdown(BREATHING_PHASES.EXHALE.duration);
-        } else {
-          setPhaseCountdown(BREATHING_PHASES.EXHALE.duration - (currentPhaseSeconds - BREATHING_PHASES.INHALE.duration - BREATHING_PHASES.HOLD.duration));
-        }
-      }
-      
-      setPhaseSeconds(currentPhaseSeconds);
-    }, 1000);
-
-    return () => clearInterval(interval);
-  };
-
-  const getCurrentPhaseProgress = () => {
-    const phaseDuration = getCurrentPhaseDuration();
-    if (!phaseDuration) return 0;
-    return ((phaseDuration - phaseCountdown) / phaseDuration) * 100;
-  };
-
-  const getOverallProgress = () => {
-    return (seconds / EXERCISE_DURATION) * 100;
-  };
 
   const menuItems = [
     { id: 'breathing', icon: <Clock className="w-6 h-6" />, label: 'Respiração', color: 'bg-[#D3E4FD]' },
@@ -204,83 +60,9 @@ const Mental = () => {
 
       <Tabs value={activeTab} className="w-full">
         <TabsContent value="breathing">
-          <Card className="bg-gradient-to-br from-[#E6F8FC] to-[#F6F9FE]">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg sm:text-xl text-primary">Respiração 4-7-8</CardTitle>
-              <div className="flex justify-between items-center">
-                <p className="text-sm text-muted-foreground">
-                  Exercícios completados hoje: {completedExercises}/{DAILY_REWARD_LIMIT}
-                </p>
-                <Badge variant="secondary">
-                  <Coins className="w-4 h-4 mr-1" />
-                  1 FIT por exercício
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="flex flex-col items-center justify-center p-4 sm:p-8 min-h-[350px] sm:min-h-[400px]">
-              {!isBreathing ? (
-                <div className="w-full max-w-md space-y-4">
-                  <p className="text-sm text-center text-muted-foreground mb-6">
-                    Complete 1 minuto de exercício para ganhar 1 FIT (limite de {DAILY_REWARD_LIMIT} por dia)
-                  </p>
-                  <Button 
-                    onClick={startBreathing} 
-                    size="lg" 
-                    className="w-full bg-primary hover:bg-primary/90 shadow-lg"
-                    disabled={completedExercises >= DAILY_REWARD_LIMIT}
-                  >
-                    {completedExercises >= DAILY_REWARD_LIMIT 
-                      ? 'Limite diário atingido' 
-                      : 'Iniciar Exercício'}
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center space-y-6">
-                  <div 
-                    className={`w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 rounded-full flex flex-col items-center justify-center transition-all duration-500 shadow-lg relative
-                      ${breathingPhase === BREATHING_PHASES.INHALE.label ? 'animate-scale-in bg-[#D3E4FD]' : 
-                        breathingPhase === BREATHING_PHASES.HOLD.label ? 'bg-[#F2FCE2]' : 'animate-scale-out bg-[#FFDEE2]'}`}
-                  >
-                    <span className="text-xl sm:text-2xl font-bold text-primary mb-2">{breathingPhase}</span>
-                    <span className="text-3xl sm:text-4xl font-bold text-primary">
-                      {phaseCountdown}
-                    </span>
-                    <svg className="absolute inset-0 w-full h-full -rotate-90">
-                      <circle
-                        className="text-gray-200"
-                        strokeWidth="4"
-                        stroke="currentColor"
-                        fill="transparent"
-                        r="47%"
-                        cx="50%"
-                        cy="50%"
-                      />
-                      <circle
-                        className="text-primary transition-all duration-500"
-                        strokeWidth="4"
-                        strokeDasharray={`${getCurrentPhaseProgress() * 2.95} 295`}
-                        strokeLinecap="round"
-                        stroke="currentColor"
-                        fill="transparent"
-                        r="47%"
-                        cx="50%"
-                        cy="50%"
-                      />
-                    </svg>
-                  </div>
-
-                  <div className="w-full max-w-md space-y-4">
-                    <div className="text-center text-sm text-muted-foreground">
-                      Tempo total: {seconds}s / {EXERCISE_DURATION}s
-                    </div>
-                    <Progress value={getOverallProgress()} className="h-2" />
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <MentalHealthResources />
         </TabsContent>
-
+        
         <TabsContent value="meditation">
           <Card className="bg-gradient-to-br from-[#FEF9F9] to-[#F8F8FF]">
             <CardHeader className="pb-2">
@@ -402,8 +184,26 @@ const Mental = () => {
                 </Card>
                 
                 <Card className="p-4">
-                  <h3 className="font-semibold text-primary mb-4">Conteúdo Educativo</h3>
-                  <MentalHealthResources />
+                  <h3 className="font-semibold text-primary mb-4">Materiais Educativos</h3>
+                  <div className="grid gap-4">
+                    {[
+                      { title: 'Guia de Saúde Mental', type: 'PDF', size: '2.3 MB' },
+                      { title: 'Técnicas de Relaxamento', type: 'Vídeo', duration: '15 min' },
+                      { title: 'Práticas de Mindfulness', type: 'Áudio', duration: '20 min' }
+                    ].map((material, index) => (
+                      <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                        <div>
+                          <h4 className="font-medium">{material.title}</h4>
+                          <p className="text-sm text-muted-foreground">
+                            {material.type} • {material.duration || material.size}
+                          </p>
+                        </div>
+                        <Button variant="ghost" size="sm">
+                          <BookOpen className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                 </Card>
               </div>
             </CardContent>
