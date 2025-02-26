@@ -16,14 +16,6 @@ export interface Transaction {
   created_at: string;
   recipient_id?: string;
   qr_code_id?: string;
-  sender?: {
-    user?: {
-      email?: string;
-    };
-  };
-  recipient?: {
-    email?: string;
-  };
 }
 
 export interface Wallet {
