@@ -2,6 +2,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ModuleForm } from "./ModuleForm";
 import { VideoForm } from "./VideoForm";
+import { MentalHealthPrompts } from "./MentalHealthPrompts";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -41,12 +42,19 @@ export const MentalHealthTab = () => {
       <TabsList>
         <TabsTrigger value="modules">Módulos</TabsTrigger>
         <TabsTrigger value="videos">Vídeos</TabsTrigger>
+        <TabsTrigger value="prompts">Prompts IA</TabsTrigger>
       </TabsList>
+      
       <TabsContent value="modules">
         <ModuleForm onModuleChange={fetchModules} />
       </TabsContent>
+      
       <TabsContent value="videos">
         <VideoForm modules={modules} />
+      </TabsContent>
+      
+      <TabsContent value="prompts">
+        <MentalHealthPrompts />
       </TabsContent>
     </Tabs>
   );
