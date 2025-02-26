@@ -6,7 +6,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Camera, LogOut, Coins } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useWallet } from "@/hooks/useWallet";
 
 const Profile = () => {
@@ -165,15 +165,16 @@ const Profile = () => {
         <div className="flex justify-between items-center">
           <CardTitle className="text-2xl text-primary-500">Perfil</CardTitle>
           <div className="flex items-center gap-4">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => navigate('/wallet')}
-              className="flex items-center gap-2 bg-primary-50 hover:bg-primary-100 text-primary-600 -ml-10"
-            >
-              <Coins className="w-4 h-4" />
-              <span className="font-bold">{wallet?.balance || 0} FITs</span>
-            </Button>
+            <Link to="/wallet">
+              <Button
+                type="button"
+                variant="ghost"
+                className="flex items-center gap-2 bg-primary-50 hover:bg-primary-100 text-primary-600 -ml-10"
+              >
+                <Coins className="w-4 h-4" />
+                <span className="font-bold">{wallet?.balance || 0} FITs</span>
+              </Button>
+            </Link>
             <Button
               variant="outline"
               size="sm"
