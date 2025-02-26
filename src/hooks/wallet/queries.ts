@@ -53,16 +53,12 @@ export function useTransactionsQuery(walletId: string | undefined) {
     queryFn: async () => {
       if (!walletId) throw new Error('No wallet found');
 
-      // Get the transactions with wallet and user information
       const { data, error } = await supabase
         .from('fit_transactions')
         .select(`
           *,
-          wallets!fit_transactions_wallet_id_fkey (
-            user_id,
-            profiles!wallets_user_id_fkey (email)
-          ),
-          profiles!fit_transactions_recipient_id_fkey (email)
+          sender_profile:profiles!fit_transactions_wallet_id_fkey(email),
+          recipient_profile:profiles!fit_transactions_recipient_id_fkey(email)
         `)
         .eq('wallet_id', walletId)
         .order('created_at', { ascending: false });
@@ -71,8 +67,8 @@ export function useTransactionsQuery(walletId: string | undefined) {
 
       return (data || []).map(transaction => ({
         ...transaction,
-        sender_profile: transaction.wallets?.profiles ? { email: transaction.wallets.profiles.email } : null,
-        recipient_profile: transaction.profiles ? { email: transaction.profiles.email } : null
+        sender_profile: transaction.sender_profile ? { email: transaction.sender_profile.email } : null,
+        recipient_profile: transaction.recipient_profile ? { email: transaction.recipient_profile.email } : null
       })) as TransactionWithProfiles[];
     },
     enabled: !!walletId
