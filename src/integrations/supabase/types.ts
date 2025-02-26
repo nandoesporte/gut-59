@@ -501,6 +501,77 @@ export type Database = {
           },
         ]
       }
+      mental_modules: {
+        Row: {
+          created_at: string
+          description: string | null
+          display_order: number
+          id: string
+          name: string
+          status: Database["public"]["Enums"]["mental_video_status"] | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          display_order: number
+          id?: string
+          name: string
+          status?: Database["public"]["Enums"]["mental_video_status"] | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          name?: string
+          status?: Database["public"]["Enums"]["mental_video_status"] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      mental_videos: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          module_id: string | null
+          status: Database["public"]["Enums"]["mental_video_status"] | null
+          title: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          module_id?: string | null
+          status?: Database["public"]["Enums"]["mental_video_status"] | null
+          title: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          module_id?: string | null
+          status?: Database["public"]["Enums"]["mental_video_status"] | null
+          title?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mental_videos_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "mental_modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           content: string
@@ -2150,6 +2221,7 @@ export type Database = {
         | "spine"
         | "shoulder"
         | "elbow_hand"
+      mental_video_status: "active" | "inactive"
       message_type: "nutricionista" | "personal"
       module_status: "active" | "inactive"
       muscle_group:

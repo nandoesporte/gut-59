@@ -24,7 +24,8 @@ export const ModuleForm = ({ onModuleChange }: ModuleFormProps) => {
         .insert({
           name,
           description,
-          display_order: parseInt(displayOrder)
+          display_order: parseInt(displayOrder),
+          status: 'active'
         });
 
       if (error) throw error;

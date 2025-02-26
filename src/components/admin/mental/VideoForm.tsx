@@ -31,6 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { MentalModule, MentalVideo } from "./types";
 
 const formSchema = z.object({
   title: z.string().min(1, "Título é obrigatório"),
@@ -41,14 +42,14 @@ const formSchema = z.object({
 });
 
 interface VideoFormProps {
-  modules: any[];
+  modules: MentalModule[];
 }
 
 export const VideoForm = ({ modules }: VideoFormProps) => {
-  const [videos, setVideos] = useState<any[]>([]);
+  const [videos, setVideos] = useState<MentalVideo[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const form = useForm({
+  const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       title: "",
@@ -89,7 +90,13 @@ export const VideoForm = ({ modules }: VideoFormProps) => {
     try {
       const { error } = await supabase
         .from('mental_videos')
-        .insert(values);
+        .insert({
+          title: values.title,
+          description: values.description,
+          module_id: values.module_id,
+          url: values.url,
+          status: values.status
+        });
 
       if (error) throw error;
 
