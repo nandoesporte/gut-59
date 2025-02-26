@@ -35,6 +35,19 @@ const Mental = () => {
   
   const { addTransaction } = useWallet();
 
+  const getCurrentPhaseDuration = () => {
+    switch (breathingPhase) {
+      case BREATHING_PHASES.INHALE.label:
+        return BREATHING_PHASES.INHALE.duration;
+      case BREATHING_PHASES.HOLD.label:
+        return BREATHING_PHASES.HOLD.duration;
+      case BREATHING_PHASES.EXHALE.label:
+        return BREATHING_PHASES.EXHALE.duration;
+      default:
+        return 0;
+    }
+  };
+
   useEffect(() => {
     checkDailyExercises();
   }, []);
@@ -387,20 +400,6 @@ const Mental = () => {
       </Tabs>
     </div>
   );
-};
-
-// Helper function to get current phase duration
-const getCurrentPhaseDuration = () => {
-  switch (breathingPhase) {
-    case 'Inspire':
-      return BREATHING_PHASES.INHALE.duration;
-    case 'Segure':
-      return BREATHING_PHASES.HOLD.duration;
-    case 'Expire':
-      return BREATHING_PHASES.EXHALE.duration;
-    default:
-      return 0;
-  }
 };
 
 export default Mental;
