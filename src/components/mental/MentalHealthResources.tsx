@@ -2,15 +2,17 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useWallet } from "@/hooks/useWallet";
+import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
+import "react-circular-progressbar/dist/styles.css";
 
 interface BreathingExercise {
   count: number;
   totalBreaths: number;
   isComplete: boolean;
+  secondsLeft: number;
 }
 
 interface MentalHealthSettings {
@@ -23,10 +25,12 @@ export const MentalHealthResources = () => {
     count: 0,
     totalBreaths: 10,
     isComplete: false,
+    secondsLeft: 5,
   });
   const [dailyExercisesCount, setDailyExercisesCount] = useState(0);
-  const [dailyLimit, setDailyLimit] = useState(5); // Default value
+  const [dailyLimit, setDailyLimit] = useState(5);
   const [isLoading, setIsLoading] = useState(true);
+  const [timer, setTimer] = useState<NodeJS.Timeout | null>(null);
   const wallet = useWallet();
 
   useEffect(() => {
@@ -40,7 +44,6 @@ export const MentalHealthResources = () => {
         if (error) throw error;
         setDailyLimit((settings as MentalHealthSettings).breathing_exercise_daily_limit);
         
-        // Fetch today's exercise count
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
@@ -64,24 +67,58 @@ export const MentalHealthResources = () => {
     loadSettings();
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (timer) {
+        clearTimeout(timer);
+      }
+    };
+  }, [timer]);
+
   const startBreathing = () => {
     if (dailyExercisesCount >= dailyLimit) {
       toast.error(`Você atingiu o limite diário de ${dailyLimit} exercícios`);
       return;
     }
-    setExercise({ count: 0, totalBreaths: 10, isComplete: false });
+    setExercise({
+      count: 0,
+      totalBreaths: 10,
+      isComplete: false,
+      secondsLeft: 5,
+    });
     breathe();
   };
 
   const breathe = () => {
     if (exercise.count < exercise.totalBreaths) {
+      const newTimer = setInterval(() => {
+        setExercise(prev => {
+          if (prev.secondsLeft > 1) {
+            return { ...prev, secondsLeft: prev.secondsLeft - 1 };
+          } else {
+            clearInterval(newTimer);
+            return {
+              ...prev,
+              count: prev.count + 1,
+              secondsLeft: 5,
+            };
+          }
+        });
+      }, 1000);
+
+      setTimer(newTimer);
+
       setTimeout(() => {
-        setExercise(prev => ({
-          ...prev,
-          count: prev.count + 1,
-        }));
-        breathe();
-      }, 5000); // 5 seconds per breath
+        clearInterval(newTimer);
+        setExercise(prev => {
+          if (prev.count + 1 < prev.totalBreaths) {
+            breathe();
+            return prev;
+          } else {
+            return { ...prev, isComplete: true };
+          }
+        });
+      }, 5000);
     } else {
       setExercise(prev => ({ ...prev, isComplete: true }));
       completeExercise();
@@ -120,11 +157,26 @@ export const MentalHealthResources = () => {
             </div>
             
             {exercise.count > 0 && !exercise.isComplete ? (
-              <div className="space-y-2">
-                <div className="text-center text-xl">
+              <div className="flex flex-col items-center space-y-4">
+                <div className="w-48 h-48">
+                  <CircularProgressbar
+                    value={(exercise.secondsLeft / 5) * 100}
+                    text={`${exercise.secondsLeft}s`}
+                    styles={buildStyles({
+                      pathColor: exercise.count % 2 === 0 ? '#4CAF50' : '#2196F3',
+                      textColor: exercise.count % 2 === 0 ? '#4CAF50' : '#2196F3',
+                      trailColor: '#d6d6d6',
+                    })}
+                  />
+                </div>
+                <div className="text-center text-xl font-medium" style={{
+                  color: exercise.count % 2 === 0 ? '#4CAF50' : '#2196F3'
+                }}>
                   {exercise.count % 2 === 0 ? "Inspire..." : "Expire..."}
                 </div>
-                <Progress value={(exercise.count / exercise.totalBreaths) * 100} />
+                <div className="text-sm text-muted-foreground">
+                  Respiração {exercise.count + 1} de {exercise.totalBreaths}
+                </div>
               </div>
             ) : (
               <Button 
