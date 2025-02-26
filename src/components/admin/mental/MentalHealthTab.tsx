@@ -11,15 +11,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { MentalModule } from "./types";
 
-interface Settings {
+interface MentalHealthSettings {
   id: string;
   breathing_exercise_daily_limit: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export const MentalHealthTab = () => {
   const [modules, setModules] = useState<MentalModule[]>([]);
   const [loading, setLoading] = useState(true);
-  const [settings, setSettings] = useState<Settings | null>(null);
+  const [settings, setSettings] = useState<MentalHealthSettings | null>(null);
   const [newLimit, setNewLimit] = useState<number>(5);
 
   useEffect(() => {
@@ -35,7 +37,7 @@ export const MentalHealthTab = () => {
         .single();
 
       if (error) throw error;
-      setSettings(data);
+      setSettings(data as MentalHealthSettings);
       setNewLimit(data.breathing_exercise_daily_limit);
     } catch (error) {
       console.error('Error fetching settings:', error);

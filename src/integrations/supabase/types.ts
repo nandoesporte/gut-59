@@ -501,6 +501,27 @@ export type Database = {
           },
         ]
       }
+      mental_health_settings: {
+        Row: {
+          breathing_exercise_daily_limit: number
+          created_at: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          breathing_exercise_daily_limit?: number
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          breathing_exercise_daily_limit?: number
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       mental_modules: {
         Row: {
           created_at: string
