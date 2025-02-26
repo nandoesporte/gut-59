@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -161,11 +162,6 @@ const Profile = () => {
     }
   };
 
-  const handleNavigateToWallet = (e: React.MouseEvent) => {
-    e.preventDefault();
-    navigate('/wallet');
-  };
-
   return (
     <Card className="w-full max-w-2xl mx-auto mt-2">
       <CardHeader className="relative">
@@ -174,8 +170,8 @@ const Profile = () => {
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
-              onClick={handleNavigateToWallet}
-              className="flex items-center gap-2 bg-primary-50 hover:bg-primary-100 text-primary-600 -ml-10"
+              onClick={() => navigate('/wallet')}
+              className="flex items-center gap-2 bg-primary-50 hover:bg-primary-100 text-primary-600"
             >
               <Coins className="w-4 h-4" />
               <span className="font-bold">{wallet?.balance || 0} FITs</span>
