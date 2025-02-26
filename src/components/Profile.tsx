@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -165,12 +166,12 @@ const Profile = () => {
     <Card className="w-full max-w-2xl mx-auto mt-2">
       <CardHeader className="relative">
         <div className="flex justify-between items-center">
-          <CardTitle className="text-2xl text-primary-500">Seu Perfil</CardTitle>
+          <CardTitle className="text-2xl text-primary-500">Perfil</CardTitle>
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
               onClick={() => navigate('/wallet')}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 -ml-10 bg-primary-50 hover:bg-primary-100 text-primary-600"
             >
               <Coins className="w-4 h-4" />
               <span className="font-bold">{wallet?.balance || 0} FITs</span>
