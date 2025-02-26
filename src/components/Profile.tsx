@@ -171,7 +171,7 @@ const Profile = () => {
             <Button
               variant="ghost"
               onClick={() => navigate('/wallet')}
-              className="flex items-center gap-2 bg-primary-50 hover:bg-primary-100 text-primary-600"
+              className="flex items-center gap-2 bg-primary-50 hover:bg-primary-100 text-primary-600 -ml-10"
             >
               <Coins className="w-4 h-4" />
               <span className="font-bold">{wallet?.balance || 0} FITs</span>
