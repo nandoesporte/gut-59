@@ -88,15 +88,12 @@ const Wallet = () => {
     }
   };
 
-  const getTransactionDescription = (transaction: Transaction & {
-    sender_profile?: { email: string } | null;
-    recipient_profile?: { email: string } | null;
-  }) => {
+  const getTransactionDescription = (transaction: Transaction) => {
     if (transaction.transaction_type === 'transfer') {
       if (transaction.amount > 0) {
-        return `Recebido de ${transaction.sender_profile?.email || 'Usuário desconhecido'}`;
+        return `Recebido de ${transaction.sender?.user?.email || 'Usuário'}`;
       } else {
-        return `Enviado para ${transaction.recipient_profile?.email || 'Usuário desconhecido'}`;
+        return `Enviado para ${transaction.recipient?.email || 'Usuário'}`;
       }
     }
     return transaction.description || transactionTypeInfo[transaction.transaction_type].label;
