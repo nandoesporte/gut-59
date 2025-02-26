@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useWallet } from '@/hooks/useWallet';
@@ -60,46 +61,50 @@ const Wallet = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    const setupRealtimeSubscription = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-    const channel = supabase
-      .channel('wallet-transactions')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'fit_transactions',
-          filter: `recipient_id=eq.${user.id}`
-        },
-        (payload) => {
-          const amount = payload.new.amount;
-          const audio = new Audio('/notification.mp3');
-          
-          toast.success(
-            'Nova transferência recebida!',
-            {
-              description: `Você recebeu ${amount} FITs`,
-              duration: 5000,
-              position: 'top-center',
-              icon: <Coins className="h-5 w-5 text-primary animate-bounce" />,
-              className: 'bg-card border-border shadow-lg',
-              style: {
-                background: '#1A1F2C',
-                color: '#FFFFFF',
-              },
-            }
-          );
+      const channel = supabase
+        .channel('wallet-transactions')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'fit_transactions',
+            filter: `recipient_id=eq.${user.id}`
+          },
+          (payload) => {
+            const amount = payload.new.amount;
+            const audio = new Audio('/notification.mp3');
+            
+            toast.success(
+              'Nova transferência recebida!',
+              {
+                description: `Você recebeu ${amount} FITs`,
+                duration: 5000,
+                position: 'top-center',
+                icon: <Coins className="h-5 w-5 text-primary animate-bounce" />,
+                className: 'bg-card border-border shadow-lg',
+                style: {
+                  background: '#1A1F2C',
+                  color: '#FFFFFF',
+                },
+              }
+            );
 
-          audio.play().catch(() => {});
-        }
-      )
-      .subscribe();
+            audio.play().catch(() => {});
+          }
+        )
+        .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
+      return () => {
+        supabase.removeChannel(channel);
+      };
     };
+
+    setupRealtimeSubscription();
   }, []);
 
   const handleCreateQRCode = async () => {
