@@ -8,6 +8,9 @@ export function useTransactionMutations(walletId: string | undefined, invalidate
     mutationFn: async (input: TransactionInput) => {
       if (!walletId) throw new Error('Wallet not initialized');
 
+      // Debug logs para acompanhar o fluxo
+      console.log('Iniciando transação. Saldo antes:', { walletId, type: input.type, amount: input.amount });
+
       // Ensure reward transactions are always positive
       const amount = ['daily_tip', 'water_intake', 'steps', 'meal_plan', 'workout_plan', 'physio_plan'].includes(input.type)
         ? Math.abs(input.amount)  // Force positive for rewards
@@ -26,7 +29,10 @@ export function useTransactionMutations(walletId: string | undefined, invalidate
     },
     onSuccess: () => {
       console.log('Transação criada com sucesso');
-      invalidateQueries();
+      // Forçar uma atualização imediata dos dados
+      setTimeout(() => {
+        invalidateQueries();
+      }, 100);
     },
     onError: (error) => {
       console.error('Erro ao criar transação:', error);
