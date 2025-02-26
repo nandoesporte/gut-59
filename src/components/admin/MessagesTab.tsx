@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
@@ -26,7 +25,7 @@ interface Message {
   receiver_id: string;
   content: string;
   created_at: string;
-  type: 'nutricionista' | 'personal';
+  type: 'nutricionista' | 'personal' | 'mental_health';
   read: boolean;
   profiles: {
     name: string | null;
