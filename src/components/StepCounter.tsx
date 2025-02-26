@@ -36,6 +36,11 @@ const STORAGE_KEYS = {
   LAST_STEP_TIME: 'stepCounter_lastStepTime'
 };
 
+const ACCELEROMETER_CONFIG = {
+  frequency: 60,
+  windowSize: 5
+};
+
 const loadStoredSteps = () => {
   const today = new Date().toISOString().split('T')[0];
   const lastSync = localStorage.getItem(STORAGE_KEYS.LAST_SYNC);
@@ -54,10 +59,10 @@ const StepCounter = () => {
   const initialSteps = loadStoredSteps();
   const initialLastStepTime = Number(localStorage.getItem(STORAGE_KEYS.LAST_STEP_TIME) || '0');
   const initialParameters = JSON.parse(localStorage.getItem(STORAGE_KEYS.PARAMETERS) || 'null') || {
-    magnitudeThreshold: 2.8,
-    averageThreshold: 1.5,
-    minStepInterval: 300,
-    peakThreshold: 2.0
+    magnitudeThreshold: 1.2,
+    averageThreshold: 0.8,
+    minStepInterval: 250,
+    peakThreshold: 1.0
   };
 
   const [steps, setSteps] = useState(initialSteps);
@@ -74,67 +79,16 @@ const StepCounter = () => {
   const calibrationData = useRef<CalibrationData[]>([]);
   const [parameters, setParameters] = useState(initialParameters);
 
-  useEffect(() => {
-    const loadLastRewardDate = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data } = await supabase
-        .from('step_rewards')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('reward_date', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (data) {
-        setLastRewardDate(data.reward_date);
-      }
-    };
-
-    loadLastRewardDate();
-  }, []);
-
-  useEffect(() => {
-    if (steps !== initialSteps) {
-      localStorage.setItem(STORAGE_KEYS.STEPS, steps.toString());
-    }
-  }, [steps, initialSteps]);
-
-  useEffect(() => {
-    if (lastStepTime !== initialLastStepTime) {
-      localStorage.setItem(STORAGE_KEYS.LAST_STEP_TIME, lastStepTime.toString());
-    }
-  }, [lastStepTime, initialLastStepTime]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.PARAMETERS, JSON.stringify(parameters));
-  }, [parameters]);
-
-  useEffect(() => {
-    const syncOnVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        const currentSteps = loadStoredSteps();
-        if (currentSteps !== steps) {
-          setSteps(currentSteps);
-        }
-      }
-    };
-
-    document.addEventListener('visibilitychange', syncOnVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', syncOnVisibilityChange);
-    };
-  }, [steps]);
-
-  const calculateMagnitude = (acc: AccelerationData): number => {
-    return Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
+  const movingAverageFilter = (buffer: number[], windowSize: number = ACCELEROMETER_CONFIG.windowSize): number => {
+    if (buffer.length === 0) return 0;
+    const window = buffer.slice(-windowSize);
+    const sum = window.reduce((a, b) => a + b, 0);
+    return sum / window.length;
   };
 
-  const movingAverage = (buffer: number[], windowSize: number = 5): number => {
-    if (buffer.length === 0) return 0;
-    const sum = buffer.slice(-windowSize).reduce((a, b) => a + b, 0);
-    return sum / Math.min(windowSize, buffer.length);
+  const calculateMagnitude = (acc: AccelerationData): number => {
+    const weightedY = acc.y * 1.5;
+    return Math.sqrt(acc.x * acc.x + weightedY * weightedY + acc.z * acc.z);
   };
 
   const analyzeCalibrationData = () => {
@@ -167,13 +121,15 @@ const StepCounter = () => {
       }
     });
 
-    const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+    const avgInterval = intervals.length > 0 
+      ? intervals.reduce((a, b) => a + b, 0) / intervals.length 
+      : 300;
 
     const newParameters = {
-      magnitudeThreshold: avgPeakMagnitude * 0.8,
-      averageThreshold: avgPeakAvgMagnitude * 0.8,
-      minStepInterval: Math.min(avgInterval * 0.8, 300),
-      peakThreshold: avgPeakMagnitude * 0.7
+      magnitudeThreshold: avgPeakMagnitude * 0.7,
+      averageThreshold: avgPeakAvgMagnitude * 0.6,
+      minStepInterval: Math.min(Math.max(avgInterval * 0.7, 200), 400),
+      peakThreshold: avgPeakMagnitude * 0.6
     };
 
     setParameters(newParameters);
@@ -188,10 +144,10 @@ const StepCounter = () => {
     if (isCalibrating) {
       setAccelerationBuffer(prev => {
         const newBuffer = [...prev, magnitude];
-        return newBuffer.slice(-10);
+        return newBuffer.slice(-ACCELEROMETER_CONFIG.windowSize);
       });
       
-      const avgMagnitude = movingAverage(accelerationBuffer);
+      const avgMagnitude = movingAverageFilter(accelerationBuffer);
       calibrationData.current.push({
         magnitude,
         avgMagnitude,
@@ -203,17 +159,23 @@ const StepCounter = () => {
 
     setAccelerationBuffer(prev => {
       const newBuffer = [...prev, magnitude];
-      return newBuffer.slice(-10);
+      return newBuffer.slice(-ACCELEROMETER_CONFIG.windowSize);
     });
 
-    const avgMagnitude = movingAverage(accelerationBuffer);
-    const diffY = Math.abs(acceleration.y - lastAcceleration.y);
+    const avgMagnitude = movingAverageFilter(accelerationBuffer);
+    
+    const verticalChange = Math.abs(acceleration.y - lastAcceleration.y);
+    
     const timeSinceLastStep = now - lastStepTime;
 
-    if (magnitude > parameters.peakThreshold && !peakDetected && timeSinceLastStep > parameters.minStepInterval) {
+    if (magnitude > parameters.peakThreshold && 
+        !peakDetected && 
+        timeSinceLastStep > parameters.minStepInterval) {
       setPeakDetected(true);
       
-      if (diffY > parameters.magnitudeThreshold && avgMagnitude > parameters.averageThreshold) {
+      if (verticalChange > parameters.magnitudeThreshold && 
+          avgMagnitude > parameters.averageThreshold &&
+          Math.abs(acceleration.x) < Math.abs(acceleration.y) * 1.5) {
         const newSteps = steps + 1;
         setSteps(newSteps);
         setLastStepTime(now);
@@ -223,10 +185,9 @@ const StepCounter = () => {
         console.log('Passo detectado:', {
           magnitude,
           avgMagnitude,
-          diffY,
+          verticalChange,
           timeSinceLastStep,
-          parameters,
-          totalSteps: newSteps
+          parameters
         });
       }
     } else if (magnitude < parameters.peakThreshold / 2) {
@@ -249,11 +210,11 @@ const StepCounter = () => {
       try {
         // @ts-ignore
         sensor = new Accelerometer({ 
-          frequency: 30
+          frequency: ACCELEROMETER_CONFIG.frequency
         });
         
         let lastProcessTime = 0;
-        const processInterval = 33;
+        const processInterval = 1000 / ACCELEROMETER_CONFIG.frequency;
 
         sensor.addEventListener('reading', () => {
           const now = Date.now();
@@ -308,6 +269,38 @@ const StepCounter = () => {
       }
     };
   }, [permission, isCalibrating]);
+
+  useEffect(() => {
+    if (steps !== initialSteps) {
+      localStorage.setItem(STORAGE_KEYS.STEPS, steps.toString());
+    }
+  }, [steps, initialSteps]);
+
+  useEffect(() => {
+    if (lastStepTime !== initialLastStepTime) {
+      localStorage.setItem(STORAGE_KEYS.LAST_STEP_TIME, lastStepTime.toString());
+    }
+  }, [lastStepTime, initialLastStepTime]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.PARAMETERS, JSON.stringify(parameters));
+  }, [parameters]);
+
+  useEffect(() => {
+    const syncOnVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const currentSteps = loadStoredSteps();
+        if (currentSteps !== steps) {
+          setSteps(currentSteps);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', syncOnVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', syncOnVisibilityChange);
+    };
+  }, [steps]);
 
   const startCalibration = () => {
     setIsCalibrating(true);
