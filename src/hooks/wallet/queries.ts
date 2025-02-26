@@ -24,10 +24,16 @@ export function useWalletQuery() {
           .single();
 
         if (createError) throw createError;
-        return newWallet as Wallet;
+        return {
+          ...newWallet,
+          balance: Math.max(0, newWallet.balance)
+        } as Wallet;
       }
 
-      return wallet as Wallet;
+      return {
+        ...wallet,
+        balance: Math.max(0, wallet.balance)
+      } as Wallet;
     }
   });
 }
