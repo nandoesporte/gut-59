@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -51,16 +52,40 @@ const StepCounter = () => {
   useEffect(() => {
     const checkSensor = async () => {
       try {
-        if ('Accelerometer' in window) {
-          const permission = await (navigator.permissions as any).query({ name: 'accelerometer' });
+        // Verifica primeiro se estamos em um ambiente móvel
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        if (!isMobile) {
+          setSensorState(prev => ({ ...prev, supported: false }));
+          console.log('Dispositivo não é móvel');
+          return;
+        }
+
+        // Verifica suporte ao sensor de passos
+        if ('StepCounter' in window || 'Pedometer' in window) {
+          const permission = await (navigator.permissions as any).query({ 
+            name: 'activity' // Para iOS
+          }).catch(async () => {
+            // Tenta accelerometer se activity não estiver disponível
+            return await (navigator.permissions as any).query({ 
+              name: 'accelerometer' 
+            });
+          });
           
           setSensorState({
-            sensor: new (window as any).Accelerometer({ frequency: 60 }),
+            sensor: ('StepCounter' in window) ? new (window as any).StepCounter() : 
+                   ('Pedometer' in window) ? new (window as any).Pedometer() : null,
             supported: true,
+            permission: permission.state
+          });
+          
+          console.log('Sensor suportado:', {
+            hasStepCounter: 'StepCounter' in window,
+            hasPedometer: 'Pedometer' in window,
             permission: permission.state
           });
         } else {
           setSensorState(prev => ({ ...prev, supported: false }));
+          console.log('Sensores não suportados');
           toast.error('Seu dispositivo não suporta o contador de passos');
         }
       } catch (error) {
@@ -79,16 +104,32 @@ const StepCounter = () => {
     const startCounting = async () => {
       try {
         if (!sensorState.supported || sensorState.permission !== 'granted') {
+          console.log('Não pode iniciar contagem:', { 
+            supported: sensorState.supported, 
+            permission: sensorState.permission 
+          });
           return;
         }
 
-        if ('StepDetector' in window) {
-          stepDetector = new (window as any).StepDetector();
-          stepDetector.addEventListener('stepcounter', () => {
-            setSteps(prev => prev + 1);
+        console.log('Iniciando contagem de passos');
+        
+        if (sensorState.sensor) {
+          stepDetector = sensorState.sensor;
+          
+          // Tenta diferentes eventos de acordo com o sensor disponível
+          ['stepcounter', 'step', 'pedometer'].forEach(eventName => {
+            stepDetector.addEventListener(eventName, (event: any) => {
+              console.log(`Evento ${eventName}:`, event);
+              if (event.steps) {
+                setSteps(event.steps);
+              } else {
+                setSteps(prev => prev + 1);
+              }
+            });
           });
           
           await stepDetector.start();
+          console.log('Contador iniciado com sucesso');
         }
       } catch (error) {
         console.error('Erro ao iniciar contador:', error);
@@ -102,6 +143,7 @@ const StepCounter = () => {
       if (stepDetector) {
         try {
           stepDetector.stop();
+          console.log('Contador parado');
         } catch (error) {
           console.error('Erro ao parar contador:', error);
         }
@@ -111,7 +153,20 @@ const StepCounter = () => {
 
   const requestPermission = async () => {
     try {
-      const result = await (navigator.permissions as any).query({ name: 'accelerometer' });
+      console.log('Solicitando permissão');
+      
+      // Tenta primeiro a permissão de atividade (iOS)
+      const result = await (navigator.permissions as any).query({ 
+        name: 'activity' 
+      }).catch(async () => {
+        // Se falhar, tenta accelerometer (Android)
+        return await (navigator.permissions as any).query({ 
+          name: 'accelerometer' 
+        });
+      });
+
+      console.log('Resultado da permissão:', result.state);
+      
       setSensorState(prev => ({ ...prev, permission: result.state }));
       
       if (result.state === 'granted') {
@@ -202,7 +257,7 @@ const StepCounter = () => {
             </div>
             
             <Progress 
-              value={progress} 
+              value={Math.min((steps / goalSteps) * 100, 100)} 
               className="h-2 w-full bg-primary-100"
             />
 
@@ -213,7 +268,7 @@ const StepCounter = () => {
                   Calorias
                 </div>
                 <div className="text-lg font-semibold text-primary-600">
-                  {calories} kcal
+                  {Math.round(steps * 0.05)} kcal
                 </div>
               </div>
               
@@ -223,7 +278,7 @@ const StepCounter = () => {
                   Distância
                 </div>
                 <div className="text-lg font-semibold text-primary-600">
-                  {distance} km
+                  {((steps * 0.762) / 1000).toFixed(2)} km
                 </div>
               </div>
             </div>
