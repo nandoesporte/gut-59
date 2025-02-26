@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useWallet } from '@/hooks/useWallet';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Coins, ArrowUpCircle, CalendarDays, Droplets, Footprints, QrCode, Send, Mail } from 'lucide-react';
+import { Coins, ArrowUpCircle, CalendarDays, Droplets, Footprints, QrCode, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -80,9 +80,6 @@ const Wallet = () => {
             const amount = payload.new.amount;
             const audio = new Audio('/notification.mp3');
             
-            queryClient.invalidateQueries({ queryKey: ['wallet'] });
-            queryClient.invalidateQueries({ queryKey: ['transactions'] });
-            
             toast.success(
               'Nova transferência recebida!',
               {
@@ -113,6 +110,7 @@ const Wallet = () => {
         },
         () => {
           queryClient.invalidateQueries({ queryKey: ['wallet'] });
+          queryClient.invalidateQueries({ queryKey: ['transactions'] });
         }
       );
 

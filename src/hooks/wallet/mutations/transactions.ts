@@ -22,7 +22,10 @@ export function useTransactionMutations(walletId: string | undefined, invalidate
         qrCodeId: input.qrCodeId
       });
     },
-    onSuccess: invalidateQueries
+    onSuccess: () => {
+      // Only invalidate once after the transaction is complete
+      invalidateQueries();
+    }
   });
 
   return { addTransaction };
