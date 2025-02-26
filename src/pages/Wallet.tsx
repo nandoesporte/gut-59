@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import QRCode from 'qrcode';
 import { toast } from 'sonner';
 import { TransferForm } from '@/components/wallet/TransferForm';
-import { Transaction } from '@/types/wallet'; // Add this import
+import { Transaction } from '@/types/wallet';
 
 const transactionTypeInfo = {
   daily_tip: {
