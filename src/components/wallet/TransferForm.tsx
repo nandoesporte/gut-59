@@ -1,8 +1,8 @@
-
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { transferSchema, type TransferFormValues } from './schemas/transfer-schema';
 import { useWallet } from '@/hooks/useWallet';
 import { TransferFormFields } from './components/TransferFormFields';
@@ -11,6 +11,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { TransactionReceipt } from './components/TransactionReceipt';
 import { Transaction } from '@/types/wallet';
+import { AlertCircle } from "lucide-react";
 
 export function TransferForm() {
   const { wallet } = useWallet();
@@ -18,6 +19,7 @@ export function TransferForm() {
   const [showReceipt, setShowReceipt] = useState(false);
   const [lastTransaction, setLastTransaction] = useState<Transaction | null>(null);
   const [recipientEmail, setRecipientEmail] = useState<string>('');
+  const [insufficientFunds, setInsufficientFunds] = useState(false);
   
   const form = useForm<TransferFormValues>({
     resolver: zodResolver(transferSchema),
@@ -29,7 +31,15 @@ export function TransferForm() {
   });
 
   useEffect(() => {
-    // Inscrever-se para atualizações em tempo real das transações
+    const amount = form.watch('amount');
+    if (wallet && amount > wallet.balance) {
+      setInsufficientFunds(true);
+    } else {
+      setInsufficientFunds(false);
+    }
+  }, [form.watch('amount'), wallet]);
+
+  useEffect(() => {
     const channel = supabase
       .channel('wallet-updates')
       .on(
@@ -41,7 +51,6 @@ export function TransferForm() {
           filter: wallet ? `wallet_id=eq.${wallet.id}` : undefined
         },
         () => {
-          // Recarregar os dados da carteira quando houver uma nova transação
           window.location.reload();
         }
       )
@@ -58,10 +67,15 @@ export function TransferForm() {
       return;
     }
 
+    if (values.amount > wallet.balance) {
+      toast.error('Saldo insuficiente para realizar a transferência');
+      setInsufficientFunds(true);
+      return;
+    }
+
     try {
       setIsLoading(true);
 
-      // Primeiro, buscar o ID do usuário destinatário pelo email
       const { data: recipientProfile, error: profileError } = await supabase
         .from('profiles')
         .select('id, email')
@@ -73,13 +87,11 @@ export function TransferForm() {
         return;
       }
 
-      // Verificar se o usuário está tentando transferir para ele mesmo
       if (recipientProfile.id === wallet.user_id) {
         toast.error('Você não pode transferir FITs para você mesmo');
         return;
       }
 
-      // Usar a função process_transfer do banco de dados
       const { data: transferResult, error } = await supabase.rpc('process_transfer', {
         sender_wallet_id: wallet.user_id,
         recipient_wallet_id: recipientProfile.id,
@@ -90,6 +102,7 @@ export function TransferForm() {
       if (error) {
         if (error.message.includes('Saldo insuficiente')) {
           toast.error('Saldo insuficiente para realizar a transferência');
+          setInsufficientFunds(true);
         } else {
           toast.error('Erro ao realizar transferência. Tente novamente.');
         }
@@ -97,7 +110,6 @@ export function TransferForm() {
         return;
       }
 
-      // Buscar a transação recém-criada
       const { data: newTransaction } = await supabase
         .from('fit_transactions')
         .select('*')
@@ -114,6 +126,7 @@ export function TransferForm() {
 
       toast.success('Transferência realizada com sucesso!');
       form.reset();
+      setInsufficientFunds(false);
     } catch (error) {
       toast.error('Erro ao realizar transferência. Tente novamente.');
       console.error('Transfer error:', error);
@@ -127,7 +140,21 @@ export function TransferForm() {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleTransfer)} className="space-y-4">
           <TransferFormFields form={form} />
-          <Button type="submit" className="w-full" disabled={isLoading}>
+          
+          {insufficientFunds && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Saldo insuficiente. Seu saldo atual é de {wallet?.balance || 0} FITs.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <Button 
+            type="submit" 
+            className="w-full" 
+            disabled={isLoading || insufficientFunds}
+          >
             {isLoading ? 'Processando...' : 'Enviar FITs'}
           </Button>
         </form>
