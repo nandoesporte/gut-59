@@ -1,3 +1,4 @@
+
 export type TransactionType = 
   | 'daily_tip'
   | 'water_intake'
@@ -6,6 +7,11 @@ export type TransactionType =
   | 'workout_plan'
   | 'physio_plan'
   | 'transfer'
+  | 'steps_reward'
+  | 'water_reward'
+  | 'meal_plan_generation'
+  | 'workout_plan_generation'
+  | 'rehab_plan_generation'
   | 'breathing_exercise';
 
 export interface Transaction {
