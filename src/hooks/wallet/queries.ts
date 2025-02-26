@@ -46,7 +46,17 @@ export function useTransactionsQuery(walletId: string | undefined) {
 
       const { data } = await supabase
         .from('fit_transactions')
-        .select('*')
+        .select(`
+          *,
+          recipient:recipient_id(
+            email:profiles!recipient_id(email)
+          ),
+          sender:wallet_id(
+            user:user_id(
+              email:profiles!user_id(email)
+            )
+          )
+        `)
         .eq('wallet_id', walletId)
         .order('created_at', { ascending: false })
         .limit(10);
