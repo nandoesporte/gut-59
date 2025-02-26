@@ -9,6 +9,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useWallet } from '@/hooks/useWallet';
 import { REWARDS } from '@/constants/rewards';
 
+interface StepReward {
+  reward_date: string;
+}
+
 const StepCounter = () => {
   const [steps, setSteps] = useState(0);
   const [goalSteps] = useState(10000);
@@ -31,7 +35,7 @@ const StepCounter = () => {
         .eq('user_id', user.id)
         .order('reward_date', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (data) {
         setLastRewardDate(data.reward_date);
@@ -44,10 +48,8 @@ const StepCounter = () => {
   useEffect(() => {
     const checkSensor = async () => {
       try {
-        // Verifica se a API de sensores está disponível
         if ('Accelerometer' in window) {
-          // Verifica a permissão
-          let permission = await navigator.permissions.query({ name: 'accelerometer' as PermissionName });
+          const permission = await (navigator.permissions as any).query({ name: 'accelerometer' });
           
           setSensorState({
             sensor: new (window as any).Accelerometer({ frequency: 60 }),
@@ -106,7 +108,7 @@ const StepCounter = () => {
 
   const requestPermission = async () => {
     try {
-      const result = await navigator.permissions.request({ name: 'accelerometer' as PermissionName });
+      const result = await (navigator.permissions as any).query({ name: 'accelerometer' });
       setSensorState(prev => ({ ...prev, permission: result.state }));
       
       if (result.state === 'granted') {

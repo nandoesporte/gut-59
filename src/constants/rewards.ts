@@ -6,5 +6,7 @@ export const REWARDS = {
   MEAL_PLAN: 10,         // Pontos por gerar plano alimentar
   WORKOUT_PLAN: 10,      // Pontos por gerar plano de treino
   REHAB_PLAN: 10,        // Pontos por gerar plano de reabilitação
-  STEPS_THRESHOLD: 8000  // Meta de passos para ganhar pontos
+  STEPS_THRESHOLD: 8000, // Meta de passos para ganhar pontos
+  STEPS: 5              // Pontos por completar passos diários
 } as const;
+
