@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,7 +5,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Camera, LogOut, Coins } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useWallet } from "@/hooks/useWallet";
 
 const Profile = () => {
@@ -60,6 +59,7 @@ const Profile = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
 
+      // Upload to Storage
       const fileExt = file.name.split('.').pop();
       const filePath = `${user.id}/${crypto.randomUUID()}.${fileExt}`;
 
@@ -71,10 +71,12 @@ const Profile = () => {
 
       if (uploadError) throw uploadError;
 
+      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('profile_photos')
         .getPublicUrl(filePath);
 
+      // Update profile with new photo URL
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ photo_url: publicUrl })
@@ -163,18 +165,16 @@ const Profile = () => {
     <Card className="w-full max-w-2xl mx-auto mt-2">
       <CardHeader className="relative">
         <div className="flex justify-between items-center">
-          <CardTitle className="text-2xl text-primary-500">Perfil</CardTitle>
+          <CardTitle className="text-2xl text-primary-500">Seu Perfil</CardTitle>
           <div className="flex items-center gap-4">
-            <Link to="/wallet">
-              <Button
-                type="button"
-                variant="ghost"
-                className="flex items-center gap-2 bg-primary-50 hover:bg-primary-100 text-primary-600 -ml-10"
-              >
-                <Coins className="w-4 h-4" />
-                <span className="font-bold">{wallet?.balance || 0} FITs</span>
-              </Button>
-            </Link>
+            <Button
+              variant="ghost"
+              onClick={() => navigate('/wallet')}
+              className="flex items-center gap-2"
+            >
+              <Coins className="w-4 h-4" />
+              <span className="font-bold">{wallet?.balance || 0} FITs</span>
+            </Button>
             <Button
               variant="outline"
               size="sm"
