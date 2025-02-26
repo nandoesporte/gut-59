@@ -35,17 +35,18 @@ export function TransferForm() {
   const onSubmit = async (values: TransferFormValues) => {
     try {
       setIsLoading(true);
+      toast.info('Iniciando transferência...', { duration: 1000 });
       console.log('Starting transfer process with values:', values);
 
       // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError) {
         console.error('Auth error:', userError);
-        toast.error('Erro de autenticação');
+        toast.error('Erro de autenticação', { duration: 3000 });
         return;
       }
       if (!user) {
-        toast.error('Usuário não autenticado');
+        toast.error('Usuário não autenticado', { duration: 3000 });
         return;
       }
       console.log('Current user:', user.id);
@@ -61,19 +62,19 @@ export function TransferForm() {
 
       if (senderWalletError) {
         console.error('Sender wallet error:', senderWalletError);
-        toast.error('Erro ao acessar sua carteira');
+        toast.error('Erro ao acessar sua carteira', { duration: 3000 });
         return;
       }
 
       if (!senderWallet) {
-        toast.error('Você ainda não possui uma carteira');
+        toast.error('Você ainda não possui uma carteira', { duration: 3000 });
         return;
       }
 
       // Verify if sender has enough balance
       if (senderWallet.balance < values.amount) {
         console.log('Insufficient balance:', { balance: senderWallet.balance, requested: values.amount });
-        toast.error('Saldo insuficiente para realizar a transferência');
+        toast.error('Saldo insuficiente para realizar a transferência', { duration: 3000 });
         return;
       }
 
@@ -88,18 +89,18 @@ export function TransferForm() {
 
       if (profileError) {
         console.error('Profile error:', profileError);
-        toast.error('Erro ao buscar destinatário');
+        toast.error('Erro ao buscar destinatário', { duration: 3000 });
         return;
       }
 
       if (!recipientProfile) {
-        toast.error('Destinatário não encontrado');
+        toast.error('Destinatário não encontrado', { duration: 3000 });
         return;
       }
 
       // Prevent self-transfer
       if (recipientProfile.id === user.id) {
-        toast.error('Você não pode transferir FITs para você mesmo');
+        toast.error('Você não pode transferir FITs para você mesmo', { duration: 3000 });
         return;
       }
 
@@ -114,18 +115,18 @@ export function TransferForm() {
 
       if (recipientWalletError) {
         console.error('Recipient wallet error:', recipientWalletError);
-        toast.error('Erro ao acessar carteira do destinatário');
+        toast.error('Erro ao acessar carteira do destinatário', { duration: 3000 });
         return;
       }
 
       if (!recipientWallet) {
-        toast.error('O destinatário ainda não possui uma carteira');
+        toast.error('O destinatário ainda não possui uma carteira', { duration: 3000 });
         return;
       }
 
       const transferParams = {
-        sender_wallet_id: senderWallet.id,
-        recipient_wallet_id: recipientWallet.id,
+        sender_wallet_id: user.id,
+        recipient_wallet_id: recipientProfile.id,
         transfer_amount: values.amount,
         description: values.description || 'Transferência de FITs'
       };
@@ -143,18 +144,18 @@ export function TransferForm() {
       if (transferError) {
         console.error('Transfer error:', transferError);
         if (transferError.message.includes('not enough balance')) {
-          toast.error('Saldo insuficiente para realizar a transferência');
+          toast.error('Saldo insuficiente para realizar a transferência', { duration: 3000 });
         } else {
-          toast.error('Erro ao realizar transferência');
+          toast.error('Erro ao realizar transferência', { duration: 3000 });
         }
         return;
       }
 
       form.reset();
-      toast.success('Transferência realizada com sucesso!');
+      toast.success('Transferência realizada com sucesso!', { duration: 3000 });
     } catch (error) {
       console.error('Error during transfer:', error);
-      toast.error('Erro ao realizar transferência');
+      toast.error('Erro ao realizar transferência', { duration: 3000 });
     } finally {
       setIsLoading(false);
     }
