@@ -11,26 +11,13 @@ import {
 } from "@/components/ui/collapsible";
 import { UserList } from "./messages/UserList";
 import { UserConversation } from "./messages/UserConversation";
+import type { Message } from "@/types/messages";
 
 interface User {
   id: string;
   name: string | null;
   photo_url: string | null;
   unread_messages?: number;
-}
-
-interface Message {
-  id: string;
-  sender_id: string;
-  receiver_id: string;
-  content: string;
-  created_at: string;
-  type: 'nutricionista' | 'personal' | 'mental_health';
-  read: boolean;
-  profiles: {
-    name: string | null;
-    photo_url: string | null;
-  } | null;
 }
 
 export const MessagesTab = () => {
@@ -75,14 +62,12 @@ export const MessagesTab = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Get admin user ID
       const { data: adminData } = await supabase
         .from('user_roles')
         .select('user_id')
         .eq('role', 'admin')
         .maybeSingle();
 
-      // Get personal trainer user ID
       const { data: personalData } = await supabase
         .from('user_roles')
         .select('user_id')
@@ -94,7 +79,6 @@ export const MessagesTab = () => {
         personalData?.user_id
       ].filter(Boolean);
 
-      // Fetch users who have messages with the nutritionist
       const { data: nutritionistUsers, error: nutritionistError } = await supabase
         .from('profiles')
         .select(`
@@ -107,7 +91,6 @@ export const MessagesTab = () => {
 
       if (nutritionistError) throw nutritionistError;
 
-      // Fetch users who have messages with the personal trainer
       const { data: personalUsers, error: personalError } = await supabase
         .from('profiles')
         .select(`
