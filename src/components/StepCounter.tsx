@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -74,10 +73,10 @@ const StepCounter = () => {
       return newBuffer.slice(-10); // Mantém os últimos 10 valores
     });
 
-    // Parâmetros ajustáveis
-    const minStepInterval = 250; // Tempo mínimo entre passos (ms)
-    const magnitudeThreshold = 12; // Limite de magnitude para detecção
-    const averageThreshold = 10; // Limite para média móvel
+    // Parâmetros ajustáveis - reduzidos para maior sensibilidade
+    const minStepInterval = 200; // Tempo mínimo entre passos (ms)
+    const magnitudeThreshold = 1.5; // Reduzido de 12 para 1.5
+    const averageThreshold = 1.2; // Reduzido de 10 para 1.2
     
     // Calcula a média móvel
     const avgMagnitude = movingAverage(accelerationBuffer);
@@ -86,10 +85,8 @@ const StepCounter = () => {
     const diffY = Math.abs(acceleration.y - lastAcceleration.y);
     const timeSinceLastStep = now - lastStepTime;
 
-    // Condições para detectar um passo
-    const isStepPattern = diffY > magnitudeThreshold && 
-                         magnitude > averageThreshold &&
-                         avgMagnitude > averageThreshold &&
+    // Condições para detectar um passo - simplificadas e mais sensíveis
+    const isStepPattern = (diffY > magnitudeThreshold || magnitude > averageThreshold) &&
                          timeSinceLastStep > minStepInterval;
 
     if (isStepPattern) {
@@ -119,11 +116,11 @@ const StepCounter = () => {
       try {
         // @ts-ignore
         sensor = new Accelerometer({ 
-          frequency: 30, // Reduzido para melhor estabilidade
+          frequency: 60, // Aumentado para melhor detecção
         });
         
         let lastProcessTime = 0;
-        const processInterval = 33; // ~30Hz
+        const processInterval = 16; // ~60Hz para maior responsividade
 
         sensor.addEventListener('reading', () => {
           const now = Date.now();
