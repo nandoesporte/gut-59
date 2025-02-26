@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useWallet } from '@/hooks/useWallet';
@@ -13,6 +12,7 @@ import { toast } from 'sonner';
 import { TransferForm } from '@/components/wallet/TransferForm';
 import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 const transactionTypeInfo = {
   daily_tip: {
@@ -53,6 +53,7 @@ const transactionTypeInfo = {
 };
 
 const Wallet = () => {
+  const queryClient = useQueryClient();
   const { wallet, transactions, isLoading, createTransferQRCode, redeemQRCode } = useWallet();
   const [showTransferDialog, setShowTransferDialog] = useState(false);
   const [showScanDialog, setShowScanDialog] = useState(false);
@@ -79,6 +80,9 @@ const Wallet = () => {
             const amount = payload.new.amount;
             const audio = new Audio('/notification.mp3');
             
+            queryClient.invalidateQueries({ queryKey: ['wallet'] });
+            queryClient.invalidateQueries({ queryKey: ['transactions'] });
+            
             toast.success(
               'Nova transferência recebida!',
               {
@@ -99,13 +103,26 @@ const Wallet = () => {
         )
         .subscribe();
 
+      channel.on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'wallets',
+          filter: `user_id=eq.${user.id}`
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['wallet'] });
+        }
+      );
+
       return () => {
         supabase.removeChannel(channel);
       };
     };
 
     setupRealtimeSubscription();
-  }, []);
+  }, [queryClient]);
 
   const handleCreateQRCode = async () => {
     const amount = parseInt(transferAmount);
