@@ -11,7 +11,7 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 export function TransferForm() {
-  const { addTransaction, wallet } = useWallet();
+  const { wallet } = useWallet();
   const [isLoading, setIsLoading] = useState(false);
   
   const form = useForm<TransferFormValues>({
@@ -50,13 +50,23 @@ export function TransferForm() {
         return;
       }
 
-      // Agora sim, fazer a transferência usando o ID do usuário
-      await addTransaction({
-        amount: -values.amount, // Valor negativo para transferência de saída
-        type: 'transfer',
-        description: values.description || 'Transferência de FITs',
-        recipientId: recipientProfile.id // Agora usando o UUID correto
+      // Usar a função process_transfer do banco de dados que lida com ambos os lados da transferência
+      const { data, error } = await supabase.rpc('process_transfer', {
+        sender_wallet_id: wallet.user_id,
+        recipient_wallet_id: recipientProfile.id,
+        transfer_amount: values.amount,
+        description: values.description || 'Transferência de FITs'
       });
+
+      if (error) {
+        if (error.message.includes('Saldo insuficiente')) {
+          toast.error('Saldo insuficiente para realizar a transferência');
+        } else {
+          toast.error('Erro ao realizar transferência. Tente novamente.');
+        }
+        console.error('Transfer error:', error);
+        return;
+      }
 
       toast.success('Transferência realizada com sucesso!');
       form.reset();
