@@ -1,11 +1,25 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Brain, Clock, Headphones, BookOpen, MessageCircle, Smile, SmilePlus, Frown, Meh, Angry } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Brain, Clock, Headphones, BookOpen, MessageCircle, Smile, SmilePlus, Frown, Meh, Angry, Coins } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { useWallet } from '@/hooks/useWallet';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+
+const BREATHING_PHASES = {
+  INHALE: { duration: 4, label: 'Inspire' },
+  HOLD: { duration: 7, label: 'Segure' },
+  EXHALE: { duration: 8, label: 'Expire' },
+};
+
+const EXERCISE_DURATION = 60; // 1 minuto
+const DAILY_REWARD_LIMIT = 5;
 
 const Mental = () => {
   const [date] = useState<Date>(new Date());
@@ -13,8 +27,115 @@ const Mental = () => {
   const [selectedEmotion, setSelectedEmotion] = useState('');
   const [isBreathing, setIsBreathing] = useState(false);
   const [seconds, setSeconds] = useState(0);
+  const [phaseSeconds, setPhaseSeconds] = useState(0);
   const [breathingPhase, setBreathingPhase] = useState('');
   const [activeTab, setActiveTab] = useState('breathing');
+  const [completedExercises, setCompletedExercises] = useState(0);
+  
+  const { addTransaction } = useWallet();
+
+  useEffect(() => {
+    checkDailyExercises();
+  }, []);
+
+  const checkDailyExercises = async () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const { data, error } = await supabase
+      .from('fit_transactions')
+      .select('count')
+      .eq('transaction_type', 'breathing_exercise')
+      .gte('created_at', today.toISOString())
+      .single();
+
+    if (!error && data) {
+      setCompletedExercises(data.count);
+    }
+  };
+
+  const handleExerciseCompletion = async () => {
+    if (completedExercises >= DAILY_REWARD_LIMIT) {
+      toast.info('Você já atingiu o limite diário de recompensas para este exercício');
+      return;
+    }
+
+    try {
+      await addTransaction({
+        amount: 1,
+        type: 'breathing_exercise',
+        description: 'Exercício de respiração completado'
+      });
+      
+      setCompletedExercises(prev => prev + 1);
+      toast.success('Parabéns! Você ganhou 1 FIT pelo exercício de respiração', {
+        icon: <Coins className="w-4 h-4" />
+      });
+    } catch (error) {
+      console.error('Erro ao adicionar recompensa:', error);
+      toast.error('Erro ao adicionar recompensa');
+    }
+  };
+
+  const startBreathing = () => {
+    setIsBreathing(true);
+    let totalSeconds = 0;
+    let currentPhaseSeconds = 0;
+    
+    const interval = setInterval(() => {
+      if (totalSeconds >= EXERCISE_DURATION) {
+        clearInterval(interval);
+        setIsBreathing(false);
+        setSeconds(0);
+        setPhaseSeconds(0);
+        setBreathingPhase('');
+        handleExerciseCompletion();
+        return;
+      }
+
+      totalSeconds++;
+      currentPhaseSeconds++;
+      setSeconds(totalSeconds);
+      
+      // Ciclo de 19 segundos (4+7+8)
+      const cycle = totalSeconds % 19;
+      
+      if (cycle < BREATHING_PHASES.INHALE.duration) {
+        if (breathingPhase !== BREATHING_PHASES.INHALE.label) {
+          currentPhaseSeconds = 0;
+          setBreathingPhase(BREATHING_PHASES.INHALE.label);
+        }
+      } else if (cycle < BREATHING_PHASES.INHALE.duration + BREATHING_PHASES.HOLD.duration) {
+        if (breathingPhase !== BREATHING_PHASES.HOLD.label) {
+          currentPhaseSeconds = 0;
+          setBreathingPhase(BREATHING_PHASES.HOLD.label);
+        }
+      } else {
+        if (breathingPhase !== BREATHING_PHASES.EXHALE.label) {
+          currentPhaseSeconds = 0;
+          setBreathingPhase(BREATHING_PHASES.EXHALE.label);
+        }
+      }
+      
+      setPhaseSeconds(currentPhaseSeconds);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  };
+
+  const getCurrentPhaseProgress = () => {
+    const phaseDuration = breathingPhase === BREATHING_PHASES.INHALE.label 
+      ? BREATHING_PHASES.INHALE.duration 
+      : breathingPhase === BREATHING_PHASES.HOLD.label 
+        ? BREATHING_PHASES.HOLD.duration 
+        : BREATHING_PHASES.EXHALE.duration;
+
+    return (phaseSeconds / phaseDuration) * 100;
+  };
+
+  const getOverallProgress = () => {
+    return (seconds / EXERCISE_DURATION) * 100;
+  };
 
   const menuItems = [
     { id: 'breathing', icon: <Clock className="w-6 h-6" />, label: 'Respiração', color: 'bg-[#D3E4FD]' },
@@ -31,35 +152,6 @@ const Mental = () => {
     { id: 'sad', icon: <Frown className="w-6 h-6 md:w-8 md:h-8" />, label: 'Triste', color: 'bg-[#FFDEE2]' },
     { id: 'angry', icon: <Angry className="w-6 h-6 md:w-8 md:h-8" />, label: 'Irritado', color: 'bg-[#FEC6A1]' },
   ];
-
-  const startBreathing = () => {
-    setIsBreathing(true);
-    let totalSeconds = 0;
-    
-    const interval = setInterval(() => {
-      totalSeconds++;
-      setSeconds(totalSeconds);
-      
-      // 4-7-8 Breathing pattern
-      const cycle = totalSeconds % 19;
-      if (cycle < 4) {
-        setBreathingPhase('Inspire');
-      } else if (cycle < 11) {
-        setBreathingPhase('Segure');
-      } else {
-        setBreathingPhase('Expire');
-      }
-    }, 1000);
-
-    setTimeout(() => {
-      clearInterval(interval);
-      setIsBreathing(false);
-      setSeconds(0);
-      setBreathingPhase('');
-    }, 300000);
-
-    return () => clearInterval(interval);
-  };
 
   return (
     <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 space-y-4 sm:space-y-8 animate-fadeIn pb-20">
@@ -89,19 +181,31 @@ const Mental = () => {
           <Card className="bg-gradient-to-br from-[#E6F8FC] to-[#F6F9FE]">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg sm:text-xl text-primary">Respiração 4-7-8</CardTitle>
+              <div className="flex justify-between items-center">
+                <p className="text-sm text-muted-foreground">
+                  Exercícios completados hoje: {completedExercises}/{DAILY_REWARD_LIMIT}
+                </p>
+                <Badge variant="secondary">
+                  <Coins className="w-4 h-4 mr-1" />
+                  1 FIT por exercício
+                </Badge>
+              </div>
             </CardHeader>
             <CardContent className="flex flex-col items-center justify-center p-4 sm:p-8 min-h-[350px] sm:min-h-[400px]">
               {!isBreathing ? (
                 <div className="w-full max-w-md space-y-4">
                   <p className="text-sm text-center text-muted-foreground mb-6">
-                    Uma técnica simples e eficaz para reduzir ansiedade e melhorar o foco
+                    Complete 1 minuto de exercício para ganhar 1 FIT (limite de {DAILY_REWARD_LIMIT} por dia)
                   </p>
                   <Button 
                     onClick={startBreathing} 
                     size="lg" 
                     className="w-full bg-primary hover:bg-primary/90 shadow-lg"
+                    disabled={completedExercises >= DAILY_REWARD_LIMIT}
                   >
-                    Iniciar Exercício
+                    {completedExercises >= DAILY_REWARD_LIMIT 
+                      ? 'Limite diário atingido' 
+                      : 'Iniciar Exercício'}
                   </Button>
                 </div>
               ) : (
@@ -113,12 +217,17 @@ const Mental = () => {
                   >
                     <span className="text-xl sm:text-2xl font-bold text-primary">{breathingPhase}</span>
                   </div>
-                  <div className="text-xl sm:text-2xl font-semibold text-primary">
-                    {Math.floor(seconds / 60)}:{(seconds % 60).toString().padStart(2, '0')}
-                  </div>
-                  <div className="text-sm sm:text-base text-muted-foreground text-center">
-                    {breathingPhase === 'Inspire' ? '4 segundos' : 
-                     breathingPhase === 'Segure' ? '7 segundos' : '8 segundos'}
+
+                  <div className="w-full max-w-md space-y-4">
+                    <Progress value={getCurrentPhaseProgress()} className="h-2" />
+                    <div className="text-center text-sm text-muted-foreground">
+                      Fase atual: {phaseSeconds}s
+                    </div>
+
+                    <Progress value={getOverallProgress()} className="h-2" />
+                    <div className="text-center text-sm text-muted-foreground">
+                      Progresso total: {seconds}s / {EXERCISE_DURATION}s
+                    </div>
                   </div>
                 </div>
               )}

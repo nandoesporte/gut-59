@@ -1,4 +1,3 @@
-
 export type TransactionType = 
   | 'daily_tip'
   | 'water_intake'
@@ -6,7 +5,8 @@ export type TransactionType =
   | 'meal_plan'
   | 'workout_plan'
   | 'physio_plan'
-  | 'transfer';
+  | 'transfer'
+  | 'breathing_exercise';
 
 export interface Transaction {
   id: string;
