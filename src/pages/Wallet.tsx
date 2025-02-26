@@ -86,22 +86,10 @@ const Wallet = () => {
     }
   };
 
-  const getTransactionDescription = (transaction: Transaction) => {
-    if (transaction.transaction_type === 'transfer') {
-      if (transaction.amount > 0) {
-        return `Recebido de ${transaction.sender?.user?.email || 'Usuário'}`;
-      } else {
-        return `Enviado para ${transaction.recipient?.email || 'Usuário'}`;
-      }
-    }
-    return transaction.description || transactionTypeInfo[transaction.transaction_type].label;
-  };
-
   const filteredTransactions = transactions?.filter(transaction => {
     const searchLower = searchTerm.toLowerCase();
-    const description = getTransactionDescription(transaction);
     return (
-      description.toLowerCase().includes(searchLower) ||
+      transaction.description?.toLowerCase().includes(searchLower) ||
       transactionTypeInfo[transaction.transaction_type].label.toLowerCase().includes(searchLower) ||
       transaction.amount.toString().includes(searchTerm)
     );
@@ -164,7 +152,6 @@ const Wallet = () => {
             filteredTransactions?.map((transaction) => {
               const typeInfo = transactionTypeInfo[transaction.transaction_type];
               const Icon = typeInfo.icon;
-              const description = getTransactionDescription(transaction);
 
               return (
                 <div
@@ -176,7 +163,7 @@ const Wallet = () => {
                       <Icon className="w-5 h-5" />
                     </div>
                     <div>
-                      <p className="font-medium">{description}</p>
+                      <p className="font-medium">{typeInfo.label}</p>
                       <p className="text-sm text-slate-500">
                         {formatDistanceToNow(new Date(transaction.created_at), {
                           addSuffix: true,
