@@ -14,6 +14,7 @@ import { TrainingTab } from "@/components/admin/TrainingTab";
 import { ProfessionalsTab } from "@/components/admin/professionals/ProfessionalsTab";
 import { PaymentSettingsTab } from "@/components/admin/PaymentSettingsTab";
 import { AIAgentsTab } from "@/components/admin/ai-agents/AIAgentsTab";
+import { MentalHealthTab } from "@/components/admin/mental/MentalHealthTab";
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -74,6 +75,7 @@ const Admin = () => {
           <TabsTrigger value="professionals">Profissionais</TabsTrigger>
           <TabsTrigger value="payments">Pagamentos</TabsTrigger>
           <TabsTrigger value="ai-agents">Agentes de IA</TabsTrigger>
+          <TabsTrigger value="mental-health">Saúde Mental</TabsTrigger>
         </TabsList>
         <TabsContent value="users">
           <UsersTab />
@@ -89,6 +91,9 @@ const Admin = () => {
         </TabsContent>
         <TabsContent value="ai-agents">
           <AIAgentsTab />
+        </TabsContent>
+        <TabsContent value="mental-health">
+          <MentalHealthTab />
         </TabsContent>
       </Tabs>
     </div>
