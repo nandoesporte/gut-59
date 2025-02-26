@@ -46,12 +46,18 @@ export function useTransactionsQuery(walletId: string | undefined) {
 
       const { data } = await supabase
         .from('fit_transactions')
-        .select('*')
+        .select(`
+          *,
+          sender_profile:profiles!fit_transactions_wallet_id_fkey(email),
+          recipient_profile:profiles!fit_transactions_recipient_id_fkey(email)
+        `)
         .eq('wallet_id', walletId)
-        .order('created_at', { ascending: false })
-        .limit(10);
+        .order('created_at', { ascending: false });
 
-      return data as Transaction[];
+      return (data || []) as (Transaction & {
+        sender_profile: { email: string } | null;
+        recipient_profile: { email: string } | null;
+      })[];
     },
     enabled: !!walletId
   });
