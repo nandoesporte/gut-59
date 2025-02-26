@@ -13,6 +13,8 @@ export function useTransactionMutations(walletId: string | undefined, invalidate
         ? Math.abs(input.amount)  // Force positive for rewards
         : input.amount;          // Keep original sign for other transactions
 
+      console.log('Criando transação:', { walletId, amount, type: input.type });
+
       await createWalletTransaction({
         walletId,
         amount,
@@ -23,8 +25,11 @@ export function useTransactionMutations(walletId: string | undefined, invalidate
       });
     },
     onSuccess: () => {
-      // Only invalidate once after the transaction is complete
+      console.log('Transação criada com sucesso');
       invalidateQueries();
+    },
+    onError: (error) => {
+      console.error('Erro ao criar transação:', error);
     }
   });
 
