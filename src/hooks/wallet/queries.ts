@@ -38,17 +38,8 @@ export function useWalletQuery() {
   });
 }
 
-interface TransactionWithProfiles extends Transaction {
-  sender_profile: {
-    email: string;
-  } | null;
-  recipient_profile: {
-    email: string;
-  } | null;
-}
-
 export function useTransactionsQuery(walletId: string | undefined) {
-  return useQuery<TransactionWithProfiles[]>({
+  return useQuery({
     queryKey: ['transactions', walletId],
     queryFn: async () => {
       if (!walletId) throw new Error('No wallet found');
@@ -57,19 +48,21 @@ export function useTransactionsQuery(walletId: string | undefined) {
         .from('fit_transactions')
         .select(`
           *,
-          sender_profile:profiles!fit_transactions_wallet_id_fkey(email),
-          recipient_profile:profiles!fit_transactions_recipient_id_fkey(email)
+          recipient:profiles!fit_transactions_recipient_id_fkey(email),
+          sender:wallets!fit_transactions_wallet_id_fkey(
+            user:profiles!wallets_user_id_fkey(email)
+          )
         `)
         .eq('wallet_id', walletId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(10);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching transactions:', error);
+        throw error;
+      }
 
-      return (data || []).map(transaction => ({
-        ...transaction,
-        sender_profile: transaction.sender_profile ? { email: transaction.sender_profile.email } : null,
-        recipient_profile: transaction.recipient_profile ? { email: transaction.recipient_profile.email } : null
-      })) as TransactionWithProfiles[];
+      return data as Transaction[];
     },
     enabled: !!walletId
   });
