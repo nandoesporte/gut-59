@@ -30,6 +30,8 @@ const StepCounter = () => {
   const [permission, setPermission] = useState<PermissionState | null>(null);
   const { addTransaction } = useWallet();
   const [lastRewardDate, setLastRewardDate] = useState<string | null>(null);
+  const [lastStepTime, setLastStepTime] = useState(0);
+  const [accelerationBuffer, setAccelerationBuffer] = useState<number[]>([]);
 
   useEffect(() => {
     const loadLastRewardDate = async () => {
@@ -52,13 +54,53 @@ const StepCounter = () => {
     loadLastRewardDate();
   }, []);
 
+  const calculateMagnitude = (acc: AccelerationData): number => {
+    return Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
+  };
+
+  const movingAverage = (buffer: number[], windowSize: number = 5): number => {
+    if (buffer.length === 0) return 0;
+    const sum = buffer.slice(-windowSize).reduce((a, b) => a + b, 0);
+    return sum / Math.min(windowSize, buffer.length);
+  };
+
   const detectStep = (acceleration: AccelerationData) => {
-    const threshold = 10;
-    const diff = Math.abs(acceleration.y - lastAcceleration.y);
+    const now = Date.now();
+    const magnitude = calculateMagnitude(acceleration);
     
-    if (diff > threshold) {
+    // Atualiza o buffer de aceleração
+    setAccelerationBuffer(prev => {
+      const newBuffer = [...prev, magnitude];
+      return newBuffer.slice(-10); // Mantém os últimos 10 valores
+    });
+
+    // Parâmetros ajustáveis
+    const minStepInterval = 250; // Tempo mínimo entre passos (ms)
+    const magnitudeThreshold = 12; // Limite de magnitude para detecção
+    const averageThreshold = 10; // Limite para média móvel
+    
+    // Calcula a média móvel
+    const avgMagnitude = movingAverage(accelerationBuffer);
+    
+    // Calcula a diferença de aceleração
+    const diffY = Math.abs(acceleration.y - lastAcceleration.y);
+    const timeSinceLastStep = now - lastStepTime;
+
+    // Condições para detectar um passo
+    const isStepPattern = diffY > magnitudeThreshold && 
+                         magnitude > averageThreshold &&
+                         avgMagnitude > averageThreshold &&
+                         timeSinceLastStep > minStepInterval;
+
+    if (isStepPattern) {
       setSteps(prev => prev + 1);
-      console.log('Passo detectado:', { diff, acceleration });
+      setLastStepTime(now);
+      console.log('Passo detectado:', {
+        magnitude,
+        avgMagnitude,
+        diffY,
+        timeSinceLastStep
+      });
     }
     
     setLastAcceleration({
@@ -75,14 +117,24 @@ const StepCounter = () => {
       if (permission !== 'granted') return;
 
       try {
-        // @ts-ignore - TypeScript não reconhece a API do acelerômetro
-        sensor = new Accelerometer({ frequency: 60 });
+        // @ts-ignore
+        sensor = new Accelerometer({ 
+          frequency: 30, // Reduzido para melhor estabilidade
+        });
+        
+        let lastProcessTime = 0;
+        const processInterval = 33; // ~30Hz
+
         sensor.addEventListener('reading', () => {
-          detectStep({
-            x: sensor.x,
-            y: sensor.y,
-            z: sensor.z
-          });
+          const now = Date.now();
+          if (now - lastProcessTime >= processInterval) {
+            detectStep({
+              x: sensor.x,
+              y: sensor.y,
+              z: sensor.z
+            });
+            lastProcessTime = now;
+          }
         });
 
         sensor.start();
