@@ -60,7 +60,6 @@ const Profile = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
 
-      // Upload to Storage
       const fileExt = file.name.split('.').pop();
       const filePath = `${user.id}/${crypto.randomUUID()}.${fileExt}`;
 
@@ -72,12 +71,10 @@ const Profile = () => {
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('profile_photos')
         .getPublicUrl(filePath);
 
-      // Update profile with new photo URL
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ photo_url: publicUrl })
@@ -169,6 +166,7 @@ const Profile = () => {
           <CardTitle className="text-2xl text-primary-500">Perfil</CardTitle>
           <div className="flex items-center gap-4">
             <Button
+              type="button"
               variant="ghost"
               onClick={() => navigate('/wallet')}
               className="flex items-center gap-2 bg-primary-50 hover:bg-primary-100 text-primary-600 -ml-10"
