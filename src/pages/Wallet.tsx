@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useWallet } from '@/hooks/useWallet';
@@ -77,6 +78,7 @@ const Wallet = () => {
             filter: `recipient_id=eq.${user.id}`
           },
           (payload) => {
+            console.log('Nova transação recebida:', payload.new);
             const amount = payload.new.amount;
             const audio = new Audio('/notification.mp3');
             
@@ -108,7 +110,8 @@ const Wallet = () => {
           table: 'wallets',
           filter: `user_id=eq.${user.id}`
         },
-        () => {
+        (payload) => {
+          console.log('Atualização de saldo:', payload.new);
           queryClient.invalidateQueries({ queryKey: ['wallet'] });
           queryClient.invalidateQueries({ queryKey: ['transactions'] });
         }
