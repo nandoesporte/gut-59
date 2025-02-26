@@ -36,8 +36,22 @@ const STORAGE_KEYS = {
   LAST_STEP_TIME: 'stepCounter_lastStepTime'
 };
 
+const loadStoredSteps = () => {
+  const today = new Date().toISOString().split('T')[0];
+  const lastSync = localStorage.getItem(STORAGE_KEYS.LAST_SYNC);
+  const storedSteps = Number(localStorage.getItem(STORAGE_KEYS.STEPS) || '0');
+
+  if (lastSync !== today) {
+    localStorage.setItem(STORAGE_KEYS.LAST_SYNC, today);
+    localStorage.setItem(STORAGE_KEYS.STEPS, '0');
+    return 0;
+  }
+
+  return storedSteps;
+};
+
 const StepCounter = () => {
-  const initialSteps = Number(localStorage.getItem(STORAGE_KEYS.STEPS) || '0');
+  const initialSteps = loadStoredSteps();
   const initialLastStepTime = Number(localStorage.getItem(STORAGE_KEYS.LAST_STEP_TIME) || '0');
   const initialParameters = JSON.parse(localStorage.getItem(STORAGE_KEYS.PARAMETERS) || 'null') || {
     magnitudeThreshold: 2.8,
@@ -61,12 +75,37 @@ const StepCounter = () => {
   const [parameters, setParameters] = useState(initialParameters);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.STEPS, steps.toString());
-  }, [steps]);
+    const loadLastRewardDate = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from('step_rewards')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('reward_date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (data) {
+        setLastRewardDate(data.reward_date);
+      }
+    };
+
+    loadLastRewardDate();
+  }, []);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.LAST_STEP_TIME, lastStepTime.toString());
-  }, [lastStepTime]);
+    if (steps !== initialSteps) {
+      localStorage.setItem(STORAGE_KEYS.STEPS, steps.toString());
+    }
+  }, [steps, initialSteps]);
+
+  useEffect(() => {
+    if (lastStepTime !== initialLastStepTime) {
+      localStorage.setItem(STORAGE_KEYS.LAST_STEP_TIME, lastStepTime.toString());
+    }
+  }, [lastStepTime, initialLastStepTime]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.PARAMETERS, JSON.stringify(parameters));
@@ -75,13 +114,10 @@ const StepCounter = () => {
   useEffect(() => {
     const syncOnVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        const savedSteps = Number(localStorage.getItem(STORAGE_KEYS.STEPS) || '0');
-        const savedLastStepTime = Number(localStorage.getItem(STORAGE_KEYS.LAST_STEP_TIME) || '0');
-        const savedParameters = JSON.parse(localStorage.getItem(STORAGE_KEYS.PARAMETERS) || 'null');
-        
-        if (savedSteps !== steps) setSteps(savedSteps);
-        if (savedLastStepTime !== lastStepTime) setLastStepTime(savedLastStepTime);
-        if (savedParameters) setParameters(savedParameters);
+        const currentSteps = loadStoredSteps();
+        if (currentSteps !== steps) {
+          setSteps(currentSteps);
+        }
       }
     };
 
@@ -89,24 +125,7 @@ const StepCounter = () => {
     return () => {
       document.removeEventListener('visibilitychange', syncOnVisibilityChange);
     };
-  }, [steps, lastStepTime]);
-
-  useEffect(() => {
-    const checkNewDay = () => {
-      const lastSyncDate = localStorage.getItem(STORAGE_KEYS.LAST_SYNC);
-      const today = new Date().toISOString().split('T')[0];
-      
-      if (lastSyncDate !== today) {
-        setSteps(0);
-        localStorage.setItem(STORAGE_KEYS.LAST_SYNC, today);
-      }
-    };
-
-    checkNewDay();
-    const interval = setInterval(checkNewDay, 60000);
-
-    return () => clearInterval(interval);
-  }, []);
+  }, [steps]);
 
   const calculateMagnitude = (acc: AccelerationData): number => {
     return Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
