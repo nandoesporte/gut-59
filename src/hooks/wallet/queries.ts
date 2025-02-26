@@ -44,22 +44,23 @@ export function useTransactionsQuery(walletId: string | undefined) {
     queryFn: async () => {
       if (!walletId) throw new Error('No wallet found');
 
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('fit_transactions')
         .select(`
           *,
-          recipient:recipient_id(
-            email:profiles!recipient_id(email)
-          ),
-          sender:wallet_id(
-            user:user_id(
-              email:profiles!user_id(email)
-            )
+          recipient:profiles!fit_transactions_recipient_id_fkey(email),
+          sender:wallets!fit_transactions_wallet_id_fkey(
+            user:profiles!wallets_user_id_fkey(email)
           )
         `)
         .eq('wallet_id', walletId)
         .order('created_at', { ascending: false })
         .limit(10);
+
+      if (error) {
+        console.error('Error fetching transactions:', error);
+        throw error;
+      }
 
       return data as Transaction[];
     },
