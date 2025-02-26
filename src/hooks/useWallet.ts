@@ -8,7 +8,11 @@ export const useWallet = () => {
   const mutations = useWalletMutations(walletQuery.data?.id);
 
   return {
-    wallet: walletQuery.data,
+    wallet: walletQuery.data ? {
+      ...walletQuery.data,
+      // Garantir que o saldo nunca seja negativo e que seja um número
+      balance: Math.max(0, walletQuery.data.balance || 0)
+    } : null,
     transactions: transactionsQuery.data,
     isLoading: walletQuery.isLoading || transactionsQuery.isLoading,
     addTransaction: mutations.addTransaction.mutate,
