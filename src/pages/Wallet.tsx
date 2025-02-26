@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input';
 import QRCode from 'qrcode';
 import { toast } from 'sonner';
 import { TransferForm } from '@/components/wallet/TransferForm';
+import { useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 const transactionTypeInfo = {
   daily_tip: {
@@ -56,6 +58,49 @@ const Wallet = () => {
   const [transferAmount, setTransferAmount] = useState('');
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const channel = supabase
+      .channel('wallet-transactions')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'fit_transactions',
+          filter: `recipient_id=eq.${user.id}`
+        },
+        (payload) => {
+          const amount = payload.new.amount;
+          const audio = new Audio('/notification.mp3');
+          
+          toast.success(
+            'Nova transferência recebida!',
+            {
+              description: `Você recebeu ${amount} FITs`,
+              duration: 5000,
+              position: 'top-center',
+              icon: <Coins className="h-5 w-5 text-primary animate-bounce" />,
+              className: 'bg-card border-border shadow-lg',
+              style: {
+                background: '#1A1F2C',
+                color: '#FFFFFF',
+              },
+            }
+          );
+
+          audio.play().catch(() => {});
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const handleCreateQRCode = async () => {
     const amount = parseInt(transferAmount);
