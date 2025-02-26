@@ -2290,6 +2290,7 @@ export type Database = {
         | "meal_plan_generation"
         | "workout_plan_generation"
         | "rehab_plan_generation"
+        | "breathing_exercise"
       workout_goal: "lose_weight" | "maintain" | "gain_mass"
     }
     CompositeTypes: {

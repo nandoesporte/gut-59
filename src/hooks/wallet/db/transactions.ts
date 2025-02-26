@@ -34,7 +34,7 @@ export async function createWalletTransaction(input: CreateTransactionInput): Pr
 
   const { error } = await supabase
     .from('fit_transactions')
-    .insert(transaction);
+    .insert([transaction]); // Changed back to array format as required by Supabase
 
   if (error) {
     console.error('Erro na transação:', error);
