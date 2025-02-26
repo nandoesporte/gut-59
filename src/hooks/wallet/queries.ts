@@ -57,10 +57,8 @@ export function useTransactionsQuery(walletId: string | undefined) {
         .from('fit_transactions')
         .select(`
           *,
-          wallet:wallets!fit_transactions_wallet_id_fkey(
-            sender:profiles!wallets_user_id_fkey(email)
-          ),
-          recipient:profiles!fit_transactions_recipient_id_fkey(email)
+          sender_profile:profiles!fit_transactions_wallet_id_fkey(email),
+          recipient_profile:profiles!fit_transactions_recipient_id_fkey(email)
         `)
         .eq('wallet_id', walletId)
         .order('created_at', { ascending: false });
@@ -69,8 +67,8 @@ export function useTransactionsQuery(walletId: string | undefined) {
 
       return (data || []).map(transaction => ({
         ...transaction,
-        sender_profile: transaction.wallet?.sender ? { email: transaction.wallet.sender.email } : null,
-        recipient_profile: transaction.recipient ? { email: transaction.recipient.email } : null
+        sender_profile: transaction.sender_profile ? { email: transaction.sender_profile.email } : null,
+        recipient_profile: transaction.recipient_profile ? { email: transaction.recipient_profile.email } : null
       })) as TransactionWithProfiles[];
     },
     enabled: !!walletId
