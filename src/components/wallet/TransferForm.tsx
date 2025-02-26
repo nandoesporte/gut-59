@@ -1,28 +1,13 @@
 
-import { useState } from 'react';
-import { z } from 'zod';
-import { toast } from 'sonner';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { supabase } from '@/integrations/supabase/client';
-
-const transferSchema = z.object({
-  recipientEmail: z.string()
-    .email('Digite um email válido'),
-  amount: z.number()
-    .min(1, 'O valor mínimo é 1 FIT')
-    .max(1000000, 'Valor máximo excedido'),
-  description: z.string().optional()
-});
-
-type TransferFormValues = z.infer<typeof transferSchema>;
+import { Form } from "@/components/ui/form";
+import { Button } from "@/components/ui/button";
+import { transferSchema, type TransferFormValues } from './schemas/transfer-schema';
+import { useTransferSubmit } from './hooks/useTransferSubmit';
+import { TransferFormFields } from './components/TransferFormFields';
 
 export function TransferForm() {
-  const [isLoading, setIsLoading] = useState(false);
-
   const form = useForm<TransferFormValues>({
     resolver: zodResolver(transferSchema),
     defaultValues: {
@@ -32,189 +17,12 @@ export function TransferForm() {
     }
   });
 
-  const onSubmit = async (values: TransferFormValues) => {
-    try {
-      setIsLoading(true);
-      toast.info('Iniciando transferência...', { duration: 1000 });
-      console.log('Starting transfer process with values:', values);
-
-      // Get current user
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError) {
-        console.error('Auth error:', userError);
-        toast.error('Erro de autenticação', { duration: 3000 });
-        return;
-      }
-      if (!user) {
-        toast.error('Usuário não autenticado', { duration: 3000 });
-        return;
-      }
-      console.log('Current user:', user.id);
-
-      // Get the sender's wallet
-      const { data: senderWallet, error: senderWalletError } = await supabase
-        .from('wallets')
-        .select('id, balance')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      console.log('Sender wallet query result:', { senderWallet, senderWalletError });
-
-      if (senderWalletError) {
-        console.error('Sender wallet error:', senderWalletError);
-        toast.error('Erro ao acessar sua carteira', { duration: 3000 });
-        return;
-      }
-
-      if (!senderWallet) {
-        toast.error('Você ainda não possui uma carteira', { duration: 3000 });
-        return;
-      }
-
-      // Verify if sender has enough balance
-      if (senderWallet.balance < values.amount) {
-        console.log('Insufficient balance:', { balance: senderWallet.balance, requested: values.amount });
-        toast.error('Saldo insuficiente para realizar a transferência', { duration: 3000 });
-        return;
-      }
-
-      // First get the recipient's profile by email
-      const { data: recipientProfile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, email')
-        .eq('email', values.recipientEmail)
-        .maybeSingle();
-
-      console.log('Recipient profile query result:', { recipientProfile, profileError });
-
-      if (profileError) {
-        console.error('Profile error:', profileError);
-        toast.error('Erro ao buscar destinatário', { duration: 3000 });
-        return;
-      }
-
-      if (!recipientProfile) {
-        toast.error('Destinatário não encontrado', { duration: 3000 });
-        return;
-      }
-
-      // Prevent self-transfer
-      if (recipientProfile.id === user.id) {
-        toast.error('Você não pode transferir FITs para você mesmo', { duration: 3000 });
-        return;
-      }
-
-      // Get the recipient's wallet
-      const { data: recipientWallet, error: recipientWalletError } = await supabase
-        .from('wallets')
-        .select('id')
-        .eq('user_id', recipientProfile.id)
-        .maybeSingle();
-
-      console.log('Recipient wallet query result:', { recipientWallet, recipientWalletError });
-
-      if (recipientWalletError) {
-        console.error('Recipient wallet error:', recipientWalletError);
-        toast.error('Erro ao acessar carteira do destinatário', { duration: 3000 });
-        return;
-      }
-
-      if (!recipientWallet) {
-        toast.error('O destinatário ainda não possui uma carteira', { duration: 3000 });
-        return;
-      }
-
-      const transferParams = {
-        sender_wallet_id: user.id,
-        recipient_wallet_id: recipientProfile.id,
-        transfer_amount: values.amount,
-        description: values.description || 'Transferência de FITs'
-      };
-      
-      console.log('Calling process_transfer with params:', transferParams);
-
-      // Process the transfer using the RPC function
-      const { data: transferData, error: transferError } = await supabase.rpc(
-        'process_transfer',
-        transferParams
-      );
-
-      console.log('Transfer result:', { transferData, transferError });
-
-      if (transferError) {
-        console.error('Transfer error:', transferError);
-        if (transferError.message.includes('not enough balance')) {
-          toast.error('Saldo insuficiente para realizar a transferência', { duration: 3000 });
-        } else {
-          toast.error('Erro ao realizar transferência', { duration: 3000 });
-        }
-        return;
-      }
-
-      form.reset();
-      toast.success('Transferência realizada com sucesso!', { duration: 3000 });
-    } catch (error) {
-      console.error('Error during transfer:', error);
-      toast.error('Erro ao realizar transferência', { duration: 3000 });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const { isLoading, handleTransfer } = useTransferSubmit(form.reset);
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <FormField
-          control={form.control}
-          name="recipientEmail"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Email do Destinatário</FormLabel>
-              <FormControl>
-                <Input 
-                  type="email" 
-                  placeholder="email@exemplo.com" 
-                  {...field} 
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="amount"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Quantidade de FITs</FormLabel>
-              <FormControl>
-                <Input 
-                  type="number" 
-                  placeholder="0" 
-                  {...field}
-                  onChange={e => field.onChange(Number(e.target.value))}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Descrição (opcional)</FormLabel>
-              <FormControl>
-                <Input placeholder="Motivo da transferência" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
+      <form onSubmit={form.handleSubmit(handleTransfer)} className="space-y-4">
+        <TransferFormFields form={form} />
         <Button type="submit" className="w-full" disabled={isLoading}>
           {isLoading ? 'Processando...' : 'Enviar FITs'}
         </Button>
