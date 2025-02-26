@@ -1,37 +1,64 @@
 
+import { useState } from "react";
+import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
-import { Send } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface MessageInputProps {
-  newMessage: string;
-  onMessageChange: (message: string) => void;
-  onSendMessage: () => void;
-  loading: boolean;
+  selectedUserId: string;
+  onMessageSent: () => void;
+  role: "nutritionist" | "personal";
 }
 
-export const MessageInput = ({
-  newMessage,
-  onMessageChange,
-  onSendMessage,
-  loading,
-}: MessageInputProps) => {
+interface FormData {
+  content: string;
+}
+
+export const MessageInput = ({ selectedUserId, onMessageSent, role }: MessageInputProps) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const { register, handleSubmit, reset } = useForm<FormData>();
+
+  const onSubmit = async (data: FormData) => {
+    try {
+      setIsLoading(true);
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return;
+
+      const messageType = role === "nutritionist" ? "nutricionista" : "personal";
+      
+      const { error } = await supabase.from("messages").insert({
+        content: data.content,
+        sender_id: userData.user.id,
+        receiver_id: selectedUserId,
+        type: messageType,
+      });
+
+      if (error) throw error;
+
+      reset();
+      onMessageSent();
+      
+    } catch (error) {
+      console.error("Error sending message:", error);
+      toast.error("Erro ao enviar mensagem");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <div className="flex gap-2">
-      <input
-        type="text"
-        value={newMessage}
-        onChange={(e) => onMessageChange(e.target.value)}
-        onKeyPress={(e) => e.key === 'Enter' && onSendMessage()}
+    <form onSubmit={handleSubmit(onSubmit)} className="flex gap-2">
+      <Textarea
+        {...register("content", { required: true })}
         placeholder="Digite sua mensagem..."
-        className="flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+        className="flex-1"
+        rows={1}
       />
-      <Button
-        onClick={onSendMessage}
-        disabled={loading || !newMessage.trim()}
-      >
-        <Send className="w-4 h-4 mr-2" />
-        Enviar
+      <Button type="submit" disabled={isLoading}>
+        {isLoading ? "Enviando..." : "Enviar"}
       </Button>
-    </div>
+    </form>
   );
 };
