@@ -1,17 +1,15 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useWallet } from '@/hooks/useWallet';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Coins, ArrowUpCircle, CalendarDays, Droplets, Footprints, QrCode, Send } from 'lucide-react';
+import { Coins, ArrowUpCircle, CalendarDays, Droplets, Footprints, QrCode, Send, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import QRCode from 'qrcode';
 import { toast } from 'sonner';
 import { TransferForm } from '@/components/wallet/TransferForm';
-import { Transaction } from '@/types/wallet';
 
 const transactionTypeInfo = {
   daily_tip: {
