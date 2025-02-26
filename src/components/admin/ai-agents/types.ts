@@ -1,5 +1,5 @@
 
-export type AgentType = 'meal_plan' | 'workout' | 'physiotherapy';
+export type AgentType = 'meal_plan' | 'workout' | 'physiotherapy' | 'mental_health';
 
 export interface AIAgentPrompt {
   id: string;

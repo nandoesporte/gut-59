@@ -2181,7 +2181,7 @@ export type Database = {
     }
     Enums: {
       activity_level: "sedentary" | "light" | "moderate" | "intense"
-      agent_type: "meal_plan" | "workout" | "physiotherapy"
+      agent_type: "meal_plan" | "workout" | "physiotherapy" | "mental_health"
       app_role: "admin" | "user" | "personal"
       condition_type:
         | "plantar_fasciitis"
@@ -2222,7 +2222,7 @@ export type Database = {
         | "shoulder"
         | "elbow_hand"
       mental_video_status: "active" | "inactive"
-      message_type: "nutricionista" | "personal"
+      message_type: "nutricionista" | "personal" | "mental_health"
       module_status: "active" | "inactive"
       muscle_group:
         | "chest"
