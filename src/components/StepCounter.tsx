@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,7 @@ const StepCounter = () => {
   const [lastRewardDate, setLastRewardDate] = useState<string | null>(null);
   const [lastStepTime, setLastStepTime] = useState(0);
   const [accelerationBuffer, setAccelerationBuffer] = useState<number[]>([]);
+  const [peakDetected, setPeakDetected] = useState(false);
 
   useEffect(() => {
     const loadLastRewardDate = async () => {
@@ -70,34 +72,39 @@ const StepCounter = () => {
     // Atualiza o buffer de aceleração
     setAccelerationBuffer(prev => {
       const newBuffer = [...prev, magnitude];
-      return newBuffer.slice(-10); // Mantém os últimos 10 valores
+      return newBuffer.slice(-10);
     });
 
-    // Parâmetros ajustáveis - reduzidos para maior sensibilidade
-    const minStepInterval = 200; // Tempo mínimo entre passos (ms)
-    const magnitudeThreshold = 1.5; // Reduzido de 12 para 1.5
-    const averageThreshold = 1.2; // Reduzido de 10 para 1.2
+    // Parâmetros ajustados para melhor precisão
+    const minStepInterval = 300; // Aumentado para evitar detecções muito próximas
+    const magnitudeThreshold = 2.8; // Ajustado para um valor intermediário
+    const peakThreshold = 2.0; // Threshold para detectar pico de aceleração
     
     // Calcula a média móvel
     const avgMagnitude = movingAverage(accelerationBuffer);
     
-    // Calcula a diferença de aceleração
+    // Calcula a diferença de aceleração vertical
     const diffY = Math.abs(acceleration.y - lastAcceleration.y);
     const timeSinceLastStep = now - lastStepTime;
 
-    // Condições para detectar um passo - simplificadas e mais sensíveis
-    const isStepPattern = (diffY > magnitudeThreshold || magnitude > averageThreshold) &&
-                         timeSinceLastStep > minStepInterval;
-
-    if (isStepPattern) {
-      setSteps(prev => prev + 1);
-      setLastStepTime(now);
-      console.log('Passo detectado:', {
-        magnitude,
-        avgMagnitude,
-        diffY,
-        timeSinceLastStep
-      });
+    // Sistema de detecção de pico para evitar múltiplas contagens
+    if (magnitude > peakThreshold && !peakDetected && timeSinceLastStep > minStepInterval) {
+      setPeakDetected(true);
+      
+      // Verifica se é um passo válido usando múltiplos critérios
+      if (diffY > magnitudeThreshold && avgMagnitude > 1.5) {
+        setSteps(prev => prev + 1);
+        setLastStepTime(now);
+        console.log('Passo detectado:', {
+          magnitude,
+          avgMagnitude,
+          diffY,
+          timeSinceLastStep
+        });
+      }
+    } else if (magnitude < peakThreshold / 2) {
+      // Reseta a detecção de pico quando a magnitude cai significativamente
+      setPeakDetected(false);
     }
     
     setLastAcceleration({
@@ -116,11 +123,11 @@ const StepCounter = () => {
       try {
         // @ts-ignore
         sensor = new Accelerometer({ 
-          frequency: 60, // Aumentado para melhor detecção
+          frequency: 30, // Reduzido para maior estabilidade
         });
         
         let lastProcessTime = 0;
-        const processInterval = 16; // ~60Hz para maior responsividade
+        const processInterval = 33; // ~30Hz
 
         sensor.addEventListener('reading', () => {
           const now = Date.now();
