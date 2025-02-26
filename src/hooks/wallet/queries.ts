@@ -48,7 +48,8 @@ export function useTransactionsQuery(walletId: string | undefined) {
         .from('fit_transactions')
         .select('*')
         .eq('wallet_id', walletId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(10);
 
       return data as Transaction[];
     },

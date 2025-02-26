@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useWallet } from '@/hooks/useWallet';
@@ -56,6 +55,7 @@ const Wallet = () => {
   const [showScanDialog, setShowScanDialog] = useState(false);
   const [transferAmount, setTransferAmount] = useState('');
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const handleCreateQRCode = async () => {
     const amount = parseInt(transferAmount);
@@ -85,6 +85,15 @@ const Wallet = () => {
       toast.error('Erro ao resgatar QR Code');
     }
   };
+
+  const filteredTransactions = transactions?.filter(transaction => {
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      transaction.description?.toLowerCase().includes(searchLower) ||
+      transactionTypeInfo[transaction.transaction_type].label.toLowerCase().includes(searchLower) ||
+      transaction.amount.toString().includes(searchTerm)
+    );
+  });
 
   if (isLoading) {
     return (
@@ -122,7 +131,57 @@ const Wallet = () => {
         </CardContent>
       </Card>
 
-      {/* Transfer Dialog */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Histórico de Transações</CardTitle>
+          <div className="mt-2">
+            <Input
+              placeholder="Buscar transações..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="max-w-md"
+            />
+          </div>
+        </CardHeader>
+        <CardContent>
+          {filteredTransactions?.length === 0 ? (
+            <div className="text-center text-gray-500 py-4">
+              Nenhuma transação encontrada
+            </div>
+          ) : (
+            filteredTransactions?.map((transaction) => {
+              const typeInfo = transactionTypeInfo[transaction.transaction_type];
+              const Icon = typeInfo.icon;
+
+              return (
+                <div
+                  key={transaction.id}
+                  className="flex items-center justify-between p-4 bg-slate-50 rounded-lg mb-2"
+                >
+                  <div className="flex items-center space-x-4">
+                    <div className={`p-2 rounded-full bg-white ${typeInfo.color}`}>
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="font-medium">{typeInfo.label}</p>
+                      <p className="text-sm text-slate-500">
+                        {formatDistanceToNow(new Date(transaction.created_at), {
+                          addSuffix: true,
+                          locale: ptBR
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                  <p className={`font-semibold ${transaction.amount > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    {transaction.amount > 0 ? '+' : ''}{transaction.amount} FITs
+                  </p>
+                </div>
+              );
+            })
+          )}
+        </CardContent>
+      </Card>
+
       <Dialog open={showTransferDialog} onOpenChange={setShowTransferDialog}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -135,44 +194,6 @@ const Wallet = () => {
         </DialogContent>
       </Dialog>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Histórico de Transações</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {transactions?.map((transaction) => {
-            const typeInfo = transactionTypeInfo[transaction.transaction_type];
-            const Icon = typeInfo.icon;
-
-            return (
-              <div
-                key={transaction.id}
-                className="flex items-center justify-between p-4 bg-slate-50 rounded-lg mb-2"
-              >
-                <div className="flex items-center space-x-4">
-                  <div className={`p-2 rounded-full bg-white ${typeInfo.color}`}>
-                    <Icon className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="font-medium">{typeInfo.label}</p>
-                    <p className="text-sm text-slate-500">
-                      {formatDistanceToNow(new Date(transaction.created_at), {
-                        addSuffix: true,
-                        locale: ptBR
-                      })}
-                    </p>
-                  </div>
-                </div>
-                <p className={`font-semibold ${transaction.amount > 0 ? 'text-green-500' : 'text-red-500'}`}>
-                  {transaction.amount > 0 ? '+' : ''}{transaction.amount} FITs
-                </p>
-              </div>
-            );
-          })}
-        </CardContent>
-      </Card>
-
-      {/* Scan Dialog */}
       <Dialog open={showScanDialog} onOpenChange={setShowScanDialog}>
         <DialogContent>
           <DialogHeader>
