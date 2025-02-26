@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -140,7 +139,6 @@ const StepCounter = () => {
         return;
       }
 
-      // Registra a recompensa
       const { error: rewardError } = await supabase
         .from('step_rewards')
         .insert({
@@ -151,7 +149,6 @@ const StepCounter = () => {
 
       if (rewardError) throw rewardError;
 
-      // Adiciona os FITs
       await addTransaction({
         amount: REWARDS.STEPS,
         type: 'steps',
@@ -170,9 +167,8 @@ const StepCounter = () => {
   const today = new Date().toISOString().split('T')[0];
   const canReceiveReward = lastRewardDate !== today && steps > 0;
 
-  // Cálculos estimados para calorias e distância
-  const calories = Math.round(steps * 0.05); // Estimativa simples: 0.05 calorias por passo
-  const distance = ((steps * 0.762) / 1000).toFixed(2); // Média de 76.2cm por passo, convertido para km
+  const calories = Math.round(steps * 0.05);
+  const distance = ((steps * 0.762) / 1000).toFixed(2);
 
   return (
     <Card className="bg-gradient-to-br from-primary-50 to-white border-none shadow-lg">
@@ -208,7 +204,6 @@ const StepCounter = () => {
             <Progress 
               value={progress} 
               className="h-2 w-full bg-primary-100"
-              indicatorClassName="bg-primary"
             />
 
             <div className="grid grid-cols-2 gap-4">
