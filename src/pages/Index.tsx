@@ -86,10 +86,10 @@ const Index = () => {
         </Card>
       </div>
       <div className="w-full">
-        <WaterTracker />
+        <StepCounter />
       </div>
       <div className="w-full">
-        <StepCounter />
+        <WaterTracker />
       </div>
       {isAdmin ? (
         <div className="w-full">
