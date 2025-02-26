@@ -37,7 +37,12 @@ const formSchema = z.object({
   title: z.string().min(1, "Título é obrigatório"),
   description: z.string().optional(),
   module_id: z.string().min(1, "Módulo é obrigatório"),
-  url: z.string().url("URL inválida"),
+  url: z.string()
+    .min(1, "URL é obrigatória")
+    .refine((url) => {
+      // Aceita URLs do YouTube no formato completo ou encurtado
+      return url.match(/^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    }, "URL inválida do YouTube"),
   status: z.enum(["active", "inactive"]),
 });
 
@@ -126,6 +131,14 @@ export const VideoForm = ({ modules }: VideoFormProps) => {
     }
   };
 
+  const getVideoPreview = (url: string) => {
+    const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    if (match && match[1]) {
+      return `https://www.youtube.com/embed/${match[1]}`;
+    }
+    return null;
+  };
+
   if (loading) {
     return <div>Carregando...</div>;
   }
@@ -195,9 +208,9 @@ export const VideoForm = ({ modules }: VideoFormProps) => {
             name="url"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>URL do Vídeo</FormLabel>
+                <FormLabel>URL do Vídeo do YouTube</FormLabel>
                 <FormControl>
-                  <Input {...field} />
+                  <Input {...field} placeholder="https://youtube.com/watch?v=..." />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -239,6 +252,7 @@ export const VideoForm = ({ modules }: VideoFormProps) => {
             <TableRow>
               <TableHead>Título</TableHead>
               <TableHead>Módulo</TableHead>
+              <TableHead>Preview</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Ações</TableHead>
             </TableRow>
@@ -248,6 +262,19 @@ export const VideoForm = ({ modules }: VideoFormProps) => {
               <TableRow key={video.id}>
                 <TableCell>{video.title}</TableCell>
                 <TableCell>{video.mental_modules?.name}</TableCell>
+                <TableCell>
+                  {getVideoPreview(video.url) && (
+                    <div className="w-40 h-24 relative">
+                      <iframe
+                        src={getVideoPreview(video.url)}
+                        className="absolute inset-0 w-full h-full"
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                  )}
+                </TableCell>
                 <TableCell>{video.status}</TableCell>
                 <TableCell>
                   <Button
