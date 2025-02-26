@@ -29,45 +29,83 @@ interface CalibrationData {
   timestamp: number;
 }
 
+const STORAGE_KEYS = {
+  STEPS: 'stepCounter_steps',
+  LAST_SYNC: 'stepCounter_lastSync',
+  PARAMETERS: 'stepCounter_parameters',
+  LAST_STEP_TIME: 'stepCounter_lastStepTime'
+};
+
 const StepCounter = () => {
-  const [steps, setSteps] = useState(0);
+  const initialSteps = Number(localStorage.getItem(STORAGE_KEYS.STEPS) || '0');
+  const initialLastStepTime = Number(localStorage.getItem(STORAGE_KEYS.LAST_STEP_TIME) || '0');
+  const initialParameters = JSON.parse(localStorage.getItem(STORAGE_KEYS.PARAMETERS) || 'null') || {
+    magnitudeThreshold: 2.8,
+    averageThreshold: 1.5,
+    minStepInterval: 300,
+    peakThreshold: 2.0
+  };
+
+  const [steps, setSteps] = useState(initialSteps);
   const [goalSteps] = useState(10000);
   const [lastAcceleration, setLastAcceleration] = useState<AccelerationData>({ x: 0, y: 0, z: 0, timestamp: 0 });
   const [permission, setPermission] = useState<PermissionState | null>(null);
   const { addTransaction } = useWallet();
   const [lastRewardDate, setLastRewardDate] = useState<string | null>(null);
-  const [lastStepTime, setLastStepTime] = useState(0);
+  const [lastStepTime, setLastStepTime] = useState(initialLastStepTime);
   const [accelerationBuffer, setAccelerationBuffer] = useState<number[]>([]);
   const [peakDetected, setPeakDetected] = useState(false);
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [calibrationTime, setCalibrationTime] = useState(0);
   const calibrationData = useRef<CalibrationData[]>([]);
-  const [parameters, setParameters] = useState({
-    magnitudeThreshold: 2.8,
-    averageThreshold: 1.5,
-    minStepInterval: 300,
-    peakThreshold: 2.0
-  });
+  const [parameters, setParameters] = useState(initialParameters);
 
   useEffect(() => {
-    const loadLastRewardDate = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+    localStorage.setItem(STORAGE_KEYS.STEPS, steps.toString());
+  }, [steps]);
 
-      const { data } = await supabase
-        .from('step_rewards')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('reward_date', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.LAST_STEP_TIME, lastStepTime.toString());
+  }, [lastStepTime]);
 
-      if (data) {
-        setLastRewardDate(data.reward_date);
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.PARAMETERS, JSON.stringify(parameters));
+  }, [parameters]);
+
+  useEffect(() => {
+    const syncOnVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const savedSteps = Number(localStorage.getItem(STORAGE_KEYS.STEPS) || '0');
+        const savedLastStepTime = Number(localStorage.getItem(STORAGE_KEYS.LAST_STEP_TIME) || '0');
+        const savedParameters = JSON.parse(localStorage.getItem(STORAGE_KEYS.PARAMETERS) || 'null');
+        
+        if (savedSteps !== steps) setSteps(savedSteps);
+        if (savedLastStepTime !== lastStepTime) setLastStepTime(savedLastStepTime);
+        if (savedParameters) setParameters(savedParameters);
       }
     };
 
-    loadLastRewardDate();
+    document.addEventListener('visibilitychange', syncOnVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', syncOnVisibilityChange);
+    };
+  }, [steps, lastStepTime]);
+
+  useEffect(() => {
+    const checkNewDay = () => {
+      const lastSyncDate = localStorage.getItem(STORAGE_KEYS.LAST_SYNC);
+      const today = new Date().toISOString().split('T')[0];
+      
+      if (lastSyncDate !== today) {
+        setSteps(0);
+        localStorage.setItem(STORAGE_KEYS.LAST_SYNC, today);
+      }
+    };
+
+    checkNewDay();
+    const interval = setInterval(checkNewDay, 60000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const calculateMagnitude = (acc: AccelerationData): number => {
@@ -157,14 +195,19 @@ const StepCounter = () => {
       setPeakDetected(true);
       
       if (diffY > parameters.magnitudeThreshold && avgMagnitude > parameters.averageThreshold) {
-        setSteps(prev => prev + 1);
+        const newSteps = steps + 1;
+        setSteps(newSteps);
         setLastStepTime(now);
+        localStorage.setItem(STORAGE_KEYS.STEPS, newSteps.toString());
+        localStorage.setItem(STORAGE_KEYS.LAST_STEP_TIME, now.toString());
+        
         console.log('Passo detectado:', {
           magnitude,
           avgMagnitude,
           diffY,
           timeSinceLastStep,
-          parameters
+          parameters,
+          totalSteps: newSteps
         });
       }
     } else if (magnitude < parameters.peakThreshold / 2) {
