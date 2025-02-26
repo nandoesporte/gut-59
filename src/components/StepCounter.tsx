@@ -35,7 +35,7 @@ const StepCounter = () => {
 
       const { data } = await supabase
         .from('step_rewards')
-        .select<'step_rewards', StepReward>('reward_date')
+        .select('*')
         .eq('user_id', user.id)
         .order('reward_date', { ascending: false })
         .limit(1)
@@ -147,7 +147,7 @@ const StepCounter = () => {
           user_id: user.id,
           steps: steps,
           reward_date: today
-        } as StepReward);
+        });
 
       if (rewardError) throw rewardError;
 
