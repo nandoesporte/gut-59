@@ -212,23 +212,43 @@ const Mental = () => {
               ) : (
                 <div className="flex flex-col items-center justify-center space-y-6">
                   <div 
-                    className={`w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 rounded-full flex items-center justify-center transition-all duration-500 shadow-lg
+                    className={`w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 rounded-full flex flex-col items-center justify-center transition-all duration-500 shadow-lg relative
                       ${breathingPhase === 'Inspire' ? 'animate-scale-in bg-[#D3E4FD]' : 
                         breathingPhase === 'Segure' ? 'bg-[#F2FCE2]' : 'animate-scale-out bg-[#FFDEE2]'}`}
                   >
-                    <span className="text-xl sm:text-2xl font-bold text-primary">{breathingPhase}</span>
+                    <span className="text-xl sm:text-2xl font-bold text-primary mb-2">{breathingPhase}</span>
+                    <span className="text-3xl sm:text-4xl font-bold text-primary">
+                      {getCurrentPhaseDuration() - phaseSeconds}
+                    </span>
+                    <svg className="absolute inset-0 w-full h-full -rotate-90">
+                      <circle
+                        className="text-gray-200"
+                        strokeWidth="4"
+                        stroke="currentColor"
+                        fill="transparent"
+                        r="47%"
+                        cx="50%"
+                        cy="50%"
+                      />
+                      <circle
+                        className="text-primary transition-all duration-500"
+                        strokeWidth="4"
+                        strokeDasharray={`${getCurrentPhaseProgress() * 2.95} 295`}
+                        strokeLinecap="round"
+                        stroke="currentColor"
+                        fill="transparent"
+                        r="47%"
+                        cx="50%"
+                        cy="50%"
+                      />
+                    </svg>
                   </div>
 
                   <div className="w-full max-w-md space-y-4">
-                    <Progress value={getCurrentPhaseProgress()} className="h-2" />
                     <div className="text-center text-sm text-muted-foreground">
-                      Fase atual: {phaseSeconds}s
+                      Tempo total: {seconds}s / {EXERCISE_DURATION}s
                     </div>
-
                     <Progress value={getOverallProgress()} className="h-2" />
-                    <div className="text-center text-sm text-muted-foreground">
-                      Progresso total: {seconds}s / {EXERCISE_DURATION}s
-                    </div>
                   </div>
                 </div>
               )}
@@ -367,6 +387,20 @@ const Mental = () => {
       </Tabs>
     </div>
   );
+};
+
+// Helper function to get current phase duration
+const getCurrentPhaseDuration = () => {
+  switch (breathingPhase) {
+    case 'Inspire':
+      return BREATHING_PHASES.INHALE.duration;
+    case 'Segure':
+      return BREATHING_PHASES.HOLD.duration;
+    case 'Expire':
+      return BREATHING_PHASES.EXHALE.duration;
+    default:
+      return 0;
+  }
 };
 
 export default Mental;
