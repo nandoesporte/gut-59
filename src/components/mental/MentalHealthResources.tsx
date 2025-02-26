@@ -1,12 +1,12 @@
+
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useWallet } from "@/hooks/useWallet";
 import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
 import "react-circular-progressbar/dist/styles.css";
-import type { MentalModule, MentalVideo } from "../admin/mental/types";
 
 interface BreathingExercise {
   count: number;
@@ -32,8 +32,6 @@ export const MentalHealthResources = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [timer, setTimer] = useState<NodeJS.Timeout | null>(null);
   const wallet = useWallet();
-  const [modules, setModules] = useState<MentalModule[]>([]);
-  const [videos, setVideos] = useState<MentalVideo[]>([]);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -76,47 +74,6 @@ export const MentalHealthResources = () => {
       }
     };
   }, [timer]);
-
-  useEffect(() => {
-    fetchModules();
-  }, []);
-
-  const fetchModules = async () => {
-    try {
-      const { data: modulesData, error: modulesError } = await supabase
-        .from('mental_modules')
-        .select('*')
-        .eq('status', 'active')
-        .order('display_order');
-
-      if (modulesError) throw modulesError;
-      setModules(modulesData || []);
-
-      const { data: videosData, error: videosError } = await supabase
-        .from('mental_videos')
-        .select(`
-          *,
-          mental_modules (
-            name
-          )
-        `)
-        .eq('status', 'active');
-
-      if (videosError) throw videosError;
-      setVideos(videosData || []);
-    } catch (error) {
-      console.error('Error fetching mental health resources:', error);
-      toast.error('Erro ao carregar recursos de saúde mental');
-    }
-  };
-
-  const getVideoPreview = (url: string) => {
-    const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-    if (match && match[1]) {
-      return `https://www.youtube.com/embed/${match[1]}`;
-    }
-    return null;
-  };
 
   const startBreathing = () => {
     if (dailyExercisesCount >= dailyLimit) {
@@ -188,7 +145,7 @@ export const MentalHealthResources = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Card>
         <CardContent className="pt-6">
           <div className="space-y-4">
@@ -235,44 +192,6 @@ export const MentalHealthResources = () => {
           </div>
         </CardContent>
       </Card>
-
-      {modules.map((module) => (
-        <Card key={module.id}>
-          <CardHeader>
-            <CardTitle className="text-lg">{module.name}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {module.description && (
-              <p className="text-sm text-muted-foreground">{module.description}</p>
-            )}
-            <div className="grid gap-4">
-              {videos
-                .filter(video => video.module_id === module.id)
-                .map(video => (
-                  <Card key={video.id} className="p-4">
-                    <div className="space-y-4">
-                      <h4 className="font-medium">{video.title}</h4>
-                      {video.description && (
-                        <p className="text-sm text-muted-foreground">{video.description}</p>
-                      )}
-                      {getVideoPreview(video.url) && (
-                        <div className="aspect-video">
-                          <iframe
-                            src={getVideoPreview(video.url)}
-                            className="w-full h-full rounded-lg"
-                            frameBorder="0"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                            allowFullScreen
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </Card>
-                ))}
-            </div>
-          </CardContent>
-        </Card>
-      ))}
     </div>
   );
 };

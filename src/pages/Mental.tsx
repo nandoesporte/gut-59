@@ -1,17 +1,13 @@
-
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Brain, Clock, Headphones, BookOpen, MessageCircle, Smile, SmilePlus, Frown, Meh, Angry, Coins } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { useWallet } from '@/hooks/useWallet';
-import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { Brain, Clock, Headphones, BookOpen, MessageCircle, Smile, SmilePlus, Frown, Meh, Angry } from "lucide-react";
 import { MentalHealthResources } from '@/components/mental/MentalHealthResources';
+import { MentalModules } from '@/components/mental/MentalModules';
 
 const Mental = () => {
   const [date] = useState<Date>(new Date());
@@ -163,51 +159,7 @@ const Mental = () => {
         </TabsContent>
 
         <TabsContent value="resources">
-          <Card className="bg-gradient-to-br from-[#FFFFFF] to-[#F8F9FA]">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg sm:text-xl text-primary">Recursos</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 p-4">
-              <div className="grid gap-6">
-                <Card className="p-4 bg-[#F6F9FE]">
-                  <h3 className="font-semibold text-primary mb-3">Contatos de Emergência</h3>
-                  <div className="space-y-2">
-                    <p className="text-sm flex items-center gap-2">
-                      <span className="font-medium">CVV:</span>
-                      <span className="text-muted-foreground">188</span>
-                    </p>
-                    <p className="text-sm flex items-center gap-2">
-                      <span className="font-medium">SAMU:</span>
-                      <span className="text-muted-foreground">192</span>
-                    </p>
-                  </div>
-                </Card>
-                
-                <Card className="p-4">
-                  <h3 className="font-semibold text-primary mb-4">Materiais Educativos</h3>
-                  <div className="grid gap-4">
-                    {[
-                      { title: 'Guia de Saúde Mental', type: 'PDF', size: '2.3 MB' },
-                      { title: 'Técnicas de Relaxamento', type: 'Vídeo', duration: '15 min' },
-                      { title: 'Práticas de Mindfulness', type: 'Áudio', duration: '20 min' }
-                    ].map((material, index) => (
-                      <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                        <div>
-                          <h4 className="font-medium">{material.title}</h4>
-                          <p className="text-sm text-muted-foreground">
-                            {material.type} • {material.duration || material.size}
-                          </p>
-                        </div>
-                        <Button variant="ghost" size="sm">
-                          <BookOpen className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              </div>
-            </CardContent>
-          </Card>
+          <MentalModules />
         </TabsContent>
       </Tabs>
     </div>
