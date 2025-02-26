@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useWallet } from '@/hooks/useWallet';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { MentalHealthResources } from '@/components/mental/MentalHealthResources';
 
 const BREATHING_PHASES = {
   INHALE: { duration: 4, label: 'Inspire' },
@@ -337,41 +338,29 @@ const Mental = () => {
         <TabsContent value="resources">
           <Card className="bg-gradient-to-br from-[#FFFFFF] to-[#F8F9FA]">
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg sm:text-xl text-primary">Recursos Úteis</CardTitle>
+              <CardTitle className="text-lg sm:text-xl text-primary">Recursos</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 p-4">
-              <Card className="p-4 bg-[#F6F9FE]">
-                <h3 className="font-semibold text-primary mb-3">Contatos de Emergência</h3>
-                <div className="space-y-2">
-                  <p className="text-sm flex items-center gap-2">
-                    <span className="font-medium">CVV:</span>
-                    <span className="text-muted-foreground">188</span>
-                  </p>
-                  <p className="text-sm flex items-center gap-2">
-                    <span className="font-medium">SAMU:</span>
-                    <span className="text-muted-foreground">192</span>
-                  </p>
-                </div>
-              </Card>
-              
-              <Card className="p-4 bg-[#F6F9FE]">
-                <h3 className="font-semibold text-primary mb-3">Artigos Recomendados</h3>
-                <ul className="space-y-2">
-                  {[
-                    'Como lidar com a ansiedade',
-                    'Técnicas de mindfulness',
-                    'Melhorando a qualidade do sono'
-                  ].map((title, index) => (
-                    <li 
-                      key={index}
-                      className="text-sm text-primary hover:text-primary/80 cursor-pointer transition-colors flex items-center gap-2"
-                    >
-                      <BookOpen className="w-4 h-4" />
-                      {title}
-                    </li>
-                  ))}
-                </ul>
-              </Card>
+              <div className="grid gap-6">
+                <Card className="p-4 bg-[#F6F9FE]">
+                  <h3 className="font-semibold text-primary mb-3">Contatos de Emergência</h3>
+                  <div className="space-y-2">
+                    <p className="text-sm flex items-center gap-2">
+                      <span className="font-medium">CVV:</span>
+                      <span className="text-muted-foreground">188</span>
+                    </p>
+                    <p className="text-sm flex items-center gap-2">
+                      <span className="font-medium">SAMU:</span>
+                      <span className="text-muted-foreground">192</span>
+                    </p>
+                  </div>
+                </Card>
+                
+                <Card className="p-4">
+                  <h3 className="font-semibold text-primary mb-4">Conteúdo Educativo</h3>
+                  <MentalHealthResources />
+                </Card>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
