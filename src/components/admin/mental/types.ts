@@ -18,5 +18,5 @@ export interface MentalVideo {
   status: 'active' | 'inactive';
   created_at: string;
   updated_at: string;
-  mental_modules?: MentalModule;
+  mental_modules?: Partial<MentalModule>;
 }
