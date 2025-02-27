@@ -181,10 +181,10 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
         height: preferences.height,
         gender: preferences.gender,
         goal: preferences.goal,
-        activity_level: preferences.activityLevel,
-        preferred_exercise_types: preferences.preferredExerciseTypes,
-        training_location: preferences.trainingLocation,
-        days_per_week: preferences.daysPerWeek || 3
+        activity_level: preferences.activity_level,
+        preferred_exercise_types: preferences.preferred_exercise_types,
+        training_location: preferences.available_equipment ? preferences.available_equipment[0] : "gym",
+        days_per_week: 3 // Valor padrão, já que não existe no tipo WorkoutPreferences
       };
       
       const { data: response, error: planError } = await supabase.functions.invoke('generate-workout-plan', {
