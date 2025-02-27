@@ -96,7 +96,8 @@ export const generateMealPlan = async ({
     
     console.log('[MEAL PLAN] Enviando payload:', JSON.stringify(payload, null, 2));
     
-    const { data: response, error: generateError } = await supabase.functions.invoke(
+    // Primeira tentativa
+    let { data: response, error: generateError } = await supabase.functions.invoke(
       'generate-meal-plan',
       { body: payload }
     );
@@ -136,6 +137,7 @@ export const generateMealPlan = async ({
       
       toastId = toast.loading("Otimizando seu plano alimentar...");
       
+      // Segunda tentativa com payload simplificado - usando variáveis diferentes
       const { data: retryResponse, error: retryError } = await supabase.functions.invoke(
         'generate-meal-plan',
         { body: simplifiedPayload }
@@ -150,6 +152,7 @@ export const generateMealPlan = async ({
       
       // Se a segunda tentativa for bem-sucedida, usar essa resposta
       console.log('[MEAL PLAN] Segunda tentativa bem-sucedida!');
+      // Atribuímos à variável response (agora 'let') a resposta da segunda tentativa
       response = retryResponse;
     }
 
