@@ -111,31 +111,37 @@ export const useMenuController = () => {
 
       console.log('Preferências existentes:', existingPreferences);
       
-      const generatedMealPlan = await generateMealPlan({
-        userData: {
-          id: userData.user.id,
-          weight: Number(formData.weight),
-          height: Number(formData.height),
-          age: Number(formData.age),
-          gender: formData.gender,
-          activityLevel: formData.activityLevel,
-          goal: formData.goal,
-          dailyCalories: calorieNeeds
-        },
-        selectedFoods: selectedFoodsData,
-        preferences,
-        addTransaction: addTransactionAsync
-      });
+      try {
+        const generatedMealPlan = await generateMealPlan({
+          userData: {
+            id: userData.user.id,
+            weight: Number(formData.weight),
+            height: Number(formData.height),
+            age: Number(formData.age),
+            gender: formData.gender,
+            activityLevel: formData.activityLevel,
+            goal: formData.goal,
+            dailyCalories: calorieNeeds
+          },
+          selectedFoods: selectedFoodsData,
+          preferences,
+          addTransaction: addTransactionAsync
+        });
 
-      if (!generatedMealPlan) {
-        throw new Error('Plano alimentar não foi gerado corretamente');
+        if (!generatedMealPlan) {
+          throw new Error('Plano alimentar não foi gerado corretamente');
+        }
+
+        console.log('Plano gerado:', generatedMealPlan);
+        setMealPlan(generatedMealPlan);
+        setDietaryPreferences(preferences);
+        setCurrentStep(4);
+        return true;
+      } catch (genError) {
+        console.error('Erro na geração do plano:', genError);
+        toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
+        return false;
       }
-
-      console.log('Plano gerado:', generatedMealPlan);
-      setMealPlan(generatedMealPlan);
-      setDietaryPreferences(preferences);
-      setCurrentStep(4);
-      return true;
 
     } catch (error) {
       console.error('Erro completo:', error);
