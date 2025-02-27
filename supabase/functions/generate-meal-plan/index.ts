@@ -1,238 +1,199 @@
 
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { calculateDailyCalories } from "./calculators.ts";
+import { validateInput } from "./validator.ts";
+import { generateRecommendations } from "./recommendations.ts";
+
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-const WEEK_DAYS = [
-  "Segunda-feira",
-  "Terça-feira",
-  "Quarta-feira",
-  "Quinta-feira",
-  "Sexta-feira",
-  "Sábado",
-  "Domingo"
-];
-
-const MEASUREMENT_GUIDELINES = `
-Use SEMPRE as seguintes unidades de medida ao descrever porções:
-
-1. Medidas Básicas:
-- Gramas (g) para sólidos: "100g de frango"
-- Mililitros (ml) para líquidos: "200ml de leite"
-- Xícaras (xíc) para volumes: "1 xíc de arroz cozido"
-
-2. Colheres:
-- Colher de sopa (cs): "2 cs de azeite"
-- Colher de chá (cc): "1 cc de sal"
-
-3. Unidades e Porções:
-- Unidades inteiras: "1 ovo", "1 maçã"
-- Fatias: "2 fatias de pão integral"
-- Porções: "1 porção média de arroz"
-
-4. Quantidades Aproximadas:
-- Tamanhos: "porção pequena/média/grande"
-- Punhado: "1 punhado de castanhas"
-- Pedaço: "1 pedaço médio de queijo"
-
-5. Preparação:
-- Especificar sempre o modo: "cru", "cozido", "grelhado", "assado", "refogado"
-
-6. Proporções:
-- Usar frações claras: "metade", "um quarto", "três quartos"
-
-7. Cortes:
-- Especificar o tipo: "em cubos", "fatias finas", "ralado"
-
-8. Bebidas:
-- Copo (200-250ml)
-- Garrafa (especificar ml)
-
-IMPORTANTE: Sempre especifique o modo de preparo e o tamanho/quantidade exata dos alimentos.`;
-
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { userData, selectedFoods, dietaryPreferences } = await req.json();
+    const requestData = await req.json();
+    console.log("Requisição recebida:", JSON.stringify(requestData));
 
-    if (!userData || !selectedFoods || !dietaryPreferences) {
-      throw new Error('Dados incompletos para geração do plano');
+    const { userData, selectedFoods, dietaryPreferences } = requestData;
+
+    // Validação básica dos dados
+    validateInput(userData, selectedFoods, dietaryPreferences);
+
+    // Calcular necessidades calóricas se não fornecidas
+    if (!userData.dailyCalories) {
+      userData.dailyCalories = calculateDailyCalories(
+        userData.weight,
+        userData.height,
+        userData.age,
+        userData.gender,
+        userData.activityLevel,
+        userData.goal
+      );
     }
 
-    console.log('Buscando prompt ativo mais recente...');
-    const { data: promptData, error: promptError } = await supabase
-      .from('ai_agent_prompts')
-      .select('*')
-      .eq('agent_type', 'meal_plan')
-      .eq('is_active', true)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    console.log(`Necessidade calórica calculada: ${userData.dailyCalories} kcal`);
 
-    if (promptError) {
-      console.error('Erro ao buscar prompt:', promptError);
-      throw new Error('Erro ao buscar prompt: ' + promptError.message);
+    // Buscar o prompt ativo para plano alimentar
+    const promptResponse = await fetch(
+      `${SUPABASE_URL}/rest/v1/ai_agent_prompts?agent_type=eq.meal_plan&is_active=eq.true&order=created_at.desc&limit=1`,
+      {
+        headers: {
+          'apikey': SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+        }
+      }
+    );
+
+    if (!promptResponse.ok) {
+      throw new Error('Erro ao buscar prompt de plano alimentar');
     }
+
+    const prompts = await promptResponse.json();
     
-    if (!promptData) {
-      console.error('Nenhum prompt ativo encontrado');
-      throw new Error('Nenhum prompt ativo encontrado para geração de plano alimentar');
+    if (!prompts || prompts.length === 0) {
+      throw new Error('Nenhum prompt de plano alimentar ativo encontrado');
     }
 
-    console.log('Prompt encontrado:', promptData.name);
-    const basePrompt = promptData.prompt;
+    const systemPrompt = prompts[0].prompt;
 
-    const prompt = `${basePrompt}
+    // Construir o prompt com os dados do usuário
+    const userPrompt = `
+Crie um plano alimentar personalizado com as seguintes características:
 
-${MEASUREMENT_GUIDELINES}
+DADOS DO USUÁRIO:
+- Gênero: ${userData.gender}
+- Idade: ${userData.age} anos
+- Peso: ${userData.weight} kg
+- Altura: ${userData.height} cm
+- Nível de atividade: ${userData.activityLevel}
+- Objetivo: ${userData.goal}
+- Necessidade calórica diária: ${userData.dailyCalories} kcal
 
-IMPORTANTE: Você DEVE gerar um cardápio diferente para CADA DIA DA SEMANA e retornar APENAS um objeto JSON válido com a seguinte estrutura:
+PREFERÊNCIAS ALIMENTARES:
+- Alergias: ${dietaryPreferences.hasAllergies ? dietaryPreferences.allergies.join(', ') : 'Nenhuma'}
+- Restrições alimentares: ${dietaryPreferences.dietaryRestrictions?.join(', ') || 'Nenhuma'}
+- Horário de treino: ${dietaryPreferences.trainingTime || 'Não especificado'}
 
+ALIMENTOS PREFERIDOS:
+${selectedFoods.map(food => `- ${food.name} (${food.calories} kcal, P: ${food.protein}g, C: ${food.carbs}g, G: ${food.fats}g)`).join('\n')}
+
+Por favor, crie um plano alimentar semanal personalizado com 7 dias. Para cada dia, forneça café da manhã, lanche da manhã, almoço, lanche da tarde e jantar.
+
+Formate a resposta como JSON válido com a seguinte estrutura:
 {
   "weeklyPlan": {
     "monday": {
-      "dayName": "Segunda-feira",
       "meals": {
         "breakfast": {
-          "description": string,
-          "foods": Array<{ name: string, portion: number, unit: string, details?: string }>,
-          "calories": number,
-          "macros": { protein: number, carbs: number, fats: number, fiber: number }
+          "foods": [
+            { "name": "Nome do alimento", "portion": "Quantidade", "unit": "Unidade de medida" }
+          ],
+          "calories": 500,
+          "macros": { "protein": 20, "carbs": 60, "fats": 15, "fiber": 5 }
         },
-        "morningSnack": { ... mesmo formato do café da manhã },
-        "lunch": { ... mesmo formato do café da manhã },
-        "afternoonSnack": { ... mesmo formato do café da manhã },
-        "dinner": { ... mesmo formato do café da manhã }
+        // outras refeições: morningSnack, lunch, afternoonSnack, dinner
       },
-      "dailyTotals": {
-        "calories": number,
-        "protein": number,
-        "carbs": number,
-        "fats": number,
-        "fiber": number
-      }
+      "dailyTotals": { "calories": 2000, "protein": 120, "carbs": 220, "fats": 60, "fiber": 30 }
     },
-    "tuesday": { ... mesmo formato de segunda-feira },
-    "wednesday": { ... mesmo formato de segunda-feira },
-    "thursday": { ... mesmo formato de segunda-feira },
-    "friday": { ... mesmo formato de segunda-feira },
-    "saturday": { ... mesmo formato de segunda-feira },
-    "sunday": { ... mesmo formato de segunda-feira }
+    // outros dias da semana: tuesday, wednesday, thursday, friday, saturday, sunday
   },
   "weeklyTotals": {
-    "averageCalories": number,
-    "averageProtein": number,
-    "averageCarbs": number,
-    "averageFats": number,
-    "averageFiber": number
+    "averageCalories": 2000,
+    "averageProtein": 120,
+    "averageCarbs": 220,
+    "averageFats": 60,
+    "averageFiber": 30
   },
   "recommendations": {
-    "general": string,
-    "preworkout": string,
-    "postworkout": string,
-    "timing": string[]
+    "general": "Recomendações gerais de alimentação e hidratação",
+    "preworkout": "Sugestões de alimentação pré-treino",
+    "postworkout": "Sugestões de alimentação pós-treino",
+    "timing": ["Recomendação 1 sobre horários", "Recomendação 2 sobre horários"]
   }
 }
+`;
 
-REGRAS IMPORTANTES:
-1. Gere um cardápio DIFERENTE para cada dia da semana
-2. Mantenha as calorias e macronutrientes dentro das metas diárias
-3. Varie os alimentos para garantir diversidade nutricional
-4. Considere a rotina do usuário em cada dia da semana
-5. Use as unidades de medida especificadas acima
-6. NÃO repita as mesmas refeições em dias consecutivos
-
-NÃO inclua nenhum texto adicional, markdown ou explicações. Retorne APENAS o JSON.`;
-
-    const modelInput = {
-      userData,
-      selectedFoods,
-      dietaryPreferences
-    };
-
-    console.log('Fazendo chamada para OpenAI...');
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openAIApiKey) {
-      throw new Error('OpenAI API key não configurada');
-    }
-
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Chamar o modelo Llama para gerar o plano alimentar
+    console.log("Iniciando chamada ao modelo Llama...");
+    const llamaResponse = await fetch(`${SUPABASE_URL}/functions/v1/llama-completion`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: prompt
-          },
-          {
-            role: 'user',
-            content: JSON.stringify(modelInput)
-          }
-        ],
+        systemPrompt,
+        userPrompt,
         temperature: 0.7,
-      }),
+        maxTokens: 4096
+      })
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('OpenAI API error:', errorData);
-      throw new Error(`Erro na API do OpenAI: ${errorData.error?.message || 'Erro desconhecido'}`);
+    if (!llamaResponse.ok) {
+      const errorText = await llamaResponse.text();
+      console.error('Erro na chamada da função llama-completion:', errorText);
+      throw new Error('Erro ao gerar plano com o modelo Llama');
     }
 
-    console.log('Processando resposta da OpenAI...');
-    const aiResponse = await response.json();
+    const llamaData = await llamaResponse.json();
+    const responseText = llamaData.choices[0].message.content;
+    
+    console.log('Resposta do modelo Llama recebida, extraindo JSON...');
+    
+    // Extrair o JSON da resposta
     let mealPlan;
-
     try {
-      console.log('Raw AI response:', aiResponse.choices[0].message.content);
+      // Tentar extrair o JSON da resposta, que pode estar envolta em markdown
+      const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/) || 
+                        responseText.match(/```([\s\S]*?)```/) ||
+                        [null, responseText];
       
-      const content = aiResponse.choices[0].message.content.trim();
-      const jsonStart = content.indexOf('{');
-      const jsonEnd = content.lastIndexOf('}') + 1;
-      const jsonStr = content.slice(jsonStart, jsonEnd);
-      
-      mealPlan = JSON.parse(jsonStr);
-    } catch (error) {
-      console.error('Error parsing AI response:', error);
-      console.log('Raw AI response:', aiResponse.choices[0].message.content);
-      throw new Error('A resposta da IA não está no formato JSON esperado');
+      const jsonString = jsonMatch[1] || responseText;
+      mealPlan = JSON.parse(jsonString);
+      console.log('Plano alimentar extraído com sucesso');
+    } catch (parseError) {
+      console.error('Erro ao extrair JSON da resposta:', parseError);
+      console.log('Resposta original:', responseText);
+      throw new Error('Falha ao processar a resposta do modelo');
     }
 
-    if (!mealPlan || !mealPlan.weeklyPlan) {
-      console.error('Invalid meal plan structure:', mealPlan);
-      throw new Error('Plano alimentar gerado com estrutura inválida');
+    // Fallback para recomendações se não estiverem presentes
+    if (!mealPlan.recommendations) {
+      console.log("Gerando recomendações padrão...");
+      mealPlan.recommendations = generateRecommendations(
+        userData.dailyCalories,
+        userData.goal,
+        dietaryPreferences.trainingTime
+      );
     }
 
-    return new Response(JSON.stringify({ mealPlan }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    // Retorna o plano alimentar gerado
+    return new Response(
+      JSON.stringify({ mealPlan }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
   } catch (error) {
-    console.error('Error in generate-meal-plan:', error);
+    console.error("Erro:", error);
+    
     return new Response(
       JSON.stringify({ 
-        error: error.message || 'Erro interno ao gerar plano alimentar',
-        details: error.stack
-      }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+        error: error instanceof Error ? error.message : 'Erro desconhecido',
+        stack: error instanceof Error ? error.stack : undefined
+      }),
+      { 
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
   }
 });

@@ -1,257 +1,309 @@
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-import { corsHeaders } from '../_shared/cors.ts';
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
-interface RehabPlanRequest {
-  preferences: {
-    age: number;
-    weight: number;
-    height: number;
-    gender: string;
-    joint_area: string;
-    condition: string;
-    pain_level: number;
-    mobility_level: string;
-    previous_treatment: boolean;
-    activity_level: string;
-  };
-  userId: string;
-}
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const { preferences, userId } = await req.json() as RehabPlanRequest;
+    const { preferences, userId } = await req.json();
+    
+    console.log('Gerando plano de reabilitação para usuário:', userId);
+    console.log('Preferências recebidas:', JSON.stringify(preferences));
 
-    console.log('Gerando plano para:', preferences);
-
-    const selectExercises = async (params: {
-      joint_area: string;
-      condition: string;
-      pain_level: number;
-      activity_level: string;
-      mobility_level: string;
-    }) => {
-      const difficulty = 
-        params.pain_level > 7 ? 'beginner' :
-        params.activity_level === 'active' && params.pain_level < 4 ? 'advanced' :
-        'intermediate';
-
-      const exerciseTypes = 
-        params.mobility_level === 'limited' ? ['mobility'] :
-        params.mobility_level === 'moderate' ? ['mobility', 'strength'] :
-        ['mobility', 'strength', 'cardio'];
-
-      console.log('Buscando exercícios com critérios:', {
-        joint_area: params.joint_area,
-        condition: params.condition,
-        difficulty,
-        exerciseTypes
-      });
-
-      const { data: exercises, error } = await supabase
-        .from('physio_exercises')
-        .select(`
-          id,
-          name,
-          description,
-          gif_url,
-          joint_area,
-          condition,
-          exercise_type,
-          difficulty,
-          is_compound_movement,
-          progression_level,
-          recommended_repetitions,
-          recommended_sets,
-          hold_time_seconds,
-          rest_time_seconds,
-          pain_level_threshold,
-          primary_goals,
-          target_symptoms,
-          setup_instructions,
-          required_equipment,
-          precautions,
-          contraindications,
-          movement_speed,
-          resistance_level,
-          acute_phase_suitable,
-          rehabilitation_phase_suitable,
-          maintenance_phase_suitable
-        `)
-        .eq('joint_area', params.joint_area)
-        .eq('condition', params.condition)
-        .lte('pain_level_threshold', params.pain_level + 2)
-        .in('exercise_type', exerciseTypes)
-        .eq('difficulty', difficulty)
-        .order('progression_level');
-
-      if (error) {
-        console.error('Erro ao buscar exercícios:', error);
-        throw error;
-      }
-
-      console.log(`Encontrados ${exercises?.length || 0} exercícios`);
-      return exercises || [];
-    };
-
-    const exercises = await selectExercises({
-      joint_area: preferences.joint_area,
-      condition: preferences.condition,
-      pain_level: preferences.pain_level,
-      activity_level: preferences.activity_level,
-      mobility_level: preferences.mobility_level
-    });
-
-    if (exercises.length === 0) {
-      throw new Error('Não foram encontrados exercícios adequados para suas condições');
+    if (!userId) {
+      throw new Error('ID do usuário é obrigatório');
     }
 
-    const startDate = new Date();
-    const endDate = new Date();
-    endDate.setDate(endDate.getDate() + 28);
+    // Buscar o prompt ativo para plano de fisioterapia
+    const promptResponse = await fetch(
+      `${SUPABASE_URL}/rest/v1/ai_agent_prompts?agent_type=eq.physiotherapy&is_active=eq.true&order=created_at.desc&limit=1`,
+      {
+        headers: {
+          'apikey': SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+        }
+      }
+    );
 
-    console.log('Criando plano de reabilitação');
+    if (!promptResponse.ok) {
+      throw new Error('Erro ao buscar prompt de fisioterapia');
+    }
 
-    const { data: plan, error: planError } = await supabase
-      .from('rehab_plans')
-      .insert({
+    const prompts = await promptResponse.json();
+    
+    if (!prompts || prompts.length === 0) {
+      throw new Error('Nenhum prompt de fisioterapia ativo encontrado');
+    }
+
+    const systemPrompt = prompts[0].prompt;
+    
+    // Buscar exercícios de fisioterapia disponíveis
+    console.log('Buscando exercícios de fisioterapia...');
+    const exercisesResponse = await fetch(
+      `${SUPABASE_URL}/rest/v1/physio_exercises?select=id,name,gif_url,description,joint_area,condition&limit=100`, 
+      {
+        headers: {
+          'apikey': SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        }
+      }
+    );
+    
+    if (!exercisesResponse.ok) {
+      const errorText = await exercisesResponse.text();
+      console.error('Erro ao buscar exercícios de fisioterapia:', errorText);
+      throw new Error(`Falha ao buscar exercícios: ${errorText}`);
+    }
+
+    const exercises = await exercisesResponse.json();
+    console.log(`Encontrados ${exercises.length} exercícios de fisioterapia`);
+    
+    if (exercises.length === 0) {
+      throw new Error('Nenhum exercício de fisioterapia disponível no banco de dados');
+    }
+
+    // Filtrar exercícios relevantes para a condição
+    const relevantExercises = preferences.joint_area 
+      ? exercises.filter(e => e.joint_area === preferences.joint_area || e.condition === preferences.condition)
+      : exercises;
+    
+    const exercisesToUse = relevantExercises.length > 0 ? relevantExercises : exercises;
+    console.log(`Usando ${exercisesToUse.length} exercícios relevantes para a condição`);
+
+    // Criar um plano básico inicial
+    const today = new Date();
+    const endDate = new Date(today);
+    endDate.setDate(today.getDate() + 30); // Plano de 30 dias
+    
+    const planId = crypto.randomUUID();
+
+    console.log('Criando plano com ID:', planId);
+
+    // Criar plano no banco de dados
+    const createPlanResponse = await fetch(`${SUPABASE_URL}/rest/v1/rehab_plans`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify({
+        id: planId,
         user_id: userId,
         joint_area: preferences.joint_area,
         condition: preferences.condition,
-        goal: preferences.pain_level > 7 ? 'pain_relief' : 
-              preferences.mobility_level === 'limited' ? 'mobility' : 'strength',
-        start_date: startDate.toISOString(),
-        end_date: endDate.toISOString()
+        goal: preferences.goal,
+        start_date: today.toISOString().split('T')[0],
+        end_date: endDate.toISOString().split('T')[0]
       })
-      .select()
-      .single();
+    });
 
-    if (planError) {
-      console.error('Erro ao criar plano:', planError);
-      throw planError;
+    if (!createPlanResponse.ok) {
+      const errorText = await createPlanResponse.text();
+      console.error('Erro ao criar plano:', errorText);
+      throw new Error(`Falha ao criar o plano: ${errorText}`);
     }
 
-    console.log('Plano criado:', plan.id);
+    const createdPlan = await createPlanResponse.json();
+    console.log('Plano criado com sucesso:', createdPlan);
 
-    const sessions = [];
-    for (let day = 1; day <= 28; day++) {
-      const week = Math.ceil(day / 7);
-      console.log(`Criando sessão para dia ${day} (semana ${week})`);
+    // Preparar o prompt para o modelo Llama
+    const userPrompt = `
+Crie um plano de reabilitação personalizado com as seguintes características:
+- Área articular afetada: ${preferences.joint_area}
+- Condição médica: ${preferences.condition}
+- Objetivo da reabilitação: ${preferences.goal}
+- Nível de dor (0-10): ${preferences.pain_level || 'Não informado'}
+- Tempo desde a lesão: ${preferences.injury_time || 'Não informado'}
 
-      const weeklyExercises = exercises.filter(ex => {
-        if (week === 1) return ex.acute_phase_suitable;
-        if (week === 2 || week === 3) return ex.rehabilitation_phase_suitable;
-        return ex.maintenance_phase_suitable;
-      });
+O plano deve conter 3 sessões de reabilitação, cada uma com 3-4 exercícios específicos.
+Inclua apenas exercícios dos IDs a seguir (retorne EXATAMENTE esses IDs): ${JSON.stringify(exercisesToUse.slice(0, 20).map(e => ({ id: e.id, name: e.name })))}
 
-      const dailyExercises = weeklyExercises
-        .sort(() => Math.random() - 0.5)
-        .slice(0, 4);
+Formate a resposta como um JSON válido com esta estrutura:
+{
+  "sessions": [
+    {
+      "day_number": 1,
+      "warmup_description": "texto",
+      "cooldown_description": "texto",
+      "exercises": [
+        {
+          "exercise_id": "id-do-exercício",
+          "sets": 3,
+          "reps": 10,
+          "rest_time_seconds": 30
+        },
+        ...mais exercícios
+      ]
+    },
+    ...mais sessões
+  ]
+}
+`;
 
-      const { data: session, error: sessionError } = await supabase
-        .from('rehab_sessions')
-        .insert({
-          plan_id: plan.id,
-          day_number: day,
-          warmup_description: "Realize 5-10 minutos de aquecimento leve focando na região afetada. " +
-                            "Inclua movimentos suaves e alongamentos leves para preparar os músculos e articulações.",
-          cooldown_description: "Faça alongamentos suaves por 5-10 minutos após os exercícios. " +
-                              "Aplique gelo se necessário para reduzir qualquer inflamação."
-        })
-        .select()
-        .single();
+    // Usar a função Llama para gerar o plano
+    console.log('Chamando modelo Llama para gerar plano de reabilitação...');
+    const llamaResponse = await fetch(`${SUPABASE_URL}/functions/v1/llama-completion`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+      },
+      body: JSON.stringify({
+        systemPrompt,
+        userPrompt,
+        temperature: 0.7
+      })
+    });
 
-      if (sessionError) {
-        console.error('Erro ao criar sessão:', sessionError);
-        throw sessionError;
-      }
+    if (!llamaResponse.ok) {
+      const errorText = await llamaResponse.text();
+      console.error('Erro na chamada da função llama-completion:', errorText);
+      throw new Error('Erro ao gerar plano com o modelo Llama');
+    }
 
-      console.log(`Sessão ${session.id} criada para dia ${day}`);
-
-      for (let i = 0; i < dailyExercises.length; i++) {
-        const exercise = dailyExercises[i];
+    const llamaData = await llamaResponse.json();
+    const responseText = llamaData.choices[0].message.content;
+    
+    console.log('Resposta do modelo Llama recebida, extraindo JSON...');
+    
+    // Extrair o JSON da resposta
+    let rehabPlan;
+    try {
+      // Tentar extrair o JSON da resposta, que pode estar envolta em markdown
+      const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/) || 
+                        responseText.match(/```([\s\S]*?)```/) ||
+                        [null, responseText];
+      
+      const jsonString = jsonMatch[1] || responseText;
+      rehabPlan = JSON.parse(jsonString);
+      console.log('Plano de reabilitação extraído com sucesso');
+    } catch (parseError) {
+      console.error('Erro ao extrair JSON da resposta:', parseError);
+      console.log('Resposta original:', responseText);
+      throw new Error('Falha ao processar a resposta do modelo');
+    }
+    
+    // Criar as sessões e exercícios a partir do plano gerado
+    console.log('Criando sessões de reabilitação...');
+    if (rehabPlan && rehabPlan.sessions) {
+      for (const session of rehabPlan.sessions) {
+        const sessionId = crypto.randomUUID();
         
-        const sets = exercise.recommended_sets || 
-          (week === 1 ? 2 : exercise.recommended_sets || 3);
+        // Criar sessão
+        const createSessionResponse = await fetch(`${SUPABASE_URL}/rest/v1/rehab_sessions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_SERVICE_ROLE_KEY,
+            'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify({
+            id: sessionId,
+            plan_id: planId,
+            day_number: session.day_number,
+            warmup_description: session.warmup_description,
+            cooldown_description: session.cooldown_description
+          })
+        });
+
+        if (!createSessionResponse.ok) {
+          console.error('Erro ao criar sessão:', await createSessionResponse.text());
+          continue;
+        }
         
-        const reps = exercise.recommended_repetitions ||
-          (week === 1 ? Math.min(8, exercise.recommended_repetitions || 10) : 
-           exercise.recommended_repetitions || 10);
-
-        const { error: exerciseError } = await supabase
-          .from('rehab_session_exercises')
-          .insert({
-            session_id: session.id,
-            exercise_id: exercise.id,
-            sets,
-            reps,
-            rest_time_seconds: exercise.rest_time_seconds || 30,
-            order_in_session: i + 1
-          });
-
-        if (exerciseError) {
-          console.error('Erro ao adicionar exercício à sessão:', exerciseError);
-          throw exerciseError;
+        // Adicionar exercícios à sessão
+        if (session.exercises && Array.isArray(session.exercises)) {
+          for (const exercise of session.exercises) {
+            // Verificar se o exercício existe
+            const exerciseExists = exercises.some(e => e.id === exercise.exercise_id);
+            if (!exerciseExists) {
+              console.warn(`Exercício com ID ${exercise.exercise_id} não encontrado no banco de dados, pulando...`);
+              continue;
+            }
+            
+            const exerciseResponse = await fetch(`${SUPABASE_URL}/rest/v1/rehab_session_exercises`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_SERVICE_ROLE_KEY,
+                'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+                'Prefer': 'return=representation'
+              },
+              body: JSON.stringify({
+                session_id: sessionId,
+                exercise_id: exercise.exercise_id,
+                sets: exercise.sets,
+                reps: exercise.reps,
+                rest_time_seconds: exercise.rest_time_seconds,
+                order_in_session: exercise.order_in_session || 1
+              })
+            });
+            
+            if (!exerciseResponse.ok) {
+              console.error('Erro ao adicionar exercício:', await exerciseResponse.text());
+            }
+          }
         }
       }
-
-      sessions.push({
-        ...session,
-        exercises: dailyExercises.map((ex, index) => ({
-          name: ex.name,
-          description: ex.description,
-          gifUrl: ex.gif_url,
-          sets: week === 1 ? 2 : ex.recommended_sets || 3,
-          reps: week === 1 ? Math.min(8, ex.recommended_repetitions || 10) : ex.recommended_repetitions || 10,
-          rest_time_seconds: ex.rest_time_seconds || 30,
-          movement_speed: ex.movement_speed,
-          resistance_level: ex.resistance_level,
-          hold_time_seconds: ex.hold_time_seconds,
-          setup_instructions: ex.setup_instructions,
-          precautions: ex.precautions,
-          required_equipment: ex.required_equipment,
-          notes: [
-            ex.setup_instructions,
-            ex.precautions?.length ? `Precauções: ${ex.precautions.join(', ')}` : null,
-            ex.contraindications?.length ? `Contraindicações: ${ex.contraindications.join(', ')}` : null
-          ].filter(Boolean).join('\n\n')
-        }))
-      });
     }
-
-    console.log('Plano gerado com sucesso');
-
-    return new Response(JSON.stringify({
-      id: plan.id,
-      user_id: plan.user_id,
-      goal: plan.goal,
-      condition: plan.condition,
-      start_date: plan.start_date,
-      end_date: plan.end_date,
-      rehab_sessions: sessions
-    }), {
+    
+    // Buscar o plano completo com todas as suas associações
+    console.log('Buscando plano completo...');
+    const planQueryUrl = `${SUPABASE_URL}/rest/v1/rehab_plans?id=eq.${planId}&select=id,user_id,joint_area,condition,goal,start_date,end_date,rehab_sessions(id,day_number,warmup_description,cooldown_description,rehab_session_exercises(id,sets,reps,rest_time_seconds,order_in_session,exercise:physio_exercises(id,name,description,gif_url)))`;
+    
+    const planResponse = await fetch(planQueryUrl, {
       headers: {
-        ...corsHeaders,
-        'Content-Type': 'application/json'
+        'apikey': SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
       }
     });
+    
+    if (!planResponse.ok) {
+      const errorText = await planResponse.text();
+      console.error('Erro ao buscar plano completo:', errorText);
+      throw new Error(`Falha ao recuperar o plano gerado: ${errorText}`);
+    }
+    
+    const finalPlan = await planResponse.json();
+    
+    if (!finalPlan || finalPlan.length === 0) {
+      console.error('Plano não encontrado na consulta final');
+      throw new Error('Plano gerado não encontrado no banco');
+    }
+    
+    console.log('Plano completo gerado com sucesso:', finalPlan[0].id);
+    console.log('Sessões no plano:', finalPlan[0].rehab_sessions?.length || 0);
+    
+    return new Response(
+      JSON.stringify(finalPlan[0]),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
   } catch (error) {
-    console.error('Erro ao gerar plano:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 400,
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'application/json'
+    console.error('Erro durante o processo:', error);
+    return new Response(
+      JSON.stringify({ 
+        error: error instanceof Error ? error.message : 'Erro desconhecido ao gerar plano de reabilitação',
+        stack: error instanceof Error ? error.stack : undefined
+      }),
+      { 
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
-    });
+    );
   }
 });

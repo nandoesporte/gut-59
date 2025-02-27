@@ -1,213 +1,299 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { corsHeaders } from "../_shared/cors.ts"
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
-const supabaseUrl = Deno.env.get('SUPABASE_URL')
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabase = createClient(supabaseUrl!, supabaseServiceKey!)
-    const { preferences, userId } = await req.json()
+    const { preferences, userId } = await req.json();
+    
+    console.log('Gerando plano de treino para usuário:', userId);
+    console.log('Preferências recebidas:', JSON.stringify(preferences));
 
-    console.log('Received preferences:', preferences)
-
-    // Fetch exercises based on preferences
-    let query = supabase
-      .from('exercises')
-      .select('*')
-
-    // Filter by exercise type if specified
-    if (preferences.preferred_exercise_types && preferences.preferred_exercise_types.length > 0) {
-      query = query.in('exercise_type', preferences.preferred_exercise_types)
+    if (!userId) {
+      throw new Error('ID do usuário é obrigatório');
     }
 
-    // Add equipment filter if specified
-    if (preferences.available_equipment && preferences.available_equipment.length > 0) {
-      if (!preferences.available_equipment.includes('all')) {
-        query = query.overlaps('equipment_needed', preferences.available_equipment)
+    // Buscar o prompt ativo para plano de treino
+    const promptResponse = await fetch(
+      `${SUPABASE_URL}/rest/v1/ai_agent_prompts?agent_type=eq.workout&is_active=eq.true&order=created_at.desc&limit=1`,
+      {
+        headers: {
+          'apikey': SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+        }
       }
+    );
+
+    if (!promptResponse.ok) {
+      throw new Error('Erro ao buscar prompt de plano de treino');
     }
 
-    const { data: exercises, error: exercisesError } = await query
-
-    if (exercisesError) {
-      throw exercisesError
+    const prompts = await promptResponse.json();
+    
+    if (!prompts || prompts.length === 0) {
+      throw new Error('Nenhum prompt de plano de treino ativo encontrado');
     }
 
-    console.log(`Found ${exercises?.length || 0} matching exercises`)
-
-    if (!exercises || exercises.length === 0) {
-      throw new Error('No suitable exercises found for the given preferences')
+    const systemPrompt = prompts[0].prompt;
+    
+    // Buscar exercícios disponíveis
+    console.log('Buscando exercícios disponíveis...');
+    const exercisesResponse = await fetch(
+      `${SUPABASE_URL}/rest/v1/exercises?select=id,name,gif_url,description,muscle_group,equipment&limit=100`, 
+      {
+        headers: {
+          'apikey': SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        }
+      }
+    );
+    
+    if (!exercisesResponse.ok) {
+      const errorText = await exercisesResponse.text();
+      console.error('Erro ao buscar exercícios:', errorText);
+      throw new Error(`Falha ao buscar exercícios: ${errorText}`);
     }
 
-    // First create the workout plan
-    const { data: workoutPlan, error: planError } = await supabase
-      .from('workout_plans')
-      .insert({
+    const exercises = await exercisesResponse.json();
+    console.log(`Encontrados ${exercises.length} exercícios`);
+    
+    if (exercises.length === 0) {
+      throw new Error('Nenhum exercício disponível no banco de dados');
+    }
+
+    // Criar um plano básico inicial
+    const today = new Date();
+    const endDate = new Date(today);
+    endDate.setDate(today.getDate() + 30); // Plano de 30 dias
+    
+    const planId = crypto.randomUUID();
+
+    console.log('Criando plano com ID:', planId);
+
+    // Criar plano no banco de dados
+    const createPlanResponse = await fetch(`${SUPABASE_URL}/rest/v1/workout_plans`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify({
+        id: planId,
         user_id: userId,
-        goal: preferences.goal,
-        start_date: new Date().toISOString(),
-        end_date: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString(), // 28 days from now
+        goal: preferences.goal || 'maintain',
+        start_date: today.toISOString().split('T')[0],
+        end_date: endDate.toISOString().split('T')[0],
       })
-      .select()
-      .single()
+    });
 
-    if (planError) throw planError
+    if (!createPlanResponse.ok) {
+      const errorText = await createPlanResponse.text();
+      console.error('Erro ao criar plano:', errorText);
+      throw new Error(`Falha ao criar o plano: ${errorText}`);
+    }
 
-    console.log('Created workout plan:', workoutPlan)
+    const createdPlan = await createPlanResponse.json();
+    console.log('Plano criado com sucesso:', createdPlan);
 
-    // Generate and save workout sessions
-    const sessions = generateWorkoutSessions(exercises, preferences)
-    const savedSessions = []
+    // Preparar o prompt para o modelo Llama
+    const userPrompt = `
+Crie um plano de treino personalizado com as seguintes características:
+- Objetivo do usuário: ${preferences.goal || 'manutenção'}
+- Nível de atividade: ${preferences.activity_level || 'moderado'}
+- Condições de saúde: ${preferences.health_conditions?.join(', ') || 'nenhuma'}
+- Equipamentos disponíveis: ${preferences.available_equipment?.join(', ') || 'básicos'}
+- Tipos de exercícios preferidos: ${preferences.preferred_exercise_types?.join(', ') || 'variados'}
+- Dias por semana: ${preferences.days_per_week || 3}
 
-    for (const session of sessions) {
-      // Create the workout session
-      const { data: workoutSession, error: sessionError } = await supabase
-        .from('workout_sessions')
-        .insert({
-          plan_id: workoutPlan.id,
-          day_number: session.day_number,
-          warmup_description: session.warmup_description,
-          cooldown_description: session.cooldown_description
-        })
-        .select()
-        .single()
+O plano deve conter ${preferences.days_per_week || 3} sessões de treino, cada uma com 5-6 exercícios.
+Inclua apenas exercícios dos IDs a seguir (retorne EXATAMENTE esses IDs): ${JSON.stringify(exercises.slice(0, 20).map(e => ({ id: e.id, name: e.name })))}
 
-      if (sessionError) throw sessionError
+Formate a resposta como um JSON válido com esta estrutura:
+{
+  "sessions": [
+    {
+      "day_number": 1,
+      "warmup_description": "texto",
+      "cooldown_description": "texto",
+      "exercises": [
+        {
+          "exercise_id": "id-do-exercício",
+          "sets": 3,
+          "reps": 12,
+          "rest_time_seconds": 60
+        },
+        ...mais exercícios
+      ]
+    },
+    ...mais sessões
+  ]
+}
+`;
 
-      console.log('Created workout session:', workoutSession)
+    // Usar a função Llama para gerar o plano
+    console.log('Chamando modelo Llama para gerar plano de treino...');
+    const llamaResponse = await fetch(`${SUPABASE_URL}/functions/v1/llama-completion`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+      },
+      body: JSON.stringify({
+        systemPrompt,
+        userPrompt,
+        temperature: 0.7
+      })
+    });
 
-      // Save session exercises
-      for (const exercise of session.exercises) {
-        const { error: exerciseError } = await supabase
-          .from('session_exercises')
-          .insert({
-            session_id: workoutSession.id,
-            exercise_id: exercise.id,
-            sets: exercise.sets,
-            reps: exercise.reps,
-            rest_time_seconds: exercise.rest_time_seconds,
-            order_in_session: session.exercises.indexOf(exercise)
+    if (!llamaResponse.ok) {
+      const errorText = await llamaResponse.text();
+      console.error('Erro na chamada da função llama-completion:', errorText);
+      throw new Error('Erro ao gerar plano com o modelo Llama');
+    }
+
+    const llamaData = await llamaResponse.json();
+    const responseText = llamaData.choices[0].message.content;
+    
+    console.log('Resposta do modelo Llama recebida, extraindo JSON...');
+    
+    // Extrair o JSON da resposta
+    let workoutPlan;
+    try {
+      // Tentar extrair o JSON da resposta, que pode estar envolta em markdown
+      const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/) || 
+                        responseText.match(/```([\s\S]*?)```/) ||
+                        [null, responseText];
+      
+      const jsonString = jsonMatch[1] || responseText;
+      workoutPlan = JSON.parse(jsonString);
+      console.log('Plano de treino extraído com sucesso');
+    } catch (parseError) {
+      console.error('Erro ao extrair JSON da resposta:', parseError);
+      console.log('Resposta original:', responseText);
+      throw new Error('Falha ao processar a resposta do modelo');
+    }
+    
+    // Criar as sessões e exercícios a partir do plano gerado
+    console.log('Criando sessões de treino...');
+    if (workoutPlan && workoutPlan.sessions) {
+      for (const session of workoutPlan.sessions) {
+        const sessionId = crypto.randomUUID();
+        
+        // Criar sessão
+        const createSessionResponse = await fetch(`${SUPABASE_URL}/rest/v1/workout_sessions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_SERVICE_ROLE_KEY,
+            'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify({
+            id: sessionId,
+            workout_plan_id: planId,
+            day_number: session.day_number,
+            warmup_description: session.warmup_description,
+            cooldown_description: session.cooldown_description
           })
+        });
 
-        if (exerciseError) throw exerciseError
+        if (!createSessionResponse.ok) {
+          console.error('Erro ao criar sessão:', await createSessionResponse.text());
+          continue;
+        }
+        
+        // Adicionar exercícios à sessão
+        if (session.exercises && Array.isArray(session.exercises)) {
+          for (const exercise of session.exercises) {
+            // Verificar se o exercício existe
+            const exerciseExists = exercises.some(e => e.id === exercise.exercise_id);
+            if (!exerciseExists) {
+              console.warn(`Exercício com ID ${exercise.exercise_id} não encontrado no banco de dados, pulando...`);
+              continue;
+            }
+            
+            const exerciseResponse = await fetch(`${SUPABASE_URL}/rest/v1/session_exercises`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_SERVICE_ROLE_KEY,
+                'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+                'Prefer': 'return=representation'
+              },
+              body: JSON.stringify({
+                session_id: sessionId,
+                exercise_id: exercise.exercise_id,
+                sets: exercise.sets,
+                reps: exercise.reps,
+                rest_time_seconds: exercise.rest_time_seconds
+              })
+            });
+            
+            if (!exerciseResponse.ok) {
+              console.error('Erro ao adicionar exercício:', await exerciseResponse.text());
+            }
+          }
+        }
       }
-
-      // Fetch the complete session with exercises
-      const { data: completeSession, error: fetchError } = await supabase
-        .from('workout_sessions')
-        .select(`
-          *,
-          session_exercises (
-            *,
-            exercise:exercises (*)
-          )
-        `)
-        .eq('id', workoutSession.id)
-        .single()
-
-      if (fetchError) throw fetchError
-
-      savedSessions.push(completeSession)
     }
-
-    // Return the complete workout plan with sessions
-    const response = {
-      ...workoutPlan,
-      workout_sessions: savedSessions
+    
+    // Buscar o plano completo com todas as suas associações
+    console.log('Buscando plano completo...');
+    const planQueryUrl = `${SUPABASE_URL}/rest/v1/workout_plans?id=eq.${planId}&select=id,user_id,goal,start_date,end_date,workout_sessions(id,day_number,warmup_description,cooldown_description,session_exercises(id,sets,reps,rest_time_seconds,exercise:exercises(id,name,description,gif_url)))`;
+    
+    const planResponse = await fetch(planQueryUrl, {
+      headers: {
+        'apikey': SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+      }
+    });
+    
+    if (!planResponse.ok) {
+      const errorText = await planResponse.text();
+      console.error('Erro ao buscar plano completo:', errorText);
+      throw new Error(`Falha ao recuperar o plano gerado: ${errorText}`);
     }
-
-    return new Response(JSON.stringify(response), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    })
+    
+    const finalPlan = await planResponse.json();
+    
+    if (!finalPlan || finalPlan.length === 0) {
+      console.error('Plano não encontrado na consulta final');
+      throw new Error('Plano gerado não encontrado no banco');
+    }
+    
+    console.log('Plano completo gerado com sucesso:', finalPlan[0].id);
+    console.log('Sessões no plano:', finalPlan[0].workout_sessions?.length || 0);
+    
+    return new Response(
+      JSON.stringify(finalPlan[0]),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
   } catch (error) {
-    console.error('Error generating workout plan:', error)
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400,
-    })
+    console.error('Erro durante o processo:', error);
+    return new Response(
+      JSON.stringify({ 
+        error: error instanceof Error ? error.message : 'Erro desconhecido ao gerar plano de treino',
+        stack: error instanceof Error ? error.stack : undefined
+      }),
+      { 
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
   }
-})
-
-function generateWorkoutSessions(exercises: any[], preferences: any) {
-  // Create 3 workout sessions per week for 4 weeks
-  const sessions = []
-  const sessionsPerWeek = 3
-  const numberOfWeeks = 4
-
-  for (let week = 0; week < numberOfWeeks; week++) {
-    for (let session = 0; session < sessionsPerWeek; session++) {
-      const dayNumber = week * sessionsPerWeek + session + 1
-
-      // Select random exercises for this session
-      const sessionExercises = selectExercisesForSession(exercises, preferences)
-
-      sessions.push({
-        day_number: dayNumber,
-        warmup_description: generateWarmup(),
-        cooldown_description: generateCooldown(),
-        exercises: sessionExercises
-      })
-    }
-  }
-
-  return sessions
-}
-
-function selectExercisesForSession(exercises: any[], preferences: any) {
-  const exercisesPerSession = 6
-  const selectedExercises = []
-
-  // Ensure we have a mix of exercise types
-  const exercisesByType = exercises.reduce((acc: any, exercise: any) => {
-    if (!acc[exercise.exercise_type]) {
-      acc[exercise.exercise_type] = []
-    }
-    acc[exercise.exercise_type].push(exercise)
-    return acc
-  }, {})
-
-  // Select exercises based on user's preferred types
-  for (let i = 0; i < exercisesPerSession; i++) {
-    const availableTypes = Object.keys(exercisesByType).filter(type => 
-      exercisesByType[type].length > 0 &&
-      (!preferences.preferred_exercise_types?.length || preferences.preferred_exercise_types.includes(type))
-    )
-
-    if (availableTypes.length === 0) break
-
-    const randomType = availableTypes[Math.floor(Math.random() * availableTypes.length)]
-    const typeExercises = exercisesByType[randomType]
-    const randomIndex = Math.floor(Math.random() * typeExercises.length)
-    const selectedExercise = typeExercises[randomIndex]
-
-    // Remove selected exercise to avoid duplicates
-    exercisesByType[randomType] = typeExercises.filter((_: any, index: number) => index !== randomIndex)
-
-    selectedExercises.push({
-      id: selectedExercise.id,
-      name: selectedExercise.name,
-      sets: Math.floor(Math.random() * (selectedExercise.max_sets - selectedExercise.min_sets + 1)) + selectedExercise.min_sets,
-      reps: Math.floor(Math.random() * (selectedExercise.max_reps - selectedExercise.min_reps + 1)) + selectedExercise.min_reps,
-      rest_time_seconds: selectedExercise.rest_time_seconds
-    })
-  }
-
-  return selectedExercises
-}
-
-function generateWarmup() {
-  return "5-10 minutos de aquecimento cardiovascular leve seguido por exercícios de mobilidade dinâmica"
-}
-
-function generateCooldown() {
-  return "5-10 minutos de alongamento dos principais grupos musculares trabalhados"
-}
+});

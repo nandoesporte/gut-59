@@ -25,5 +25,17 @@ verify_jwt = false
 [functions.generate-rehab-plan]
 verify_jwt = true
 
+[functions.generate-workout-plan]
+verify_jwt = true
+
+[functions.generate-meal-plan]
+verify_jwt = true
+
 [functions.grant-plan-access]
+verify_jwt = true
+
+[functions.mental-health-chat]
+verify_jwt = true
+
+[functions.llama-completion]
 verify_jwt = true
