@@ -29,11 +29,6 @@ export const useChat = () => {
     try {
       // Cria o array de mensagens para enviar para a API
       const messagesForApi = [
-        // Um prompt de sistema para contextualizar o assistente
-        {
-          role: 'system',
-          content: 'Você é um assistente de saúde útil e informativo chamado Mais Saúde. Você fornece informações sobre saúde, nutrição, exercícios e bem-estar. Você responde de forma simpática, clara e concisa, sempre em português do Brasil. Você não é um médico e incentiva os usuários a consultar profissionais de saúde para questões médicas específicas.',
-        },
         // Inclui o histórico de mensagens para manter o contexto
         ...state.messages,
         // Adiciona a nova mensagem do usuário
@@ -42,7 +37,10 @@ export const useChat = () => {
 
       // Faz a chamada para a Edge Function
       const { data, error } = await supabase.functions.invoke('llama-chat', {
-        body: { messages: messagesForApi },
+        body: { 
+          messages: messagesForApi,
+          systemPrompt: 'Você é um assistente de saúde útil e informativo chamado Mais Saúde. Você fornece informações sobre saúde, nutrição, exercícios e bem-estar. Você responde de forma simpática, clara e concisa, sempre em português do Brasil. Você não é um médico e incentiva os usuários a consultar profissionais de saúde para questões médicas específicas.'
+        },
       });
 
       if (error) throw new Error(error.message);

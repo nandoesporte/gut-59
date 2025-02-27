@@ -29,7 +29,8 @@ serve(async (req) => {
       ? [{ role: "system", content: systemPrompt }, ...messages]
       : messages;
 
-    console.log("Chamando API Groq com mensagens para o chat");
+    console.log("Chamando API Groq com prompt:", systemPrompt ? systemPrompt.substring(0, 100) + "..." : "Nenhum");
+    console.log("Número de mensagens:", completeMessages.length);
 
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -55,7 +56,6 @@ serve(async (req) => {
       );
     }
 
-    console.log("Resposta da API Groq recebida com sucesso");
     return new Response(
       JSON.stringify(data),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

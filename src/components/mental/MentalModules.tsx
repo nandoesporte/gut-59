@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
@@ -48,6 +47,25 @@ export const MentalModules = () => {
       return `https://www.youtube.com/embed/${match[1]}`;
     }
     return null;
+  };
+
+  const generateMentalHealthPrompt = async (prompt: string) => {
+    const messages = [{ role: "user", content: prompt }];
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('llama-agent', {
+        body: { 
+          messages: messages,
+          systemPrompt: "Você é um assistente especializado em saúde mental. Forneça orientações sobre bem-estar psicológico, técnicas de meditação e estratégias para lidar com estresse e ansiedade. Seja empático e forneça informações baseadas em evidências."
+        }
+      });
+      
+      if (error) throw new Error(error.message);
+      return data.choices[0].message.content;
+    } catch (error) {
+      console.error("Erro ao gerar conteúdo de saúde mental:", error);
+      throw error;
+    }
   };
 
   return (
