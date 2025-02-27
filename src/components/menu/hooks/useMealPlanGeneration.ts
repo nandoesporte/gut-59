@@ -35,6 +35,7 @@ export const generateMealPlan = async ({
   addTransaction
 }: MealPlanGenerationProps) => {
   let toastId: string | number | undefined;
+  let mealPlanResponse: any = null;
 
   try {
     console.log('[MEAL PLAN] Iniciando processo de geração do plano personalizado');
@@ -97,7 +98,7 @@ export const generateMealPlan = async ({
     console.log('[MEAL PLAN] Enviando payload:', JSON.stringify(payload, null, 2));
     
     // Primeira tentativa
-    let { data: response, error: generateError } = await supabase.functions.invoke(
+    const { data: response, error: generateError } = await supabase.functions.invoke(
       'generate-meal-plan',
       { body: payload }
     );
@@ -137,7 +138,7 @@ export const generateMealPlan = async ({
       
       toastId = toast.loading("Otimizando seu plano alimentar...");
       
-      // Segunda tentativa com payload simplificado - usando variáveis diferentes
+      // Segunda tentativa com payload simplificado
       const { data: retryResponse, error: retryError } = await supabase.functions.invoke(
         'generate-meal-plan',
         { body: simplifiedPayload }
@@ -152,24 +153,26 @@ export const generateMealPlan = async ({
       
       // Se a segunda tentativa for bem-sucedida, usar essa resposta
       console.log('[MEAL PLAN] Segunda tentativa bem-sucedida!');
-      // Atribuímos à variável response (agora 'let') a resposta da segunda tentativa
-      response = retryResponse;
+      mealPlanResponse = retryResponse;
+    } else {
+      // Se a primeira tentativa foi bem-sucedida, use a resposta original
+      mealPlanResponse = response;
     }
 
     // Validação da resposta
-    if (!response || !response.mealPlan) {
-      console.error('[MEAL PLAN] Resposta inválida:', JSON.stringify(response, null, 2));
+    if (!mealPlanResponse || !mealPlanResponse.mealPlan) {
+      console.error('[MEAL PLAN] Resposta inválida:', JSON.stringify(mealPlanResponse, null, 2));
       toast.dismiss(toastId);
       toast.error("Resposta inválida do servidor. Por favor, tente novamente.");
       throw new Error("Resposta inválida do servidor");
     }
 
     console.log('[MEAL PLAN] Resposta recebida com sucesso');
-    console.log('[MEAL PLAN] Estrutura do plano:', Object.keys(response.mealPlan).join(', '));
+    console.log('[MEAL PLAN] Estrutura do plano:', Object.keys(mealPlanResponse.mealPlan).join(', '));
 
     // Verificar se o plano tem a estrutura esperada
-    if (!response.mealPlan.weeklyPlan || !response.mealPlan.recommendations) {
-      console.error('[MEAL PLAN] Estrutura do plano incompleta:', JSON.stringify(response.mealPlan, null, 2));
+    if (!mealPlanResponse.mealPlan.weeklyPlan || !mealPlanResponse.mealPlan.recommendations) {
+      console.error('[MEAL PLAN] Estrutura do plano incompleta:', JSON.stringify(mealPlanResponse.mealPlan, null, 2));
       toast.dismiss(toastId);
       toast.error("Plano gerado com estrutura incompleta. Por favor, tente novamente.");
       throw new Error("Estrutura do plano incompleta");
@@ -177,20 +180,20 @@ export const generateMealPlan = async ({
 
     // Verificar se todos os dias da semana estão presentes
     const requiredDays = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
-    const missingDays = requiredDays.filter(day => !response.mealPlan.weeklyPlan[day]);
+    const missingDays = requiredDays.filter(day => !mealPlanResponse.mealPlan.weeklyPlan[day]);
     
     if (missingDays.length > 0) {
       console.error(`[MEAL PLAN] Dias ausentes no plano: ${missingDays.join(', ')}`);
       // Tentar completar os dias faltantes copiando de outros dias existentes
-      const availableDays = requiredDays.filter(day => response.mealPlan.weeklyPlan[day]);
+      const availableDays = requiredDays.filter(day => mealPlanResponse.mealPlan.weeklyPlan[day]);
       
       if (availableDays.length > 0) {
-        const templateDay = response.mealPlan.weeklyPlan[availableDays[0]];
+        const templateDay = mealPlanResponse.mealPlan.weeklyPlan[availableDays[0]];
         
         missingDays.forEach(missingDay => {
           console.log(`[MEAL PLAN] Copiando dia ${availableDays[0]} para ${missingDay}`);
-          response.mealPlan.weeklyPlan[missingDay] = JSON.parse(JSON.stringify(templateDay));
-          response.mealPlan.weeklyPlan[missingDay].dayName = missingDay.charAt(0).toUpperCase() + missingDay.slice(1);
+          mealPlanResponse.mealPlan.weeklyPlan[missingDay] = JSON.parse(JSON.stringify(templateDay));
+          mealPlanResponse.mealPlan.weeklyPlan[missingDay].dayName = missingDay.charAt(0).toUpperCase() + missingDay.slice(1);
         });
         
         console.log('[MEAL PLAN] Dias faltantes foram complementados');
@@ -211,13 +214,13 @@ export const generateMealPlan = async ({
     console.log('[MEAL PLAN] Transação de recompensa adicionada');
 
     // Salvar os dados do plano
-    await saveMealPlanData(userData.id, response.mealPlan, userData.dailyCalories, preferences);
+    await saveMealPlanData(userData.id, mealPlanResponse.mealPlan, userData.dailyCalories, preferences);
     console.log('[MEAL PLAN] Dados do plano e preferências salvos com sucesso');
 
     toast.dismiss(toastId);
     toast.success(`Cardápio personalizado gerado com sucesso! +${REWARDS.MEAL_PLAN} FITs`);
 
-    return response.mealPlan;
+    return mealPlanResponse.mealPlan;
   } catch (error) {
     if (toastId) toast.dismiss(toastId);
     
