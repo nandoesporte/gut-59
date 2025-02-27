@@ -53,22 +53,6 @@ export const generateMealPlan = async ({
 
     toastId = toast.loading("Gerando seu plano alimentar personalizado...");
 
-    // Adicionar logs detalhados para depuração
-    console.log('Enviando dados para a função generate-meal-plan:', {
-      userData: {
-        weight: userData.weight,
-        height: userData.height,
-        age: userData.age,
-        gender: userData.gender,
-        activityLevel: userData.activityLevel,
-        goal: userData.goal,
-        userId: userData.id,
-        dailyCalories: userData.dailyCalories
-      },
-      selectedFoods: selectedFoodsDetails,
-      dietaryPreferences: preferences
-    });
-
     const { data: response, error: generateError } = await supabase.functions.invoke(
       'generate-meal-plan',
       {
@@ -89,14 +73,9 @@ export const generateMealPlan = async ({
       }
     );
 
-    if (generateError) {
+    if (generateError || !response?.mealPlan) {
       console.error('Erro ao gerar plano:', generateError);
-      throw new Error(generateError.message || 'Falha ao gerar cardápio');
-    }
-
-    if (!response?.mealPlan) {
-      console.error('Resposta inválida da função:', response);
-      throw new Error('Resposta inválida ao gerar cardápio');
+      throw new Error(generateError?.message || 'Falha ao gerar cardápio');
     }
 
     console.log('Resposta da Edge Function:', response);
@@ -123,10 +102,6 @@ export const generateMealPlan = async ({
   } catch (error) {
     if (toastId) toast.dismiss(toastId);
     console.error('Erro na geração do plano:', error);
-    
-    // Mensagem de erro mais específica para o usuário
-    toast.error("Não foi possível gerar o plano alimentar. Por favor, tente novamente.");
-    
     throw error;
   }
 };

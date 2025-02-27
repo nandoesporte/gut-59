@@ -10,7 +10,7 @@ import { MenuHeader } from "@/components/menu/MenuHeader";
 import { useMenuController } from "@/components/menu/MenuController";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import type { DietaryPreferences } from "@/components/menu/types";
 
 const Menu = () => {
@@ -25,8 +25,6 @@ const Menu = () => {
     mealPlan,
     formData,
     loading,
-    setLoading,
-    dietaryPreferences,
     handleCalculateCalories,
     handleFoodSelection,
     handleDietaryPreferences,
@@ -42,14 +40,6 @@ const Menu = () => {
       });
     }
   }, [mealPlan]);
-
-  const handleFoodSelectionConfirm = () => {
-    if (selectedFoods.length === 0) {
-      toast.error("Selecione pelo menos um alimento");
-      return;
-    }
-    setCurrentStep(3);
-  };
 
   if (loading) {
     return (
@@ -96,33 +86,29 @@ const Menu = () => {
             {/* Etapa 2: Seleção de Alimentos */}
             <Card className={`p-4 sm:p-6 ${!calorieNeeds ? 'opacity-50 pointer-events-none' : ''}`}>
               <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center">
-                <span className={`${currentStep >= 2 ? 'bg-green-500' : 'bg-gray-300'} text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2`}>2</span>
+                <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">2</span>
                 Preferências Alimentares
               </h2>
-              {currentStep >= 2 && (
-                <FoodSelector
-                  protocolFoods={protocolFoods}
-                  selectedFoods={selectedFoods}
-                  onFoodSelection={handleFoodSelection}
-                  totalCalories={totalCalories}
-                  onBack={() => setCurrentStep(1)}
-                  onConfirm={handleFoodSelectionConfirm}
-                />
-              )}
+              <FoodSelector
+                protocolFoods={protocolFoods}
+                selectedFoods={selectedFoods}
+                onFoodSelection={handleFoodSelection}
+                totalCalories={totalCalories}
+                onBack={() => {}}
+                onConfirm={() => {}}
+              />
             </Card>
 
             {/* Etapa 3: Preferências Dietéticas */}
-            <Card className={`p-4 sm:p-6 ${currentStep < 3 ? 'opacity-50 pointer-events-none' : ''}`}>
+            <Card className={`p-4 sm:p-6 ${selectedFoods.length === 0 ? 'opacity-50 pointer-events-none' : ''}`}>
               <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center">
-                <span className={`${currentStep >= 3 ? 'bg-green-500' : 'bg-gray-300'} text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2`}>3</span>
+                <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">3</span>
                 Restrições e Preferências
               </h2>
-              {currentStep >= 3 && (
-                <DietaryPreferencesForm
-                  onSubmit={handleDietaryPreferences}
-                  onBack={() => setCurrentStep(2)}
-                />
-              )}
+              <DietaryPreferencesForm
+                onSubmit={handleDietaryPreferences}
+                onBack={() => {}}
+              />
             </Card>
 
             {/* Etapa 4: Exibição do Plano */}
@@ -137,17 +123,11 @@ const Menu = () => {
                     mealPlan={mealPlan}
                     onRefresh={async () => {
                       try {
-                        setLoading(true);
-                        if (dietaryPreferences) {
-                          await handleDietaryPreferences(dietaryPreferences);
-                        }
                         return Promise.resolve();
                       } catch (error) {
                         console.error('Erro ao atualizar cardápio:', error);
                         toast.error("Erro ao atualizar o cardápio");
                         return Promise.reject(error);
-                      } finally {
-                        setLoading(false);
                       }
                     }}
                   />
