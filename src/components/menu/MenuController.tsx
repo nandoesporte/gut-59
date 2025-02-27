@@ -162,6 +162,8 @@ export const useMenuController = () => {
     mealPlan,
     formData,
     loading,
+    setLoading,
+    dietaryPreferences,
     handleCalculateCalories,
     handleFoodSelection,
     handleDietaryPreferences,

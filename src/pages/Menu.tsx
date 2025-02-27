@@ -10,7 +10,7 @@ import { MenuHeader } from "@/components/menu/MenuHeader";
 import { useMenuController } from "@/components/menu/MenuController";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DietaryPreferences } from "@/components/menu/types";
 
 const Menu = () => {
@@ -25,6 +25,8 @@ const Menu = () => {
     mealPlan,
     formData,
     loading,
+    setLoading,
+    dietaryPreferences,
     handleCalculateCalories,
     handleFoodSelection,
     handleDietaryPreferences,
