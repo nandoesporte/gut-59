@@ -15,6 +15,7 @@ import Instructions from './pages/Instructions'
 import NotFound from './pages/NotFound'
 import Wallet from './pages/Wallet'
 import Mental from './pages/Mental'
+import AIChat from './pages/AIChat'
 
 function App() {
   return (
@@ -33,6 +34,7 @@ function App() {
           <Route path="instructions" element={<Instructions />} />
           <Route path="wallet" element={<Wallet />} />
           <Route path="mental" element={<Mental />} />
+          <Route path="ai-chat" element={<AIChat />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>

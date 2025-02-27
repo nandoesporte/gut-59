@@ -27,3 +27,6 @@ verify_jwt = true
 
 [functions.grant-plan-access]
 verify_jwt = true
+
+[functions.llama-chat]
+verify_jwt = true
