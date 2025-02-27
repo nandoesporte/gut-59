@@ -50,6 +50,36 @@ const transactionTypeInfo = {
     label: 'Transferência',
     icon: Send,
     color: 'text-orange-500'
+  },
+  steps_reward: {
+    label: 'Recompensa de Passos',
+    icon: Footprints,
+    color: 'text-green-600'
+  },
+  water_reward: {
+    label: 'Recompensa de Água',
+    icon: Droplets,
+    color: 'text-blue-600'
+  },
+  meal_plan_generation: {
+    label: 'Geração de Plano Alimentar',
+    icon: ArrowUpCircle,
+    color: 'text-yellow-500'
+  },
+  workout_plan_generation: {
+    label: 'Geração de Plano de Treino',
+    icon: ArrowUpCircle,
+    color: 'text-pink-500'
+  },
+  rehab_plan_generation: {
+    label: 'Geração de Plano de Reabilitação',
+    icon: ArrowUpCircle,
+    color: 'text-red-500'
+  },
+  breathing_exercise: {
+    label: 'Exercício de Respiração',
+    icon: CalendarDays,
+    color: 'text-blue-400'
   }
 };
 
@@ -156,9 +186,16 @@ const Wallet = () => {
 
   const filteredTransactions = transactions?.filter(transaction => {
     const searchLower = searchTerm.toLowerCase();
+    // Verifique se o tipo de transação existe no objeto transactionTypeInfo
+    const typeInfo = transactionTypeInfo[transaction.transaction_type] || {
+      label: transaction.transaction_type,
+      icon: Coins,
+      color: 'text-gray-500'
+    };
+    
     return (
       transaction.description?.toLowerCase().includes(searchLower) ||
-      transactionTypeInfo[transaction.transaction_type].label.toLowerCase().includes(searchLower) ||
+      typeInfo.label.toLowerCase().includes(searchLower) ||
       transaction.amount.toString().includes(searchTerm)
     );
   });
@@ -218,7 +255,13 @@ const Wallet = () => {
             </div>
           ) : (
             filteredTransactions?.map((transaction) => {
-              const typeInfo = transactionTypeInfo[transaction.transaction_type];
+              // Adicione uma verificação para garantir que o tipo existe
+              const typeInfo = transactionTypeInfo[transaction.transaction_type] || {
+                label: transaction.transaction_type,
+                icon: Coins,
+                color: 'text-gray-500'
+              };
+              
               const Icon = typeInfo.icon;
 
               return (
