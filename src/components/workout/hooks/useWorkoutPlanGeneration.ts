@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { WorkoutPreferences } from "../types";
 import { WorkoutPlan } from "../types/workout-plan";
@@ -171,8 +172,23 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       }
 
       console.log("Acesso permitido, gerando plano...");
+      console.log("Enviando preferências:", preferences);
+      
+      // Convertendo para formato esperado pela API
+      const apiPreferences = {
+        age: preferences.age,
+        weight: preferences.weight,
+        height: preferences.height,
+        gender: preferences.gender,
+        goal: preferences.goal,
+        activity_level: preferences.activityLevel,
+        preferred_exercise_types: preferences.preferredExerciseTypes,
+        training_location: preferences.trainingLocation,
+        days_per_week: preferences.daysPerWeek || 3
+      };
+      
       const { data: response, error: planError } = await supabase.functions.invoke('generate-workout-plan', {
-        body: { preferences, userId: user.id }
+        body: { preferences: apiPreferences, userId: user.id }
       });
 
       if (planError) {
@@ -185,7 +201,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
         throw new Error("Nenhum plano foi gerado");
       }
 
-      console.log("Plano gerado com sucesso");
+      console.log("Plano gerado com sucesso:", response);
       await addTransaction({
         amount: REWARDS.WORKOUT_PLAN,
         type: 'workout_plan',
