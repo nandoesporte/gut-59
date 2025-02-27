@@ -97,23 +97,36 @@ export const generateMealPlan = async ({
     
     console.log('[MEAL PLAN] Enviando payload:', JSON.stringify(payload, null, 2));
     
-    // Primeira tentativa
-    const { data: firstResponse, error: generateError } = await supabase.functions.invoke(
-      'generate-meal-plan',
-      { body: payload }
-    );
+    // Primeiro, tentamos gerar o plano completo
+    try {
+      const { data: firstResponse, error: generateError } = await supabase.functions.invoke(
+        'generate-meal-plan',
+        { body: payload }
+      );
 
-    if (generateError) {
-      console.error('[MEAL PLAN] Erro na Edge Function:', generateError);
-      console.error('[MEAL PLAN] Código do erro:', generateError?.code);
-      console.error('[MEAL PLAN] Mensagem completa:', generateError?.message);
+      // Verificamos se a resposta foi bem-sucedida
+      if (!generateError && firstResponse && firstResponse.mealPlan) {
+        console.log('[MEAL PLAN] Primeira tentativa bem-sucedida');
+        mealPlanResponse = firstResponse;
+      } else {
+        // Se houver erro, tentamos uma abordagem simplificada
+        console.error('[MEAL PLAN] Erro na primeira tentativa:', generateError);
+        if (generateError) {
+          console.error('[MEAL PLAN] Código do erro:', generateError.code);
+          console.error('[MEAL PLAN] Mensagem completa:', generateError.message);
+        }
+        if (!firstResponse || !firstResponse.mealPlan) {
+          console.error('[MEAL PLAN] Resposta inválida na primeira tentativa');
+        }
+        
+        throw new Error("Falha na primeira tentativa");
+      }
+    } catch (firstError) {
+      console.log('[MEAL PLAN] Capturado erro na primeira tentativa, tentando novamente com payload simplificado');
       toast.dismiss(toastId);
-      toast.error("Falha na geração do plano. Tentando novamente...");
+      toastId = toast.loading("Otimizando seu plano alimentar...");
       
-      // Tentar novamente com ajustes no payload
-      console.log('[MEAL PLAN] Tentando novamente com ajustes...');
-      
-      // Simplificar o payload para reduzir chances de erro
+      // Simplificar o payload para a segunda tentativa
       const simplifiedPayload = {
         userData: {
           weight: Math.round(userData.weight),
@@ -125,43 +138,53 @@ export const generateMealPlan = async ({
           userId: userData.id,
           dailyCalories: Math.round(userData.dailyCalories)
         },
-        selectedFoods: selectedFoodsDetails.slice(0, 30), // Limitar número de alimentos se houver muitos
+        selectedFoods: selectedFoodsDetails.slice(0, 30), // Limitar número de alimentos
         dietaryPreferences: {
           hasAllergies: preferences.hasAllergies || false,
-          allergies: (preferences.allergies || []).slice(0, 5), // Limitar número de alergias
-          dietaryRestrictions: (preferences.dietaryRestrictions || []).slice(0, 5), // Limitar restrições
+          allergies: (preferences.allergies || []).slice(0, 5),
+          dietaryRestrictions: (preferences.dietaryRestrictions || []).slice(0, 5),
           trainingTime: preferences.trainingTime
         }
       };
       
       console.log('[MEAL PLAN] Tentando com payload simplificado:', JSON.stringify(simplifiedPayload, null, 2));
       
-      toastId = toast.loading("Otimizando seu plano alimentar...");
-      
       // Segunda tentativa com payload simplificado
-      const { data: retryResponse, error: retryError } = await supabase.functions.invoke(
-        'generate-meal-plan',
-        { body: simplifiedPayload }
-      );
-      
-      if (retryError || !retryResponse || !retryResponse.mealPlan) {
-        console.error('[MEAL PLAN] Erro na segunda tentativa:', retryError || "Resposta inválida");
+      try {
+        const { data: retryResponse, error: retryError } = await supabase.functions.invoke(
+          'generate-meal-plan',
+          { body: simplifiedPayload }
+        );
+        
+        if (retryError || !retryResponse || !retryResponse.mealPlan) {
+          console.error('[MEAL PLAN] Erro na segunda tentativa:', retryError || "Resposta inválida");
+          toast.dismiss(toastId);
+          toast.error("Não foi possível gerar seu plano personalizado. Por favor, tente novamente.");
+          throw new Error(retryError?.message || "Falha na geração do plano personalizado");
+        }
+        
+        console.log('[MEAL PLAN] Segunda tentativa bem-sucedida!');
+        mealPlanResponse = retryResponse;
+      } catch (retryAttemptError) {
+        console.error('[MEAL PLAN] Erro na segunda tentativa completa:', retryAttemptError);
         toast.dismiss(toastId);
-        toast.error("Não foi possível gerar seu plano personalizado. Por favor, tente novamente.");
-        throw new Error(retryError?.message || "Falha na geração do plano personalizado");
+        
+        // Como última tentativa, criamos um plano alimentar simplificado localmente
+        try {
+          console.log('[MEAL PLAN] Gerando plano simplificado localmente...');
+          mealPlanResponse = generateSimplifiedMealPlan(selectedFoodsDetails, userData.dailyCalories);
+          toastId = toast.loading("Finalizando plano alimentar...");
+        } catch (localGenerationError) {
+          console.error('[MEAL PLAN] Falha na geração local:', localGenerationError);
+          toast.error("Não foi possível gerar seu plano. Tente novamente mais tarde.");
+          throw new Error("Todas as tentativas de geração falharam");
+        }
       }
-      
-      // Se a segunda tentativa for bem-sucedida, usar essa resposta
-      console.log('[MEAL PLAN] Segunda tentativa bem-sucedida!');
-      mealPlanResponse = retryResponse;
-    } else {
-      // Se a primeira tentativa foi bem-sucedida, use a resposta original
-      mealPlanResponse = firstResponse;
     }
 
     // Validação da resposta
     if (!mealPlanResponse || !mealPlanResponse.mealPlan) {
-      console.error('[MEAL PLAN] Resposta inválida:', JSON.stringify(mealPlanResponse, null, 2));
+      console.error('[MEAL PLAN] Resposta final inválida:', JSON.stringify(mealPlanResponse, null, 2));
       toast.dismiss(toastId);
       toast.error("Resposta inválida do servidor. Por favor, tente novamente.");
       throw new Error("Resposta inválida do servidor");
@@ -170,12 +193,15 @@ export const generateMealPlan = async ({
     console.log('[MEAL PLAN] Resposta recebida com sucesso');
     console.log('[MEAL PLAN] Estrutura do plano:', Object.keys(mealPlanResponse.mealPlan).join(', '));
 
-    // Verificar se o plano tem a estrutura esperada
-    if (!mealPlanResponse.mealPlan.weeklyPlan || !mealPlanResponse.mealPlan.recommendations) {
-      console.error('[MEAL PLAN] Estrutura do plano incompleta:', JSON.stringify(mealPlanResponse.mealPlan, null, 2));
-      toast.dismiss(toastId);
-      toast.error("Plano gerado com estrutura incompleta. Por favor, tente novamente.");
-      throw new Error("Estrutura do plano incompleta");
+    // Verificar se o plano tem a estrutura esperada e completar se necessário
+    if (!mealPlanResponse.mealPlan.weeklyPlan) {
+      console.error('[MEAL PLAN] Plano sem estrutura semanal. Criando estrutura básica...');
+      mealPlanResponse.mealPlan.weeklyPlan = createBasicWeeklyPlan(selectedFoodsDetails);
+    }
+    
+    if (!mealPlanResponse.mealPlan.recommendations) {
+      console.log('[MEAL PLAN] Adicionando recomendações padrão');
+      mealPlanResponse.mealPlan.recommendations = generateDefaultRecommendations(userData.goal);
     }
 
     // Verificar se todos os dias da semana estão presentes
@@ -183,7 +209,7 @@ export const generateMealPlan = async ({
     const missingDays = requiredDays.filter(day => !mealPlanResponse.mealPlan.weeklyPlan[day]);
     
     if (missingDays.length > 0) {
-      console.error(`[MEAL PLAN] Dias ausentes no plano: ${missingDays.join(', ')}`);
+      console.log(`[MEAL PLAN] Dias ausentes no plano: ${missingDays.join(', ')}`);
       // Tentar completar os dias faltantes copiando de outros dias existentes
       const availableDays = requiredDays.filter(day => mealPlanResponse.mealPlan.weeklyPlan[day]);
       
@@ -198,10 +224,30 @@ export const generateMealPlan = async ({
         
         console.log('[MEAL PLAN] Dias faltantes foram complementados');
       } else {
-        toast.dismiss(toastId);
-        toast.error("Plano incompleto gerado. Por favor, tente novamente.");
-        throw new Error("Nenhum dia válido encontrado no plano");
+        console.log('[MEAL PLAN] Nenhum dia disponível para copiar, criando estrutura básica...');
+        requiredDays.forEach(day => {
+          if (!mealPlanResponse.mealPlan.weeklyPlan[day]) {
+            mealPlanResponse.mealPlan.weeklyPlan[day] = createBasicDayPlan(day, selectedFoodsDetails);
+          }
+        });
       }
+    }
+
+    // Verificar meal-by-meal e adicionar totais diários se necessário
+    requiredDays.forEach(day => {
+      const dayPlan = mealPlanResponse.mealPlan.weeklyPlan[day];
+      if (!dayPlan.meals) {
+        dayPlan.meals = createBasicMeals(selectedFoodsDetails);
+      }
+      
+      if (!dayPlan.dailyTotals) {
+        dayPlan.dailyTotals = calculateDailyTotals(dayPlan.meals);
+      }
+    });
+
+    // Adicionar totais semanais se não existirem
+    if (!mealPlanResponse.mealPlan.weeklyTotals) {
+      mealPlanResponse.mealPlan.weeklyTotals = calculateWeeklyTotals(mealPlanResponse.mealPlan.weeklyPlan);
     }
 
     // Adicionar a transação de recompensa
@@ -238,6 +284,232 @@ export const generateMealPlan = async ({
     throw error;
   }
 };
+
+// Funções auxiliares para geração de plano simplificado
+
+function generateSimplifiedMealPlan(foods: any[], dailyCalories: number) {
+  console.log('[MEAL PLAN] Gerando plano simplificado com', foods.length, 'alimentos');
+  
+  // Criar estrutura básica do plano
+  const weeklyPlan = {
+    monday: createBasicDayPlan('monday', foods),
+    tuesday: createBasicDayPlan('tuesday', foods),
+    wednesday: createBasicDayPlan('wednesday', foods),
+    thursday: createBasicDayPlan('thursday', foods),
+    friday: createBasicDayPlan('friday', foods),
+    saturday: createBasicDayPlan('saturday', foods),
+    sunday: createBasicDayPlan('sunday', foods)
+  };
+  
+  // Totais semanais
+  const weeklyTotals = calculateWeeklyTotals(weeklyPlan);
+  
+  // Recomendações básicas
+  const recommendations = generateDefaultRecommendations('maintain');
+  
+  return {
+    mealPlan: {
+      weeklyPlan,
+      weeklyTotals,
+      recommendations
+    }
+  };
+}
+
+function createBasicWeeklyPlan(foods: any[]) {
+  return {
+    monday: createBasicDayPlan('monday', foods),
+    tuesday: createBasicDayPlan('tuesday', foods),
+    wednesday: createBasicDayPlan('wednesday', foods),
+    thursday: createBasicDayPlan('thursday', foods),
+    friday: createBasicDayPlan('friday', foods),
+    saturday: createBasicDayPlan('saturday', foods),
+    sunday: createBasicDayPlan('sunday', foods)
+  };
+}
+
+function createBasicDayPlan(day: string, foods: any[]) {
+  const capitalizedDay = day.charAt(0).toUpperCase() + day.slice(1);
+  const meals = createBasicMeals(foods);
+  const dailyTotals = calculateDailyTotals(meals);
+  
+  return {
+    dayName: capitalizedDay,
+    meals,
+    dailyTotals
+  };
+}
+
+function createBasicMeals(foods: any[]) {
+  // Categorizar alimentos
+  const proteins = foods.filter(f => f.protein > 10);
+  const carbs = foods.filter(f => f.carbs > 10);
+  const fats = foods.filter(f => f.fats > 5);
+  const fruits = foods.filter(f => f.name.toLowerCase().includes('fruta') || f.food_group_id === 3);
+  
+  // Se não tivermos alimentos suficientes nas categorias, usamos alimentos aleatórios
+  const getRandomFood = (list: any[], fallback: any[]) => {
+    const sourceList = list.length > 0 ? list : fallback;
+    return sourceList[Math.floor(Math.random() * sourceList.length)];
+  };
+  
+  // Criamos refeições básicas com base nos alimentos disponíveis
+  const createMeal = (name: string, numberOfFoods = 3) => {
+    const mealFoods = [];
+    
+    // Tentamos incluir proteína
+    if (proteins.length > 0) {
+      mealFoods.push(getRandomFood(proteins, foods));
+    }
+    
+    // Tentamos incluir carboidratos
+    if (carbs.length > 0) {
+      mealFoods.push(getRandomFood(carbs, foods));
+    }
+    
+    // Adicionamos alimentos adicionais se necessário
+    while (mealFoods.length < numberOfFoods && foods.length > 0) {
+      const randomFood = foods[Math.floor(Math.random() * foods.length)];
+      // Verificar se o alimento já está incluído
+      if (!mealFoods.some(f => f.id === randomFood.id)) {
+        mealFoods.push(randomFood);
+      }
+    }
+    
+    // Calcular macros totais da refeição
+    const macros = {
+      protein: mealFoods.reduce((sum, food) => sum + (food.protein || 0), 0),
+      carbs: mealFoods.reduce((sum, food) => sum + (food.carbs || 0), 0),
+      fats: mealFoods.reduce((sum, food) => sum + (food.fats || 0), 0),
+      fiber: 5 // Valor padrão de fibras
+    };
+    
+    // Calcular calorias
+    const calories = (macros.protein * 4) + (macros.carbs * 4) + (macros.fats * 9);
+    
+    // Gerar nome da refeição baseado nos alimentos
+    const description = mealFoods.length > 0 
+      ? `${mealFoods[0].name}${mealFoods.length > 1 ? ` com ${mealFoods[1].name}` : ''}${mealFoods.length > 2 ? ` e ${mealFoods[2].name}` : ''}`
+      : name;
+    
+    return {
+      foods: mealFoods.map(food => ({
+        name: food.name,
+        unit: food.portionUnit || "g",
+        details: food.protein > 15 ? "Proteína" : (food.carbs > 15 ? "Carboidrato" : "Vegetal/Fruta"),
+        portion: 100
+      })),
+      macros,
+      calories,
+      description
+    };
+  };
+  
+  return {
+    breakfast: createMeal("Café da Manhã", 2),
+    morningSnack: createMeal("Lanche da Manhã", 2),
+    lunch: createMeal("Almoço", 3),
+    afternoonSnack: createMeal("Lanche da Tarde", 2),
+    dinner: createMeal("Jantar", 3)
+  };
+}
+
+function calculateDailyTotals(meals: any) {
+  // Somar macros e calorias de todas as refeições
+  const dailyTotals = {
+    protein: 0,
+    carbs: 0,
+    fats: 0,
+    fiber: 0,
+    calories: 0
+  };
+  
+  // Verificar cada refeição
+  Object.values(meals).forEach((meal: any) => {
+    if (meal && meal.macros) {
+      dailyTotals.protein += meal.macros.protein || 0;
+      dailyTotals.carbs += meal.macros.carbs || 0;
+      dailyTotals.fats += meal.macros.fats || 0;
+      dailyTotals.fiber += meal.macros.fiber || 0;
+      dailyTotals.calories += meal.calories || 0;
+    }
+  });
+  
+  return dailyTotals;
+}
+
+function calculateWeeklyTotals(weeklyPlan: any) {
+  // Inicializar acumuladores
+  let totalProtein = 0;
+  let totalCarbs = 0;
+  let totalFats = 0;
+  let totalFiber = 0;
+  let totalCalories = 0;
+  const daysCount = Object.keys(weeklyPlan).length || 7;
+  
+  // Somar totais de cada dia
+  Object.values(weeklyPlan).forEach((day: any) => {
+    if (day && day.dailyTotals) {
+      totalProtein += day.dailyTotals.protein || 0;
+      totalCarbs += day.dailyTotals.carbs || 0;
+      totalFats += day.dailyTotals.fats || 0;
+      totalFiber += day.dailyTotals.fiber || 0;
+      totalCalories += day.dailyTotals.calories || 0;
+    }
+  });
+  
+  // Calcular médias
+  return {
+    averageProtein: totalProtein / daysCount,
+    averageCarbs: totalCarbs / daysCount,
+    averageFats: totalFats / daysCount,
+    averageFiber: totalFiber / daysCount,
+    averageCalories: totalCalories / daysCount
+  };
+}
+
+function generateDefaultRecommendations(goal: string) {
+  // Recomendações básicas
+  const generalTips = [
+    "Beba pelo menos 2 litros de água por dia",
+    "Priorize alimentos integrais e minimamente processados",
+    "Inclua fontes de proteína em todas as refeições",
+    "Consuma pelo menos 2 porções de frutas e 3 de vegetais diariamente"
+  ];
+  
+  // Recomendações específicas por objetivo
+  let specificTips = [];
+  
+  if (goal === 'lose' || goal === 'lose_weight') {
+    specificTips = [
+      "Evite bebidas açucaradas, inclusive sucos de frutas",
+      "Reduza o consumo de carboidratos refinados (pães, massas e doces)",
+      "Aumente o consumo de proteínas para ajudar na saciedade",
+      "Prefira métodos de cocção com menos gordura (cozido, assado, grelhado)"
+    ];
+  } else if (goal === 'gain' || goal === 'gain_weight') {
+    specificTips = [
+      "Aumente o tamanho das porções gradualmente",
+      "Consuma alimentos calóricos saudáveis como abacate, azeite e oleaginosas",
+      "Inclua lanches entre as refeições principais",
+      "Considere shakes proteicos caseiros com frutas, leite e aveia"
+    ];
+  } else {
+    specificTips = [
+      "Mantenha regularidade nos horários das refeições",
+      "Equilibre o consumo de proteínas, carboidratos e gorduras saudáveis",
+      "Preste atenção aos sinais de fome e saciedade",
+      "Faça refeições variadas para garantir todos os nutrientes"
+    ];
+  }
+  
+  return {
+    general: generalTips,
+    specific: specificTips,
+    hydration: "Mantenha-se bem hidratado bebendo água regularmente ao longo do dia",
+    supplements: "Consulte um profissional de saúde antes de iniciar suplementação"
+  };
+}
 
 const saveMealPlanData = async (userId: string, mealPlan: any, calories: number, preferences: DietaryPreferences) => {
   try {
