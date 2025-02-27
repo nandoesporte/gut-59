@@ -96,11 +96,18 @@ export const generateMealPlan = async ({
     
     console.log('[MEAL PLAN] Enviando payload:', JSON.stringify(payload, null, 2));
     
+    // Modificado para usar let em vez de const
+    let response;
+    let generateError;
+    
     // Primeira tentativa
-    let { data: response, error: generateError } = await supabase.functions.invoke(
+    const firstAttempt = await supabase.functions.invoke(
       'generate-meal-plan',
       { body: payload }
     );
+    
+    response = firstAttempt.data;
+    generateError = firstAttempt.error;
 
     if (generateError) {
       console.error('[MEAL PLAN] Erro na Edge Function:', generateError);
@@ -137,11 +144,14 @@ export const generateMealPlan = async ({
       
       toastId = toast.loading("Otimizando seu plano alimentar...");
       
-      // Segunda tentativa com payload simplificado - usando variáveis diferentes
-      const { data: retryResponse, error: retryError } = await supabase.functions.invoke(
+      // Segunda tentativa com payload simplificado
+      const secondAttempt = await supabase.functions.invoke(
         'generate-meal-plan',
         { body: simplifiedPayload }
       );
+      
+      const retryResponse = secondAttempt.data;
+      const retryError = secondAttempt.error;
       
       if (retryError || !retryResponse || !retryResponse.mealPlan) {
         console.error('[MEAL PLAN] Erro na segunda tentativa:', retryError || "Resposta inválida");
@@ -152,7 +162,6 @@ export const generateMealPlan = async ({
       
       // Se a segunda tentativa for bem-sucedida, usar essa resposta
       console.log('[MEAL PLAN] Segunda tentativa bem-sucedida!');
-      // Atribuímos à variável response (agora 'let') a resposta da segunda tentativa
       response = retryResponse;
     }
 
