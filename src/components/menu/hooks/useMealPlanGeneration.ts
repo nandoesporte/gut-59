@@ -98,7 +98,7 @@ export const generateMealPlan = async ({
     console.log('[MEAL PLAN] Enviando payload:', JSON.stringify(payload, null, 2));
     
     // Primeira tentativa
-    const { data: response, error: generateError } = await supabase.functions.invoke(
+    const { data: firstResponse, error: generateError } = await supabase.functions.invoke(
       'generate-meal-plan',
       { body: payload }
     );
@@ -156,7 +156,7 @@ export const generateMealPlan = async ({
       mealPlanResponse = retryResponse;
     } else {
       // Se a primeira tentativa foi bem-sucedida, use a resposta original
-      mealPlanResponse = response;
+      mealPlanResponse = firstResponse;
     }
 
     // Validação da resposta
