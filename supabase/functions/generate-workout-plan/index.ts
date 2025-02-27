@@ -19,7 +19,7 @@ serve(async (req) => {
     const { preferences, userId } = await req.json();
     
     console.log('Gerando plano de treino para usuário:', userId);
-    console.log('Preferências recebidas:', preferences);
+    console.log('Preferências recebidas:', JSON.stringify(preferences));
 
     if (!userId) {
       throw new Error('ID do usuário é obrigatório');
@@ -61,10 +61,10 @@ serve(async (req) => {
     const createdPlan = await createPlanResponse.json();
     console.log('Plano criado com sucesso:', createdPlan);
     
-    // Buscar exercícios disponíveis
+    // Buscar exercícios disponíveis - Modificado para não usar a coluna category que não existe
     console.log('Buscando exercícios disponíveis...');
     const exercisesResponse = await fetch(
-      `${SUPABASE_URL}/rest/v1/exercises?select=id,name,gif_url,description,category,equipment&limit=100`, 
+      `${SUPABASE_URL}/rest/v1/exercises?select=id,name,gif_url,description,muscle_group,equipment&limit=100`, 
       {
         headers: {
           'apikey': SUPABASE_SERVICE_ROLE_KEY,
@@ -86,47 +86,47 @@ serve(async (req) => {
       throw new Error('Nenhum exercício disponível no banco de dados');
     }
 
-    // Dividir exercícios por categorias
-    console.log('Organizando exercícios por categoria...');
-    const upperBodyExercises = exercises.filter(e => 
-      ['chest', 'back', 'shoulders', 'arms', 'upper body'].includes(e.category?.toLowerCase() || '')
-    );
-    
-    const lowerBodyExercises = exercises.filter(e => 
-      ['legs', 'calves', 'lower body'].includes(e.category?.toLowerCase() || '')
-    );
-    
-    const coreExercises = exercises.filter(e => 
-      ['core', 'abs', 'abdominals'].includes(e.category?.toLowerCase() || '')
-    );
+    // Examinar a estrutura dos exercícios para debug
+    console.log('Estrutura de exemplo do primeiro exercício:', 
+      exercises.length > 0 ? JSON.stringify(exercises[0], null, 2) : 'Nenhum exercício encontrado');
 
-    // Garantir que temos pelo menos alguns exercícios em cada categoria
-    // Se faltar, usar todos os exercícios disponíveis
-    if (upperBodyExercises.length < 3) upperBodyExercises.push(...exercises.slice(0, 5));
-    if (lowerBodyExercises.length < 3) lowerBodyExercises.push(...exercises.slice(0, 5));
-    if (coreExercises.length < 3) coreExercises.push(...exercises.slice(0, 5));
+    // Distribuir exercícios em 3 grupos para 3 dias de treino
+    // Em vez de categorizar por tipos específicos, vamos apenas dividir em 3 grupos
+    const exercisesPerGroup = Math.ceil(exercises.length / 3);
+    const exerciseGroups = [
+      exercises.slice(0, exercisesPerGroup),
+      exercises.slice(exercisesPerGroup, exercisesPerGroup * 2),
+      exercises.slice(exercisesPerGroup * 2)
+    ];
+
+    // Garantir que todos os grupos tenham pelo menos alguns exercícios
+    for (let i = 0; i < exerciseGroups.length; i++) {
+      if (exerciseGroups[i].length < 3) {
+        exerciseGroups[i] = exercises.slice(0, Math.min(6, exercises.length));
+      }
+    }
 
     const sessionTypes = [
       { 
-        name: 'Treino de Membros Superiores', 
-        focus: 'Membros Superiores',
-        exercises: upperBodyExercises,
-        warmup: 'Aquecimento de 5-10 minutos com cardio leve (esteira ou bicicleta) seguido de rotações de ombro e movimentos de mobilidade para os braços.',
-        cooldown: 'Alongamentos para peito, costas e braços. Mantenha cada posição por 20-30 segundos.'
+        name: 'Treino A', 
+        focus: 'Grupo 1',
+        exercises: exerciseGroups[0],
+        warmup: 'Aquecimento de 5-10 minutos com cardio leve seguido de mobilização articular.',
+        cooldown: 'Alongamentos para os músculos trabalhados. Mantenha cada posição por 20-30 segundos.'
       },
       { 
-        name: 'Treino de Membros Inferiores', 
-        focus: 'Membros Inferiores',
-        exercises: lowerBodyExercises,
-        warmup: 'Aquecimento de 5-10 minutos com cardio leve, seguido de alongamentos dinâmicos para pernas e mobilidade de quadril.',
-        cooldown: 'Alongamentos para quadríceps, isquiotibiais e panturrilhas. Mantenha cada posição por 20-30 segundos.'
+        name: 'Treino B', 
+        focus: 'Grupo 2',
+        exercises: exerciseGroups[1],
+        warmup: 'Aquecimento de 5-10 minutos com cardio leve, seguido de mobilização articular.',
+        cooldown: 'Alongamentos para os músculos trabalhados. Mantenha cada posição por 20-30 segundos.'
       },
       { 
-        name: 'Treino de Core e Abdômen', 
-        focus: 'Core e Abdômen',
-        exercises: coreExercises,
-        warmup: 'Aquecimento com 5 minutos de cardio leve seguido de mobilidade de tronco e quadril.',
-        cooldown: 'Alongamentos para lombar e abdômen. Mantenha cada posição por 20-30 segundos.'
+        name: 'Treino C', 
+        focus: 'Grupo 3',
+        exercises: exerciseGroups[2],
+        warmup: 'Aquecimento com 5 minutos de cardio leve seguido de mobilização articular.',
+        cooldown: 'Alongamentos para os músculos trabalhados. Mantenha cada posição por 20-30 segundos.'
       }
     ];
     
