@@ -1,6 +1,6 @@
 
 import { Link, useLocation } from "react-router-dom";
-import { Home, LineChart, ShoppingBag, Settings, ScrollText, UtensilsCrossed, Dumbbell, Stethoscope, Brain, MessageSquare } from "lucide-react";
+import { Home, LineChart, ShoppingBag, Settings, ScrollText, UtensilsCrossed, Dumbbell, Stethoscope, Brain } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -56,12 +56,6 @@ const Navigation = () => {
             icon={<Brain className="w-6 h-6 md:w-7 md:h-7" />}
             text="Psico"
             active={isActive("/mental")}
-          />
-          <NavLink
-            to="/ai-chat"
-            icon={<MessageSquare className="w-6 h-6 md:w-7 md:h-7" />}
-            text="Chat IA"
-            active={isActive("/ai-chat")}
           />
           <a
             href="https://katiasantin.com.br/loja"
