@@ -31,6 +31,42 @@ export function calculateMifflinStJeor(
   return Math.round(bmr * activityFactor);
 }
 
+export function calculateDailyCalories(
+  weight: number,
+  height: number,
+  age: number,
+  gender: string,
+  activityLevel: string,
+  goal: string
+): number {
+  // Mapear níveis de atividade para fatores
+  const activityFactors: {[key: string]: number} = {
+    sedentary: 1.2,      // Pouco ou nenhum exercício
+    light: 1.375,        // Exercício leve (1-3 dias por semana)
+    moderate: 1.55,      // Exercício moderado (3-5 dias por semana)
+    active: 1.725,       // Exercício intenso (6-7 dias por semana)
+    very_active: 1.9     // Exercício muito intenso (2x por dia, treinos intensos)
+  };
+  
+  // Obter fator de atividade apropriado ou usar valor padrão
+  const activityFactor = activityFactors[activityLevel] || 1.55;
+  
+  // Calcular necessidades calóricas básicas usando Mifflin-St Jeor
+  const bmr = calculateMifflinStJeor(weight, height, age, gender, 1.0);
+  const maintenanceCalories = bmr * activityFactor;
+  
+  // Ajustar com base no objetivo
+  switch (goal) {
+    case 'lose_weight':
+      return Math.round(maintenanceCalories * 0.85); // Déficit de 15%
+    case 'gain_weight':
+      return Math.round(maintenanceCalories * 1.15); // Superávit de 15%
+    case 'maintain':
+    default:
+      return Math.round(maintenanceCalories);
+  }
+}
+
 export function adjustCaloriesForGoal(baseCalories: number, goal: string): number {
   switch (goal) {
     case 'lose':
@@ -79,6 +115,38 @@ export function calculateMacroDistribution(calories: number, goal: string, weigh
     fats: Math.round(fatCalories / 9),
     fiber: Math.round(calories / 1000 * 14) // 14g de fibra por 1000kcal
   };
+}
+
+export interface Food {
+  id: string;
+  name: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  fiber: number;
+  serving_size: number;
+  serving_unit: string;
+  food_group_id: number;
+}
+
+export interface FoodWithPortion extends Food {
+  portion: number;
+  portionUnit: string;
+  calculatedNutrients: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fats: number;
+    fiber: number;
+  };
+}
+
+export interface MacroTargets {
+  protein: number;
+  carbs: number;
+  fats: number;
+  fiber: number;
 }
 
 export function calculatePortion(
