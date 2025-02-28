@@ -23,10 +23,13 @@ export const useFoodSelection = () => {
   });
 
   const handleFoodSelection = useCallback((foodId: string, food?: ProtocolFood) => {
+    // Certifique-se de que foodId seja sempre uma string
+    const stringFoodId = String(foodId);
+    
     setSelectedFoods(prevSelected => {
-      const newSelected = prevSelected.includes(foodId)
-        ? prevSelected.filter(id => id !== foodId)
-        : [...prevSelected, foodId];
+      const newSelected = prevSelected.includes(stringFoodId)
+        ? prevSelected.filter(id => id !== stringFoodId)
+        : [...prevSelected, stringFoodId];
       
       // Se temos o objeto de alimento completo, vamos categorizá-lo por refeição
       if (food) {
@@ -36,12 +39,12 @@ export const useFoodSelection = () => {
           const updatedMeals = { ...prev };
           
           // Se o alimento foi selecionado, adiciona à refeição correspondente
-          if (!prevSelected.includes(foodId)) {
-            updatedMeals[mealType] = [...updatedMeals[mealType], foodId];
+          if (!prevSelected.includes(stringFoodId)) {
+            updatedMeals[mealType] = [...updatedMeals[mealType], stringFoodId];
           } 
           // Se foi desselecionado, remove da refeição correspondente
           else {
-            updatedMeals[mealType] = updatedMeals[mealType].filter(id => id !== foodId);
+            updatedMeals[mealType] = updatedMeals[mealType].filter(id => id !== stringFoodId);
           }
           
           return updatedMeals;
@@ -53,7 +56,7 @@ export const useFoodSelection = () => {
   }, []);
 
   const calculateTotalCalories = useCallback((foods: ProtocolFood[]) => {
-    const selected = foods.filter(food => selectedFoods.includes(food.id));
+    const selected = foods.filter(food => selectedFoods.includes(String(food.id)));
     const total = selected.reduce((sum, food) => sum + (food.calories || 0), 0);
     setTotalCalories(total);
     return total;
@@ -69,7 +72,7 @@ export const useFoodSelection = () => {
     };
     
     selectedFoods.forEach(foodId => {
-      const food = foods.find(f => f.id === foodId);
+      const food = foods.find(f => String(f.id) === String(foodId));
       if (food) {
         const mealType = FOOD_GROUP_TO_MEAL_TYPE[food.food_group_id as keyof typeof FOOD_GROUP_TO_MEAL_TYPE] || 'snack';
         // Ensure foodId is always a string

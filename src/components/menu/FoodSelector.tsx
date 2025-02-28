@@ -42,11 +42,11 @@ const MealSection = ({
       {foods.map((food) => (
         <Button
           key={food.id}
-          variant={selectedFoods.includes(food.id) ? "default" : "outline"}
-          onClick={() => onFoodSelection(food.id, food)}
+          variant={selectedFoods.includes(String(food.id)) ? "default" : "outline"}
+          onClick={() => onFoodSelection(String(food.id), food)}
           className={`
             h-auto py-3 px-4 w-full text-left justify-start
-            ${selectedFoods.includes(food.id)
+            ${selectedFoods.includes(String(food.id))
               ? 'bg-green-100 border-green-500 text-green-700 hover:bg-green-200 hover:text-green-800'
               : 'hover:bg-green-50 hover:border-green-200'}
           `}
