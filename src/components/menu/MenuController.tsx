@@ -94,17 +94,25 @@ export const useMenuController = () => {
         // Também salvar os dados básicos do usuário
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          const { error } = await supabase.from('nutrition_preferences').upsert({
-            user_id: user.id,
-            weight: Number(formData.weight),
-            height: Number(formData.height),
-            age: Number(formData.age),
-            gender: formData.gender,
-            activity_level: formData.activityLevel,
-            goal: formData.goal,
-            calories_needed: calories,
-            selected_foods: selectedFoods // Incluir selected_foods para evitar sobrescrever
-          }, { onConflict: 'user_id' });
+          // Corrigindo a chamada upsert para atender ao tipo esperado
+          const { error } = await supabase
+            .from('nutrition_preferences')
+            .upsert({
+              id: undefined, // Deixe o ID ser gerado automaticamente se for novo
+              user_id: user.id,
+              weight: Number(formData.weight),
+              height: Number(formData.height),
+              age: Number(formData.age),
+              gender: formData.gender,
+              activity_level: formData.activityLevel as any,
+              goal: formData.goal as any,
+              calories_needed: calories,
+              selected_foods: selectedFoods,
+              created_at: undefined, // Deixe o timestamp ser gerado automaticamente
+              updated_at: undefined, // Deixe o timestamp ser gerado automaticamente
+              allergies: undefined,
+              dietary_preferences: undefined
+            });
 
           if (error) {
             console.error('Erro ao salvar preferências nutricionais:', error);
@@ -141,23 +149,25 @@ export const useMenuController = () => {
         console.error('Erro ao buscar preferências existentes:', fetchError);
       }
 
-      // Preparar dados para atualização
-      const updateData = {
-        user_id: user.id,
-        selected_foods: selectedFoods,
-        // Manter os outros campos se existirem
-        weight: existingPrefs?.weight || null,
-        height: existingPrefs?.height || null,
-        age: existingPrefs?.age || null,
-        gender: existingPrefs?.gender || 'male',
-        activity_level: existingPrefs?.activity_level || null,
-        goal: existingPrefs?.goal || null,
-        calories_needed: existingPrefs?.calories_needed || null
-      };
-
+      // Corrigindo a chamada upsert para atender ao tipo esperado
       const { error } = await supabase
         .from('nutrition_preferences')
-        .upsert(updateData, { onConflict: 'user_id' });
+        .upsert({
+          id: existingPrefs?.id,
+          user_id: user.id,
+          selected_foods: selectedFoods,
+          weight: existingPrefs?.weight || null,
+          height: existingPrefs?.height || null,
+          age: existingPrefs?.age || null,
+          gender: existingPrefs?.gender || 'male',
+          activity_level: existingPrefs?.activity_level || null,
+          goal: existingPrefs?.goal || null,
+          calories_needed: existingPrefs?.calories_needed || null,
+          created_at: undefined, // Deixe o timestamp ser atualizado automaticamente
+          updated_at: undefined, // Deixe o timestamp ser atualizado automaticamente
+          allergies: existingPrefs?.allergies,
+          dietary_preferences: existingPrefs?.dietary_preferences
+        });
 
       if (error) {
         console.error('Erro ao salvar preferências de alimentos:', error);
