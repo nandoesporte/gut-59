@@ -29,6 +29,12 @@ interface MealPlanGenerationProps {
   }>;
 }
 
+// Interface para a resposta da edge function
+interface EdgeFunctionResponse {
+  mealPlan: any;
+  [key: string]: any;
+}
+
 export const generateMealPlan = async ({
   userData,
   selectedFoods,
@@ -145,10 +151,10 @@ export const generateMealPlan = async ({
     const edgeFunctionTimeout = 25000;
     
     // Implementar timeout manual com Promise.race
-    let resultData = null;
+    let resultData: EdgeFunctionResponse | null = null;
     try {
       // Criar uma promessa que rejeita após o timeout
-      const timeoutPromise = new Promise((_, reject) => {
+      const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error("Timeout na chamada à Edge Function")), edgeFunctionTimeout);
       });
       
@@ -159,9 +165,9 @@ export const generateMealPlan = async ({
       ]);
       
       // Verificar se temos resultado e se ele contém um plano válido
-      if (result && 'data' in result && result.data && result.data.mealPlan) {
+      if (result && 'data' in result && result.data && typeof result.data === 'object' && 'mealPlan' in result.data) {
         console.log('[MEAL PLAN] Chamada à Edge Function bem-sucedida!');
-        resultData = result.data;
+        resultData = result.data as EdgeFunctionResponse;
       } else {
         console.error('[MEAL PLAN] Resposta da Edge Function sem dados válidos:', result);
         throw new Error("Resposta da Edge Function inválida");
