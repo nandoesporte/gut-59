@@ -109,6 +109,11 @@ export function validateMealPlanRequest(requestData: any): {
     preferences.dietaryRestrictions = [];
   }
 
+  // Ensure training time is properly formatted - can be null or string
+  if (preferences.trainingTime !== null && typeof preferences.trainingTime !== 'string') {
+    preferences.trainingTime = null;
+  }
+
   console.log("Validation successful");
   return {
     isValid: true,

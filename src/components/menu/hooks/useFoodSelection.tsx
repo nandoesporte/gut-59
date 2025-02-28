@@ -56,7 +56,7 @@ export const useFoodSelection = () => {
         });
       }
       
-      return newSelected;
+      return newSelected.map(id => String(id)); // Ensure all IDs are strings
     });
   }, []);
 
@@ -80,11 +80,11 @@ export const useFoodSelection = () => {
       const food = foods.find(f => String(f.id) === foodId);
       if (food) {
         const mealType = FOOD_GROUP_TO_MEAL_TYPE[food.food_group_id as keyof typeof FOOD_GROUP_TO_MEAL_TYPE] || 'snack';
-        mealTypeMap[mealType].push(foodId);
+        mealTypeMap[mealType].push(String(foodId));
       }
     });
     
-    // Double-check that all IDs are strings
+    // Ensure all IDs are strings
     Object.keys(mealTypeMap).forEach(key => {
       mealTypeMap[key] = mealTypeMap[key].map(id => String(id));
     });
