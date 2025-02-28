@@ -32,29 +32,33 @@ const renderMealSection = (pdf: jsPDF, meal: Meal | undefined, title: string, yP
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(10);
   
-  meal.foods.forEach(food => {
-    if (yPos > 270) {
-      pdf.addPage();
-      yPos = 20;
-    }
-    pdf.text(`• ${food.portion} ${food.unit} de ${food.name}`, 25, yPos);
-    yPos += 5;
-    if (food.details) {
-      const detailsLines = pdf.splitTextToSize(food.details, 160);
-      detailsLines.forEach((line: string) => {
-        if (yPos > 270) {
-          pdf.addPage();
-          yPos = 20;
-        }
-        pdf.text(`  ${line}`, 30, yPos);
-        yPos += 5;
-      });
-    }
-  });
+  if (meal.foods && Array.isArray(meal.foods)) {
+    meal.foods.forEach(food => {
+      if (yPos > 270) {
+        pdf.addPage();
+        yPos = 20;
+      }
+      pdf.text(`• ${food.portion} ${food.unit} de ${food.name}`, 25, yPos);
+      yPos += 5;
+      if (food.details) {
+        const detailsLines = pdf.splitTextToSize(food.details, 160);
+        detailsLines.forEach((line: string) => {
+          if (yPos > 270) {
+            pdf.addPage();
+            yPos = 20;
+          }
+          pdf.text(`  ${line}`, 30, yPos);
+          yPos += 5;
+        });
+      }
+    });
+  }
 
   yPos += 5;
   pdf.setFontSize(9);
-  pdf.text(`Proteínas: ${meal.macros.protein}g | Carboidratos: ${meal.macros.carbs}g | Gorduras: ${meal.macros.fats}g | Fibras: ${meal.macros.fiber}g`, 25, yPos);
+  if (meal.macros) {
+    pdf.text(`Proteínas: ${meal.macros.protein}g | Carboidratos: ${meal.macros.carbs}g | Gorduras: ${meal.macros.fats}g | Fibras: ${meal.macros.fiber}g`, 25, yPos);
+  }
   yPos += 10;
 
   return yPos;
@@ -74,20 +78,22 @@ const renderDayPlan = (pdf: jsPDF, dayPlan: DailyPlan, dayName: string, isFirstP
   yPos += 15;
 
   // Refeições
-  if (dayPlan.meals.breakfast) {
-    yPos = renderMealSection(pdf, dayPlan.meals.breakfast, "Café da Manhã", yPos);
-  }
-  if (dayPlan.meals.morningSnack) {
-    yPos = renderMealSection(pdf, dayPlan.meals.morningSnack, "Lanche da Manhã", yPos);
-  }
-  if (dayPlan.meals.lunch) {
-    yPos = renderMealSection(pdf, dayPlan.meals.lunch, "Almoço", yPos);
-  }
-  if (dayPlan.meals.afternoonSnack) {
-    yPos = renderMealSection(pdf, dayPlan.meals.afternoonSnack, "Lanche da Tarde", yPos);
-  }
-  if (dayPlan.meals.dinner) {
-    yPos = renderMealSection(pdf, dayPlan.meals.dinner, "Jantar", yPos);
+  if (dayPlan.meals) {
+    if (dayPlan.meals.breakfast) {
+      yPos = renderMealSection(pdf, dayPlan.meals.breakfast, "Café da Manhã", yPos);
+    }
+    if (dayPlan.meals.morningSnack) {
+      yPos = renderMealSection(pdf, dayPlan.meals.morningSnack, "Lanche da Manhã", yPos);
+    }
+    if (dayPlan.meals.lunch) {
+      yPos = renderMealSection(pdf, dayPlan.meals.lunch, "Almoço", yPos);
+    }
+    if (dayPlan.meals.afternoonSnack) {
+      yPos = renderMealSection(pdf, dayPlan.meals.afternoonSnack, "Lanche da Tarde", yPos);
+    }
+    if (dayPlan.meals.dinner) {
+      yPos = renderMealSection(pdf, dayPlan.meals.dinner, "Jantar", yPos);
+    }
   }
 
   // Totais diários
@@ -108,6 +114,8 @@ const renderDayPlan = (pdf: jsPDF, dayPlan: DailyPlan, dayName: string, isFirstP
 };
 
 const renderRecommendations = (pdf: jsPDF, recommendations: MealPlan['recommendations']) => {
+  if (!recommendations) return;
+  
   pdf.addPage();
   let yPos = 20;
 
@@ -123,12 +131,15 @@ const renderRecommendations = (pdf: jsPDF, recommendations: MealPlan['recommenda
 
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(10);
-  const generalLines = pdf.splitTextToSize(recommendations.general, 170);
-  generalLines.forEach((line: string) => {
-    pdf.text(line, 25, yPos);
-    yPos += 6;
-  });
-  yPos += 5;
+  
+  if (recommendations.general) {
+    const generalLines = pdf.splitTextToSize(recommendations.general, 170);
+    generalLines.forEach((line: string) => {
+      pdf.text(line, 25, yPos);
+      yPos += 6;
+    });
+    yPos += 5;
+  }
 
   if (recommendations.preworkout) {
     pdf.setFont("helvetica", "bold");
@@ -170,6 +181,13 @@ const renderRecommendations = (pdf: jsPDF, recommendations: MealPlan['recommenda
 
 export const generateMealPlanPDF = async (plan: MealPlan) => {
   try {
+    if (!plan || !plan.weeklyPlan || Object.keys(plan.weeklyPlan).length === 0) {
+      console.error("Plano alimentar inválido:", plan);
+      throw new Error("Plano alimentar inválido ou incompleto");
+    }
+    
+    console.log("Iniciando geração do PDF do plano alimentar");
+    
     const pdf = new jsPDF({
       orientation: "portrait",
       unit: "mm",
@@ -193,14 +211,30 @@ export const generateMealPlanPDF = async (plan: MealPlan) => {
 
     let isFirstPage = true;
     
-    // Verificar se o plano tem a estrutura esperada
-    if (!plan.weeklyPlan || Object.keys(plan.weeklyPlan).length === 0) {
-      throw new Error("Plano alimentar inválido ou incompleto");
+    // Verificar se todos os dias da semana estão presentes
+    const missingDays = Object.keys(dayNameMap).filter(day => !plan.weeklyPlan[day]);
+    if (missingDays.length > 0) {
+      console.warn(`Dias ausentes no plano: ${missingDays.join(', ')}`);
+      const availableDays = Object.keys(plan.weeklyPlan);
+      
+      if (availableDays.length > 0) {
+        // Usar um dia existente como modelo para os dias faltantes
+        const templateDay = plan.weeklyPlan[availableDays[0]];
+        missingDays.forEach(day => {
+          console.log(`Copiando dia ${availableDays[0]} para ${day}`);
+          plan.weeklyPlan[day] = JSON.parse(JSON.stringify(templateDay));
+        });
+      } else {
+        throw new Error("Plano alimentar não contém dados de refeições diárias");
+      }
     }
 
+    // Renderizar cada dia do plano
     Object.entries(plan.weeklyPlan).forEach(([day, dayPlan]) => {
-      renderDayPlan(pdf, dayPlan, dayNameMap[day], isFirstPage);
-      isFirstPage = false;
+      if (dayNameMap[day]) {
+        renderDayPlan(pdf, dayPlan, dayNameMap[day], isFirstPage);
+        isFirstPage = false;
+      }
     });
 
     // Adicionar médias semanais
@@ -247,6 +281,7 @@ export const generateMealPlanPDF = async (plan: MealPlan) => {
 
     // Salvar o PDF
     const fileName = `plano_alimentar_${format(new Date(), "dd_MM_yyyy")}.pdf`;
+    console.log(`Salvando PDF como: ${fileName}`);
     pdf.save(fileName);
     
     return true;

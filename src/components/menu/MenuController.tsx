@@ -1,7 +1,8 @@
+
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import type { DietaryPreferences, MealPlan } from "./types";
+import type { DietaryPreferences, MealPlan, ProtocolFood } from "./types";
 import { CalorieCalculatorForm, activityLevels } from "./CalorieCalculator";
 import { useProtocolFoods } from "./hooks/useProtocolFoods";
 import { useCalorieCalculator } from "./hooks/useCalorieCalculator";
@@ -425,27 +426,35 @@ export const useMenuController = () => {
         return;
       }
       
+      // Converta os valores de string para número
+      const weightNum = Number(formData.weight);
+      const heightNum = Number(formData.height);
+      const ageNum = Number(formData.age);
+      
+      // Obtenha os alimentos selecionados com dados completos
+      const selectedFoodsData = protocolFoods.filter(food => 
+        nutritionPrefs.selected_foods.includes(food.id)
+      );
+      
       const newMealPlan = await generateMealPlan({
         userData: {
           id: user.id,
-          weight: formData.weight,
-          height: formData.height,
-          age: formData.age,
+          weight: weightNum,
+          height: heightNum,
+          age: ageNum,
           gender: formData.gender,
           activityLevel: formData.activityLevel,
           goal: formData.goal,
           dailyCalories: calorieNeeds
         },
-        selectedFoods: nutritionPrefs.selected_foods,
+        selectedFoods: selectedFoodsData,
         preferences: {
           hasAllergies: preferences.has_allergies,
           allergies: preferences.allergies,
           dietaryRestrictions: preferences.dietary_restrictions,
           trainingTime: preferences.training_time
         },
-        addTransaction: async (params) => {
-          // Implementação da transação se necessário
-        }
+        addTransaction: addTransactionAsync
       });
       
       setMealPlan(newMealPlan);
