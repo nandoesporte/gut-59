@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,7 +9,6 @@ import { useFoodSelection } from "./hooks/useFoodSelection";
 import { useWallet } from "@/hooks/useWallet";
 import { generateMealPlan } from "./hooks/useMealPlanGeneration";
 
-// Função auxiliar para mapear valores de goal para os valores aceitos pelo banco de dados
 const mapGoalToDbValue = (goal: string | undefined): "maintain" | "lose_weight" | "gain_mass" => {
   if (!goal) return "maintain";
   
@@ -26,7 +24,6 @@ const mapGoalToDbValue = (goal: string | undefined): "maintain" | "lose_weight" 
   }
 };
 
-// Interface para os dados retornados da consulta ao banco
 interface NutritionPreferences {
   id?: string;
   selected_foods?: string[];
@@ -52,7 +49,6 @@ export const useMenuController = () => {
   const { selectedFoods, foodsByMealType, totalCalories, handleFoodSelection, calculateTotalCalories, categorizeFoodsByMealType } = useFoodSelection();
   const wallet = useWallet();
 
-  // Create a Promise-wrapped version of addTransaction
   const addTransactionAsync = async (params: Parameters<typeof wallet.addTransaction>[0]) => {
     return new Promise<void>((resolve, reject) => {
       try {
@@ -68,15 +64,12 @@ export const useMenuController = () => {
     calculateTotalCalories(protocolFoods);
   }, [selectedFoods, protocolFoods, calculateTotalCalories]);
 
-  // Carregar preferências de alimentos salvos anteriormente
   useEffect(() => {
     const loadSavedPreferences = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // Modificação para lidar com a possibilidade de que o campo food_by_meal_type ainda não exista
-        // no banco de dados. Verificamos apenas selected_foods inicialmente.
         const { data: nutritionPrefs, error } = await supabase
           .from('nutrition_preferences')
           .select('selected_foods')
@@ -89,14 +82,12 @@ export const useMenuController = () => {
         }
 
         if (nutritionPrefs?.selected_foods && Array.isArray(nutritionPrefs.selected_foods)) {
-          // Restaurar alimentos selecionados da última vez
           nutritionPrefs.selected_foods.forEach(foodId => {
             if (typeof foodId === 'string' && !selectedFoods.includes(foodId)) {
               handleFoodSelection(foodId);
             }
           });
           
-          // Categorizar os alimentos existentes
           if (nutritionPrefs.selected_foods.length > 0) {
             categorizeFoodsByMealType(protocolFoods);
           }
@@ -123,13 +114,16 @@ export const useMenuController = () => {
       if (calories) {
         toast.success("Calorias calculadas com sucesso!");
         
-        // Também salvar os dados básicos do usuário
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           console.log("Salvando preferências para o usuário:", user.id);
           console.log("Dados do formulário:", formData);
           
-          // Verificar se já existe um registro
+          const activityLevel = formData.activityLevel as "sedentary" | "light" | "moderate" | "intense";
+          const goal = mapGoalToDbValue(formData.goal);
+          
+          console.log("Mapeamento de objetivo:", formData.goal, "->", goal);
+          
           const { data: existingRecord, error: selectError } = await supabase
             .from('nutrition_preferences')
             .select('id')
@@ -140,15 +134,8 @@ export const useMenuController = () => {
             console.error('Erro ao verificar preferências existentes:', selectError);
           }
           
-          // Mapear os valores para os tipos esperados
-          const activityLevel = formData.activityLevel as "sedentary" | "light" | "moderate" | "intense";
-          const goal = mapGoalToDbValue(formData.goal);
-          
-          console.log("Mapeamento de objetivo:", formData.goal, "->", goal);
-          
           if (existingRecord) {
             console.log("Atualizando registro existente:", existingRecord.id);
-            // Atualizar registro existente
             const { error } = await supabase
               .from('nutrition_preferences')
               .update({
@@ -170,7 +157,6 @@ export const useMenuController = () => {
             }
           } else {
             console.log("Criando novo registro de preferências");
-            // Inserir novo registro
             const { error } = await supabase
               .from('nutrition_preferences')
               .insert({
@@ -213,7 +199,6 @@ export const useMenuController = () => {
       return false;
     }
     
-    // Mostramos um feedback imediato ao usuário
     toast.success("Processando sua seleção de alimentos...");
     
     try {
@@ -228,8 +213,6 @@ export const useMenuController = () => {
       console.log("Alimentos selecionados:", selectedFoods);
       console.log("Alimentos por tipo de refeição:", foodsByMealType);
 
-      // CORREÇÃO: Usar order e limit para garantir que obtemos apenas o registro mais recente
-      // Esta abordagem evita o erro de múltiplas linhas quando há registros duplicados
       const { data: recentPrefs, error: recentError } = await supabase
         .from('nutrition_preferences')
         .select('id')
@@ -240,7 +223,6 @@ export const useMenuController = () => {
 
       if (recentError) {
         console.error('Erro ao buscar preferência mais recente:', recentError);
-        // Vamos tentar criar um novo registro mesmo assim
         console.log("Tentando criar um novo registro após erro na busca");
       }
 
@@ -248,8 +230,6 @@ export const useMenuController = () => {
       
       if (recentPrefs?.id) {
         console.log("Encontrado registro existente. Atualizando ID:", recentPrefs.id);
-        // Atualizar o registro existente
-        // Nota: Removido o campo food_by_meal_type até que seja adicionado ao banco de dados
         const { error: updateError } = await supabase
           .from('nutrition_preferences')
           .update({ 
@@ -267,9 +247,6 @@ export const useMenuController = () => {
         }
       } else {
         console.log("Nenhum registro encontrado ou erro na busca. Criando novo...");
-        // Se não existir ou houve erro na busca, criar um novo com valores mínimos necessários
-        
-        // Primeiro, verificamos se já existe algum registro para este usuário para evitar duplicação
         const { data: anyExisting } = await supabase
           .from('nutrition_preferences')
           .select('count')
@@ -279,7 +256,6 @@ export const useMenuController = () => {
         
         if (hasExisting) {
           console.log("Já existem registros para este usuário. Tentando excluir registros antigos...");
-          // Tenta excluir registros antigos para evitar duplicação
           await supabase
             .from('nutrition_preferences')
             .delete()
@@ -288,13 +264,12 @@ export const useMenuController = () => {
           console.log("Registros antigos excluídos. Criando novo registro limpo.");
         }
         
-        // Inserir novo registro
         const { error: insertError } = await supabase
           .from('nutrition_preferences')
           .insert({
             user_id: user.id,
             selected_foods: selectedFoods,
-            weight: Number(formData.weight) || 70, // Usar valor do formulário se disponível
+            weight: Number(formData.weight) || 70,
             height: Number(formData.height) || 170,
             age: Number(formData.age) || 30,
             gender: formData.gender || 'male',
@@ -316,11 +291,9 @@ export const useMenuController = () => {
         console.log("Preferências de alimentos salvas com sucesso!");
         console.log("Avançando para a etapa 3 (restrições dietéticas)");
         
-        // Avançar para a próxima etapa diretamente
         console.log("Configurando próxima etapa para 3");
         setCurrentStep(3);
         
-        // Notificar o usuário
         toast.success("Preferências de alimentos salvas! Agora informe suas restrições dietéticas.");
         return true;
       }
@@ -335,7 +308,6 @@ export const useMenuController = () => {
   };
 
   const handleDietaryPreferences = async (preferences: DietaryPreferences) => {    
-    // Validações iniciais
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) {
       toast.error("Usuário não autenticado");
@@ -366,7 +338,6 @@ export const useMenuController = () => {
       const selectedFoodsData = protocolFoods.filter(food => selectedFoods.includes(food.id));
       console.log('Dados dos alimentos selecionados:', selectedFoodsData);
 
-      // Salvar preferências dietéticas na tabela
       const { error: prefsError } = await supabase
         .from('dietary_preferences')
         .upsert({
@@ -393,7 +364,7 @@ export const useMenuController = () => {
           dailyCalories: calorieNeeds
         },
         selectedFoods: selectedFoodsData,
-        foodsByMealType, // Passando alimentos categorizados por refeição
+        foodsByMealType,
         preferences,
         addTransaction: addTransactionAsync
       });
@@ -404,13 +375,10 @@ export const useMenuController = () => {
 
       console.log('Plano gerado:', generatedMealPlan);
       
-      // Definimos o plano gerado no estado
       setMealPlan(generatedMealPlan);
       
-      // Definimos as preferências dietéticas no estado
       setDietaryPreferences(preferences);
       
-      // Atualizamos o estado para a etapa 4 (exibição do plano)
       console.log("Avançando para a etapa 4 (exibição do plano alimentar)");
       setCurrentStep(4);
       
@@ -424,7 +392,74 @@ export const useMenuController = () => {
     }
   };
 
-  // Para debugging: monitorar alterações no mealPlan
+  const regenerateMealPlan = async () => {
+    try {
+      setLoading(true);
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast.error("Você precisa estar logado para gerar um plano alimentar");
+        return;
+      }
+      
+      const { data: preferences } = await supabase
+        .from('dietary_preferences')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+        
+      if (!preferences) {
+        toast.error("Não foi possível encontrar suas preferências dietéticas");
+        return;
+      }
+      
+      const { data: nutritionPrefs } = await supabase
+        .from('nutrition_preferences')
+        .select('selected_foods')
+        .eq('user_id', user.id)
+        .single();
+        
+      if (!nutritionPrefs || !nutritionPrefs.selected_foods) {
+        toast.error("Não foi possível encontrar suas preferências alimentares");
+        return;
+      }
+      
+      const newMealPlan = await generateMealPlan({
+        userData: {
+          id: user.id,
+          weight: formData.weight,
+          height: formData.height,
+          age: formData.age,
+          gender: formData.gender,
+          activityLevel: formData.activityLevel,
+          goal: formData.goal,
+          dailyCalories: calorieNeeds
+        },
+        selectedFoods: nutritionPrefs.selected_foods,
+        preferences: {
+          hasAllergies: preferences.has_allergies,
+          allergies: preferences.allergies,
+          dietaryRestrictions: preferences.dietary_restrictions,
+          trainingTime: preferences.training_time
+        },
+        addTransaction: async (params) => {
+          // Implementação da transação se necessário
+        }
+      });
+      
+      setMealPlan(newMealPlan);
+      toast.success("Plano alimentar atualizado com sucesso!");
+      
+    } catch (error) {
+      console.error("Erro ao regenerar plano alimentar:", error);
+      toast.error("Não foi possível gerar um novo plano alimentar");
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (mealPlan) {
       console.log("PLANO ALIMENTAR ATUALIZADO:", mealPlan);
@@ -449,5 +484,6 @@ export const useMenuController = () => {
     handleConfirmFoodSelection,
     handleDietaryPreferences,
     setFormData,
+    regenerateMealPlan,
   };
 };

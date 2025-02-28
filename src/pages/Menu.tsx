@@ -11,7 +11,6 @@ import { useMenuController } from "@/components/menu/MenuController";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useRef } from "react";
-import type { DietaryPreferences } from "@/components/menu/types";
 
 const Menu = () => {
   const mealPlanRef = useRef<HTMLDivElement>(null);
@@ -32,6 +31,7 @@ const Menu = () => {
     handleConfirmFoodSelection,
     handleDietaryPreferences,
     setFormData,
+    regenerateMealPlan,
   } = useMenuController();
 
   // Auto-scroll to meal plan when it's generated
@@ -70,9 +70,8 @@ const Menu = () => {
 
   const handleRefreshMealPlan = async () => {
     try {
-      // Se houver função para gerar novo plano, poderia ser chamada aqui
-      // Por enquanto vamos apenas mostrar uma mensagem
-      toast.info("Funcionalidade de atualização em desenvolvimento");
+      toast.info("Gerando novo plano alimentar...");
+      await regenerateMealPlan();
       return Promise.resolve();
     } catch (error) {
       console.error('Erro ao atualizar cardápio:', error);

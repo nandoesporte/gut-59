@@ -192,6 +192,12 @@ export const generateMealPlanPDF = async (plan: MealPlan) => {
     };
 
     let isFirstPage = true;
+    
+    // Verificar se o plano tem a estrutura esperada
+    if (!plan.weeklyPlan || Object.keys(plan.weeklyPlan).length === 0) {
+      throw new Error("Plano alimentar inválido ou incompleto");
+    }
+
     Object.entries(plan.weeklyPlan).forEach(([day, dayPlan]) => {
       renderDayPlan(pdf, dayPlan, dayNameMap[day], isFirstPage);
       isFirstPage = false;
@@ -225,11 +231,27 @@ export const generateMealPlanPDF = async (plan: MealPlan) => {
       renderRecommendations(pdf, plan.recommendations);
     }
 
+    // Adicionar rodapé com data de geração
+    const pageCount = pdf.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      pdf.setPage(i);
+      pdf.setFontSize(8);
+      pdf.setTextColor(100);
+      pdf.text(
+        `Gerado em: ${format(new Date(), "dd/MM/yyyy")} | Página ${i} de ${pageCount}`,
+        pdf.internal.pageSize.width / 2,
+        pdf.internal.pageSize.height - 10,
+        { align: "center" }
+      );
+    }
+
     // Salvar o PDF
-    pdf.save(`plano_alimentar_${format(new Date(), "dd_MM_yyyy")}.pdf`);
-    toast.success("PDF gerado com sucesso!");
+    const fileName = `plano_alimentar_${format(new Date(), "dd_MM_yyyy")}.pdf`;
+    pdf.save(fileName);
+    
+    return true;
   } catch (error) {
     console.error("Erro ao gerar PDF:", error);
-    toast.error("Erro ao gerar PDF do plano alimentar");
+    throw error;
   }
 };

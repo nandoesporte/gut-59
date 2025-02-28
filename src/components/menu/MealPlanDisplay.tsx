@@ -9,6 +9,7 @@ import { Recommendations } from "./components/Recommendations";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { MealPlan } from "./types";
 import { useRef, useState } from "react";
+import { toast } from "sonner";
 
 interface MealPlanDisplayProps {
   mealPlan: MealPlan;
@@ -28,10 +29,35 @@ const dayNameMap: Record<string, string> = {
 export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) => {
   const planRef = useRef<HTMLDivElement>(null);
   const [selectedDay, setSelectedDay] = useState<string>("monday");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const handleDownloadPDF = async () => {
     if (!mealPlan) return;
-    await generateMealPlanPDF(mealPlan);
+    
+    try {
+      setIsDownloading(true);
+      await generateMealPlanPDF(mealPlan);
+      toast.success("PDF gerado com sucesso!");
+    } catch (error) {
+      console.error("Erro ao gerar PDF:", error);
+      toast.error("Erro ao gerar o PDF. Por favor, tente novamente.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const handleRefreshPlan = async () => {
+    try {
+      setIsGenerating(true);
+      await onRefresh();
+      toast.success("Plano alimentar atualizado com sucesso!");
+    } catch (error) {
+      console.error("Erro ao atualizar o plano:", error);
+      toast.error("Não foi possível gerar um novo plano. Tente novamente.");
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   if (!mealPlan || !mealPlan.weeklyPlan) {
@@ -102,13 +128,41 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
           Seu Plano Alimentar Semanal
         </h2>
         <div className="flex gap-2 w-full sm:w-auto">
-          <Button variant="outline" onClick={handleDownloadPDF} className="flex-1 sm:flex-none">
-            <FileDown className="w-4 h-4 mr-2" />
-            Baixar PDF
+          <Button 
+            variant="outline" 
+            onClick={handleDownloadPDF} 
+            className="flex-1 sm:flex-none"
+            disabled={isDownloading}
+          >
+            {isDownloading ? (
+              <>
+                <span className="animate-spin mr-2">⭮</span>
+                Gerando...
+              </>
+            ) : (
+              <>
+                <FileDown className="w-4 h-4 mr-2" />
+                Baixar PDF
+              </>
+            )}
           </Button>
-          <Button variant="outline" onClick={onRefresh} className="flex-1 sm:flex-none">
-            <RefreshCcw className="w-4 h-4 mr-2" />
-            Gerar Novo
+          <Button 
+            variant="outline" 
+            onClick={handleRefreshPlan} 
+            className="flex-1 sm:flex-none"
+            disabled={isGenerating}
+          >
+            {isGenerating ? (
+              <>
+                <span className="animate-spin mr-2">⭮</span>
+                Atualizando...
+              </>
+            ) : (
+              <>
+                <RefreshCcw className="w-4 h-4 mr-2" />
+                Gerar Novo
+              </>
+            )}
           </Button>
         </div>
       </div>
