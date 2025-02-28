@@ -42,6 +42,11 @@ const Menu = () => {
     }
   }, [mealPlan]);
 
+  // Debug para verificar as transições de etapa
+  useEffect(() => {
+    console.log("Etapa atual:", currentStep);
+  }, [currentStep]);
+
   if (loading) {
     return (
       <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-4">
@@ -73,7 +78,7 @@ const Menu = () => {
             {/* Etapa 1: Cálculo de Calorias */}
             <Card className="p-4 sm:p-6">
               <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center">
-                <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">1</span>
+                <span className={`bg-${currentStep >= 1 ? 'green' : 'gray'}-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2`}>1</span>
                 Dados Básicos e Calorias
               </h2>
               <CalorieCalculatorStep
@@ -87,7 +92,7 @@ const Menu = () => {
             {/* Etapa 2: Seleção de Alimentos */}
             <Card className={`p-4 sm:p-6 ${!calorieNeeds ? 'opacity-50 pointer-events-none' : ''}`}>
               <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center">
-                <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">2</span>
+                <span className={`bg-${currentStep >= 2 ? 'green' : 'gray'}-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2`}>2</span>
                 Preferências Alimentares
               </h2>
               <FoodSelector
@@ -103,7 +108,7 @@ const Menu = () => {
             {/* Etapa 3: Preferências Dietéticas */}
             <Card className={`p-4 sm:p-6 ${currentStep < 3 ? 'opacity-50 pointer-events-none' : ''}`}>
               <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center">
-                <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">3</span>
+                <span className={`bg-${currentStep >= 3 ? 'green' : 'gray'}-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2`}>3</span>
                 Restrições e Preferências
               </h2>
               <DietaryPreferencesForm

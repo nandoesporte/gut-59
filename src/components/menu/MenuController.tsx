@@ -161,6 +161,7 @@ export const useMenuController = () => {
   };
 
   const handleConfirmFoodSelection = async () => {
+    console.log("Iniciando confirmação de seleção de alimentos");
     // Salvar seleção de alimentos na tabela
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -215,6 +216,7 @@ export const useMenuController = () => {
       }
 
       toast.success("Preferências de alimentos salvas com sucesso!");
+      console.log("Avançando para a etapa 3");
       setCurrentStep(3);
       return true;
     } catch (error) {
