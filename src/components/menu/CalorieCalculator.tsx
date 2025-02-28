@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Scale, Activity, Footprints, Dumbbell } from "lucide-react";
+import { Scale, Activity, Footprints, Dumbbell, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GoalCards, Goal } from "./GoalCards";
 import { SelectCard } from "@/components/workout/components/SelectCard";
@@ -23,7 +23,7 @@ export const activityLevels = [
   {
     value: "sedentary",
     label: "Sedentário",
-    description: "Pouco ou nenhum exercício",
+    description: "Pouco ou nenhum exercício, trabalho de escritório",
     icon: Scale,
     multiplier: 1.2
   },
@@ -47,6 +47,13 @@ export const activityLevels = [
     description: "Exercício intenso (6-7 dias/semana)",
     icon: Dumbbell,
     multiplier: 1.725
+  },
+  {
+    value: "athlete",
+    label: "Atleta",
+    description: "Exercícios muito intensos, trabalho físico ou atletas",
+    icon: Trophy,
+    multiplier: 1.9
   }
 ];
 
@@ -175,6 +182,26 @@ const CalorieCalculator = ({
             >
               Calcular Necessidades Calóricas
             </Button>
+
+            {calorieNeeds && (
+              <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-md">
+                <h3 className="text-lg font-semibold text-green-800 mb-2">Resultado do Cálculo</h3>
+                <p className="text-gray-700">
+                  Com base nos seus dados e no seu objetivo de 
+                  <span className="font-medium"> {formData.goal === 'maintain' ? 'manutenção de peso' : 
+                                                formData.goal === 'lose' ? 'perda de peso' : 
+                                                'ganho de massa'}</span>, 
+                  sua necessidade calórica diária é de aproximadamente:
+                </p>
+                <p className="text-2xl font-bold text-green-600 mt-2 text-center">
+                  {calorieNeeds} kcal
+                </p>
+                <p className="text-xs text-gray-500 mt-2">
+                  * Este cálculo utiliza a equação de Harris-Benedict para determinar seu metabolismo basal, 
+                  ajustado pelo seu nível de atividade física e objetivo.
+                </p>
+              </div>
+            )}
           </div>
         </form>
       </Card>

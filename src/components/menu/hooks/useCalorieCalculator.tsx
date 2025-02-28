@@ -10,8 +10,8 @@ type NutritionPreference = Database['public']['Tables']['nutrition_preferences']
 const mapGoalToEnum = (goal: string): Database['public']['Enums']['nutritional_goal'] => {
   const goalMap: Record<string, Database['public']['Enums']['nutritional_goal']> = {
     'lose': 'lose_weight',
-    'maintain': 'maintain',
-    'gain': 'gain_mass'
+    'gain': 'gain_mass',
+    'maintain': 'maintain'
   };
   return goalMap[goal] || 'maintain';
 };
@@ -20,24 +20,89 @@ export const useCalorieCalculator = () => {
   const [loading, setLoading] = useState(false);
   const [calorieNeeds, setCalorieNeeds] = useState<number | null>(null);
 
-  const calculateBMR = (data: CalorieCalculatorForm) => {
+  /**
+   * Calcula a Taxa Metabólica Basal (TMB) usando a equação de Harris-Benedict
+   * @param data Dados do formulário
+   * @returns Taxa Metabólica Basal em calorias
+   */
+  const calculateBMR = (data: CalorieCalculatorForm): number => {
     const weight = parseFloat(data.weight);
     const height = parseFloat(data.height);
     const age = parseFloat(data.age);
 
     if (data.gender === "male") {
+      // Fórmula para homens: TMB = 88.36 + (13.4 × peso) + (4.8 × altura) - (5.7 × idade)
       return 88.36 + (13.4 * weight) + (4.8 * height) - (5.7 * age);
     } else {
+      // Fórmula para mulheres: TMB = 447.6 + (9.2 × peso) + (3.1 × altura) - (4.3 × idade)
       return 447.6 + (9.2 * weight) + (3.1 * height) - (4.3 * age);
     }
   };
 
-  const calculateCalories = async (formData: CalorieCalculatorForm, selectedLevel: { multiplier: number }) => {
+  /**
+   * Obtém o fator de atividade baseado no nível de atividade
+   * @param activityLevel Nível de atividade física
+   * @returns Fator de multiplicação para o cálculo do GET
+   */
+  const getActivityFactor = (activityLevel: string): number => {
+    switch (activityLevel) {
+      case "sedentary":
+        return 1.2;   // Sedentário: pouca ou nenhuma atividade física
+      case "light":
+        return 1.375; // Atividade leve: exercícios leves 1-3 dias/semana
+      case "moderate":
+        return 1.55;  // Atividade moderada: exercícios moderados 3-5 dias/semana
+      case "intense":
+        return 1.725; // Atividade intensa: exercícios intensos 6-7 dias/semana
+      case "athlete":
+        return 1.9;   // Atleta: exercícios muito intensos, trabalho físico
+      default:
+        return 1.2;   // Padrão: sedentário
+    }
+  };
+
+  /**
+   * Ajusta as calorias com base no objetivo do usuário
+   * @param calories Gasto Energético Total (GET)
+   * @param goal Objetivo (perda, manutenção ou ganho)
+   * @returns Calorias ajustadas conforme o objetivo
+   */
+  const adjustCaloriesForGoal = (calories: number, goal: string | undefined): number => {
+    if (!goal) return calories;
+
+    switch (goal) {
+      case "lose":
+        // Perda de peso: redução de 15% 
+        return Math.round(calories * 0.85);
+      case "gain":
+        // Ganho de massa: aumento de 15%
+        return Math.round(calories * 1.15);
+      case "maintain":
+      default:
+        // Manutenção: sem ajuste
+        return Math.round(calories);
+    }
+  };
+
+  const calculateCalories = async (formData: CalorieCalculatorForm, selectedLevel: { value: string }) => {
     try {
       setLoading(true);
+      
+      // Calcular a Taxa Metabólica Basal (TMB)
       const bmr = calculateBMR(formData);
-      const activityMultiplier = selectedLevel ? selectedLevel.multiplier : 1.2;
-      const dailyCalories = Math.round(bmr * activityMultiplier);
+      console.log(`TMB calculada: ${bmr.toFixed(2)} calorias`);
+      
+      // Obter o fator de atividade
+      const activityFactor = getActivityFactor(selectedLevel.value);
+      console.log(`Fator de atividade (${selectedLevel.value}): ${activityFactor}`);
+      
+      // Calcular o Gasto Energético Total (GET)
+      const totalEnergyExpenditure = bmr * activityFactor;
+      console.log(`GET (antes do ajuste): ${totalEnergyExpenditure.toFixed(2)} calorias`);
+      
+      // Ajustar calorias com base no objetivo
+      const adjustedCalories = adjustCaloriesForGoal(totalEnergyExpenditure, formData.goal);
+      console.log(`Calorias ajustadas para objetivo (${formData.goal}): ${adjustedCalories} calorias`);
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -69,8 +134,8 @@ export const useCalorieCalculator = () => {
         throw nutritionError;
       }
 
-      setCalorieNeeds(dailyCalories);
-      return dailyCalories;
+      setCalorieNeeds(adjustedCalories);
+      return adjustedCalories;
     } catch (error) {
       console.error('Error calculating calories:', error);
       toast.error("Erro ao calcular necessidades calóricas");
