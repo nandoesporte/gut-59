@@ -1,7 +1,10 @@
 
 import Ajv from "https://esm.sh/ajv@8.12.0";
 
-const ajv = new Ajv();
+const ajv = new Ajv({ 
+  strictTypes: false,
+  allowUnionTypes: true 
+});
 
 export const mealPlanSchema = {
   type: "object",
@@ -113,15 +116,14 @@ const requestSchema = {
   properties: {
     userData: {
       type: "object",
-      required: ["id", "weight", "height", "age", "gender", "activityLevel", "goal"],
       properties: {
         id: { type: "string" },
         weight: { type: "number", minimum: 1 },
         height: { type: "number", minimum: 1 },
         age: { type: "number", minimum: 1 },
-        gender: { type: "string", enum: ["male", "female"] },
-        activityLevel: { type: "string", enum: ["sedentary", "light", "moderate", "active", "very_active"] },
-        goal: { type: "string", enum: ["lose_weight", "maintain", "gain_mass"] },
+        gender: { type: "string" },
+        activityLevel: { type: "string" },
+        goal: { type: "string" },
         dailyCalories: { type: "number", minimum: 0 }
       },
       additionalProperties: true
@@ -130,9 +132,14 @@ const requestSchema = {
       type: "array",
       items: {
         type: "object",
-        required: ["id", "name", "calories", "protein", "carbs", "fats"],
+        required: ["id", "name", "calories"],
         properties: {
-          id: { type: ["string", "number"] },
+          id: { 
+            anyOf: [
+              { type: "string" },
+              { type: "number" }
+            ]
+          },
           name: { type: "string" },
           calories: { type: "number", minimum: 0 },
           protein: { type: "number", minimum: 0 },
@@ -157,7 +164,10 @@ const requestSchema = {
           items: { type: "string" }
         },
         trainingTime: { 
-          type: ["string", "null"]
+          anyOf: [
+            { type: "string" },
+            { type: "null" }
+          ]
         }
       },
       additionalProperties: true
@@ -166,7 +176,12 @@ const requestSchema = {
       type: "object",
       additionalProperties: {
         type: "array",
-        items: { type: "string" }
+        items: { 
+          anyOf: [
+            { type: "string" },
+            { type: "number" }
+          ]  
+        }
       }
     },
     options: {
@@ -181,6 +196,29 @@ const requestSchema = {
 export const validatePayload = (data: unknown): boolean => {
   try {
     console.log("Validating payload...");
+    
+    // Optional debug log to understand what data is coming in
+    console.log("Incoming payload:", JSON.stringify(data, null, 2).substring(0, 1000) + "...");
+    
+    // Validate payload shape first
+    if (!data || typeof data !== 'object') {
+      console.error("Invalid payload: payload must be an object");
+      return false;
+    }
+    
+    // Check for minimal required properties manually before using AJV
+    const payload = data as any;
+    if (!payload.userData) {
+      console.error("Invalid payload: missing userData");
+      return false;
+    }
+    
+    if (!payload.selectedFoods || !Array.isArray(payload.selectedFoods) || payload.selectedFoods.length === 0) {
+      console.error("Invalid payload: missing or empty selectedFoods array");
+      return false;
+    }
+    
+    // Now use AJV for full schema validation
     const validate = ajv.compile(requestSchema);
     const isValid = validate(data);
     
@@ -229,7 +267,7 @@ interface UserData {
   gender: string;
   activityLevel: string;
   goal: string;
-  userId: string;
+  userId?: string;
   dailyCalories?: number;
 }
 
@@ -283,14 +321,9 @@ export const validateInput = (
   }
 
   // Validar objetivo
-  const validGoals = ['lose_weight', 'gain_weight', 'maintain'];
+  const validGoals = ['lose_weight', 'gain_mass', 'maintain'];
   if (!userData.goal || !validGoals.includes(userData.goal.toLowerCase())) {
     throw new Error('Objetivo inválido');
-  }
-
-  // Validar ID do usuário
-  if (!userData.userId || typeof userData.userId !== 'string') {
-    throw new Error('ID do usuário inválido ou ausente');
   }
 
   // Validar alimentos selecionados
