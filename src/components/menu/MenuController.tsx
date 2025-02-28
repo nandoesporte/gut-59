@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -338,6 +337,13 @@ export const useMenuController = () => {
     try {
       const selectedFoodsData = protocolFoods.filter(food => selectedFoods.includes(food.id));
       console.log('Dados dos alimentos selecionados:', selectedFoodsData);
+      
+      const sanitizedFoodsByMealType: Record<string, string[]> = {};
+      Object.keys(foodsByMealType).forEach(mealType => {
+        sanitizedFoodsByMealType[mealType] = foodsByMealType[mealType].map(id => String(id));
+      });
+      
+      console.log('foodsByMealType sanitized:', sanitizedFoodsByMealType);
 
       const { error: prefsError } = await supabase
         .from('dietary_preferences')
@@ -365,7 +371,7 @@ export const useMenuController = () => {
           dailyCalories: calorieNeeds
         },
         selectedFoods: selectedFoodsData,
-        foodsByMealType,
+        foodsByMealType: sanitizedFoodsByMealType,
         preferences,
         addTransaction: addTransactionAsync
       });
@@ -426,15 +432,21 @@ export const useMenuController = () => {
         return;
       }
       
-      // Converta os valores de string para número
       const weightNum = Number(formData.weight);
       const heightNum = Number(formData.height);
       const ageNum = Number(formData.age);
       
-      // Obtenha os alimentos selecionados com dados completos
       const selectedFoodsData = protocolFoods.filter(food => 
         nutritionPrefs.selected_foods.includes(food.id)
       );
+      
+      const foodMealTypes: Record<string, string[]> = {};
+      
+      Object.keys(foodsByMealType).forEach(mealType => {
+        foodMealTypes[mealType] = foodsByMealType[mealType].map(id => String(id));
+      });
+      
+      console.log('Regenerating meal plan with sanitized foodsByMealType:', foodMealTypes);
       
       const newMealPlan = await generateMealPlan({
         userData: {
@@ -448,6 +460,7 @@ export const useMenuController = () => {
           dailyCalories: calorieNeeds
         },
         selectedFoods: selectedFoodsData,
+        foodsByMealType: foodMealTypes,
         preferences: {
           hasAllergies: preferences.has_allergies,
           allergies: preferences.allergies,

@@ -72,7 +72,8 @@ export const useFoodSelection = () => {
       const food = foods.find(f => f.id === foodId);
       if (food) {
         const mealType = FOOD_GROUP_TO_MEAL_TYPE[food.food_group_id as keyof typeof FOOD_GROUP_TO_MEAL_TYPE] || 'snack';
-        mealTypeMap[mealType].push(foodId);
+        // Ensure foodId is always a string
+        mealTypeMap[mealType].push(String(foodId));
       }
     });
     
