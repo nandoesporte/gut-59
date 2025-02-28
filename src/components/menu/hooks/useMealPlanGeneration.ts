@@ -124,8 +124,9 @@ export const generateMealPlan = async ({
     const mappedGoal = goalMapping[userData.goal as keyof typeof goalMapping] || "maintain";
     console.log(`[MEAL PLAN] Objetivo mapeado: ${userData.goal} -> ${mappedGoal}`);
     
-    // Reduzir tamanho do payload para evitar shutdown por timeout
-    const simplifiedPayload = {
+    // Melhorar a solicitação enviada à edge function para garantir 
+    // que o agente nutri+ possa gerar um plano mais personalizado
+    const enhancedPayload = {
       userData: {
         weight: Math.round(userData.weight),
         height: Math.round(userData.height),
@@ -136,19 +137,27 @@ export const generateMealPlan = async ({
         userId: userData.id,
         dailyCalories: Math.round(userData.dailyCalories)
       },
-      selectedFoods: selectedFoodsDetails.slice(0, 10), // Limitando para 10 alimentos
+      selectedFoods: selectedFoodsDetails.slice(0, 15), // Aumentando para 15 alimentos para melhor personalização
       dietaryPreferences: {
         hasAllergies: preferences.hasAllergies || false,
         allergies: (preferences.allergies || []).slice(0, 3), // Limitar alergias
         dietaryRestrictions: (preferences.dietaryRestrictions || []).slice(0, 3), // Limitar restrições
         trainingTime: preferences.trainingTime
+      },
+      options: {
+        agentVersion: "nutri+",  // Sinalizar versão específica do agente
+        includeRecipes: true,    // Solicitar receitas detalhadas
+        followNutritionalGuidelines: true, // Seguir diretrizes nutricionais
+        optimizeForMacros: true, // Otimizar para macronutrientes
+        enhanceNutritionalVariety: true, // Melhorar a variedade nutricional
+        useSimplifiedTerms: false // Usar terminologia nutricional completa
       }
     };
     
-    console.log('[MEAL PLAN] Enviando payload simplificado:', JSON.stringify(simplifiedPayload, null, 2));
+    console.log('[MEAL PLAN] Enviando payload aprimorado:', JSON.stringify(enhancedPayload, null, 2));
     
-    // Definir timeout para capturar falhas por timeout (25 segundos)
-    const edgeFunctionTimeout = 25000;
+    // Definir timeout para capturar falhas por timeout (30 segundos - aumentado para dar mais tempo ao processamento)
+    const edgeFunctionTimeout = 30000;
     
     // Implementar timeout manual com Promise.race
     let resultData: EdgeFunctionResponse | null = null;
@@ -160,7 +169,7 @@ export const generateMealPlan = async ({
       
       // Corrida entre o timeout e a chamada à Edge Function
       const result = await Promise.race([
-        supabase.functions.invoke('generate-meal-plan', { body: simplifiedPayload }),
+        supabase.functions.invoke('generate-meal-plan', { body: enhancedPayload }),
         timeoutPromise
       ]);
       
@@ -182,9 +191,39 @@ export const generateMealPlan = async ({
         }
       }
       
-      // Usar plano padrão quando edge function falha
-      console.log('[MEAL PLAN] Usando plano padrão devido a falha na Edge Function');
-      return createDefaultMealPlan(userData, selectedFoodsDetails);
+      // Tentar uma segunda tentativa com payload simplificado
+      console.log('[MEAL PLAN] Tentando novamente com payload simplificado...');
+      
+      // Tentar uma segunda chamada com payload ainda mais simplificado
+      try {
+        const simplifiedPayload = {
+          userData: enhancedPayload.userData,
+          selectedFoods: selectedFoodsDetails.slice(0, 5), // Reduzir para apenas 5 alimentos
+          dietaryPreferences: enhancedPayload.dietaryPreferences,
+          options: {
+            agentVersion: "nutri+",
+            useSimplifiedTerms: true // Simplificar para melhorar desempenho
+          }
+        };
+        
+        const fallbackResult = await supabase.functions.invoke('generate-meal-plan', { 
+          body: simplifiedPayload 
+        });
+        
+        if (fallbackResult && fallbackResult.data && fallbackResult.data.mealPlan) {
+          console.log('[MEAL PLAN] Segunda tentativa bem-sucedida!');
+          resultData = fallbackResult.data as EdgeFunctionResponse;
+        } else {
+          console.error('[MEAL PLAN] Segunda tentativa falhou:', fallbackResult);
+          throw new Error("Não foi possível gerar o plano alimentar");
+        }
+      } catch (fallbackError) {
+        console.error('[MEAL PLAN] Erro na segunda tentativa:', fallbackError);
+        
+        // Usar plano padrão quando edge function falha
+        console.log('[MEAL PLAN] Usando plano padrão devido a falha na Edge Function');
+        return createDefaultMealPlan(userData, selectedFoodsDetails);
+      }
     }
 
     // Verificar se o plano tem a estrutura completa esperada
@@ -223,6 +262,37 @@ export const generateMealPlan = async ({
         return createDefaultMealPlan(userData, selectedFoodsDetails);
       }
     }
+
+    // Garantir que as recomendações existam e estejam no formato esperado
+    if (!resultData.mealPlan.recommendations) {
+      console.log('[MEAL PLAN] Adicionando recomendações padrão ao plano');
+      resultData.mealPlan.recommendations = getDefaultRecommendations(userData.goal);
+    }
+    
+    // Conferir estrutura completa do plano para garantir exibição na UI
+    Object.keys(resultData.mealPlan.weeklyPlan).forEach(day => {
+      const dayPlan = resultData.mealPlan.weeklyPlan[day];
+      
+      // Garantir que cada dia possui todas as refeições
+      if (!dayPlan.meals) {
+        dayPlan.meals = {};
+      }
+      
+      // Verificar cada refeição
+      const requiredMeals = ['breakfast', 'morningSnack', 'lunch', 'afternoonSnack', 'dinner'];
+      requiredMeals.forEach(mealType => {
+        if (!dayPlan.meals[mealType]) {
+          console.log(`[MEAL PLAN] Adicionando refeição padrão: ${mealType} para ${day}`);
+          dayPlan.meals[mealType] = createDefaultMeal(mealType, userData.dailyCalories);
+        }
+      });
+      
+      // Garantir totais diários
+      if (!dayPlan.dailyTotals) {
+        console.log(`[MEAL PLAN] Adicionando totais diários para ${day}`);
+        dayPlan.dailyTotals = calculateDailyTotals(dayPlan.meals);
+      }
+    });
 
     // Adicionar a transação de recompensa
     try {
@@ -268,6 +338,173 @@ export const generateMealPlan = async ({
     // Retornar um plano padrão em caso de falha
     return createDefaultMealPlan(userData, selectedFoods);
   }
+};
+
+// Função para criar uma refeição padrão
+const createDefaultMeal = (mealType: string, dailyCalories: number) => {
+  const totalCals = dailyCalories || 2000;
+  let calories, protein, carbs, fats, fiber;
+  let foods = [];
+  let description = '';
+  
+  switch(mealType) {
+    case 'breakfast':
+      calories = Math.round(totalCals * 0.25);
+      protein = Math.round(calories * 0.25 / 4);
+      carbs = Math.round(calories * 0.55 / 4);
+      fats = Math.round(calories * 0.2 / 9);
+      fiber = 5;
+      foods = [
+        { name: "Pão integral", portion: 50, unit: "g", details: "Fonte de carboidratos complexos" },
+        { name: "Ovos", portion: 100, unit: "g", details: "Fonte de proteína de alta qualidade" },
+        { name: "Banana", portion: 100, unit: "g", details: "Fonte de potássio e fibras" }
+      ];
+      description = `Café da manhã balanceado com aproximadamente ${calories} calorias.`;
+      break;
+      
+    case 'morningSnack':
+      calories = Math.round(totalCals * 0.1);
+      protein = Math.round(calories * 0.2 / 4);
+      carbs = Math.round(calories * 0.6 / 4);
+      fats = Math.round(calories * 0.2 / 9);
+      fiber = 3;
+      foods = [
+        { name: "Iogurte natural", portion: 150, unit: "g", details: "Fonte de probióticos e proteínas" },
+        { name: "Frutas vermelhas", portion: 50, unit: "g", details: "Ricas em antioxidantes" }
+      ];
+      description = `Lanche leve e nutritivo com aproximadamente ${calories} calorias.`;
+      break;
+      
+    case 'lunch':
+      calories = Math.round(totalCals * 0.35);
+      protein = Math.round(calories * 0.3 / 4);
+      carbs = Math.round(calories * 0.45 / 4);
+      fats = Math.round(calories * 0.25 / 9);
+      fiber = 8;
+      foods = [
+        { name: "Arroz integral", portion: 100, unit: "g", details: "Fonte de carboidratos complexos" },
+        { name: "Feijão", portion: 80, unit: "g", details: "Fonte de proteínas vegetais e fibras" },
+        { name: "Peito de frango grelhado", portion: 120, unit: "g", details: "Proteína magra de alta qualidade" },
+        { name: "Salada verde", portion: 100, unit: "g", details: "Rica em vitaminas e minerais" }
+      ];
+      description = `Almoço completo e balanceado com aproximadamente ${calories} calorias.`;
+      break;
+      
+    case 'afternoonSnack':
+      calories = Math.round(totalCals * 0.1);
+      protein = Math.round(calories * 0.15 / 4);
+      carbs = Math.round(calories * 0.5 / 4);
+      fats = Math.round(calories * 0.35 / 9);
+      fiber = 3;
+      foods = [
+        { name: "Castanhas", portion: 30, unit: "g", details: "Fonte de gorduras saudáveis e antioxidantes" },
+        { name: "Maçã", portion: 100, unit: "g", details: "Rica em fibras e baixo índice glicêmico" }
+      ];
+      description = `Lanche da tarde nutritivo com aproximadamente ${calories} calorias.`;
+      break;
+      
+    case 'dinner':
+      calories = Math.round(totalCals * 0.2);
+      protein = Math.round(calories * 0.35 / 4);
+      carbs = Math.round(calories * 0.35 / 4);
+      fats = Math.round(calories * 0.3 / 9);
+      fiber = 6;
+      foods = [
+        { name: "Batata doce", portion: 100, unit: "g", details: "Carboidrato complexo de baixo índice glicêmico" },
+        { name: "Filé de peixe", portion: 120, unit: "g", details: "Rico em ômega-3 e proteína de alta qualidade" },
+        { name: "Legumes no vapor", portion: 100, unit: "g", details: "Ricos em fibras, vitaminas e minerais" }
+      ];
+      description = `Jantar leve e nutritivo com aproximadamente ${calories} calorias.`;
+      break;
+      
+    default:
+      calories = Math.round(totalCals * 0.15);
+      protein = Math.round(calories * 0.2 / 4);
+      carbs = Math.round(calories * 0.5 / 4);
+      fats = Math.round(calories * 0.3 / 9);
+      fiber = 4;
+      foods = [
+        { name: "Frutas", portion: 150, unit: "g", details: "Vitaminas e minerais essenciais" },
+        { name: "Grãos integrais", portion: 50, unit: "g", details: "Fonte de energia de liberação lenta" }
+      ];
+      description = `Refeição balanceada com aproximadamente ${calories} calorias.`;
+  }
+  
+  return {
+    foods,
+    calories,
+    macros: { protein, carbs, fats, fiber },
+    description
+  };
+};
+
+// Função para calcular totais diários
+const calculateDailyTotals = (meals: any) => {
+  let calories = 0;
+  let protein = 0;
+  let carbs = 0;
+  let fats = 0;
+  let fiber = 0;
+  
+  Object.values(meals).forEach((meal: any) => {
+    if (meal && meal.calories) {
+      calories += meal.calories;
+      protein += meal.macros?.protein || 0;
+      carbs += meal.macros?.carbs || 0;
+      fats += meal.macros?.fats || 0;
+      fiber += meal.macros?.fiber || 0;
+    }
+  });
+  
+  return {
+    calories,
+    protein,
+    carbs,
+    fats,
+    fiber
+  };
+};
+
+// Função para obter recomendações padrão baseadas no objetivo
+const getDefaultRecommendations = (goal: string) => {
+  const generalRecs = [
+    "Mantenha-se hidratado bebendo pelo menos 2 litros de água por dia.",
+    "Tente consumir alimentos integrais em vez de processados sempre que possível.",
+    "Inclua uma variedade de frutas e vegetais coloridos em sua dieta.",
+    "Consuma proteínas de qualidade em todas as refeições principais.",
+    "Prefira gorduras saudáveis como azeite de oliva, abacate e castanhas."
+  ];
+  
+  const preworkoutRecs = "Consuma uma refeição rica em carboidratos e moderada em proteínas 1-2 horas antes do treino. Opções como batata doce com frango, pão integral com ovos ou banana com pasta de amendoim são boas escolhas.";
+  
+  const postworkoutRecs = "Após o treino, consuma uma combinação de proteínas e carboidratos para auxiliar na recuperação muscular. Whey protein com banana, iogurte com frutas ou peito de frango com arroz são excelentes opções.";
+  
+  const timingRecs = [
+    "Tome café da manhã dentro de 1 hora após acordar.",
+    "Mantenha um intervalo de 3-4 horas entre as refeições principais.",
+    "Evite refeições pesadas nas 2-3 horas antes de dormir."
+  ];
+  
+  // Adicionar recomendações específicas baseadas no objetivo
+  if (goal === "lose" || goal === "lose_weight") {
+    generalRecs.push("Crie um déficit calórico moderado, priorizando a redução de alimentos processados e açúcares.");
+    generalRecs.push("Aumente a ingestão de alimentos ricos em fibras para promover saciedade.");
+    timingRecs.push("Considere uma janela de alimentação restrita de 10-12 horas para potencializar a perda de peso.");
+  } else if (goal === "gain" || goal === "gain_weight") {
+    generalRecs.push("Aumente gradualmente a ingestão calórica, priorizando proteínas de alta qualidade.");
+    generalRecs.push("Distribua bem as refeições ao longo do dia, evitando ficar longos períodos sem se alimentar.");
+    timingRecs.push("Considere uma refeição adicional antes de dormir rica em proteínas de absorção lenta como caseína.");
+  } else {
+    generalRecs.push("Mantenha o equilíbrio energético, ajustando a ingestão calórica conforme seu nível de atividade diária.");
+    generalRecs.push("Priorize a variedade alimentar para garantir a ingestão adequada de todos os nutrientes.");
+  }
+  
+  return {
+    general: generalRecs.join(" "),
+    preworkout: preworkoutRecs,
+    postworkout: postworkoutRecs,
+    timing: timingRecs
+  };
 };
 
 // Função para criar um plano de refeição padrão de fallback
@@ -453,15 +690,8 @@ const createDefaultMealPlan = (userData: MealPlanGenerationProps['userData'], se
     averageFiber: 25
   };
 
-  // Criar recomendações generalizadas
-  const recommendations = [
-    "Mantenha-se hidratado bebendo pelo menos 2 litros de água por dia.",
-    "Tente consumir alimentos integrais em vez de processados sempre que possível.",
-    "Inclua uma variedade de frutas e vegetais coloridos em sua dieta diária para obter diferentes vitaminas e antioxidantes.",
-    "Consuma proteínas magras para auxiliar na recuperação muscular e manutenção da massa magra.",
-    "Prefira gorduras saudáveis como azeite de oliva, abacate e castanhas.",
-    "Este é um plano básico. Recomendamos refazer a geração do plano caso encontre dificuldades."
-  ];
+  // Obter recomendações baseadas no objetivo do usuário
+  const recommendations = getDefaultRecommendations(userData.goal);
 
   // Montar o plano alimentar completo
   return {
