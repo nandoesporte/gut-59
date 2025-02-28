@@ -45,6 +45,40 @@ export const useMenuController = () => {
     calculateTotalCalories(protocolFoods);
   }, [selectedFoods, protocolFoods]);
 
+  // Carregar preferências de alimentos salvos anteriormente
+  useEffect(() => {
+    const loadSavedPreferences = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: nutritionPrefs, error } = await supabase
+          .from('nutrition_preferences')
+          .select('selected_foods')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (error) {
+          console.error('Erro ao carregar preferências alimentares:', error);
+          return;
+        }
+
+        if (nutritionPrefs?.selected_foods && Array.isArray(nutritionPrefs.selected_foods)) {
+          // Restaurar alimentos selecionados da última vez
+          nutritionPrefs.selected_foods.forEach(foodId => {
+            if (typeof foodId === 'string' && !selectedFoods.includes(foodId)) {
+              handleFoodSelection(foodId);
+            }
+          });
+        }
+      } catch (err) {
+        console.error('Erro ao carregar preferências:', err);
+      }
+    };
+
+    loadSavedPreferences();
+  }, []);
+
   const handleCalculateCalories = async () => {
     const selectedLevel = activityLevels.find(level => level.value === formData.activityLevel);
     if (!selectedLevel) {
@@ -56,12 +90,63 @@ export const useMenuController = () => {
       const calories = await calculateCalories(formData, selectedLevel);
       if (calories) {
         toast.success("Calorias calculadas com sucesso!");
+        
+        // Também salvar os dados básicos do usuário
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { error } = await supabase.from('nutrition_preferences').upsert({
+            user_id: user.id,
+            weight: Number(formData.weight),
+            height: Number(formData.height),
+            age: Number(formData.age),
+            gender: formData.gender,
+            activity_level: formData.activityLevel,
+            goal: formData.goal,
+            calories_needed: calories
+          }, { onConflict: 'user_id' });
+
+          if (error) {
+            console.error('Erro ao salvar preferências nutricionais:', error);
+          }
+        }
+        
         setCurrentStep(2);
       }
       return calories !== null;
     } catch (error) {
       console.error('Erro ao calcular calorias:', error);
       toast.error("Erro ao calcular as calorias necessárias");
+      return false;
+    }
+  };
+
+  const handleConfirmFoodSelection = async () => {
+    // Salvar seleção de alimentos na tabela
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Usuário não autenticado");
+        return false;
+      }
+
+      // Atualizar o registro existente ou criar um novo com a seleção de alimentos
+      const { error } = await supabase.from('nutrition_preferences').upsert({
+        user_id: user.id,
+        selected_foods: selectedFoods
+      }, { onConflict: 'user_id' });
+
+      if (error) {
+        console.error('Erro ao salvar preferências de alimentos:', error);
+        toast.error("Erro ao salvar preferências de alimentos");
+        return false;
+      }
+
+      toast.success("Preferências de alimentos salvas com sucesso!");
+      setCurrentStep(3);
+      return true;
+    } catch (error) {
+      console.error('Erro ao salvar preferências de alimentos:', error);
+      toast.error("Erro ao salvar preferências de alimentos");
       return false;
     }
   };
@@ -98,18 +183,18 @@ export const useMenuController = () => {
       const selectedFoodsData = protocolFoods.filter(food => selectedFoods.includes(food.id));
       console.log('Dados dos alimentos selecionados:', selectedFoodsData);
 
-      // Verificar preferências existentes
-      const { data: existingPreferences, error: preferencesError } = await supabase
-        .from('dietary_preferences')
-        .select('*')
-        .eq('user_id', userData.user.id)
-        .single();
+      // Salvar preferências dietéticas na tabela
+      const { error: prefsError } = await supabase.from('dietary_preferences').upsert({
+        user_id: userData.user.id,
+        has_allergies: preferences.hasAllergies,
+        allergies: preferences.allergies,
+        dietary_restrictions: preferences.dietaryRestrictions,
+        training_time: preferences.trainingTime
+      }, { onConflict: 'user_id' });
 
-      if (preferencesError && preferencesError.code !== 'PGRST116') {
-        console.error('Erro ao verificar preferências existentes:', preferencesError);
+      if (prefsError) {
+        console.error('Erro ao salvar preferências dietéticas:', prefsError);
       }
-
-      console.log('Preferências existentes:', existingPreferences);
       
       const generatedMealPlan = await generateMealPlan({
         userData: {
@@ -158,6 +243,7 @@ export const useMenuController = () => {
     loading,
     handleCalculateCalories,
     handleFoodSelection,
+    handleConfirmFoodSelection,
     handleDietaryPreferences,
     setFormData,
   };

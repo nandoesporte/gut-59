@@ -132,6 +132,7 @@ export const FoodSelector = ({
       return;
     }
 
+    // Salvar os alimentos selecionados e prosseguir
     onConfirm();
   };
 

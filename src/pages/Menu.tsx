@@ -27,6 +27,7 @@ const Menu = () => {
     loading,
     handleCalculateCalories,
     handleFoodSelection,
+    handleConfirmFoodSelection,
     handleDietaryPreferences,
     setFormData,
   } = useMenuController();
@@ -94,20 +95,20 @@ const Menu = () => {
                 selectedFoods={selectedFoods}
                 onFoodSelection={handleFoodSelection}
                 totalCalories={totalCalories}
-                onBack={() => {}}
-                onConfirm={() => {}}
+                onBack={() => setCurrentStep(1)}
+                onConfirm={handleConfirmFoodSelection}
               />
             </Card>
 
             {/* Etapa 3: Preferências Dietéticas */}
-            <Card className={`p-4 sm:p-6 ${selectedFoods.length === 0 ? 'opacity-50 pointer-events-none' : ''}`}>
+            <Card className={`p-4 sm:p-6 ${currentStep < 3 ? 'opacity-50 pointer-events-none' : ''}`}>
               <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center">
                 <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">3</span>
                 Restrições e Preferências
               </h2>
               <DietaryPreferencesForm
                 onSubmit={handleDietaryPreferences}
-                onBack={() => {}}
+                onBack={() => setCurrentStep(2)}
               />
             </Card>
 
