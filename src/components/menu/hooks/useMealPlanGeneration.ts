@@ -118,138 +118,77 @@ export const generateMealPlan = async ({
     const mappedGoal = goalMapping[userData.goal as keyof typeof goalMapping] || "maintain";
     console.log(`[MEAL PLAN] Objetivo mapeado: ${userData.goal} -> ${mappedGoal}`);
     
-    const payload = {
+    // Reduzir tamanho do payload para evitar shutdown por timeout
+    const simplifiedPayload = {
       userData: {
-        weight: userData.weight,
-        height: userData.height,
+        weight: Math.round(userData.weight),
+        height: Math.round(userData.height),
         age: userData.age,
-        gender: userData.gender,
-        activityLevel: userData.activityLevel,
+        gender: userData.gender === "male" ? "male" : "female",
+        activityLevel: userData.activityLevel || "moderate",
         goal: mappedGoal,
         userId: userData.id,
-        dailyCalories: userData.dailyCalories
+        dailyCalories: Math.round(userData.dailyCalories)
       },
-      selectedFoods: selectedFoodsDetails,
-      dietaryPreferences: preferences
+      selectedFoods: selectedFoodsDetails.slice(0, 10), // Limitando para 10 alimentos
+      dietaryPreferences: {
+        hasAllergies: preferences.hasAllergies || false,
+        allergies: (preferences.allergies || []).slice(0, 3), // Limitar alergias
+        dietaryRestrictions: (preferences.dietaryRestrictions || []).slice(0, 3), // Limitar restrições
+        trainingTime: preferences.trainingTime
+      }
     };
     
-    console.log('[MEAL PLAN] Enviando payload:', JSON.stringify(payload, null, 2));
+    console.log('[MEAL PLAN] Enviando payload simplificado:', JSON.stringify(simplifiedPayload, null, 2));
     
-    // Usando um objeto temporário para armazenar o resultado final
+    // Definir timeout para capturar falhas por timeout (25 segundos)
+    const edgeFunctionTimeout = 25000;
+    
+    // Implementar timeout manual com Promise.race
     let resultData = null;
-    
-    // Primeira tentativa - usar .then para evitar problemas com constantes
     try {
-      console.log('[MEAL PLAN] Iniciando primeira tentativa');
-      const firstResult = await supabase.functions.invoke('generate-meal-plan', { 
-        body: payload 
+      // Criar uma promessa que rejeita após o timeout
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Timeout na chamada à Edge Function")), edgeFunctionTimeout);
       });
       
-      if (firstResult.error) {
-        console.error('[MEAL PLAN] Erro na Edge Function:', firstResult.error);
-        console.error('[MEAL PLAN] Código do erro:', firstResult.error?.code);
-        console.error('[MEAL PLAN] Mensagem completa:', firstResult.error?.message);
-        throw new Error(firstResult.error.message || "Falha na chamada à Edge Function");
-      }
+      // Corrida entre o timeout e a chamada à Edge Function
+      const result = await Promise.race([
+        supabase.functions.invoke('generate-meal-plan', { body: simplifiedPayload }),
+        timeoutPromise
+      ]);
       
-      if (firstResult.data && firstResult.data.mealPlan) {
-        console.log('[MEAL PLAN] Primeira tentativa bem-sucedida!');
-        resultData = firstResult.data;
+      // Verificar se temos resultado e se ele contém um plano válido
+      if (result && 'data' in result && result.data && result.data.mealPlan) {
+        console.log('[MEAL PLAN] Chamada à Edge Function bem-sucedida!');
+        resultData = result.data;
       } else {
-        console.error('[MEAL PLAN] Resposta da primeira tentativa sem dados válidos');
-        console.error('[MEAL PLAN] Resposta recebida:', JSON.stringify(firstResult.data));
-        throw new Error("Resposta da primeira tentativa inválida");
+        console.error('[MEAL PLAN] Resposta da Edge Function sem dados válidos:', result);
+        throw new Error("Resposta da Edge Function inválida");
       }
-    } catch (firstAttemptError) {
-      console.error('[MEAL PLAN] Erro capturado na primeira tentativa:', firstAttemptError);
-      toast.dismiss(toastId);
-      toast.error("Falha na geração do plano. Tentando novamente...");
+    } catch (edgeFunctionError) {
+      console.error('[MEAL PLAN] Erro na chamada à Edge Function:', edgeFunctionError);
       
-      // Tentar novamente com ajustes no payload
-      console.log('[MEAL PLAN] Tentando novamente com ajustes...');
-      
-      // Simplificar o payload para reduzir chances de erro
-      const simplifiedPayload = {
-        userData: {
-          weight: Math.round(userData.weight),
-          height: Math.round(userData.height),
-          age: userData.age,
-          gender: userData.gender === "male" ? "male" : "female",
-          activityLevel: userData.activityLevel || "moderate",
-          goal: mappedGoal,
-          userId: userData.id,
-          dailyCalories: Math.round(userData.dailyCalories)
-        },
-        selectedFoods: selectedFoodsDetails.slice(0, 20), // Reduzindo número de alimentos
-        dietaryPreferences: {
-          hasAllergies: preferences.hasAllergies || false,
-          allergies: (preferences.allergies || []).slice(0, 3), // Limitar alergias
-          dietaryRestrictions: (preferences.dietaryRestrictions || []).slice(0, 3), // Limitar restrições
-          trainingTime: preferences.trainingTime
+      if (edgeFunctionError instanceof Error) {
+        console.error('[MEAL PLAN] Detalhes do erro:', edgeFunctionError.message);
+        if (edgeFunctionError.stack) {
+          console.error('[MEAL PLAN] Stack:', edgeFunctionError.stack);
         }
-      };
-      
-      console.log('[MEAL PLAN] Tentando com payload simplificado:', JSON.stringify(simplifiedPayload, null, 2));
-      
-      toastId = toast.loading("Otimizando seu plano alimentar...");
-      
-      // Segunda tentativa com payload simplificado
-      try {
-        console.log('[MEAL PLAN] Iniciando segunda tentativa');
-        const secondResult = await supabase.functions.invoke('generate-meal-plan', { 
-          body: simplifiedPayload 
-        });
-        
-        if (secondResult.error) {
-          console.error('[MEAL PLAN] Erro na segunda tentativa:', secondResult.error);
-          toast.dismiss(toastId);
-          console.log('[MEAL PLAN] Tentando com plano default...');
-          
-          // Terceira tentativa - usar plano padrão pré-definido
-          return createDefaultMealPlan(userData.dailyCalories);
-        }
-        
-        if (!secondResult.data || !secondResult.data.mealPlan) {
-          console.error('[MEAL PLAN] Resposta inválida na segunda tentativa:', secondResult.data);
-          toast.dismiss(toastId);
-          console.log('[MEAL PLAN] Tentando com plano default...');
-          
-          // Usar plano padrão pré-definido
-          return createDefaultMealPlan(userData.dailyCalories);
-        }
-        
-        console.log('[MEAL PLAN] Segunda tentativa bem-sucedida!');
-        resultData = secondResult.data;
-      } catch (secondAttemptError) {
-        console.error('[MEAL PLAN] Erro na segunda tentativa:', secondAttemptError);
-        toast.dismiss(toastId);
-        console.log('[MEAL PLAN] Tentando com plano default...');
-        
-        // Usar plano padrão pré-definido
-        return createDefaultMealPlan(userData.dailyCalories);
       }
+      
+      // Usar plano padrão quando edge function falha
+      console.log('[MEAL PLAN] Usando plano padrão devido a falha na Edge Function');
+      return createDefaultMealPlan(userData, selectedFoodsDetails);
     }
 
-    // Validar que temos dados resultantes
-    if (!resultData || !resultData.mealPlan) {
-      console.error('[MEAL PLAN] Resposta final inválida:', JSON.stringify(resultData, null, 2));
+    // Verificar se o plano tem a estrutura completa esperada
+    if (!resultData || !resultData.mealPlan || !resultData.mealPlan.weeklyPlan) {
+      console.error('[MEAL PLAN] Estrutura do plano incompleta:', JSON.stringify(resultData, null, 2));
       toast.dismiss(toastId);
-      console.log('[MEAL PLAN] Usando plano default como fallback');
       
-      // Usar plano padrão pré-definido
-      return createDefaultMealPlan(userData.dailyCalories);
-    }
-
-    console.log('[MEAL PLAN] Resposta recebida com sucesso');
-    console.log('[MEAL PLAN] Estrutura do plano:', Object.keys(resultData.mealPlan).join(', '));
-
-    // Verificar se o plano tem a estrutura esperada
-    if (!resultData.mealPlan.weeklyPlan || !resultData.mealPlan.recommendations) {
-      console.error('[MEAL PLAN] Estrutura do plano incompleta:', JSON.stringify(resultData.mealPlan, null, 2));
-      console.log('[MEAL PLAN] Usando plano default como fallback');
-      
-      // Usar plano padrão pré-definido
-      return createDefaultMealPlan(userData.dailyCalories);
+      // Usar plano padrão como fallback
+      console.log('[MEAL PLAN] Usando plano padrão como fallback para estrutura incompleta');
+      return createDefaultMealPlan(userData, selectedFoodsDetails);
     }
 
     // Verificar se todos os dias da semana estão presentes
@@ -258,6 +197,7 @@ export const generateMealPlan = async ({
     
     if (missingDays.length > 0) {
       console.error(`[MEAL PLAN] Dias ausentes no plano: ${missingDays.join(', ')}`);
+      
       // Tentar completar os dias faltantes copiando de outros dias existentes
       const availableDays = requiredDays.filter(day => resultData.mealPlan.weeklyPlan[day]);
       
@@ -272,8 +212,9 @@ export const generateMealPlan = async ({
         
         console.log('[MEAL PLAN] Dias faltantes foram complementados');
       } else {
-        console.log('[MEAL PLAN] Nenhum dia válido encontrado. Usando plano default');
-        return createDefaultMealPlan(userData.dailyCalories);
+        // Se não houver nenhum dia para copiar, usar plano padrão
+        console.log('[MEAL PLAN] Nenhum dia válido encontrado. Usando plano padrão');
+        return createDefaultMealPlan(userData, selectedFoodsDetails);
       }
     }
 
@@ -319,13 +260,15 @@ export const generateMealPlan = async ({
     toast.error("Não foi possível gerar o plano alimentar personalizado. Usando plano básico.");
     
     // Retornar um plano padrão em caso de falha
-    return createDefaultMealPlan(userData.dailyCalories || 2000);
+    return createDefaultMealPlan(userData, selectedFoods);
   }
 };
 
 // Função para criar um plano de refeição padrão de fallback
-const createDefaultMealPlan = (dailyCalories: number) => {
-  console.log('[MEAL PLAN] Criando plano padrão de fallback com', dailyCalories, 'calorias/dia');
+const createDefaultMealPlan = (userData: MealPlanGenerationProps['userData'], selectedFoods: any[]) => {
+  console.log('[MEAL PLAN] Criando plano padrão de fallback com', userData.dailyCalories, 'calorias/dia');
+  
+  const dailyCalories = userData.dailyCalories || 2000;
   
   // Cálculo básico de macronutrientes
   const protein = Math.round(dailyCalories * 0.3 / 4); // 30% proteína (4 cal/g)
@@ -351,6 +294,60 @@ const createDefaultMealPlan = (dailyCalories: number) => {
     sunday: "Domingo"
   };
   
+  // Lista de alimentos básicos para montar refeições padrão
+  // Preferir os alimentos selecionados pelo usuário quando disponíveis
+  const userFoodNames = selectedFoods.map(food => food.name.toLowerCase());
+  
+  const basicFoods = {
+    carbs: [
+      "Arroz integral", "Pão integral", "Batata doce", "Aveia", "Quinoa", 
+      "Tapioca", "Macarrão integral", "Mandioca"
+    ].filter(food => {
+      // Favorece alimentos que o usuário selecionou
+      const normalizedFood = food.toLowerCase();
+      return userFoodNames.some(userFood => userFood.includes(normalizedFood) || normalizedFood.includes(userFood));
+    })[0] || "Arroz integral",
+    
+    proteins: [
+      "Peito de frango", "Ovos", "Carne magra", "Peixe", "Tofu", 
+      "Whey protein", "Feijão", "Lentilha"
+    ].filter(food => {
+      const normalizedFood = food.toLowerCase();
+      return userFoodNames.some(userFood => userFood.includes(normalizedFood) || normalizedFood.includes(userFood));
+    })[0] || "Peito de frango",
+    
+    fats: [
+      "Azeite de oliva", "Abacate", "Castanhas", "Sementes de chia", "Nozes", 
+      "Amêndoas", "Semente de linhaça", "Óleo de coco"
+    ].filter(food => {
+      const normalizedFood = food.toLowerCase();
+      return userFoodNames.some(userFood => userFood.includes(normalizedFood) || normalizedFood.includes(userFood));
+    })[0] || "Azeite de oliva",
+    
+    fruits: [
+      "Banana", "Maçã", "Laranja", "Uva", "Abacaxi", 
+      "Morango", "Melancia", "Kiwi"
+    ].filter(food => {
+      const normalizedFood = food.toLowerCase();
+      return userFoodNames.some(userFood => userFood.includes(normalizedFood) || normalizedFood.includes(userFood));
+    })[0] || "Banana",
+    
+    vegetables: [
+      "Brócolis", "Couve", "Espinafre", "Alface", "Cenoura", 
+      "Tomate", "Pepino", "Abobrinha"
+    ].filter(food => {
+      const normalizedFood = food.toLowerCase();
+      return userFoodNames.some(userFood => userFood.includes(normalizedFood) || normalizedFood.includes(userFood));
+    })[0] || "Brócolis",
+    
+    dairy: [
+      "Leite desnatado", "Iogurte natural", "Queijo cottage", "Queijo branco", "Ricota"
+    ].filter(food => {
+      const normalizedFood = food.toLowerCase();
+      return userFoodNames.some(userFood => userFood.includes(normalizedFood) || normalizedFood.includes(userFood));
+    })[0] || "Iogurte natural"
+  };
+  
   // Criar cada dia da semana
   Object.entries(dayNames).forEach(([day, dayName]) => {
     weeklyPlan[day] = {
@@ -358,9 +355,9 @@ const createDefaultMealPlan = (dailyCalories: number) => {
       meals: {
         breakfast: {
           foods: [
-            { name: "Pão integral", portion: 50, unit: "g", details: "Fonte de carboidratos" },
+            { name: basicFoods.carbs, portion: 50, unit: "g", details: "Fonte de carboidratos" },
             { name: "Ovos", portion: 100, unit: "g", details: "Fonte de proteína" },
-            { name: "Frutas da estação", portion: 100, unit: "g", details: "Fonte de fibras e vitaminas" }
+            { name: basicFoods.fruits, portion: 100, unit: "g", details: "Fonte de fibras e vitaminas" }
           ],
           calories: breakfastCals,
           macros: {
@@ -373,8 +370,8 @@ const createDefaultMealPlan = (dailyCalories: number) => {
         },
         morningSnack: {
           foods: [
-            { name: "Frutas", portion: 150, unit: "g", details: "Fonte de carboidratos e fibras" },
-            { name: "Iogurte natural", portion: 100, unit: "g", details: "Fonte de proteínas" }
+            { name: basicFoods.fruits, portion: 150, unit: "g", details: "Fonte de carboidratos e fibras" },
+            { name: basicFoods.dairy, portion: 100, unit: "g", details: "Fonte de proteínas" }
           ],
           calories: Math.round(snackCals / 2),
           macros: {
@@ -387,10 +384,10 @@ const createDefaultMealPlan = (dailyCalories: number) => {
         },
         lunch: {
           foods: [
-            { name: "Arroz integral", portion: 100, unit: "g", details: "Fonte de carboidratos" },
+            { name: basicFoods.carbs, portion: 100, unit: "g", details: "Fonte de carboidratos" },
             { name: "Feijão", portion: 80, unit: "g", details: "Fonte de proteínas e fibras" },
-            { name: "Peito de frango grelhado", portion: 120, unit: "g", details: "Fonte de proteínas" },
-            { name: "Legumes variados", portion: 150, unit: "g", details: "Fonte de vitaminas e minerais" }
+            { name: basicFoods.proteins, portion: 120, unit: "g", details: "Fonte de proteínas" },
+            { name: basicFoods.vegetables, portion: 150, unit: "g", details: "Fonte de vitaminas e minerais" }
           ],
           calories: lunchCals,
           macros: {
@@ -403,8 +400,8 @@ const createDefaultMealPlan = (dailyCalories: number) => {
         },
         afternoonSnack: {
           foods: [
-            { name: "Castanhas", portion: 30, unit: "g", details: "Fonte de gorduras boas" },
-            { name: "Banana", portion: 100, unit: "g", details: "Fonte de carboidratos" }
+            { name: basicFoods.fats, portion: 30, unit: "g", details: "Fonte de gorduras boas" },
+            { name: basicFoods.fruits, portion: 100, unit: "g", details: "Fonte de carboidratos" }
           ],
           calories: Math.round(snackCals / 2),
           macros: {
@@ -418,8 +415,8 @@ const createDefaultMealPlan = (dailyCalories: number) => {
         dinner: {
           foods: [
             { name: "Batata doce", portion: 100, unit: "g", details: "Fonte de carboidratos complexos" },
-            { name: "Filé de peixe", portion: 100, unit: "g", details: "Fonte de proteínas e ômega 3" },
-            { name: "Salada verde", portion: 100, unit: "g", details: "Fonte de vitaminas e minerais" }
+            { name: "Peixe", portion: 100, unit: "g", details: "Fonte de proteínas e ômega 3" },
+            { name: basicFoods.vegetables, portion: 100, unit: "g", details: "Fonte de vitaminas e minerais" }
           ],
           calories: dinnerCals,
           macros: {
@@ -456,7 +453,8 @@ const createDefaultMealPlan = (dailyCalories: number) => {
     "Tente consumir alimentos integrais em vez de processados sempre que possível.",
     "Inclua uma variedade de frutas e vegetais coloridos em sua dieta diária para obter diferentes vitaminas e antioxidantes.",
     "Consuma proteínas magras para auxiliar na recuperação muscular e manutenção da massa magra.",
-    "Prefira gorduras saudáveis como azeite de oliva, abacate e castanhas."
+    "Prefira gorduras saudáveis como azeite de oliva, abacate e castanhas.",
+    "Este é um plano básico. Recomendamos refazer a geração do plano caso encontre dificuldades."
   ];
 
   // Montar o plano alimentar completo
