@@ -53,13 +53,16 @@ export const DietaryPreferencesForm = ({ onSubmit, onBack }: DietaryPreferencesF
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Ensure all fields are properly formatted before submission
+    // Ensure all fields are properly formatted and sanitized before submission
     const sanitizedPreferences: DietaryPreferences = {
       hasAllergies: Boolean(preferences.hasAllergies),
       allergies: Array.isArray(preferences.allergies) ? preferences.allergies : [],
       dietaryRestrictions: Array.isArray(preferences.dietaryRestrictions) ? preferences.dietaryRestrictions : [],
       trainingTime: preferences.trainingTime || null,
     };
+    
+    // Log what we're submitting for debugging
+    console.log("Submitting dietary preferences:", JSON.stringify(sanitizedPreferences, null, 2));
     
     onSubmit(sanitizedPreferences);
   };

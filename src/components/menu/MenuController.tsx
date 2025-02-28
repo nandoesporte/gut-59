@@ -329,35 +329,47 @@ export const useMenuController = () => {
       return false;
     }
 
-    console.log('Preferências alimentares recebidas:', preferences);
+    console.log('Preferências alimentares recebidas:', JSON.stringify(preferences, null, 2));
     console.log('Alimentos selecionados:', selectedFoods);
 
     setLoading(true);
 
     try {
-      const selectedFoodsData = protocolFoods.filter(food => selectedFoods.includes(food.id));
-      console.log('Dados dos alimentos selecionados:', selectedFoodsData);
+      const selectedFoodsData = protocolFoods.filter(food => selectedFoods.includes(String(food.id)));
+      console.log('Dados dos alimentos selecionados:', selectedFoodsData.map(f => ({ id: f.id, name: f.name })));
       
       const sanitizedFoodsByMealType: Record<string, string[]> = {};
       Object.keys(foodsByMealType).forEach(mealType => {
         sanitizedFoodsByMealType[mealType] = foodsByMealType[mealType].map(id => String(id));
       });
       
-      console.log('foodsByMealType sanitized:', sanitizedFoodsByMealType);
+      console.log('foodsByMealType sanitized:', JSON.stringify(sanitizedFoodsByMealType, null, 2));
 
       const { error: prefsError } = await supabase
         .from('dietary_preferences')
         .upsert({
           user_id: userData.user.id,
-          has_allergies: preferences.hasAllergies,
-          allergies: preferences.allergies,
-          dietary_restrictions: preferences.dietaryRestrictions,
+          has_allergies: Boolean(preferences.hasAllergies),
+          allergies: Array.isArray(preferences.allergies) ? preferences.allergies : [],
+          dietary_restrictions: Array.isArray(preferences.dietaryRestrictions) ? preferences.dietaryRestrictions : [],
           training_time: preferences.trainingTime
         }, { onConflict: 'user_id' });
           
       if (prefsError) {
         console.error('Erro ao salvar preferências dietéticas:', prefsError);
+        console.error('Erro completo:', JSON.stringify(prefsError, null, 2));
+      } else {
+        console.log('Preferências dietéticas salvas com sucesso');
       }
+      
+      const sanitizedPreferences: DietaryPreferences = {
+        hasAllergies: Boolean(preferences.hasAllergies),
+        allergies: Array.isArray(preferences.allergies) ? preferences.allergies : [],
+        dietaryRestrictions: Array.isArray(preferences.dietaryRestrictions) ? preferences.dietaryRestrictions : [],
+        trainingTime: preferences.trainingTime
+      };
+      
+      console.log('Preferências sanitizadas para o Edge Function:', JSON.stringify(sanitizedPreferences, null, 2));
       
       const generatedMealPlan = await generateMealPlan({
         userData: {
@@ -372,7 +384,7 @@ export const useMenuController = () => {
         },
         selectedFoods: selectedFoodsData,
         foodsByMealType: sanitizedFoodsByMealType,
-        preferences,
+        preferences: sanitizedPreferences,
         addTransaction: addTransactionAsync
       });
 

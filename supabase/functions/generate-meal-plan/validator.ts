@@ -40,7 +40,7 @@ export function validateMealPlanRequest(requestData: any): {
     userDataKeys: requestData.userData ? Object.keys(requestData.userData) : 'missing',
     selectedFoodsLength: requestData.selectedFoods ? requestData.selectedFoods.length : 'missing',
     foodsByMealTypeKeys: requestData.foodsByMealType ? Object.keys(requestData.foodsByMealType) : 'missing',
-    preferencesKeys: requestData.preferences ? Object.keys(requestData.preferences) : 'missing'
+    preferencesKeys: requestData.dietaryPreferences ? Object.keys(requestData.dietaryPreferences) : 'missing'
   }));
 
   // Check for required fields
@@ -56,8 +56,18 @@ export function validateMealPlanRequest(requestData: any): {
     return { isValid: false, error: "Missing or invalid foodsByMealType" };
   }
 
-  if (!requestData.preferences || typeof requestData.preferences !== 'object') {
-    return { isValid: false, error: "Missing or invalid preferences" };
+  // Handle missing or invalid preferences
+  let preferences: DietaryPreferences;
+  if (!requestData.dietaryPreferences || typeof requestData.dietaryPreferences !== 'object') {
+    console.warn("Missing or invalid preferences, using default values");
+    preferences = {
+      hasAllergies: false,
+      allergies: [],
+      dietaryRestrictions: [],
+      trainingTime: null
+    };
+  } else {
+    preferences = requestData.dietaryPreferences as DietaryPreferences;
   }
 
   // Normalize and validate foodsByMealType
@@ -96,7 +106,6 @@ export function validateMealPlanRequest(requestData: any): {
   }
 
   // Validate preferences
-  const preferences = requestData.preferences as DietaryPreferences;
   if (typeof preferences.hasAllergies !== 'boolean') {
     preferences.hasAllergies = false;
   }
