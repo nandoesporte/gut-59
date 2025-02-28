@@ -237,7 +237,7 @@ export const FoodSelector = ({
         />
       </div>
 
-      {/* Botão de confirmação central */}
+      {/* Área de confirmação */}
       <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4 text-center">
         <p className="text-sm text-green-700 mb-3">
           <strong>Você selecionou {selectedFoods.length} alimentos.</strong><br/>
@@ -249,17 +249,6 @@ export const FoodSelector = ({
           size="lg"
         >
           ✓ Confirmar Seleção e Continuar
-        </Button>
-      </div>
-
-      {/* Botão de confirmação alternativo (visível ao rolar até o final) */}
-      <div className="mt-12 flex justify-center">
-        <Button 
-          onClick={handleConfirm}
-          className="bg-green-500 hover:bg-green-600 text-white px-8 py-3 font-semibold text-lg"
-          size="lg"
-        >
-          Confirmar Seleção ({selectedFoods.length} alimentos)
         </Button>
       </div>
 

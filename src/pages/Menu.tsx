@@ -47,13 +47,6 @@ const Menu = () => {
     console.log("Etapa atual:", currentStep);
   }, [currentStep]);
 
-  // Função de debug para testar a transição manual de etapas
-  const forceNextStep = () => {
-    console.log("Forçando próxima etapa. Etapa atual:", currentStep);
-    setCurrentStep(prev => prev + 1);
-    console.log("Nova etapa:", currentStep + 1);
-  };
-
   if (loading) {
     return (
       <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-4">
@@ -184,27 +177,6 @@ const Menu = () => {
                     }}
                   />
                 </Card>
-              </div>
-            )}
-
-            {/* Debug Button - Remover em produção */}
-            {import.meta.env.DEV && (
-              <div className="mt-4 border border-red-300 p-4 bg-red-50 rounded">
-                <h3 className="text-red-600 font-medium mb-2">Debug Controls (apenas em ambiente de desenvolvimento)</h3>
-                <div className="flex gap-2">
-                  <button 
-                    onClick={forceNextStep}
-                    className="px-3 py-1 bg-red-100 border border-red-300 rounded hover:bg-red-200"
-                  >
-                    Forçar próxima etapa (current: {currentStep})
-                  </button>
-                  <button 
-                    onClick={() => handleConfirmFoodSelection()}
-                    className="px-3 py-1 bg-blue-100 border border-blue-300 rounded hover:bg-blue-200"
-                  >
-                    Testar Confirm Food Selection
-                  </button>
-                </div>
               </div>
             )}
 
