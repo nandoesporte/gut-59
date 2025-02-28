@@ -2233,6 +2233,30 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      update_dietary_preferences: {
+        Args: {
+          p_user_id: string
+          p_has_allergies: boolean
+          p_allergies: string[]
+          p_dietary_restrictions: string[]
+          p_training_time: string
+        }
+        Returns: undefined
+      }
+      update_nutrition_preferences: {
+        Args: {
+          p_user_id: string
+          p_data: Json
+        }
+        Returns: undefined
+      }
+      update_nutrition_selected_foods: {
+        Args: {
+          p_user_id: string
+          p_selected_foods: string[]
+        }
+        Returns: undefined
+      }
       update_user_water_goal: {
         Args: {
           p_user_id: string
