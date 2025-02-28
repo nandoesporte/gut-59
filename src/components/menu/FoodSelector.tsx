@@ -7,16 +7,12 @@ import { usePaymentHandling } from "./hooks/usePaymentHandling";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { ProtocolFood } from "@/types/education";
-
-interface ProtocolFoodExtended extends ProtocolFood {
-  food_group_id: number;
-}
+import { ProtocolFood } from "./types"; // Corrigido o caminho de importação
 
 interface FoodSelectorProps {
-  protocolFoods: ProtocolFoodExtended[];
+  protocolFoods: ProtocolFood[];
   selectedFoods: string[];
-  onFoodSelection: (foodId: string, food?: ProtocolFoodExtended) => void;
+  onFoodSelection: (foodId: string, food?: ProtocolFood) => void;
   totalCalories: number;
   onBack: () => void;
   onConfirm: () => Promise<boolean> | void;
@@ -31,9 +27,9 @@ const MealSection = ({
 }: {
   title: string;
   icon: React.ReactNode;
-  foods: ProtocolFoodExtended[];
+  foods: ProtocolFood[];
   selectedFoods: string[];
-  onFoodSelection: (foodId: string, food?: ProtocolFoodExtended) => void;
+  onFoodSelection: (foodId: string, food?: ProtocolFood) => void;
 }) => (
   <Card className="p-6 space-y-4 shadow-lg hover:shadow-xl transition-shadow">
     <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
