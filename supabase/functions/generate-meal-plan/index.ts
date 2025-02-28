@@ -4,6 +4,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { calculateDailyCalories } from "./calculators.ts";
 import { validateInput } from "./validator.ts";
 import { generateRecommendations } from "./recommendations.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,6 +16,11 @@ const groqApiKey = Deno.env.get('GROQ_API_KEY');
 // Configurar chaves da API Nutritionix
 const NUTRITIONIX_APP_ID = Deno.env.get('NUTRITIONIX_APP_ID') || "75c8c0ea";
 const NUTRITIONIX_API_KEY = Deno.env.get('NUTRITIONIX_API_KEY') || "636f7a3146b09d140b5353ef030fb2a4";
+
+// Crie uma instância do cliente Supabase
+const supabaseUrl = Deno.env.get('SUPABASE_URL');
+const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -81,9 +87,37 @@ serve(async (req) => {
     const foodsByMealType = organizeFoodsByMealType(enhancedFoods);
     console.log("Alimentos organizados por tipo de refeição para evitar misturas inadequadas");
 
+    // Buscar o prompt personalizado do agente Nutri+
+    console.log("Buscando prompt personalizado do agente Nutri+");
+    let customPrompt = null;
+    
+    try {
+      const { data: promptData, error } = await supabase
+        .from('ai_agent_prompts')
+        .select('*')
+        .eq('agent_type', 'meal_plan')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      
+      if (error) {
+        console.error("Erro ao buscar prompt personalizado:", error);
+        console.log("Usando prompt padrão devido a erro na consulta");
+      } else if (promptData) {
+        customPrompt = promptData.prompt;
+        console.log("Prompt personalizado encontrado e será utilizado");
+      } else {
+        console.log("Nenhum prompt personalizado encontrado, usando prompt padrão");
+      }
+    } catch (promptError) {
+      console.error("Erro ao buscar prompt personalizado:", promptError);
+      console.log("Usando prompt padrão devido a exceção");
+    }
+
     // Gerar o plano alimentar
     console.log("Iniciando geração do plano alimentar");
-    const generatedMealPlan = await generateMealPlan(userData, foodsByMealType, dietaryPreferences, req.url);
+    const generatedMealPlan = await generateMealPlan(userData, foodsByMealType, dietaryPreferences, req.url, customPrompt);
 
     return new Response(JSON.stringify({ 
       mealPlan: generatedMealPlan 
@@ -206,17 +240,17 @@ async function enhanceFoodsWithNutritionixData(foods) {
   return enhancedFoods;
 }
 
-async function generateMealPlan(userData, foodsByMealType, dietaryPreferences, requestUrl) {
+async function generateMealPlan(userData, foodsByMealType, dietaryPreferences, requestUrl, customPrompt) {
   try {
     console.log("Tentando gerar plano com o modelo Llama via Groq");
-    const result = await generateWithLlama(userData, foodsByMealType, dietaryPreferences, requestUrl);
+    const result = await generateWithLlama(userData, foodsByMealType, dietaryPreferences, requestUrl, customPrompt);
     return result;
   } catch (llamaError) {
     console.error("Erro ao gerar plano com o modelo Llama:", llamaError);
     
     try {
       console.log("Tentando gerar plano com OpenAI como alternativa");
-      const result = await generateWithOpenAI(userData, foodsByMealType, dietaryPreferences);
+      const result = await generateWithOpenAI(userData, foodsByMealType, dietaryPreferences, customPrompt);
       return result;
     } catch (openaiError) {
       console.error("Erro ao gerar plano com OpenAI:", openaiError);
@@ -228,7 +262,7 @@ async function generateMealPlan(userData, foodsByMealType, dietaryPreferences, r
   }
 }
 
-async function generateWithLlama(userData, foodsByMealType, dietaryPreferences, requestUrl) {
+async function generateWithLlama(userData, foodsByMealType, dietaryPreferences, requestUrl, customPrompt) {
   try {
     console.log("Preparando dados para o modelo Llama");
     
@@ -245,8 +279,10 @@ async function generateWithLlama(userData, foodsByMealType, dietaryPreferences, 
       }));
     }
 
-    // Construir o prompt para o modelo
-    const prompt = generateMealPlanPrompt(userData, promptData, dietaryPreferences);
+    // Construir o prompt para o modelo (usar customPrompt se disponível)
+    const prompt = customPrompt 
+      ? prepareCustomPrompt(customPrompt, userData, promptData, dietaryPreferences)
+      : generateMealPlanPrompt(userData, promptData, dietaryPreferences);
     
     console.log("Enviando requisição para llama-completion");
     
@@ -309,7 +345,7 @@ async function generateWithLlama(userData, foodsByMealType, dietaryPreferences, 
   }
 }
 
-async function generateWithOpenAI(userData, foodsByMealType, dietaryPreferences) {
+async function generateWithOpenAI(userData, foodsByMealType, dietaryPreferences, customPrompt) {
   if (!openAIApiKey) {
     throw new Error("API key do OpenAI não configurada");
   }
@@ -330,8 +366,10 @@ async function generateWithOpenAI(userData, foodsByMealType, dietaryPreferences)
     }));
   }
 
-  // Construir o prompt para o modelo
-  const prompt = generateMealPlanPrompt(userData, promptData, dietaryPreferences);
+  // Construir o prompt para o modelo (usar customPrompt se disponível)
+  const prompt = customPrompt 
+    ? prepareCustomPrompt(customPrompt, userData, promptData, dietaryPreferences)
+    : generateMealPlanPrompt(userData, promptData, dietaryPreferences);
   
   try {
     console.log("Enviando requisição para OpenAI");
@@ -400,6 +438,50 @@ async function generateWithOpenAI(userData, foodsByMealType, dietaryPreferences)
     console.error("Erro ao gerar com OpenAI:", error);
     throw error;
   }
+}
+
+// Função para preparar o prompt personalizado do admin
+function prepareCustomPrompt(customPrompt, userData, foodsByMealType, dietaryPreferences) {
+  // Criar variáveis para substituir no prompt
+  const variables = {
+    USER_WEIGHT: userData.weight,
+    USER_HEIGHT: userData.height,
+    USER_AGE: userData.age,
+    USER_GENDER: userData.gender === 'male' ? 'Masculino' : 'Feminino',
+    USER_ACTIVITY_LEVEL: userData.activityLevel,
+    USER_GOAL: userData.goal,
+    USER_DAILY_CALORIES: userData.dailyCalories,
+    USER_ALLERGIES: dietaryPreferences?.hasAllergies 
+      ? dietaryPreferences.allergies?.join(', ') 
+      : 'Nenhuma alergia',
+    USER_RESTRICTIONS: dietaryPreferences?.dietaryRestrictions?.length > 0 
+      ? dietaryPreferences.dietaryRestrictions.join(', ') 
+      : 'Nenhuma restrição',
+    USER_TRAINING_TIME: dietaryPreferences?.trainingTime || 'Sem treino',
+    FOODS_BY_MEAL: formatFoodsByMealForPrompt(foodsByMealType)
+  };
+  
+  // Substituir cada variável no prompt
+  let processedPrompt = customPrompt;
+  for (const [key, value] of Object.entries(variables)) {
+    const placeholder = new RegExp(`\\{${key}\\}`, 'g');
+    processedPrompt = processedPrompt.replace(placeholder, value);
+  }
+  
+  console.log("Prompt personalizado processado com sucesso");
+  return processedPrompt;
+}
+
+// Função para formatar alimentos por refeição para o prompt personalizado
+function formatFoodsByMealForPrompt(foodsByMealType) {
+  return Object.entries(foodsByMealType)
+    .map(([mealType, foods]) => {
+      if (!foods || foods.length === 0) return `### ${mealType}: Nenhum alimento disponível`;
+      
+      return `### ${mealType}:
+${foods.map(food => `- ${food.name}: ${food.calories} kcal, ${food.protein || 0}g proteína, ${food.carbs || 0}g carboidratos, ${food.fats || 0}g gorduras`).join('\n')}`;
+    })
+    .join('\n\n');
 }
 
 function generateBasicMealPlan(userData, foodsByMealType, dietaryPreferences) {
