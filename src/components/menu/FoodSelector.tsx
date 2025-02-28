@@ -24,7 +24,7 @@ interface FoodSelectorProps {
   onFoodSelection: (foodId: string) => void;
   totalCalories: number;
   onBack: () => void;
-  onConfirm: () => void;
+  onConfirm: () => Promise<boolean> | void;
 }
 
 const MealSection = ({
@@ -132,15 +132,20 @@ export const FoodSelector = ({
       return;
     }
 
-    // Salvar os alimentos selecionados e prosseguir
-    const success = await onConfirm();
-    
-    // Adicionar verificação explícita de sucesso
-    if (success) {
-      console.log("Confirmação de seleção de alimentos bem-sucedida, avançando para próxima etapa");
-    } else {
-      console.error("Falha ao confirmar seleção de alimentos");
-      toast.error("Erro ao salvar suas preferências alimentares. Tente novamente.");
+    try {
+      // Salvar os alimentos selecionados e prosseguir
+      const result = await onConfirm();
+      
+      // Se retornar um booleano, verificamos se é verdadeiro
+      if (result === false) {
+        console.error("Falha ao confirmar seleção de alimentos");
+        toast.error("Erro ao salvar suas preferências alimentares. Tente novamente.");
+      } else {
+        console.log("Confirmação de seleção de alimentos enviada");
+      }
+    } catch (error) {
+      console.error("Erro ao processar a confirmação:", error);
+      toast.error("Erro ao processar sua seleção. Tente novamente.");
     }
   };
 
