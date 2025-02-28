@@ -12,6 +12,8 @@ const corsHeaders = {
 
 const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 const groqApiKey = Deno.env.get('GROQ_API_KEY');
+const NUTRITIONIX_APP_ID = Deno.env.get('NUTRITIONIX_APP_ID');
+const NUTRITIONIX_API_KEY = Deno.env.get('NUTRITIONIX_API_KEY');
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -42,9 +44,37 @@ serve(async (req) => {
       console.log(`Calorias diárias fornecidas: ${userData.dailyCalories} kcal`);
     }
 
+    // Enriquecer os dados dos alimentos com informações nutricionais mais precisas
+    if (NUTRITIONIX_APP_ID && NUTRITIONIX_API_KEY) {
+      try {
+        console.log("Enriquecendo dados dos alimentos com a API Nutritionix");
+        const enhancedFoods = await enhanceFoodsWithNutritionixData(selectedFoods);
+        
+        if (enhancedFoods.length > 0) {
+          console.log(`Dados de ${enhancedFoods.length}/${selectedFoods.length} alimentos enriquecidos com Nutritionix`);
+          // Substituir apenas os alimentos que foram enriquecidos
+          const enhancedFoodsMap = new Map(enhancedFoods.map(food => [food.name.toLowerCase(), food]));
+          
+          selectedFoods = selectedFoods.map(food => {
+            const enhanced = enhancedFoodsMap.get(food.name.toLowerCase());
+            return enhanced || food;
+          });
+        }
+      } catch (nutritionixError) {
+        console.error("Erro ao enriquecer dados com Nutritionix:", nutritionixError);
+        // Continuar com os dados originais em caso de erro
+      }
+    } else {
+      console.log("Chaves da API Nutritionix não configuradas. Usando dados originais.");
+    }
+
+    // Separar alimentos por tipo de refeição para evitar misturas inadequadas
+    const foodsByMealType = organizeFoodsByMealType(selectedFoods);
+    console.log("Alimentos organizados por tipo de refeição para evitar misturas inadequadas");
+
     // Gerar o plano alimentar
     console.log("Iniciando geração do plano alimentar");
-    const generatedMealPlan = await generateMealPlan(userData, selectedFoods, dietaryPreferences);
+    const generatedMealPlan = await generateMealPlan(userData, foodsByMealType, dietaryPreferences);
 
     return new Response(JSON.stringify({ 
       mealPlan: generatedMealPlan 
@@ -68,44 +98,138 @@ serve(async (req) => {
   }
 });
 
-async function generateMealPlan(userData, selectedFoods, dietaryPreferences) {
+// Função para organizar alimentos por tipo de refeição
+function organizeFoodsByMealType(foods) {
+  // Definir grupos de alimentos por tipo de refeição
+  const mealTypeGroups = {
+    breakfast: [1, 2, 3, 6], // Vegetais, frutas, grãos, laticínios
+    morningSnack: [2, 6, 7], // Frutas, laticínios, gorduras saudáveis
+    lunch: [1, 3, 4, 5], // Vegetais, grãos, proteínas animais e vegetais
+    afternoonSnack: [2, 6, 7], // Similar ao lanche da manhã
+    dinner: [1, 3, 4, 5] // Similar ao almoço
+  };
+
+  const result = {};
+  
+  // Organizar alimentos por tipo de refeição
+  for (const [mealType, groupIds] of Object.entries(mealTypeGroups)) {
+    result[mealType] = foods.filter(food => 
+      groupIds.includes(food.food_group_id) || 
+      // Incluir alimentos sem grupo definido em todas as refeições
+      !food.food_group_id || food.food_group_id === 10
+    );
+  }
+  
+  // Log dos alimentos organizados
+  for (const [mealType, mealFoods] of Object.entries(result)) {
+    console.log(`${mealType}: ${mealFoods.length} alimentos disponíveis`);
+  }
+  
+  return result;
+}
+
+// Função para enriquecer dados com a API Nutritionix
+async function enhanceFoodsWithNutritionixData(foods) {
+  const enhancedFoods = [];
+  const topFoods = foods.slice(0, 10); // Limitar para não sobrecarregar a API
+  
+  for (const food of topFoods) {
+    try {
+      // Consultar a API Nutritionix
+      const response = await fetch('https://trackapi.nutritionix.com/v2/natural/nutrients', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-app-id': NUTRITIONIX_APP_ID,
+          'x-app-key': NUTRITIONIX_API_KEY
+        },
+        body: JSON.stringify({
+          query: food.name
+        })
+      });
+      
+      if (!response.ok) {
+        console.warn(`Erro ao consultar Nutritionix para ${food.name}: ${response.status}`);
+        continue;
+      }
+      
+      const data = await response.json();
+      
+      if (data.foods && data.foods.length > 0) {
+        const nutritionData = data.foods[0];
+        
+        // Criar versão enriquecida do alimento
+        const enhancedFood = {
+          ...food,
+          calories: Math.round(nutritionData.nf_calories),
+          protein: Math.round(nutritionData.nf_protein),
+          carbs: Math.round(nutritionData.nf_total_carbohydrate),
+          fats: Math.round(nutritionData.nf_total_fat),
+          fiber: nutritionData.nf_dietary_fiber ? Math.round(nutritionData.nf_dietary_fiber) : (food.fiber || 0),
+          // Manter grupo alimentar original se disponível
+          food_group_id: food.food_group_id,
+          nutritionix_data: {
+            serving_unit: nutritionData.serving_unit,
+            serving_qty: nutritionData.serving_qty,
+            serving_weight_grams: nutritionData.serving_weight_grams
+          }
+        };
+        
+        enhancedFoods.push(enhancedFood);
+        console.log(`Dados de ${food.name} enriquecidos com Nutritionix`);
+      }
+    } catch (error) {
+      console.error(`Erro ao processar ${food.name} com Nutritionix:`, error);
+    }
+    
+    // Pequeno delay para não sobrecarregar a API
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+  
+  return enhancedFoods;
+}
+
+async function generateMealPlan(userData, foodsByMealType, dietaryPreferences) {
   try {
     console.log("Tentando gerar plano com o modelo Llama via Groq");
-    const result = await generateWithLlama(userData, selectedFoods, dietaryPreferences);
+    const result = await generateWithLlama(userData, foodsByMealType, dietaryPreferences);
     return result;
   } catch (llamaError) {
     console.error("Erro ao gerar plano com o modelo Llama:", llamaError);
     
     try {
       console.log("Tentando gerar plano com OpenAI como alternativa");
-      const result = await generateWithOpenAI(userData, selectedFoods, dietaryPreferences);
+      const result = await generateWithOpenAI(userData, foodsByMealType, dietaryPreferences);
       return result;
     } catch (openaiError) {
       console.error("Erro ao gerar plano com OpenAI:", openaiError);
       
       // Se ambos os modelos falharem, tente um plano básico
       console.log("Gerando plano básico com dados locais");
-      return generateBasicMealPlan(userData, selectedFoods, dietaryPreferences);
+      return generateBasicMealPlan(userData, foodsByMealType, dietaryPreferences);
     }
   }
 }
 
-async function generateWithLlama(userData, selectedFoods, dietaryPreferences) {
+async function generateWithLlama(userData, foodsByMealType, dietaryPreferences) {
   try {
     console.log("Preparando dados para o modelo Llama");
     
-    // Simplificar os alimentos para reduzir o tamanho da entrada
-    const simplifiedFoods = selectedFoods.map(food => ({
-      name: food.name,
-      calories: food.calories,
-      protein: food.protein,
-      carbs: food.carbs,
-      fats: food.fats,
-      food_group_id: food.food_group_id
-    }));
+    // Preparar os dados por tipo de refeição para o prompt
+    const promptData = {};
+    for (const [mealType, foods] of Object.entries(foodsByMealType)) {
+      promptData[mealType] = foods.map(food => ({
+        name: food.name,
+        calories: food.calories,
+        protein: food.protein,
+        carbs: food.carbs,
+        fats: food.fats,
+        food_group_id: food.food_group_id
+      }));
+    }
 
     // Construir o prompt para o modelo
-    const prompt = generateMealPlanPrompt(userData, simplifiedFoods, dietaryPreferences);
+    const prompt = generateMealPlanPrompt(userData, promptData, dietaryPreferences);
     
     console.log("Enviando requisição para llama-completion");
     const llamaResponse = await fetch(`${req.url.split('/generate-meal-plan')[0]}/llama-completion`, {
@@ -164,25 +288,29 @@ async function generateWithLlama(userData, selectedFoods, dietaryPreferences) {
   }
 }
 
-async function generateWithOpenAI(userData, selectedFoods, dietaryPreferences) {
+async function generateWithOpenAI(userData, foodsByMealType, dietaryPreferences) {
   if (!openAIApiKey) {
     throw new Error("API key do OpenAI não configurada");
   }
 
   console.log("Preparando dados para o modelo OpenAI");
   
-  // Simplificar os alimentos para reduzir o tamanho da entrada
-  const simplifiedFoods = selectedFoods.slice(0, 40).map(food => ({
-    name: food.name,
-    calories: food.calories,
-    protein: food.protein,
-    carbs: food.carbs,
-    fats: food.fats,
-    food_group_id: food.food_group_id
-  }));
+  // Preparar os dados por tipo de refeição para o prompt
+  const promptData = {};
+  for (const [mealType, foods] of Object.entries(foodsByMealType)) {
+    // Limitar número de alimentos por tipo de refeição
+    promptData[mealType] = foods.slice(0, 20).map(food => ({
+      name: food.name,
+      calories: food.calories,
+      protein: food.protein,
+      carbs: food.carbs,
+      fats: food.fats,
+      food_group_id: food.food_group_id
+    }));
+  }
 
   // Construir o prompt para o modelo
-  const prompt = generateMealPlanPrompt(userData, simplifiedFoods, dietaryPreferences);
+  const prompt = generateMealPlanPrompt(userData, promptData, dietaryPreferences);
   
   try {
     console.log("Enviando requisição para OpenAI");
@@ -253,29 +381,48 @@ async function generateWithOpenAI(userData, selectedFoods, dietaryPreferences) {
   }
 }
 
-function generateBasicMealPlan(userData, selectedFoods, dietaryPreferences) {
+function generateBasicMealPlan(userData, foodsByMealType, dietaryPreferences) {
   console.log("Gerando plano alimentar básico");
   
   // Função para selecionar alimentos aleatórios do grupo
   function getRandomFoods(foods, count = 3) {
+    if (!foods || foods.length === 0) return [];
     const shuffled = [...foods].sort(() => 0.5 - Math.random());
     return shuffled.slice(0, Math.min(count, shuffled.length));
   }
   
-  // Agrupar alimentos por categoria
-  const proteinFoods = selectedFoods.filter(f => f.protein / f.calories > 0.2);
-  const carbFoods = selectedFoods.filter(f => f.carbs / f.calories > 0.3);
-  const fatFoods = selectedFoods.filter(f => f.fats / f.calories > 0.3);
-  const vegFoods = selectedFoods.filter(f => f.food_group_id === 1 || f.food_group_id === 3);
-  
   // Criar refeição básica
-  function createMeal(title, calorias) {
-    const proteins = getRandomFoods(proteinFoods, 1);
-    const carbs = getRandomFoods(carbFoods, 1);
-    const fats = getRandomFoods(fatFoods, 1);
-    const veggies = getRandomFoods(vegFoods, 1);
+  function createMeal(title, calorias, mealType) {
+    const availableFoods = foodsByMealType[mealType] || [];
     
-    const selectedFoods = [...proteins, ...carbs, ...fats, ...veggies];
+    if (!availableFoods || availableFoods.length === 0) {
+      console.log(`Sem alimentos disponíveis para ${mealType}, usando lista completa`);
+      const allFoods = [].concat(...Object.values(foodsByMealType));
+      const selectedFoods = getRandomFoods(allFoods, 3);
+      
+      const mealFoods = selectedFoods.map(food => ({
+        name: food.name,
+        portion: Math.round((calorias / selectedFoods.length) / (food.calories / 100)),
+        unit: "g",
+        details: `Fonte de ${food.protein > food.carbs && food.protein > food.fats ? 'proteína' : 
+                  food.carbs > food.protein && food.carbs > food.fats ? 'carboidrato' : 'gordura'}`
+      }));
+      
+      return {
+        description: `${title} balanceada com aproximadamente ${calorias} calorias.`,
+        foods: mealFoods,
+        calories: calorias,
+        macros: {
+          protein: Math.round(selectedFoods.reduce((sum, food) => sum + food.protein, 0)),
+          carbs: Math.round(selectedFoods.reduce((sum, food) => sum + food.carbs, 0)),
+          fats: Math.round(selectedFoods.reduce((sum, food) => sum + food.fats, 0)),
+          fiber: Math.round(selectedFoods.reduce((sum, food) => sum + (food.fiber || 0), 0))
+        }
+      };
+    }
+    
+    // Selecionar alimentos apropriados para o tipo de refeição
+    const selectedFoods = getRandomFoods(availableFoods, 3);
     
     const mealFoods = selectedFoods.map(food => ({
       name: food.name,
@@ -290,10 +437,10 @@ function generateBasicMealPlan(userData, selectedFoods, dietaryPreferences) {
       foods: mealFoods,
       calories: calorias,
       macros: {
-        protein: Math.round(selectedFoods.reduce((sum, food) => sum + food.protein, 0) / selectedFoods.length * 3),
-        carbs: Math.round(selectedFoods.reduce((sum, food) => sum + food.carbs, 0) / selectedFoods.length * 3),
-        fats: Math.round(selectedFoods.reduce((sum, food) => sum + food.fats, 0) / selectedFoods.length * 3),
-        fiber: Math.round(selectedFoods.reduce((sum, food) => sum + (food.fiber || 0), 0) / selectedFoods.length * 3)
+        protein: Math.round(selectedFoods.reduce((sum, food) => sum + food.protein, 0)),
+        carbs: Math.round(selectedFoods.reduce((sum, food) => sum + food.carbs, 0)),
+        fats: Math.round(selectedFoods.reduce((sum, food) => sum + food.fats, 0)),
+        fiber: Math.round(selectedFoods.reduce((sum, food) => sum + (food.fiber || 0), 0))
       }
     };
   }
@@ -308,20 +455,20 @@ function generateBasicMealPlan(userData, selectedFoods, dietaryPreferences) {
   
   // Criar plano para um dia
   function createDayPlan(dayName) {
-    const breakfast = createMeal("Café da manhã", breakfastCal);
-    const morningSnack = createMeal("Lanche da manhã", morningSnackCal);
-    const lunch = createMeal("Almoço", lunchCal);
-    const afternoonSnack = createMeal("Lanche da tarde", afternoonSnackCal);
-    const dinner = createMeal("Jantar", dinnerCal);
+    const breakfast = createMeal("Café da manhã", breakfastCal, "breakfast");
+    const morningSnack = createMeal("Lanche da manhã", morningSnackCal, "morningSnack");
+    const lunch = createMeal("Almoço", lunchCal, "lunch");
+    const afternoonSnack = createMeal("Lanche da tarde", afternoonSnackCal, "afternoonSnack");
+    const dinner = createMeal("Jantar", dinnerCal, "dinner");
     
     const totalProtein = breakfast.macros.protein + morningSnack.macros.protein + 
-                         lunch.macros.protein + afternoonSnack.macros.protein + dinner.macros.protein;
+                       lunch.macros.protein + afternoonSnack.macros.protein + dinner.macros.protein;
     const totalCarbs = breakfast.macros.carbs + morningSnack.macros.carbs + 
-                       lunch.macros.carbs + afternoonSnack.macros.carbs + dinner.macros.carbs;
+                     lunch.macros.carbs + afternoonSnack.macros.carbs + dinner.macros.carbs;
     const totalFats = breakfast.macros.fats + morningSnack.macros.fats + 
-                      lunch.macros.fats + afternoonSnack.macros.fats + dinner.macros.fats;
+                    lunch.macros.fats + afternoonSnack.macros.fats + dinner.macros.fats;
     const totalFiber = breakfast.macros.fiber + morningSnack.macros.fiber + 
-                       lunch.macros.fiber + afternoonSnack.macros.fiber + dinner.macros.fiber;
+                     lunch.macros.fiber + afternoonSnack.macros.fiber + dinner.macros.fiber;
     
     return {
       dayName,
@@ -377,7 +524,7 @@ function generateBasicMealPlan(userData, selectedFoods, dietaryPreferences) {
   };
 }
 
-function generateMealPlanPrompt(userData, selectedFoods, dietaryPreferences) {
+function generateMealPlanPrompt(userData, foodsByMealType, dietaryPreferences) {
   // Mapear nome dos grupos alimentares
   const foodGroups = {
     1: "Verduras e Legumes",
@@ -391,14 +538,6 @@ function generateMealPlanPrompt(userData, selectedFoods, dietaryPreferences) {
     9: "Bebidas",
     10: "Outros"
   };
-
-  // Formatar alimentos com seus grupos
-  const formattedFoods = selectedFoods.map(food => {
-    return {
-      ...food,
-      group: foodGroups[food.food_group_id] || "Outros"
-    };
-  });
 
   // Calcular macros ideais baseados nas calorias e objetivo
   const idealMacros = {
@@ -424,6 +563,16 @@ function generateMealPlanPrompt(userData, selectedFoods, dietaryPreferences) {
       idealMacros.carbs = Math.round((userData.dailyCalories - (idealMacros.protein * 4 + idealMacros.fats * 9)) / 4);
   }
 
+  // Montar texto de alimentos organizados por tipo de refeição
+  const mealTypesSection = Object.entries(foodsByMealType)
+    .map(([mealType, foods]) => {
+      if (!foods || foods.length === 0) return `### ${mealType}: Nenhum alimento disponível`;
+      
+      return `### ${mealType}:
+${foods.map(food => `- ${food.name}: ${food.calories} kcal, ${food.protein}g proteína, ${food.carbs}g carboidratos, ${food.fats}g gorduras`).join('\n')}`;
+    })
+    .join('\n\n');
+
   // Construir o prompt
   return `
 Você é um nutricionista especializado em criar planos alimentares personalizados.
@@ -447,17 +596,8 @@ ${dietaryPreferences.hasAllergies ? `- Alergias: ${dietaryPreferences.allergies.
 ${dietaryPreferences.dietaryRestrictions?.length > 0 ? `- Restrições: ${dietaryPreferences.dietaryRestrictions.join(', ')}` : '- Sem restrições alimentares'}
 ${dietaryPreferences.trainingTime ? `- Horário de Treino: ${dietaryPreferences.trainingTime}` : '- Sem treino'}
 
-## ALIMENTOS DISPONÍVEIS POR GRUPO:
-${Object.entries(foodGroups)
-  .map(([groupId, groupName]) => {
-    const groupFoods = formattedFoods.filter(food => food.food_group_id === parseInt(groupId));
-    if (groupFoods.length === 0) return null;
-    
-    return `### ${groupName}:
-${groupFoods.map(food => `- ${food.name}: ${food.calories} kcal, ${food.protein}g proteína, ${food.carbs}g carboidratos, ${food.fats}g gorduras`).join('\n')}`;
-  })
-  .filter(Boolean)
-  .join('\n\n')}
+## ALIMENTOS DISPONÍVEIS POR TIPO DE REFEIÇÃO:
+${mealTypesSection}
 
 ## ESTRUTURA DE SAÍDA
 Crie um plano alimentar semanal para 7 dias apresentado em formato JSON:
@@ -511,13 +651,14 @@ Crie um plano alimentar semanal para 7 dias apresentado em formato JSON:
 
 ### INSTRUÇÕES IMPORTANTES:
 1. Distribua as calorias diárias entre as refeições, considerando o objetivo do usuário.
-2. Utilize apenas os alimentos da lista fornecida.
-3. Evite alimentos aos quais o usuário tem alergia ou restrição.
-4. Adeque as refeições ao horário de treino, se fornecido.
-5. Varie os alimentos ao longo da semana.
-6. Siga estritamente o formato JSON solicitado.
-7. Inclua porções realistas para cada alimento (em gramas, ml, unidades ou colheres).
-8. Adicione detalhes sobre como preparar ou combinar os alimentos.
+2. Utilize apenas os alimentos da lista fornecida para cada tipo de refeição.
+3. NÃO MISTURE alimentos entre os diferentes tipos de refeição (use apenas os alimentos listados em cada seção).
+4. Evite alimentos aos quais o usuário tem alergia ou restrição.
+5. Adeque as refeições ao horário de treino, se fornecido.
+6. Varie os alimentos ao longo da semana.
+7. Siga estritamente o formato JSON solicitado.
+8. Inclua porções realistas para cada alimento (em gramas, ml, unidades ou colheres).
+9. Adicione detalhes sobre como preparar ou combinar os alimentos.
 
 Apenas responda com o JSON do plano alimentar, sem texto adicional.
 `;

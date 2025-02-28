@@ -5,6 +5,7 @@ import type { DietaryPreferences, ProtocolFood } from "../types";
 import { REWARDS } from '@/constants/rewards';
 import type { TransactionType } from "@/types/wallet";
 import type { UseMutateFunction } from "@tanstack/react-query";
+import { searchFoodNutrition, convertNutritionixToProtocolFood } from "../utils/nutritionix-api";
 
 interface MealPlanGenerationProps {
   userData: {
@@ -48,16 +49,52 @@ export const generateMealPlan = async ({
     });
     console.log('[MEAL PLAN] Preferências:', JSON.stringify(preferences, null, 2));
     
-    const selectedFoodsDetails = selectedFoods.map(food => ({
+    // Tentar enriquecer os dados nutricionais dos alimentos selecionados
+    console.log('[MEAL PLAN] Verificando dados nutricionais precisos...');
+    let enhancedFoods = [...selectedFoods];
+    
+    try {
+      // Apenas para os primeiros alimentos (para não sobrecarregar a API)
+      for (let i = 0; i < Math.min(5, selectedFoods.length); i++) {
+        const food = selectedFoods[i];
+        const nutritionData = await searchFoodNutrition(food.name);
+        
+        if (nutritionData && nutritionData.length > 0) {
+          const enhancedFood = {
+            ...food,
+            calories: nutritionData[0].nf_calories ? Math.round(nutritionData[0].nf_calories) : food.calories,
+            protein: nutritionData[0].nf_protein ? Math.round(nutritionData[0].nf_protein) : food.protein || 0,
+            carbs: nutritionData[0].nf_total_carbohydrate ? Math.round(nutritionData[0].nf_total_carbohydrate) : food.carbs || 0,
+            fats: nutritionData[0].nf_total_fat ? Math.round(nutritionData[0].nf_total_fat) : food.fats || 0,
+            fiber: nutritionData[0].nf_dietary_fiber ? Math.round(nutritionData[0].nf_dietary_fiber) : food.fiber || 0,
+            nutritionix_data: {
+              serving_unit: nutritionData[0].serving_unit,
+              serving_qty: nutritionData[0].serving_qty,
+              serving_weight_grams: nutritionData[0].serving_weight_grams
+            }
+          };
+          
+          enhancedFoods[i] = enhancedFood;
+          console.log(`[MEAL PLAN] Dados de ${food.name} enriquecidos com Nutritionix`);
+        }
+      }
+    } catch (nutritionError) {
+      console.error('[MEAL PLAN] Erro ao buscar dados nutricionais:', nutritionError);
+      // Continuar com os dados originais
+    }
+
+    const selectedFoodsDetails = enhancedFoods.map(food => ({
       id: food.id,
       name: food.name,
       calories: food.calories,
       protein: food.protein || 0,
       carbs: food.carbs || 0,
       fats: food.fats || 0,
+      fiber: food.fiber || 0,
       portion: food.portion || 100,
       portionUnit: food.portionUnit || 'g',
-      food_group_id: food.food_group_id
+      food_group_id: food.food_group_id,
+      nutritionix_data: food.nutritionix_data
     }));
 
     console.log(`[MEAL PLAN] Total de alimentos selecionados: ${selectedFoodsDetails.length}`);
