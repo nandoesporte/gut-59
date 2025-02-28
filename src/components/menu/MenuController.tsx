@@ -211,28 +211,31 @@ export const useMenuController = () => {
       console.log("Confirmando seleção de alimentos para usuário:", user.id);
       console.log("Alimentos selecionados:", selectedFoods);
 
-      // Buscar o registro atual
-      const { data: existingPrefs, error: fetchError } = await supabase
+      // CORREÇÃO: Usar order e limit para garantir que obtemos apenas o registro mais recente
+      // Esta abordagem evita o erro de múltiplas linhas quando há registros duplicados
+      const { data: recentPrefs, error: recentError } = await supabase
         .from('nutrition_preferences')
-        .select('*')
+        .select('id')
         .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
-      if (fetchError) {
-        console.error('Erro ao buscar preferências existentes:', fetchError);
-        toast.error("Erro ao recuperar suas preferências");
-        return false;
+      if (recentError) {
+        console.error('Erro ao buscar preferência mais recente:', recentError);
+        // Vamos tentar criar um novo registro mesmo assim
+        console.log("Tentando criar um novo registro após erro na busca");
       }
 
       let updateSuccess = false;
       
-      if (existingPrefs) {
-        console.log("Encontrado registro existente. Atualizando...");
+      if (recentPrefs?.id) {
+        console.log("Encontrado registro existente. Atualizando ID:", recentPrefs.id);
         // Atualizar o registro existente
         const { error: updateError } = await supabase
           .from('nutrition_preferences')
           .update({ selected_foods: selectedFoods })
-          .eq('id', existingPrefs.id);
+          .eq('id', recentPrefs.id);
 
         if (updateError) {
           console.error('Erro ao atualizar preferências:', updateError);
@@ -240,21 +243,43 @@ export const useMenuController = () => {
           return false;
         } else {
           updateSuccess = true;
+          console.log("Preferências atualizadas com sucesso no registro existente");
         }
       } else {
-        console.log("Nenhum registro encontrado. Criando novo...");
-        // Se não existir, criar um novo com valores mínimos necessários
+        console.log("Nenhum registro encontrado ou erro na busca. Criando novo...");
+        // Se não existir ou houve erro na busca, criar um novo com valores mínimos necessários
+        
+        // Primeiro, verificamos se já existe algum registro para este usuário para evitar duplicação
+        const { data: anyExisting } = await supabase
+          .from('nutrition_preferences')
+          .select('count')
+          .eq('user_id', user.id);
+          
+        const hasExisting = anyExisting && Array.isArray(anyExisting) && anyExisting.length > 0;
+        
+        if (hasExisting) {
+          console.log("Já existem registros para este usuário. Tentando excluir registros antigos...");
+          // Tenta excluir registros antigos para evitar duplicação
+          await supabase
+            .from('nutrition_preferences')
+            .delete()
+            .eq('user_id', user.id);
+            
+          console.log("Registros antigos excluídos. Criando novo registro limpo.");
+        }
+        
+        // Inserir novo registro
         const { error: insertError } = await supabase
           .from('nutrition_preferences')
           .insert({
             user_id: user.id,
             selected_foods: selectedFoods,
-            weight: 70, // valores padrão para satisfazer restrições de tipo
-            height: 170,
-            age: 30,
-            gender: 'male',
-            activity_level: 'moderate' as "sedentary" | "light" | "moderate" | "intense",
-            goal: 'maintain' as "maintain" | "lose_weight" | "gain_mass"
+            weight: Number(formData.weight) || 70, // Usar valor do formulário se disponível
+            height: Number(formData.height) || 170,
+            age: Number(formData.age) || 30,
+            gender: formData.gender || 'male',
+            activity_level: (formData.activityLevel as "sedentary" | "light" | "moderate" | "intense") || 'moderate',
+            goal: mapGoalToDbValue(formData.goal) || 'maintain'
           });
 
         if (insertError) {
@@ -263,6 +288,7 @@ export const useMenuController = () => {
           return false;
         } else {
           updateSuccess = true;
+          console.log("Novo registro de preferências criado com sucesso");
         }
       }
 
@@ -270,12 +296,12 @@ export const useMenuController = () => {
         console.log("Preferências de alimentos salvas com sucesso!");
         console.log("Avançando para a etapa 3 (restrições dietéticas)");
         
-        // Forçamos a transição para a etapa 3 com um pequeno atraso para garantir que o estado foi atualizado
-        setTimeout(() => {
-          setCurrentStep(3);
-          toast.success("Preferências de alimentos salvas! Agora informe suas restrições dietéticas.");
-        }, 300);
+        // Avançar para a próxima etapa diretamente
+        console.log("Configurando próxima etapa para 3");
+        setCurrentStep(3);
         
+        // Notificar o usuário
+        toast.success("Preferências de alimentos salvas! Agora informe suas restrições dietéticas.");
         return true;
       }
       
