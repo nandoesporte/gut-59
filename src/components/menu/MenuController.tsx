@@ -102,7 +102,8 @@ export const useMenuController = () => {
             gender: formData.gender,
             activity_level: formData.activityLevel,
             goal: formData.goal,
-            calories_needed: calories
+            calories_needed: calories,
+            selected_foods: selectedFoods // Incluir selected_foods para evitar sobrescrever
           }, { onConflict: 'user_id' });
 
           if (error) {
@@ -129,11 +130,34 @@ export const useMenuController = () => {
         return false;
       }
 
-      // Atualizar o registro existente ou criar um novo com a seleção de alimentos
-      const { error } = await supabase.from('nutrition_preferences').upsert({
+      // Buscar o registro atual para obter os outros campos
+      const { data: existingPrefs, error: fetchError } = await supabase
+        .from('nutrition_preferences')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (fetchError) {
+        console.error('Erro ao buscar preferências existentes:', fetchError);
+      }
+
+      // Preparar dados para atualização
+      const updateData = {
         user_id: user.id,
-        selected_foods: selectedFoods
-      }, { onConflict: 'user_id' });
+        selected_foods: selectedFoods,
+        // Manter os outros campos se existirem
+        weight: existingPrefs?.weight || null,
+        height: existingPrefs?.height || null,
+        age: existingPrefs?.age || null,
+        gender: existingPrefs?.gender || 'male',
+        activity_level: existingPrefs?.activity_level || null,
+        goal: existingPrefs?.goal || null,
+        calories_needed: existingPrefs?.calories_needed || null
+      };
+
+      const { error } = await supabase
+        .from('nutrition_preferences')
+        .upsert(updateData, { onConflict: 'user_id' });
 
       if (error) {
         console.error('Erro ao salvar preferências de alimentos:', error);
