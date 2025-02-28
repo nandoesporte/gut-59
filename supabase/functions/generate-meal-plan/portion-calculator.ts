@@ -1,60 +1,67 @@
 
-import { Food } from "./types.ts";
+import { Food, FoodWithPortion, MacroTargets } from "./types.ts";
 
-// Calculate appropriate portion size based on target calories
-export function calculatePortionSize(food: Food, targetCalories: number): number {
-  // Default portion if food has no calories
-  if (!food.calories || food.calories === 0) {
-    return food.portion || 100;
+// Function to calculate appropriate portions based on calorie and macro targets
+export function calculatePortions(
+  foods: Food[],
+  dailyCalories: number,
+  macroTargets: MacroTargets
+): FoodWithPortion[] {
+  console.log("Calculating portions for", foods.length, "foods");
+  
+  // If no foods are provided, return an empty array
+  if (!foods || foods.length === 0) {
+    return [];
   }
+
+  // Basic calculation: Distribute calories evenly among foods
+  const caloriesPerFood = dailyCalories / foods.length;
   
-  // Calculate what portion would provide the target calories
-  const caloriesPerGram = food.calories / 100; // Assuming food.calories is per 100g
-  let calculatedPortion = targetCalories / caloriesPerGram;
-  
-  // Apply reasonable limits to portion sizes
-  // These limits could be food-type specific in a more advanced system
-  const minPortion = 20;  // Minimum 20g for any food
-  const maxPortion = 500; // Maximum 500g for any food
-  
-  // For specific food groups, modify portion size
-  if (food.food_group_id) {
-    switch (food.food_group_id) {
-      case 1: // Breakfast foods (cereals, etc.)
-        calculatedPortion = Math.min(calculatedPortion, 250);
-        break;
-      case 2: // Protein sources
-        calculatedPortion = Math.min(calculatedPortion, 200);
-        break;
-      case 3: // Snacks
-        calculatedPortion = Math.min(calculatedPortion, 150);
-        break;
-      case 4: // Vegetables
-        calculatedPortion = Math.min(calculatedPortion, 300);
-        break;
-      default:
-        // Use default limits
-        break;
+  return foods.map(food => {
+    // Skip foods with zero calories to avoid division by zero
+    if (!food.calories || food.calories <= 0) {
+      return {
+        ...food,
+        portion: 100, // Default portion
+        portionUnit: "g",
+        calculatedNutrients: {
+          calories: food.calories || 0,
+          protein: food.protein || 0,
+          carbs: food.carbs || 0,
+          fats: food.fats || 0,
+          fiber: food.fiber || 0
+        }
+      };
     }
-  }
-  
-  // If we have Nutritionix data with serving info, use that to guide portion
-  if (food.nutritionix_data && food.nutritionix_data.serving_weight_grams) {
-    const servingWeight = food.nutritionix_data.serving_weight_grams;
     
-    // Try to make portion a multiple of the standard serving size
-    const servings = Math.round(calculatedPortion / servingWeight);
-    calculatedPortion = servings * servingWeight;
+    // Calculate portion size to achieve target calories for this food
+    const portionMultiplier = caloriesPerFood / food.calories;
+    const portion = Math.round(100 * portionMultiplier); // Base portion is 100g
     
-    // Still apply min/max limits
-    calculatedPortion = Math.max(servingWeight, calculatedPortion);
-    calculatedPortion = Math.min(servingWeight * 5, calculatedPortion);
-  }
-  
-  // Apply global min/max constraints
-  calculatedPortion = Math.max(minPortion, calculatedPortion);
-  calculatedPortion = Math.min(maxPortion, calculatedPortion);
-  
-  // Round to nearest 5g for clean values
-  return Math.round(calculatedPortion / 5) * 5;
+    // Calculate actual nutrients based on the new portion
+    const calculatedNutrients = {
+      calories: Math.round(food.calories * portionMultiplier),
+      protein: Math.round((food.protein || 0) * portionMultiplier),
+      carbs: Math.round((food.carbs || 0) * portionMultiplier),
+      fats: Math.round((food.fats || 0) * portionMultiplier),
+      fiber: Math.round((food.fiber || 0) * portionMultiplier)
+    };
+    
+    return {
+      ...food,
+      portion,
+      portionUnit: "g",
+      calculatedNutrients
+    };
+  });
+}
+
+// Function to optimize portion sizes to meet macro targets
+export function optimizePortions(
+  foods: FoodWithPortion[],
+  macroTargets: MacroTargets
+): FoodWithPortion[] {
+  // Simple implementation for now
+  // In a real implementation, this could use more sophisticated algorithms
+  return foods;
 }
