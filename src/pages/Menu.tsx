@@ -15,6 +15,8 @@ import type { DietaryPreferences } from "@/components/menu/types";
 
 const Menu = () => {
   const mealPlanRef = useRef<HTMLDivElement>(null);
+  const restrictionsCardRef = useRef<HTMLDivElement>(null);
+  
   const {
     currentStep,
     setCurrentStep,
@@ -42,6 +44,17 @@ const Menu = () => {
       });
     }
   }, [mealPlan]);
+  
+  // Auto-scroll to restrictions card when moving to step 3
+  useEffect(() => {
+    if (currentStep === 3 && restrictionsCardRef.current) {
+      console.log("Scrolling to restrictions section");
+      restrictionsCardRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }
+  }, [currentStep]);
 
   // Debug para verificar as transições de etapa
   useEffect(() => {
@@ -153,29 +166,31 @@ const Menu = () => {
             </Card>
 
             {/* Etapa 3: Preferências Dietéticas */}
-            <Card className={`p-4 sm:p-6 ${currentStep < 3 ? 'opacity-70' : ''}`}>
-              <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center">
-                <span className={`bg-${currentStep >= 3 ? 'green' : 'gray'}-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2`}>3</span>
-                Restrições e Preferências
-              </h2>
-              {currentStep === 3 && (
-                <DietaryPreferencesForm
-                  onSubmit={handleDietaryPreferences}
-                  onBack={() => setCurrentStep(2)}
-                />
-              )}
-              {currentStep > 3 && (
-                <div className="text-center py-2">
-                  <p className="text-green-600 font-medium">✓ Preferências dietéticas registradas</p>
-                  <button 
-                    onClick={() => setCurrentStep(3)} 
-                    className="text-sm text-gray-500 underline mt-2"
-                  >
-                    Editar
-                  </button>
-                </div>
-              )}
-            </Card>
+            <div ref={restrictionsCardRef}>
+              <Card className={`p-4 sm:p-6 ${currentStep < 3 ? 'opacity-70' : ''}`}>
+                <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center">
+                  <span className={`bg-${currentStep >= 3 ? 'green' : 'gray'}-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2`}>3</span>
+                  Restrições e Preferências
+                </h2>
+                {currentStep === 3 && (
+                  <DietaryPreferencesForm
+                    onSubmit={handleDietaryPreferences}
+                    onBack={() => setCurrentStep(2)}
+                  />
+                )}
+                {currentStep > 3 && (
+                  <div className="text-center py-2">
+                    <p className="text-green-600 font-medium">✓ Preferências dietéticas registradas</p>
+                    <button 
+                      onClick={() => setCurrentStep(3)} 
+                      className="text-sm text-gray-500 underline mt-2"
+                    >
+                      Editar
+                    </button>
+                  </div>
+                )}
+              </Card>
+            </div>
 
             {/* Etapa 4: Exibição do Plano */}
             {currentStep === 4 && mealPlan && (
