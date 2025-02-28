@@ -7,21 +7,16 @@ import { usePaymentHandling } from "./hooks/usePaymentHandling";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { ProtocolFood } from "@/types/education";
 
-interface ProtocolFood {
-  id: string;
-  name: string;
-  calories: number;
-  protein: number;
-  carbs: number;
-  fats: number;
+interface ProtocolFoodExtended extends ProtocolFood {
   food_group_id: number;
 }
 
 interface FoodSelectorProps {
-  protocolFoods: ProtocolFood[];
+  protocolFoods: ProtocolFoodExtended[];
   selectedFoods: string[];
-  onFoodSelection: (foodId: string) => void;
+  onFoodSelection: (foodId: string, food?: ProtocolFoodExtended) => void;
   totalCalories: number;
   onBack: () => void;
   onConfirm: () => Promise<boolean> | void;
@@ -36,9 +31,9 @@ const MealSection = ({
 }: {
   title: string;
   icon: React.ReactNode;
-  foods: ProtocolFood[];
+  foods: ProtocolFoodExtended[];
   selectedFoods: string[];
-  onFoodSelection: (foodId: string) => void;
+  onFoodSelection: (foodId: string, food?: ProtocolFoodExtended) => void;
 }) => (
   <Card className="p-6 space-y-4 shadow-lg hover:shadow-xl transition-shadow">
     <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
@@ -52,7 +47,7 @@ const MealSection = ({
         <Button
           key={food.id}
           variant={selectedFoods.includes(food.id) ? "default" : "outline"}
-          onClick={() => onFoodSelection(food.id)}
+          onClick={() => onFoodSelection(food.id, food)}
           className={`
             h-auto py-3 px-4 w-full text-left justify-start
             ${selectedFoods.includes(food.id)

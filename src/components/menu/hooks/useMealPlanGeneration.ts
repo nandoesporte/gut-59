@@ -19,6 +19,7 @@ interface MealPlanGenerationProps {
     dailyCalories: number;
   };
   selectedFoods: ProtocolFood[];
+  foodsByMealType?: Record<string, string[]>; // Alimentos categorizados por refeição
   preferences: DietaryPreferences;
   addTransaction: UseMutateFunction<void, Error, {
     amount: number;
@@ -38,6 +39,7 @@ interface EdgeFunctionResponse {
 export const generateMealPlan = async ({
   userData,
   selectedFoods,
+  foodsByMealType,
   preferences,
   addTransaction
 }: MealPlanGenerationProps) => {
@@ -54,6 +56,7 @@ export const generateMealPlan = async ({
       dailyCalories: userData.dailyCalories
     });
     console.log('[MEAL PLAN] Preferências:', JSON.stringify(preferences, null, 2));
+    console.log('[MEAL PLAN] Alimentos por refeição:', foodsByMealType);
     
     // Tentar enriquecer os dados nutricionais dos alimentos selecionados
     console.log('[MEAL PLAN] Verificando dados nutricionais precisos...');
@@ -124,8 +127,36 @@ export const generateMealPlan = async ({
     const mappedGoal = goalMapping[userData.goal as keyof typeof goalMapping] || "maintain";
     console.log(`[MEAL PLAN] Objetivo mapeado: ${userData.goal} -> ${mappedGoal}`);
     
-    // Melhorar a solicitação enviada à edge function para garantir 
-    // que o agente nutri+ possa gerar um plano mais personalizado
+    // Preparar alimentos agrupados por refeição para otimização da IA
+    const mealTypeMapping = {
+      breakfast: 'breakfast', 
+      lunch: 'lunch',
+      snack: 'snack',
+      dinner: 'dinner'
+    };
+    
+    // Organizar alimentos por refeição para enviar à edge function
+    const foodsByMealTypeFormatted: Record<string, any[]> = {};
+    
+    if (foodsByMealType) {
+      // Usamos a categorização que já foi feita
+      Object.entries(foodsByMealType).forEach(([mealType, foodIds]) => {
+        const mealTypeMapped = mealTypeMapping[mealType as keyof typeof mealTypeMapping] || mealType;
+        foodsByMealTypeFormatted[mealTypeMapped] = selectedFoodsDetails.filter(food => 
+          foodIds.includes(food.id)
+        );
+      });
+    } else {
+      // Categorização automática baseada no food_group_id se não tivermos categorizados
+      foodsByMealTypeFormatted.breakfast = selectedFoodsDetails.filter(food => food.food_group_id === 1);
+      foodsByMealTypeFormatted.lunch = selectedFoodsDetails.filter(food => food.food_group_id === 2);
+      foodsByMealTypeFormatted.snack = selectedFoodsDetails.filter(food => food.food_group_id === 3);
+      foodsByMealTypeFormatted.dinner = selectedFoodsDetails.filter(food => food.food_group_id === 4);
+    }
+    
+    console.log('[MEAL PLAN] Alimentos formatados por refeição:', foodsByMealTypeFormatted);
+    
+    // Melhorar a solicitação enviada à edge function com alimentos organizados por refeição
     const enhancedPayload = {
       userData: {
         weight: Math.round(userData.weight),
@@ -137,7 +168,8 @@ export const generateMealPlan = async ({
         userId: userData.id,
         dailyCalories: Math.round(userData.dailyCalories)
       },
-      selectedFoods: selectedFoodsDetails.slice(0, 15), // Aumentando para 15 alimentos para melhor personalização
+      selectedFoods: selectedFoodsDetails,
+      foodsByMealType: foodsByMealTypeFormatted, // Enviando alimentos organizados por refeição
       dietaryPreferences: {
         hasAllergies: preferences.hasAllergies || false,
         allergies: (preferences.allergies || []).slice(0, 3), // Limitar alergias
@@ -194,11 +226,12 @@ export const generateMealPlan = async ({
       // Tentar uma segunda tentativa com payload simplificado
       console.log('[MEAL PLAN] Tentando novamente com payload simplificado...');
       
-      // Tentar uma segunda chamada com payload ainda mais simplificado
+      // Tentar uma segunda chamada com payload ainda mais simplificado, mas ainda considerando alimentos por refeição
       try {
         const simplifiedPayload = {
           userData: enhancedPayload.userData,
-          selectedFoods: selectedFoodsDetails.slice(0, 5), // Reduzir para apenas 5 alimentos
+          selectedFoods: selectedFoodsDetails.slice(0, 15), // Reduzir para 15 alimentos
+          foodsByMealType: foodsByMealTypeFormatted, // Manter a estrutura de alimentos por refeição que é a chave para melhorar o desempenho
           dietaryPreferences: enhancedPayload.dietaryPreferences,
           options: {
             agentVersion: "nutri+",
@@ -222,7 +255,7 @@ export const generateMealPlan = async ({
         
         // Usar plano padrão quando edge function falha
         console.log('[MEAL PLAN] Usando plano padrão devido a falha na Edge Function');
-        return createDefaultMealPlan(userData, selectedFoodsDetails);
+        return createDefaultMealPlan(userData, selectedFoodsDetails, foodsByMealTypeFormatted);
       }
     }
 
@@ -233,7 +266,7 @@ export const generateMealPlan = async ({
       
       // Usar plano padrão como fallback
       console.log('[MEAL PLAN] Usando plano padrão como fallback para estrutura incompleta');
-      return createDefaultMealPlan(userData, selectedFoodsDetails);
+      return createDefaultMealPlan(userData, selectedFoodsDetails, foodsByMealTypeFormatted);
     }
 
     // Verificar se todos os dias da semana estão presentes
@@ -259,7 +292,7 @@ export const generateMealPlan = async ({
       } else {
         // Se não houver nenhum dia para copiar, usar plano padrão
         console.log('[MEAL PLAN] Nenhum dia válido encontrado. Usando plano padrão');
-        return createDefaultMealPlan(userData, selectedFoodsDetails);
+        return createDefaultMealPlan(userData, selectedFoodsDetails, foodsByMealTypeFormatted);
       }
     }
 
@@ -336,7 +369,13 @@ export const generateMealPlan = async ({
     toast.error("Não foi possível gerar o plano alimentar personalizado. Usando plano básico.");
     
     // Retornar um plano padrão em caso de falha
-    return createDefaultMealPlan(userData, selectedFoods);
+    return createDefaultMealPlan(userData, selectedFoods, foodsByMealType ? 
+      {
+        breakfast: selectedFoods.filter(food => foodsByMealType.breakfast.includes(food.id)),
+        lunch: selectedFoods.filter(food => foodsByMealType.lunch.includes(food.id)),
+        snack: selectedFoods.filter(food => foodsByMealType.snack.includes(food.id)),
+        dinner: selectedFoods.filter(food => foodsByMealType.dinner.includes(food.id))
+      } : undefined);
   }
 };
 
@@ -508,7 +547,11 @@ const getDefaultRecommendations = (goal: string) => {
 };
 
 // Função para criar um plano de refeição padrão de fallback
-const createDefaultMealPlan = (userData: MealPlanGenerationProps['userData'], selectedFoods: any[]) => {
+const createDefaultMealPlan = (
+  userData: MealPlanGenerationProps['userData'], 
+  selectedFoods: any[],
+  foodsByMealType?: Record<string, any[]>
+) => {
   console.log('[MEAL PLAN] Criando plano padrão de fallback com', userData.dailyCalories, 'calorias/dia');
   
   const dailyCalories = userData.dailyCalories || 2000;
@@ -537,71 +580,55 @@ const createDefaultMealPlan = (userData: MealPlanGenerationProps['userData'], se
     sunday: "Domingo"
   };
   
-  // Lista de alimentos básicos para montar refeições padrão
-  // Preferir os alimentos selecionados pelo usuário quando disponíveis
-  const userFoodNames = selectedFoods.map(food => food.name.toLowerCase());
+  // Inicializar comida por tipo de refeição
+  const foodsForBreakfast = foodsByMealType?.breakfast || 
+    selectedFoods.filter(food => food.food_group_id === 1);
+  const foodsForLunch = foodsByMealType?.lunch || 
+    selectedFoods.filter(food => food.food_group_id === 2);
+  const foodsForSnack = foodsByMealType?.snack || 
+    selectedFoods.filter(food => food.food_group_id === 3);
+  const foodsForDinner = foodsByMealType?.dinner || 
+    selectedFoods.filter(food => food.food_group_id === 4);
+    
+  // Usar alimentos categorizados por refeição quando disponíveis
+  console.log('[MEAL PLAN] Usando alimentos categorizados para o plano padrão:', {
+    breakfast: foodsForBreakfast.length,
+    lunch: foodsForLunch.length, 
+    snack: foodsForSnack.length,
+    dinner: foodsForDinner.length
+  });
   
-  const basicFoods = {
-    carbs: [
-      "Arroz integral", "Pão integral", "Batata doce", "Aveia", "Quinoa", 
-      "Tapioca", "Macarrão integral", "Mandioca"
-    ].filter(food => {
-      // Favorece alimentos que o usuário selecionou
-      const normalizedFood = food.toLowerCase();
-      return userFoodNames.some(userFood => userFood.includes(normalizedFood) || normalizedFood.includes(userFood));
-    })[0] || "Arroz integral",
-    
-    proteins: [
-      "Peito de frango", "Ovos", "Carne magra", "Peixe", "Tofu", 
-      "Whey protein", "Feijão", "Lentilha"
-    ].filter(food => {
-      const normalizedFood = food.toLowerCase();
-      return userFoodNames.some(userFood => userFood.includes(normalizedFood) || normalizedFood.includes(userFood));
-    })[0] || "Peito de frango",
-    
-    fats: [
-      "Azeite de oliva", "Abacate", "Castanhas", "Sementes de chia", "Nozes", 
-      "Amêndoas", "Semente de linhaça", "Óleo de coco"
-    ].filter(food => {
-      const normalizedFood = food.toLowerCase();
-      return userFoodNames.some(userFood => userFood.includes(normalizedFood) || normalizedFood.includes(userFood));
-    })[0] || "Azeite de oliva",
-    
-    fruits: [
-      "Banana", "Maçã", "Laranja", "Uva", "Abacaxi", 
-      "Morango", "Melancia", "Kiwi"
-    ].filter(food => {
-      const normalizedFood = food.toLowerCase();
-      return userFoodNames.some(userFood => userFood.includes(normalizedFood) || normalizedFood.includes(userFood));
-    })[0] || "Banana",
-    
-    vegetables: [
-      "Brócolis", "Couve", "Espinafre", "Alface", "Cenoura", 
-      "Tomate", "Pepino", "Abobrinha"
-    ].filter(food => {
-      const normalizedFood = food.toLowerCase();
-      return userFoodNames.some(userFood => userFood.includes(normalizedFood) || normalizedFood.includes(userFood));
-    })[0] || "Brócolis",
-    
-    dairy: [
-      "Leite desnatado", "Iogurte natural", "Queijo cottage", "Queijo branco", "Ricota"
-    ].filter(food => {
-      const normalizedFood = food.toLowerCase();
-      return userFoodNames.some(userFood => userFood.includes(normalizedFood) || normalizedFood.includes(userFood));
-    })[0] || "Iogurte natural"
+  // Seleção de alimentos para o plano padrão por refeição
+  const getRandomFood = (foods: any[], count: number = 1) => {
+    if (!foods || foods.length === 0) return [{ name: "Opção variada", portion: 100, unit: "g", details: "Consulte um nutricionista" }];
+    // Embaralhar o array e retornar N itens
+    const shuffled = [...foods].sort(() => 0.5 - Math.random());
+    const selected = shuffled.slice(0, Math.min(count, foods.length));
+    // Mapear para o formato esperado
+    return selected.map(food => ({
+      name: food.name,
+      portion: food.portion || 100,
+      unit: food.portionUnit || "g",
+      details: getFoodDetail(food)
+    }));
   };
   
-  // Criar cada dia da semana
+  // Gerar descrição para o alimento
+  const getFoodDetail = (food: any) => {
+    if (food.food_group_id === 1) return "Fonte de carboidratos para o café da manhã";
+    if (food.food_group_id === 2) return "Alimento recomendado para o almoço";
+    if (food.food_group_id === 3) return "Opção saudável para lanches";
+    if (food.food_group_id === 4) return "Alimento recomendado para o jantar";
+    return "Alimento personalizado baseado em suas preferências";
+  };
+  
+  // Criar cada dia da semana usando os alimentos preferidos do usuário
   Object.entries(dayNames).forEach(([day, dayName]) => {
     weeklyPlan[day] = {
       dayName,
       meals: {
         breakfast: {
-          foods: [
-            { name: basicFoods.carbs, portion: 50, unit: "g", details: "Fonte de carboidratos" },
-            { name: "Ovos", portion: 100, unit: "g", details: "Fonte de proteína" },
-            { name: basicFoods.fruits, portion: 100, unit: "g", details: "Fonte de fibras e vitaminas" }
-          ],
+          foods: getRandomFood(foodsForBreakfast, 3),
           calories: breakfastCals,
           macros: {
             protein: Math.round(protein * 0.25),
@@ -612,10 +639,7 @@ const createDefaultMealPlan = (userData: MealPlanGenerationProps['userData'], se
           description: `Café da manhã balanceado com aproximadamente ${breakfastCals} calorias.`
         },
         morningSnack: {
-          foods: [
-            { name: basicFoods.fruits, portion: 150, unit: "g", details: "Fonte de carboidratos e fibras" },
-            { name: basicFoods.dairy, portion: 100, unit: "g", details: "Fonte de proteínas" }
-          ],
+          foods: getRandomFood(foodsForSnack, 2),
           calories: Math.round(snackCals / 2),
           macros: {
             protein: Math.round(protein * 0.1),
@@ -626,12 +650,7 @@ const createDefaultMealPlan = (userData: MealPlanGenerationProps['userData'], se
           description: `Lanche da manhã leve com aproximadamente ${Math.round(snackCals/2)} calorias.`
         },
         lunch: {
-          foods: [
-            { name: basicFoods.carbs, portion: 100, unit: "g", details: "Fonte de carboidratos" },
-            { name: "Feijão", portion: 80, unit: "g", details: "Fonte de proteínas e fibras" },
-            { name: basicFoods.proteins, portion: 120, unit: "g", details: "Fonte de proteínas" },
-            { name: basicFoods.vegetables, portion: 150, unit: "g", details: "Fonte de vitaminas e minerais" }
-          ],
+          foods: getRandomFood(foodsForLunch, 4),
           calories: lunchCals,
           macros: {
             protein: Math.round(protein * 0.4),
@@ -642,10 +661,7 @@ const createDefaultMealPlan = (userData: MealPlanGenerationProps['userData'], se
           description: `Almoço nutritivo e balanceado com aproximadamente ${lunchCals} calorias.`
         },
         afternoonSnack: {
-          foods: [
-            { name: basicFoods.fats, portion: 30, unit: "g", details: "Fonte de gorduras boas" },
-            { name: basicFoods.fruits, portion: 100, unit: "g", details: "Fonte de carboidratos" }
-          ],
+          foods: getRandomFood(foodsForSnack, 2),
           calories: Math.round(snackCals / 2),
           macros: {
             protein: Math.round(protein * 0.05),
@@ -656,11 +672,7 @@ const createDefaultMealPlan = (userData: MealPlanGenerationProps['userData'], se
           description: `Lanche da tarde com aproximadamente ${Math.round(snackCals/2)} calorias.`
         },
         dinner: {
-          foods: [
-            { name: "Batata doce", portion: 100, unit: "g", details: "Fonte de carboidratos complexos" },
-            { name: "Peixe", portion: 100, unit: "g", details: "Fonte de proteínas e ômega 3" },
-            { name: basicFoods.vegetables, portion: 100, unit: "g", details: "Fonte de vitaminas e minerais" }
-          ],
+          foods: getRandomFood(foodsForDinner, 3),
           calories: dinnerCals,
           macros: {
             protein: Math.round(protein * 0.2),
