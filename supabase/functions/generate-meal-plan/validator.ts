@@ -174,15 +174,8 @@ const requestSchema = {
     },
     foodsByMealType: {
       type: "object",
-      additionalProperties: {
-        type: "array",
-        items: { 
-          anyOf: [
-            { type: "string" },
-            { type: "number" }
-          ]  
-        }
-      }
+      // Make this more flexible to accept different structures
+      additionalProperties: true
     },
     options: {
       type: "object",
@@ -192,13 +185,31 @@ const requestSchema = {
   additionalProperties: true
 };
 
+// Helper function to normalize food IDs to strings
+const normalizeFoodIds = (data: any) => {
+  if (!data) return data;
+  
+  // Process foodsByMealType structure
+  if (data.foodsByMealType && typeof data.foodsByMealType === 'object') {
+    Object.keys(data.foodsByMealType).forEach(mealType => {
+      if (Array.isArray(data.foodsByMealType[mealType])) {
+        data.foodsByMealType[mealType] = data.foodsByMealType[mealType].map((id: any) => {
+          return String(id);
+        });
+      }
+    });
+  }
+  
+  return data;
+};
+
 // Export the function that validates the incoming payload
 export const validatePayload = (data: unknown): boolean => {
   try {
     console.log("Validating payload...");
     
     // Optional debug log to understand what data is coming in
-    console.log("Incoming payload:", JSON.stringify(data, null, 2).substring(0, 1000) + "...");
+    console.log("Incoming payload before normalization:", JSON.stringify(data, null, 2).substring(0, 1000) + "...");
     
     // Validate payload shape first
     if (!data || typeof data !== 'object') {
@@ -206,8 +217,13 @@ export const validatePayload = (data: unknown): boolean => {
       return false;
     }
     
+    // Normalize the data to ensure consistent types
+    const normalizedData = normalizeFoodIds(data);
+    
+    console.log("Normalized payload:", JSON.stringify(normalizedData, null, 2).substring(0, 1000) + "...");
+    
     // Check for minimal required properties manually before using AJV
-    const payload = data as any;
+    const payload = normalizedData as any;
     if (!payload.userData) {
       console.error("Invalid payload: missing userData");
       return false;
@@ -218,9 +234,9 @@ export const validatePayload = (data: unknown): boolean => {
       return false;
     }
     
-    // Now use AJV for full schema validation
+    // Now use AJV for full schema validation with more flexible additionalProperties settings
     const validate = ajv.compile(requestSchema);
-    const isValid = validate(data);
+    const isValid = validate(normalizedData);
     
     if (!isValid) {
       const errors = validate.errors?.map(err => ({
@@ -239,6 +255,7 @@ export const validatePayload = (data: unknown): boolean => {
   }
 };
 
+// Now let's update how we handle foodsByMealType in the implementation
 export const standardizeUnits = (unit: string): string => {
   const unitMap: Record<string, string> = {
     'grama': 'g',

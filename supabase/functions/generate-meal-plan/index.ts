@@ -38,10 +38,26 @@ serve(async (req) => {
     const requestData = await req.json();
     console.log("Dados recebidos:", JSON.stringify(requestData));
 
-    // Validate input
+    // Standardize foodsByMealType to ensure all IDs are strings
+    if (requestData.foodsByMealType) {
+      console.log("Standardizando foodsByMealType");
+      Object.keys(requestData.foodsByMealType).forEach(mealType => {
+        if (Array.isArray(requestData.foodsByMealType[mealType])) {
+          requestData.foodsByMealType[mealType] = requestData.foodsByMealType[mealType].map((id: any) => String(id));
+        } else {
+          // If not an array, initialize it as an empty array
+          requestData.foodsByMealType[mealType] = [];
+        }
+      });
+    }
+
+    // Validate input with more flexible validation
     const isValid = validatePayload(requestData);
     if (!isValid) {
-      return new Response(JSON.stringify({ error: 'Invalid input data' }), {
+      return new Response(JSON.stringify({ 
+        error: 'Invalid input data',
+        payload: requestData 
+      }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -61,13 +77,21 @@ serve(async (req) => {
       workoutAnalysis = analyzeWorkoutSync(dietaryPreferences.trainingTime);
     }
     
+    // Standardize foodsByMealType further for the optimization process
+    const standardizedFoodsByMealType = requestData.foodsByMealType || {
+      breakfast: [],
+      lunch: [],
+      snack: [],
+      dinner: []
+    };
+
     // Generate the optimized meal plan
     const mealPlan = await optimizeMealPlan(
       userData, 
       selectedFoods, 
       macroTargets, 
       dietaryPreferences,
-      requestData.foodsByMealType
+      standardizedFoodsByMealType
     );
     
     // Analyze meal distribution

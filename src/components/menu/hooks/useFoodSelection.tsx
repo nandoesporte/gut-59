@@ -22,7 +22,7 @@ export const useFoodSelection = () => {
     dinner: []
   });
 
-  const handleFoodSelection = useCallback((foodId: string, food?: ProtocolFood) => {
+  const handleFoodSelection = useCallback((foodId: string | number, food?: ProtocolFood) => {
     // Certifique-se de que foodId seja sempre uma string
     const stringFoodId = String(foodId);
     
@@ -46,6 +46,11 @@ export const useFoodSelection = () => {
           else {
             updatedMeals[mealType] = updatedMeals[mealType].filter(id => id !== stringFoodId);
           }
+          
+          // Ensure all IDs are stored as strings
+          Object.keys(updatedMeals).forEach(key => {
+            updatedMeals[key] = updatedMeals[key].map(id => String(id));
+          });
           
           return updatedMeals;
         });
@@ -78,6 +83,11 @@ export const useFoodSelection = () => {
         // Ensure foodId is always a string
         mealTypeMap[mealType].push(String(foodId));
       }
+    });
+    
+    // Double-check that all IDs are strings
+    Object.keys(mealTypeMap).forEach(key => {
+      mealTypeMap[key] = mealTypeMap[key].map(id => String(id));
     });
     
     setFoodsByMealType(mealTypeMap);
