@@ -122,6 +122,8 @@ export const FoodSelector = ({
   }, []);
 
   const handleConfirm = async () => {
+    console.log("Botão Confirmar Seleção clicado");
+    
     if (selectedFoods.length === 0) {
       toast.error("Selecione pelo menos um alimento");
       return;
@@ -133,15 +135,19 @@ export const FoodSelector = ({
     }
 
     try {
+      console.log("Chamando função onConfirm...");
       // Salvar os alimentos selecionados e prosseguir
       const result = await onConfirm();
+      
+      console.log("Resultado da função onConfirm:", result);
       
       // Se retornar um booleano, verificamos se é verdadeiro
       if (result === false) {
         console.error("Falha ao confirmar seleção de alimentos");
         toast.error("Erro ao salvar suas preferências alimentares. Tente novamente.");
       } else {
-        console.log("Confirmação de seleção de alimentos enviada");
+        console.log("Confirmação de seleção de alimentos bem-sucedida");
+        toast.success("Seleção de alimentos confirmada! Avançando para próxima etapa...");
       }
     } catch (error) {
       console.error("Erro ao processar a confirmação:", error);
@@ -155,12 +161,18 @@ export const FoodSelector = ({
   const dinnerFoods = protocolFoods.filter(food => food.food_group_id === 4);
 
   return (
-    <div className="space-y-8 w-full pb-24"> {/* Adicionado padding-bottom para evitar que o conteúdo fique atrás da barra fixa */}
+    <div className="space-y-8 w-full pb-24"> {/* Padding-bottom para evitar que o conteúdo fique atrás da barra fixa */}
       <div className="text-center space-y-3">
         <h2 className="text-2xl font-semibold text-gray-900">Opções de Preferência dos Alimentos</h2>
         <p className="text-gray-600 max-w-2xl mx-auto">
           Selecione suas opções preferidas de alimentos para cada refeição. A IA utilizará suas escolhas para gerar um cardápio personalizado e balanceado.
         </p>
+        <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 max-w-xl mx-auto">
+          <p className="text-sm text-yellow-700">
+            <strong>Dica:</strong> Após selecionar seus alimentos preferidos, clique no botão "Confirmar Seleção" 
+            no final da página ou na barra inferior para avançar para a próxima etapa.
+          </p>
+        </div>
       </div>
 
       {paymentRequired && (
@@ -225,6 +237,32 @@ export const FoodSelector = ({
         />
       </div>
 
+      {/* Botão de confirmação central */}
+      <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4 text-center">
+        <p className="text-sm text-green-700 mb-3">
+          <strong>Você selecionou {selectedFoods.length} alimentos.</strong><br/>
+          Clique abaixo para confirmar sua seleção e prosseguir para a próxima etapa.
+        </p>
+        <Button 
+          onClick={handleConfirm}
+          className="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 text-lg font-bold rounded-md shadow-sm"
+          size="lg"
+        >
+          ✓ Confirmar Seleção e Continuar
+        </Button>
+      </div>
+
+      {/* Botão de confirmação alternativo (visível ao rolar até o final) */}
+      <div className="mt-12 flex justify-center">
+        <Button 
+          onClick={handleConfirm}
+          className="bg-green-500 hover:bg-green-600 text-white px-8 py-3 font-semibold text-lg"
+          size="lg"
+        >
+          Confirmar Seleção ({selectedFoods.length} alimentos)
+        </Button>
+      </div>
+
       {/* Barra de ações inferior */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t py-4 px-4 md:px-8 shadow-md z-10">
         <div className="max-w-4xl mx-auto flex justify-between items-center gap-4">
@@ -237,23 +275,12 @@ export const FoodSelector = ({
           </Button>
           <Button 
             onClick={handleConfirm}
-            className="flex-1 bg-green-500 hover:bg-green-600 text-white max-w-sm font-semibold"
+            className="flex-1 bg-green-500 hover:bg-green-600 text-white max-w-sm font-semibold animate-pulse"
             size="lg"
           >
             Confirmar Seleção ({selectedFoods.length} alimentos)
           </Button>
         </div>
-      </div>
-
-      {/* Botão de confirmação alternativo (visível ao rolar até o final) */}
-      <div className="mt-12 flex justify-center">
-        <Button 
-          onClick={handleConfirm}
-          className="bg-green-500 hover:bg-green-600 text-white px-8 py-3 font-semibold text-lg"
-          size="lg"
-        >
-          Confirmar Seleção ({selectedFoods.length} alimentos)
-        </Button>
       </div>
     </div>
   );

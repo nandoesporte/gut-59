@@ -47,6 +47,13 @@ const Menu = () => {
     console.log("Etapa atual:", currentStep);
   }, [currentStep]);
 
+  // Função de debug para testar a transição manual de etapas
+  const forceNextStep = () => {
+    console.log("Forçando próxima etapa. Etapa atual:", currentStep);
+    setCurrentStep(prev => prev + 1);
+    console.log("Nova etapa:", currentStep + 1);
+  };
+
   if (loading) {
     return (
       <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-4">
@@ -81,40 +88,79 @@ const Menu = () => {
                 <span className={`bg-${currentStep >= 1 ? 'green' : 'gray'}-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2`}>1</span>
                 Dados Básicos e Calorias
               </h2>
-              <CalorieCalculatorStep
-                formData={formData}
-                onInputChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
-                onCalculate={handleCalculateCalories}
-                calorieNeeds={calorieNeeds}
-              />
+              {currentStep === 1 && (
+                <CalorieCalculatorStep
+                  formData={formData}
+                  onInputChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
+                  onCalculate={handleCalculateCalories}
+                  calorieNeeds={calorieNeeds}
+                />
+              )}
+              {currentStep > 1 && (
+                <div className="text-center py-2">
+                  <p className="text-green-600 font-medium">✓ Calorias diárias calculadas: {calorieNeeds} kcal</p>
+                  <button 
+                    onClick={() => setCurrentStep(1)} 
+                    className="text-sm text-gray-500 underline mt-2"
+                  >
+                    Editar
+                  </button>
+                </div>
+              )}
             </Card>
 
             {/* Etapa 2: Seleção de Alimentos */}
-            <Card className={`p-4 sm:p-6 ${!calorieNeeds ? 'opacity-50 pointer-events-none' : ''}`}>
+            <Card className={`p-4 sm:p-6 ${currentStep < 2 ? 'opacity-70' : ''}`}>
               <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center">
                 <span className={`bg-${currentStep >= 2 ? 'green' : 'gray'}-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2`}>2</span>
                 Preferências Alimentares
               </h2>
-              <FoodSelector
-                protocolFoods={protocolFoods}
-                selectedFoods={selectedFoods}
-                onFoodSelection={handleFoodSelection}
-                totalCalories={totalCalories}
-                onBack={() => setCurrentStep(1)}
-                onConfirm={handleConfirmFoodSelection}
-              />
+              {currentStep === 2 && (
+                <FoodSelector
+                  protocolFoods={protocolFoods}
+                  selectedFoods={selectedFoods}
+                  onFoodSelection={handleFoodSelection}
+                  totalCalories={totalCalories}
+                  onBack={() => setCurrentStep(1)}
+                  onConfirm={handleConfirmFoodSelection}
+                />
+              )}
+              {currentStep > 2 && (
+                <div className="text-center py-2">
+                  <p className="text-green-600 font-medium">✓ {selectedFoods.length} alimentos selecionados</p>
+                  <button 
+                    onClick={() => setCurrentStep(2)} 
+                    className="text-sm text-gray-500 underline mt-2"
+                  >
+                    Editar
+                  </button>
+                </div>
+              )}
             </Card>
 
             {/* Etapa 3: Preferências Dietéticas */}
-            <Card className={`p-4 sm:p-6 ${currentStep < 3 ? 'opacity-50 pointer-events-none' : ''}`}>
+            <Card className={`p-4 sm:p-6 ${currentStep < 3 ? 'opacity-70' : ''}`}>
               <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center">
                 <span className={`bg-${currentStep >= 3 ? 'green' : 'gray'}-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2`}>3</span>
                 Restrições e Preferências
               </h2>
-              <DietaryPreferencesForm
-                onSubmit={handleDietaryPreferences}
-                onBack={() => setCurrentStep(2)}
-              />
+              {currentStep === 3 && (
+                <DietaryPreferencesForm
+                  onSubmit={handleDietaryPreferences}
+                  onBack={() => setCurrentStep(2)}
+                />
+              )}
+              {currentStep > 3 && (
+                <div className="text-center py-2">
+                  <p className="text-green-600 font-medium">✓ Preferências dietéticas registradas</p>
+                  <button 
+                    onClick={() => setCurrentStep(3)} 
+                    className="text-sm text-gray-500 underline mt-2"
+                  >
+                    Editar
+                  </button>
+                </div>
+              )}
             </Card>
 
             {/* Etapa 4: Exibição do Plano */}
@@ -138,6 +184,27 @@ const Menu = () => {
                     }}
                   />
                 </Card>
+              </div>
+            )}
+
+            {/* Debug Button - Remover em produção */}
+            {import.meta.env.DEV && (
+              <div className="mt-4 border border-red-300 p-4 bg-red-50 rounded">
+                <h3 className="text-red-600 font-medium mb-2">Debug Controls (apenas em ambiente de desenvolvimento)</h3>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={forceNextStep}
+                    className="px-3 py-1 bg-red-100 border border-red-300 rounded hover:bg-red-200"
+                  >
+                    Forçar próxima etapa (current: {currentStep})
+                  </button>
+                  <button 
+                    onClick={() => handleConfirmFoodSelection()}
+                    className="px-3 py-1 bg-blue-100 border border-blue-300 rounded hover:bg-blue-200"
+                  >
+                    Testar Confirm Food Selection
+                  </button>
+                </div>
               </div>
             )}
 

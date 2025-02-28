@@ -178,6 +178,7 @@ export const useMenuController = () => {
         }
         
         setCurrentStep(2);
+        console.log("Avançando para a etapa 2 (seleção de alimentos)");
       }
       return calories !== null;
     } catch (error) {
@@ -189,10 +190,18 @@ export const useMenuController = () => {
 
   const handleConfirmFoodSelection = async () => {
     console.log("Iniciando confirmação de seleção de alimentos");
+    
+    if (selectedFoods.length === 0) {
+      console.warn("Nenhum alimento selecionado!");
+      toast.error("Por favor, selecione pelo menos um alimento antes de prosseguir");
+      return false;
+    }
+    
     // Salvar seleção de alimentos na tabela
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
+        console.error("Usuário não autenticado");
         toast.error("Usuário não autenticado");
         return false;
       }
@@ -213,6 +222,8 @@ export const useMenuController = () => {
         return false;
       }
 
+      let updateSuccess = false;
+      
       if (existingPrefs) {
         console.log("Encontrado registro existente. Atualizando...");
         // Atualizar o registro existente
@@ -225,6 +236,8 @@ export const useMenuController = () => {
           console.error('Erro ao atualizar preferências:', updateError);
           toast.error("Erro ao salvar preferências de alimentos");
           return false;
+        } else {
+          updateSuccess = true;
         }
       } else {
         console.log("Nenhum registro encontrado. Criando novo...");
@@ -246,13 +259,20 @@ export const useMenuController = () => {
           console.error('Erro ao inserir preferências:', insertError);
           toast.error("Erro ao salvar preferências de alimentos");
           return false;
+        } else {
+          updateSuccess = true;
         }
       }
 
-      toast.success("Preferências de alimentos salvas com sucesso!");
-      console.log("Avançando para a etapa 3");
-      setCurrentStep(3);
-      return true;
+      if (updateSuccess) {
+        toast.success("Preferências de alimentos salvas com sucesso!");
+        console.log("Avançando para a etapa 3 (restrições dietéticas)");
+        setCurrentStep(3);
+        return true;
+      }
+      
+      console.error("Falha ao salvar preferências de alimentos");
+      return false;
     } catch (error) {
       console.error('Erro ao salvar preferências de alimentos:', error);
       toast.error("Erro ao salvar preferências de alimentos");
@@ -331,6 +351,7 @@ export const useMenuController = () => {
       setMealPlan(generatedMealPlan);
       setDietaryPreferences(preferences);
       setCurrentStep(4);
+      console.log("Avançando para a etapa 4 (exibição do plano alimentar)");
       return true;
 
     } catch (error) {
