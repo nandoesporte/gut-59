@@ -1,108 +1,159 @@
-import { calculateNutritionalScore } from './nutritional-scorer.ts';
-import { calculatePortionSize } from './portion-calculator.ts';
-import type { Food, MealPlan, MealType, UserPreferences } from './types';
 
-export function analyzeMealPlan(
-  foods: Food[],
-  userPreferences: UserPreferences,
-  goal: string
-): MealPlan {
-  // Filter foods based on dietary restrictions and allergies
-  const allowedFoods = foods.filter(food => {
-    if (userPreferences.allergies && userPreferences.allergies.length > 0) {
-      if (food.allergens && food.allergens.some(allergen => userPreferences.allergies?.includes(allergen))) {
-        return false; // Food contains allergens the user is allergic to
-      }
-    }
-    if (userPreferences.dietaryRestrictions && userPreferences.dietaryRestrictions.length > 0) {
-      if (food.suitable_for && !food.suitable_for.some(restriction => userPreferences.dietaryRestrictions?.includes(restriction))) {
-        return false; // Food is not suitable for the user's dietary restrictions
-      }
-    }
-    return true; // Food is allowed
+import { Meal, Food, DailyPlan, NutrientAnalysis } from './types';
+import { calculatePortionSize } from './portion-calculator.ts';
+import { scoreNutritionalProfile } from './nutritional-scorer.ts';
+
+export function analyzeMealPlan(dailyPlan: DailyPlan): NutrientAnalysis {
+  // Calculate total and average nutrients
+  const totalCalories = Object.values(dailyPlan.meals).reduce(
+    (sum, meal) => sum + meal.totalNutrients.calories, 0
+  );
+  
+  const totalProtein = Object.values(dailyPlan.meals).reduce(
+    (sum, meal) => sum + meal.totalNutrients.protein, 0
+  );
+  
+  const totalCarbs = Object.values(dailyPlan.meals).reduce(
+    (sum, meal) => sum + meal.totalNutrients.carbs, 0
+  );
+  
+  const totalFats = Object.values(dailyPlan.meals).reduce(
+    (sum, meal) => sum + meal.totalNutrients.fats, 0
+  );
+  
+  const totalFiber = Object.values(dailyPlan.meals).reduce(
+    (sum, meal) => sum + meal.totalNutrients.fiber, 0
+  );
+
+  // Calculate macronutrient ratios
+  const totalCaloriesFromMacros = 
+    (totalProtein * 4) + (totalCarbs * 4) + (totalFats * 9);
+  
+  const proteinPercentage = Math.round((totalProtein * 4 / totalCaloriesFromMacros) * 100);
+  const carbsPercentage = Math.round((totalCarbs * 4 / totalCaloriesFromMacros) * 100);
+  const fatsPercentage = Math.round((totalFats * 9 / totalCaloriesFromMacros) * 100);
+
+  // Score the nutritional profile
+  const nutritionalScore = scoreNutritionalProfile({
+    calories: totalCalories,
+    protein: totalProtein,
+    carbs: totalCarbs,
+    fats: totalFats,
+    fiber: totalFiber
   });
 
-  // Score each food based on nutritional value and user preferences
-  const scoredFoods = allowedFoods.map(food => ({
-    ...food,
-    score: calculateNutritionalScore(food, goal, {
-      likedFoods: userPreferences.likedFoods,
-      dislikedFoods: userPreferences.dislikedFoods
-    })
+  // Analyze meal balance and timing
+  const mealCalorieDistribution = Object.entries(dailyPlan.meals).map(([mealType, meal]) => ({
+    mealType,
+    percentage: Math.round((meal.totalNutrients.calories / totalCalories) * 100)
   }));
 
-  // Sort foods by score
-  const sortedFoods = scoredFoods.sort((a, b) => b.score - a.score);
-
-  // Determine portion sizes for each meal
-  const breakfastFoods = sortedFoods.filter(food => food.meal_type?.includes('breakfast'));
-  const lunchFoods = sortedFoods.filter(food => food.meal_type?.includes('lunch'));
-  const dinnerFoods = sortedFoods.filter(food => food.meal_type?.includes('dinner'));
-  const snackFoods = sortedFoods.filter(food => food.meal_type?.includes('snack'));
-
-  const breakfast = selectFoodsForMeal(breakfastFoods, 'breakfast');
-  const lunch = selectFoodsForMeal(lunchFoods, 'lunch');
-  const dinner = selectFoodsForMeal(dinnerFoods, 'dinner');
-  const snacks = selectFoodsForMeal(snackFoods, 'snack');
-
-  // Construct the meal plan
-  const mealPlan: MealPlan = {
-    breakfast,
-    lunch,
-    dinner,
-    snacks,
-    totalCalories: breakfast.calories + lunch.calories + dinner.calories + snacks.calories,
-    totalProtein: breakfast.protein + lunch.protein + dinner.protein + snacks.protein,
-    totalCarbs: breakfast.carbs + lunch.carbs + dinner.carbs + snacks.carbs,
-    totalFats: breakfast.fats + lunch.fats + dinner.fats + snacks.fats
+  return {
+    totalNutrients: {
+      calories: totalCalories,
+      protein: totalProtein,
+      carbs: totalCarbs,
+      fats: totalFats,
+      fiber: totalFiber
+    },
+    macroRatios: {
+      protein: proteinPercentage,
+      carbs: carbsPercentage,
+      fats: fatsPercentage
+    },
+    mealDistribution: mealCalorieDistribution,
+    nutritionalScore,
+    recommendations: generateRecommendations({
+      macroRatios: {
+        protein: proteinPercentage,
+        carbs: carbsPercentage,
+        fats: fatsPercentage
+      },
+      totalNutrients: {
+        calories: totalCalories,
+        protein: totalProtein,
+        carbs: totalCarbs,
+        fats: totalFats,
+        fiber: totalFiber
+      },
+      mealDistribution: mealCalorieDistribution
+    })
   };
-
-  return mealPlan;
 }
 
-function selectFoodsForMeal(foods: Food[], mealType: MealType): {
-  foods: {
-    name: string;
-    portion: number;
-    unit: string;
-    calories: number;
-    protein: number;
-    carbs: number;
-    fats: number;
-  }[];
-  calories: number;
-  protein: number;
-  carbs: number;
-  fats: number;
-} {
-  let selectedFoods = [];
-  let calories = 0;
-  let protein = 0;
-  let carbs = 0;
-  let fats = 0;
+function generateRecommendations(analysis: {
+  macroRatios: { protein: number; carbs: number; fats: number };
+  totalNutrients: { calories: number; protein: number; carbs: number; fats: number; fiber: number };
+  mealDistribution: { mealType: string; percentage: number }[];
+}): string[] {
+  const recommendations: string[] = [];
 
-  for (const food of foods) {
-    const portion = calculatePortionSize(food); // Assuming this function exists
-    selectedFoods.push({
-      name: food.name,
-      portion: portion,
-      unit: food.serving_unit || 'g',
-      calories: (food.calories / 100) * portion,
-      protein: (food.protein / 100) * portion,
-      carbs: (food.carbs / 100) * portion,
-      fats: (food.fats / 100) * portion
-    });
-    calories += (food.calories / 100) * portion;
-    protein += (food.protein / 100) * portion;
-    carbs += (food.carbs / 100) * portion;
-    fats += (food.fats / 100) * portion;
+  // Check protein intake
+  if (analysis.macroRatios.protein < 15) {
+    recommendations.push(
+      "Aumentar a ingestão de proteínas incluindo mais fontes como frango, peixe, ovos, tofu ou leguminosas."
+    );
+  } else if (analysis.macroRatios.protein > 35) {
+    recommendations.push(
+      "Diminuir ligeiramente a ingestão de proteínas e aumentar a proporção de carboidratos complexos e gorduras saudáveis."
+    );
   }
 
-  return {
-    foods: selectedFoods,
-    calories: calories,
-    protein: protein,
-    carbs: carbs,
-    fats: fats
-  };
+  // Check carbohydrate intake
+  if (analysis.macroRatios.carbs < 40) {
+    recommendations.push(
+      "Considerar aumentar o consumo de carboidratos complexos como grãos integrais, frutas e legumes."
+    );
+  } else if (analysis.macroRatios.carbs > 65) {
+    recommendations.push(
+      "Reduzir a proporção de carboidratos e aumentar a ingestão de proteínas e gorduras saudáveis para maior saciedade."
+    );
+  }
+
+  // Check fat intake
+  if (analysis.macroRatios.fats < 20) {
+    recommendations.push(
+      "Aumentar o consumo de gorduras saudáveis como azeite, abacate, oleaginosas e peixes gordurosos."
+    );
+  } else if (analysis.macroRatios.fats > 35) {
+    recommendations.push(
+      "Reduzir ligeiramente a ingestão de gorduras, especialmente as gorduras saturadas."
+    );
+  }
+
+  // Check fiber intake
+  if (analysis.totalNutrients.fiber < 25) {
+    recommendations.push(
+      "Aumentar o consumo de fibras incluindo mais legumes, frutas, grãos integrais e leguminosas."
+    );
+  }
+
+  // Check meal distribution
+  const breakfast = analysis.mealDistribution.find(meal => meal.mealType === "breakfast");
+  if (breakfast && breakfast.percentage < 15) {
+    recommendations.push(
+      "Tornar o café da manhã mais substancial para melhor distribuição calórica ao longo do dia."
+    );
+  }
+  
+  // If you have a dinner entry, you can also check if dinner is too heavy
+  const dinner = analysis.mealDistribution.find(meal => meal.mealType === "dinner");
+  if (dinner && dinner.percentage > 35) {
+    recommendations.push(
+      "Distribuir mais calorias nas refeições anteriores e reduzir o tamanho do jantar."
+    );
+  }
+
+  // General recommendations for healthier eating patterns
+  if (recommendations.length === 0) {
+    recommendations.push(
+      "Manter o padrão alimentar atual que apresenta boa distribuição de macronutrientes."
+    );
+  }
+
+  recommendations.push(
+    "Manter-se bem hidratado bebendo pelo menos 2 litros de água por dia."
+  );
+
+  return recommendations;
 }
