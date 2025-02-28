@@ -10,6 +10,22 @@ import { useFoodSelection } from "./hooks/useFoodSelection";
 import { useWallet } from "@/hooks/useWallet";
 import { generateMealPlan } from "./hooks/useMealPlanGeneration";
 
+// Função auxiliar para mapear valores de goal para os valores aceitos pelo banco de dados
+const mapGoalToDbValue = (goal: string | undefined): "maintain" | "lose_weight" | "gain_mass" => {
+  if (!goal) return "maintain";
+  
+  switch (goal) {
+    case "lose":
+      return "lose_weight";
+    case "gain":
+      return "gain_mass";
+    case "maintain":
+      return "maintain";
+    default:
+      return "maintain";
+  }
+};
+
 export const useMenuController = () => {
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [dietaryPreferences, setDietaryPreferences] = useState<DietaryPreferences | null>(null);
@@ -94,6 +110,9 @@ export const useMenuController = () => {
         // Também salvar os dados básicos do usuário
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
+          console.log("Salvando preferências para o usuário:", user.id);
+          console.log("Dados do formulário:", formData);
+          
           // Verificar se já existe um registro
           const { data: existingRecord, error: selectError } = await supabase
             .from('nutrition_preferences')
@@ -107,9 +126,12 @@ export const useMenuController = () => {
           
           // Mapear os valores para os tipos esperados
           const activityLevel = formData.activityLevel as "sedentary" | "light" | "moderate" | "intense";
-          const goal = formData.goal as "maintain" | "lose_weight" | "gain_mass";
+          const goal = mapGoalToDbValue(formData.goal);
+          
+          console.log("Mapeamento de objetivo:", formData.goal, "->", goal);
           
           if (existingRecord) {
+            console.log("Atualizando registro existente:", existingRecord.id);
             // Atualizar registro existente
             const { error } = await supabase
               .from('nutrition_preferences')
@@ -127,8 +149,11 @@ export const useMenuController = () => {
             
             if (error) {
               console.error('Erro ao atualizar preferências nutricionais:', error);
+            } else {
+              console.log("Preferências atualizadas com sucesso");
             }
           } else {
+            console.log("Criando novo registro de preferências");
             // Inserir novo registro
             const { error } = await supabase
               .from('nutrition_preferences')
@@ -146,6 +171,8 @@ export const useMenuController = () => {
             
             if (error) {
               console.error('Erro ao inserir preferências nutricionais:', error);
+            } else {
+              console.log("Novas preferências criadas com sucesso");
             }
           }
         }
@@ -170,6 +197,9 @@ export const useMenuController = () => {
         return false;
       }
 
+      console.log("Confirmando seleção de alimentos para usuário:", user.id);
+      console.log("Alimentos selecionados:", selectedFoods);
+
       // Buscar o registro atual
       const { data: existingPrefs, error: fetchError } = await supabase
         .from('nutrition_preferences')
@@ -179,9 +209,12 @@ export const useMenuController = () => {
 
       if (fetchError) {
         console.error('Erro ao buscar preferências existentes:', fetchError);
+        toast.error("Erro ao recuperar suas preferências");
+        return false;
       }
 
       if (existingPrefs) {
+        console.log("Encontrado registro existente. Atualizando...");
         // Atualizar o registro existente
         const { error: updateError } = await supabase
           .from('nutrition_preferences')
@@ -194,6 +227,7 @@ export const useMenuController = () => {
           return false;
         }
       } else {
+        console.log("Nenhum registro encontrado. Criando novo...");
         // Se não existir, criar um novo com valores mínimos necessários
         const { error: insertError } = await supabase
           .from('nutrition_preferences')
