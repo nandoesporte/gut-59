@@ -77,11 +77,11 @@ export const useFoodSelection = () => {
     };
     
     selectedFoods.forEach(foodId => {
-      const food = foods.find(f => String(f.id) === String(foodId));
+      const food = foods.find(f => String(f.id) === foodId);
       if (food) {
         const mealType = FOOD_GROUP_TO_MEAL_TYPE[food.food_group_id as keyof typeof FOOD_GROUP_TO_MEAL_TYPE] || 'snack';
         // Ensure foodId is always a string
-        mealTypeMap[mealType].push(String(foodId));
+        mealTypeMap[mealType].push(foodId);
       }
     });
     
