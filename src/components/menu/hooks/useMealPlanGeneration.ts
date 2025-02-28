@@ -92,8 +92,9 @@ export const generateMealPlan = async ({
       // Continuar com os dados originais
     }
 
+    // Garantir que todos os IDs são strings
     const selectedFoodsDetails = enhancedFoods.map(food => ({
-      id: food.id,
+      id: String(food.id), // Garantir que o ID é uma string
       name: food.name,
       calories: food.calories,
       protein: food.protein || 0,
@@ -136,15 +137,31 @@ export const generateMealPlan = async ({
     };
     
     // Organizar alimentos por refeição para enviar à edge function
+    // Garantir que foodsByMealTypeFormatted contém apenas arrays de strings como IDs de alimentos
     const foodsByMealTypeFormatted: Record<string, any[]> = {};
     
     if (foodsByMealType) {
-      // Usamos a categorização que já foi feita
+      // Garantir que estamos recebendo apenas IDs de alimentos como strings
       Object.entries(foodsByMealType).forEach(([mealType, foodIds]) => {
         const mealTypeMapped = mealTypeMapping[mealType as keyof typeof mealTypeMapping] || mealType;
-        foodsByMealTypeFormatted[mealTypeMapped] = selectedFoodsDetails.filter(food => 
-          foodIds.includes(food.id)
-        );
+        
+        // Validar a estrutura de foodIds
+        if (Array.isArray(foodIds)) {
+          // Filtrar apenas os IDs que existem na lista de alimentos selecionados
+          // e garantir que tudo seja string
+          const validFoodIds = foodIds.map(id => String(id))
+                                   .filter(id => selectedFoodsDetails.some(food => String(food.id) === id));
+              
+          // Buscar os detalhes completos dos alimentos usando os IDs
+          foodsByMealTypeFormatted[mealTypeMapped] = selectedFoodsDetails.filter(food => 
+            validFoodIds.includes(String(food.id))
+          );
+          
+          console.log(`[MEAL PLAN] Refeição ${mealType} tem ${foodsByMealTypeFormatted[mealTypeMapped].length} alimentos válidos`);
+        } else {
+          console.warn(`[MEAL PLAN] foodsByMealType[${mealType}] não é um array:`, foodIds);
+          foodsByMealTypeFormatted[mealTypeMapped] = [];
+        }
       });
     } else {
       // Categorização automática baseada no food_group_id se não tivermos categorizados
@@ -154,11 +171,26 @@ export const generateMealPlan = async ({
       foodsByMealTypeFormatted.dinner = selectedFoodsDetails.filter(food => food.food_group_id === 4);
     }
     
-    console.log('[MEAL PLAN] Alimentos formatados por refeição:', foodsByMealTypeFormatted);
+    console.log('[MEAL PLAN] Alimentos formatados por refeição:', 
+      Object.entries(foodsByMealTypeFormatted).map(([type, foods]) => 
+        `${type}: ${foods.length} alimentos`
+      )
+    );
+    
+    // Debug para verificar a estrutura exata enviada
+    for (const mealType in foodsByMealTypeFormatted) {
+      console.log(`[MEAL PLAN] Verificando estrutura da refeição ${mealType}:`);
+      if (foodsByMealTypeFormatted[mealType].length > 0) {
+        console.log(`Primeiro item: ${JSON.stringify(foodsByMealTypeFormatted[mealType][0])}`);
+      } else {
+        console.log('Nenhum alimento nesta refeição');
+      }
+    }
     
     // Melhorar a solicitação enviada à edge function com alimentos organizados por refeição
     const enhancedPayload = {
       userData: {
+        id: userData.id, // Garantir que o ID do usuário está incluído
         weight: Math.round(userData.weight),
         height: Math.round(userData.height),
         age: userData.age,
@@ -186,7 +218,7 @@ export const generateMealPlan = async ({
       }
     };
     
-    console.log('[MEAL PLAN] Enviando payload aprimorado:', JSON.stringify(enhancedPayload, null, 2));
+    console.log('[MEAL PLAN] Enviando payload aprimorado:', JSON.stringify(enhancedPayload.foodsByMealType, null, 2));
     
     // Definir timeout para capturar falhas por timeout (30 segundos - aumentado para dar mais tempo ao processamento)
     const edgeFunctionTimeout = 30000;
@@ -371,10 +403,18 @@ export const generateMealPlan = async ({
     // Retornar um plano padrão em caso de falha
     return createDefaultMealPlan(userData, selectedFoods, foodsByMealType ? 
       {
-        breakfast: selectedFoods.filter(food => foodsByMealType.breakfast.includes(food.id)),
-        lunch: selectedFoods.filter(food => foodsByMealType.lunch.includes(food.id)),
-        snack: selectedFoods.filter(food => foodsByMealType.snack.includes(food.id)),
-        dinner: selectedFoods.filter(food => foodsByMealType.dinner.includes(food.id))
+        breakfast: selectedFoods.filter(food => 
+          foodsByMealType.breakfast.includes(String(food.id))
+        ),
+        lunch: selectedFoods.filter(food => 
+          foodsByMealType.lunch.includes(String(food.id))
+        ),
+        snack: selectedFoods.filter(food => 
+          foodsByMealType.snack.includes(String(food.id))
+        ),
+        dinner: selectedFoods.filter(food => 
+          foodsByMealType.dinner.includes(String(food.id))
+        )
       } : undefined);
   }
 };
