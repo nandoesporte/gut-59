@@ -35,6 +35,7 @@ const Menu = () => {
   // Auto-scroll to meal plan when it's generated
   useEffect(() => {
     if (mealPlan && mealPlanRef.current) {
+      console.log("Scrolling to meal plan section");
       mealPlanRef.current.scrollIntoView({ 
         behavior: 'smooth',
         block: 'start'
@@ -45,7 +46,27 @@ const Menu = () => {
   // Debug para verificar as transições de etapa
   useEffect(() => {
     console.log("Etapa atual:", currentStep);
-  }, [currentStep]);
+    console.log("Plano de refeição disponível:", !!mealPlan);
+    if (mealPlan) {
+      console.log("Detalhes do plano:", {
+        temPlanoSemanal: !!mealPlan.weeklyPlan,
+        diasDisponiveis: mealPlan.weeklyPlan ? Object.keys(mealPlan.weeklyPlan) : []
+      });
+    }
+  }, [currentStep, mealPlan]);
+
+  const handleRefreshMealPlan = async () => {
+    try {
+      // Se houver função para gerar novo plano, poderia ser chamada aqui
+      // Por enquanto vamos apenas mostrar uma mensagem
+      toast.info("Funcionalidade de atualização em desenvolvimento");
+      return Promise.resolve();
+    } catch (error) {
+      console.error('Erro ao atualizar cardápio:', error);
+      toast.error("Erro ao atualizar o cardápio");
+      return Promise.reject(error);
+    }
+  };
 
   if (loading) {
     return (
@@ -157,7 +178,7 @@ const Menu = () => {
             </Card>
 
             {/* Etapa 4: Exibição do Plano */}
-            {mealPlan && (
+            {currentStep === 4 && mealPlan && (
               <div ref={mealPlanRef}>
                 <Card className="p-4 sm:p-6">
                   <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center">
@@ -166,15 +187,7 @@ const Menu = () => {
                   </h2>
                   <MealPlanDisplay
                     mealPlan={mealPlan}
-                    onRefresh={async () => {
-                      try {
-                        return Promise.resolve();
-                      } catch (error) {
-                        console.error('Erro ao atualizar cardápio:', error);
-                        toast.error("Erro ao atualizar o cardápio");
-                        return Promise.reject(error);
-                      }
-                    }}
+                    onRefresh={handleRefreshMealPlan}
                   />
                 </Card>
               </div>

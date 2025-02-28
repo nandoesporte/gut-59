@@ -382,12 +382,18 @@ export const useMenuController = () => {
       }
 
       console.log('Plano gerado:', generatedMealPlan);
+      
+      // Definimos o plano gerado no estado
       setMealPlan(generatedMealPlan);
+      
+      // Definimos as preferências dietéticas no estado
       setDietaryPreferences(preferences);
-      setCurrentStep(4);
+      
+      // Atualizamos o estado para a etapa 4 (exibição do plano)
       console.log("Avançando para a etapa 4 (exibição do plano alimentar)");
+      setCurrentStep(4);
+      
       return true;
-
     } catch (error) {
       console.error('Erro completo:', error);
       toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
@@ -396,6 +402,15 @@ export const useMenuController = () => {
       setLoading(false);
     }
   };
+
+  // Para debugging: monitorar alterações no mealPlan
+  useEffect(() => {
+    if (mealPlan) {
+      console.log("PLANO ALIMENTAR ATUALIZADO:", mealPlan);
+      console.log("Plano possui weeklyPlan?", !!mealPlan.weeklyPlan);
+      console.log("Step atual:", currentStep);
+    }
+  }, [mealPlan, currentStep]);
 
   return {
     currentStep,
