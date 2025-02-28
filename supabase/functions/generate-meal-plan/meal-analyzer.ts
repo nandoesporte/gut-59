@@ -1,69 +1,108 @@
-
-import type { Food, MacroTargets, MealPlan, MealAnalysis } from './types';
-import { calculateNutritionalScore } from './nutritional-scorer';
+import { calculateNutritionalScore } from './nutritional-scorer.ts';
 import { calculatePortionSize } from './portion-calculator.ts';
+import type { Food, MealPlan, MealType, UserPreferences } from './types';
 
-export function analyzeMealPlan(plan: MealPlan, targetCalories: number, macroTargets: MacroTargets): MealAnalysis {
-  let totalCalories = 0;
-  let totalProtein = 0;
-  let totalCarbs = 0;
-  let totalFats = 0;
-  let totalFiber = 0;
-  let mealCount = 0;
-
-  // Analyze each day
-  for (const day of Object.values(plan.weeklyPlan)) {
-    if (day.meals) {
-      // Analyze each meal in the day
-      for (const meal of Object.values(day.meals)) {
-        if (meal) {
-          totalCalories += meal.calories || 0;
-          totalProtein += meal.macros?.protein || 0;
-          totalCarbs += meal.macros?.carbs || 0;
-          totalFats += meal.macros?.fats || 0;
-          totalFiber += meal.macros?.fiber || 0;
-          mealCount++;
-        }
+export function analyzeMealPlan(
+  foods: Food[],
+  userPreferences: UserPreferences,
+  goal: string
+): MealPlan {
+  // Filter foods based on dietary restrictions and allergies
+  const allowedFoods = foods.filter(food => {
+    if (userPreferences.allergies && userPreferences.allergies.length > 0) {
+      if (food.allergens && food.allergens.some(allergen => userPreferences.allergies?.includes(allergen))) {
+        return false; // Food contains allergens the user is allergic to
       }
     }
-  }
+    if (userPreferences.dietaryRestrictions && userPreferences.dietaryRestrictions.length > 0) {
+      if (food.suitable_for && !food.suitable_for.some(restriction => userPreferences.dietaryRestrictions?.includes(restriction))) {
+        return false; // Food is not suitable for the user's dietary restrictions
+      }
+    }
+    return true; // Food is allowed
+  });
 
-  // Calculate averages
-  const avgCalories = mealCount > 0 ? totalCalories / mealCount : 0;
-  const avgProtein = mealCount > 0 ? totalProtein / mealCount : 0;
-  const avgCarbs = mealCount > 0 ? totalCarbs / mealCount : 0;
-  const avgFats = mealCount > 0 ? totalFats / mealCount : 0;
-  const avgFiber = mealCount > 0 ? totalFiber / mealCount : 0;
+  // Score each food based on nutritional value and user preferences
+  const scoredFoods = allowedFoods.map(food => ({
+    ...food,
+    score: calculateNutritionalScore(food, goal, {
+      likedFoods: userPreferences.likedFoods,
+      dislikedFoods: userPreferences.dislikedFoods
+    })
+  }));
 
-  // Calculate score
-  const score = calculateNutritionalScore({
-    calories: avgCalories,
-    protein: avgProtein,
-    carbs: avgCarbs,
-    fats: avgFats,
-    fiber: avgFiber
-  }, targetCalories, macroTargets);
+  // Sort foods by score
+  const sortedFoods = scoredFoods.sort((a, b) => b.score - a.score);
 
-  return {
-    averages: {
-      calories: avgCalories,
-      protein: avgProtein,
-      carbs: avgCarbs,
-      fats: avgFats,
-      fiber: avgFiber
-    },
-    totals: {
-      calories: totalCalories,
-      protein: totalProtein,
-      carbs: totalCarbs,
-      fats: totalFats,
-      fiber: totalFiber
-    },
-    mealCount,
-    score
+  // Determine portion sizes for each meal
+  const breakfastFoods = sortedFoods.filter(food => food.meal_type?.includes('breakfast'));
+  const lunchFoods = sortedFoods.filter(food => food.meal_type?.includes('lunch'));
+  const dinnerFoods = sortedFoods.filter(food => food.meal_type?.includes('dinner'));
+  const snackFoods = sortedFoods.filter(food => food.meal_type?.includes('snack'));
+
+  const breakfast = selectFoodsForMeal(breakfastFoods, 'breakfast');
+  const lunch = selectFoodsForMeal(lunchFoods, 'lunch');
+  const dinner = selectFoodsForMeal(dinnerFoods, 'dinner');
+  const snacks = selectFoodsForMeal(snackFoods, 'snack');
+
+  // Construct the meal plan
+  const mealPlan: MealPlan = {
+    breakfast,
+    lunch,
+    dinner,
+    snacks,
+    totalCalories: breakfast.calories + lunch.calories + dinner.calories + snacks.calories,
+    totalProtein: breakfast.protein + lunch.protein + dinner.protein + snacks.protein,
+    totalCarbs: breakfast.carbs + lunch.carbs + dinner.carbs + snacks.carbs,
+    totalFats: breakfast.fats + lunch.fats + dinner.fats + snacks.fats
   };
+
+  return mealPlan;
 }
 
-export function optimizeMealPortions(foods: Food[], targetCalories: number, macroTargets: MacroTargets) {
-  return foods.map(food => calculatePortionSize(food, targetCalories / foods.length, macroTargets));
+function selectFoodsForMeal(foods: Food[], mealType: MealType): {
+  foods: {
+    name: string;
+    portion: number;
+    unit: string;
+    calories: number;
+    protein: number;
+    carbs: number;
+    fats: number;
+  }[];
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+} {
+  let selectedFoods = [];
+  let calories = 0;
+  let protein = 0;
+  let carbs = 0;
+  let fats = 0;
+
+  for (const food of foods) {
+    const portion = calculatePortionSize(food); // Assuming this function exists
+    selectedFoods.push({
+      name: food.name,
+      portion: portion,
+      unit: food.serving_unit || 'g',
+      calories: (food.calories / 100) * portion,
+      protein: (food.protein / 100) * portion,
+      carbs: (food.carbs / 100) * portion,
+      fats: (food.fats / 100) * portion
+    });
+    calories += (food.calories / 100) * portion;
+    protein += (food.protein / 100) * portion;
+    carbs += (food.carbs / 100) * portion;
+    fats += (food.fats / 100) * portion;
+  }
+
+  return {
+    foods: selectedFoods,
+    calories: calories,
+    protein: protein,
+    carbs: carbs,
+    fats: fats
+  };
 }
