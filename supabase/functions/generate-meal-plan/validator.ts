@@ -106,6 +106,101 @@ export const validateMealPlan = (data: unknown) => {
   return data;
 };
 
+// Define a schema for the payload that is received by the function
+const requestSchema = {
+  type: "object",
+  required: ["userData", "selectedFoods"],
+  properties: {
+    userData: {
+      type: "object",
+      required: ["id", "weight", "height", "age", "gender", "activityLevel", "goal"],
+      properties: {
+        id: { type: "string" },
+        weight: { type: "number", minimum: 1 },
+        height: { type: "number", minimum: 1 },
+        age: { type: "number", minimum: 1 },
+        gender: { type: "string", enum: ["male", "female"] },
+        activityLevel: { type: "string", enum: ["sedentary", "light", "moderate", "active", "very_active"] },
+        goal: { type: "string", enum: ["lose_weight", "maintain", "gain_mass"] },
+        dailyCalories: { type: "number", minimum: 0 }
+      },
+      additionalProperties: true
+    },
+    selectedFoods: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["id", "name", "calories", "protein", "carbs", "fats"],
+        properties: {
+          id: { type: ["string", "number"] },
+          name: { type: "string" },
+          calories: { type: "number", minimum: 0 },
+          protein: { type: "number", minimum: 0 },
+          carbs: { type: "number", minimum: 0 },
+          fats: { type: "number", minimum: 0 },
+          fiber: { type: "number", minimum: 0 }
+        },
+        additionalProperties: true
+      },
+      minItems: 1
+    },
+    dietaryPreferences: {
+      type: "object",
+      properties: {
+        hasAllergies: { type: "boolean" },
+        allergies: { 
+          type: "array",
+          items: { type: "string" }
+        },
+        dietaryRestrictions: { 
+          type: "array", 
+          items: { type: "string" }
+        },
+        trainingTime: { 
+          type: ["string", "null"]
+        }
+      },
+      additionalProperties: true
+    },
+    foodsByMealType: {
+      type: "object",
+      additionalProperties: {
+        type: "array",
+        items: { type: "string" }
+      }
+    },
+    options: {
+      type: "object",
+      additionalProperties: true
+    }
+  },
+  additionalProperties: true
+};
+
+// Export the function that validates the incoming payload
+export const validatePayload = (data: unknown): boolean => {
+  try {
+    console.log("Validating payload...");
+    const validate = ajv.compile(requestSchema);
+    const isValid = validate(data);
+    
+    if (!isValid) {
+      const errors = validate.errors?.map(err => ({
+        path: err.instancePath,
+        message: err.message
+      }));
+      console.error("Validation errors:", JSON.stringify(errors, null, 2));
+      return false;
+    }
+    
+    console.log("Payload validation successful");
+    return true;
+  } catch (error) {
+    console.error("Error during validation:", error);
+    return false;
+  }
+};
+
 export const standardizeUnits = (unit: string): string => {
   const unitMap: Record<string, string> = {
     'grama': 'g',
