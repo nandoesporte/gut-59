@@ -94,53 +94,58 @@ export const useMenuController = () => {
         // Também salvar os dados básicos do usuário
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          // Utilizando uma interface para satisfazer o tipo esperado
-          const nutritionData = {
-            weight: Number(formData.weight),
-            height: Number(formData.height),
-            age: Number(formData.age),
-            gender: formData.gender,
-            activity_level: formData.activityLevel,
-            goal: formData.goal,
-            calories_needed: calories,
-            selected_foods: selectedFoods
-          };
+          // Verificar se já existe um registro
+          const { data: existingRecord, error: selectError } = await supabase
+            .from('nutrition_preferences')
+            .select('id')
+            .eq('user_id', user.id)
+            .maybeSingle();
           
-          // Atualizar o registro usando RPC customizada ou procedimento armazenado
-          const { error } = await supabase.rpc('update_nutrition_preferences', {
-            p_user_id: user.id,
-            p_data: nutritionData
-          });
-
-          if (error) {
-            console.error('Erro ao salvar preferências nutricionais:', error);
+          if (selectError) {
+            console.error('Erro ao verificar preferências existentes:', selectError);
+          }
+          
+          // Mapear os valores para os tipos esperados
+          const activityLevel = formData.activityLevel as "sedentary" | "light" | "moderate" | "intense";
+          const goal = formData.goal as "maintain" | "lose_weight" | "gain_mass";
+          
+          if (existingRecord) {
+            // Atualizar registro existente
+            const { error } = await supabase
+              .from('nutrition_preferences')
+              .update({
+                weight: Number(formData.weight),
+                height: Number(formData.height),
+                age: Number(formData.age),
+                gender: formData.gender,
+                activity_level: activityLevel,
+                goal: goal,
+                calories_needed: calories,
+                selected_foods: selectedFoods
+              })
+              .eq('id', existingRecord.id);
             
-            // Fallback: se a RPC falhar, tente uma abordagem alternativa
-            try {
-              // Verificar se já existe um registro
-              const { data: existingRecord } = await supabase
-                .from('nutrition_preferences')
-                .select('id')
-                .eq('user_id', user.id)
-                .single();
-                
-              if (existingRecord) {
-                // Atualizar registro existente
-                await supabase
-                  .from('nutrition_preferences')
-                  .update(nutritionData)
-                  .eq('id', existingRecord.id);
-              } else {
-                // Inserir novo registro
-                await supabase
-                  .from('nutrition_preferences')
-                  .insert({
-                    ...nutritionData,
-                    user_id: user.id
-                  });
-              }
-            } catch (fallbackError) {
-              console.error('Erro no fallback para salvar preferências:', fallbackError);
+            if (error) {
+              console.error('Erro ao atualizar preferências nutricionais:', error);
+            }
+          } else {
+            // Inserir novo registro
+            const { error } = await supabase
+              .from('nutrition_preferences')
+              .insert({
+                user_id: user.id,
+                weight: Number(formData.weight),
+                height: Number(formData.height),
+                age: Number(formData.age),
+                gender: formData.gender,
+                activity_level: activityLevel,
+                goal: goal,
+                calories_needed: calories,
+                selected_foods: selectedFoods
+              });
+            
+            if (error) {
+              console.error('Erro ao inserir preferências nutricionais:', error);
             }
           }
         }
@@ -164,62 +169,46 @@ export const useMenuController = () => {
         return false;
       }
 
-      // Abordagem 1: Usar RPC para atualizar apenas o campo selected_foods
-      const { error: rpcError } = await supabase.rpc('update_nutrition_selected_foods', {
-        p_user_id: user.id,
-        p_selected_foods: selectedFoods
-      });
+      // Buscar o registro atual
+      const { data: existingPrefs, error: fetchError } = await supabase
+        .from('nutrition_preferences')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
 
-      if (rpcError) {
-        console.error('Erro ao usar RPC para salvar alimentos:', rpcError);
-        
-        // Fallback: Abordagem 2 - Buscar o registro e então atualizá-lo
-        try {
-          // Buscar o registro atual
-          const { data: existingPrefs, error: fetchError } = await supabase
-            .from('nutrition_preferences')
-            .select('*')
-            .eq('user_id', user.id)
-            .maybeSingle();
+      if (fetchError) {
+        console.error('Erro ao buscar preferências existentes:', fetchError);
+      }
 
-          if (fetchError) {
-            console.error('Erro ao buscar preferências existentes:', fetchError);
-            throw fetchError;
-          }
+      if (existingPrefs) {
+        // Atualizar o registro existente
+        const { error: updateError } = await supabase
+          .from('nutrition_preferences')
+          .update({ selected_foods: selectedFoods })
+          .eq('id', existingPrefs.id);
 
-          if (existingPrefs) {
-            // Atualizar o registro existente
-            const { error: updateError } = await supabase
-              .from('nutrition_preferences')
-              .update({ selected_foods: selectedFoods })
-              .eq('id', existingPrefs.id);
+        if (updateError) {
+          console.error('Erro ao atualizar preferências:', updateError);
+          toast.error("Erro ao salvar preferências de alimentos");
+          return false;
+        }
+      } else {
+        // Se não existir, criar um novo com valores mínimos necessários
+        const { error: insertError } = await supabase
+          .from('nutrition_preferences')
+          .insert({
+            user_id: user.id,
+            selected_foods: selectedFoods,
+            weight: 70, // valores padrão para satisfazer restrições de tipo
+            height: 170,
+            age: 30,
+            gender: 'male',
+            activity_level: 'moderate' as "sedentary" | "light" | "moderate" | "intense",
+            goal: 'maintain' as "maintain" | "lose_weight" | "gain_mass"
+          });
 
-            if (updateError) {
-              console.error('Erro ao atualizar preferências:', updateError);
-              throw updateError;
-            }
-          } else {
-            // Se não existir, criar um novo com valores mínimos necessários
-            const { error: insertError } = await supabase
-              .from('nutrition_preferences')
-              .insert({
-                user_id: user.id,
-                selected_foods: selectedFoods,
-                weight: 70, // valores padrão para satisfazer restrições de tipo
-                height: 170,
-                age: 30,
-                gender: 'male',
-                activity_level: 'moderate',
-                goal: 'maintenance'
-              });
-
-            if (insertError) {
-              console.error('Erro ao inserir preferências:', insertError);
-              throw insertError;
-            }
-          }
-        } catch (fallbackError) {
-          console.error('Erro no fallback para salvar alimentos:', fallbackError);
+        if (insertError) {
+          console.error('Erro ao inserir preferências:', insertError);
           toast.error("Erro ao salvar preferências de alimentos");
           return false;
         }
@@ -268,31 +257,18 @@ export const useMenuController = () => {
       console.log('Dados dos alimentos selecionados:', selectedFoodsData);
 
       // Salvar preferências dietéticas na tabela
-      const { error: prefsError } = await supabase.rpc('update_dietary_preferences', {
-        p_user_id: userData.user.id,
-        p_has_allergies: preferences.hasAllergies,
-        p_allergies: preferences.allergies,
-        p_dietary_restrictions: preferences.dietaryRestrictions,
-        p_training_time: preferences.trainingTime
-      });
-
+      const { error: prefsError } = await supabase
+        .from('dietary_preferences')
+        .upsert({
+          user_id: userData.user.id,
+          has_allergies: preferences.hasAllergies,
+          allergies: preferences.allergies,
+          dietary_restrictions: preferences.dietaryRestrictions,
+          training_time: preferences.trainingTime
+        }, { onConflict: 'user_id' });
+          
       if (prefsError) {
         console.error('Erro ao salvar preferências dietéticas:', prefsError);
-        
-        // Fallback para a abordagem tradicional
-        const { error: fallbackError } = await supabase
-          .from('dietary_preferences')
-          .upsert({
-            user_id: userData.user.id,
-            has_allergies: preferences.hasAllergies,
-            allergies: preferences.allergies,
-            dietary_restrictions: preferences.dietaryRestrictions,
-            training_time: preferences.trainingTime
-          }, { onConflict: 'user_id' });
-          
-        if (fallbackError) {
-          console.error('Erro no fallback para salvar preferências dietéticas:', fallbackError);
-        }
       }
       
       const generatedMealPlan = await generateMealPlan({
