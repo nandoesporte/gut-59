@@ -9,6 +9,7 @@ export interface ProtocolFood {
   food_group_id: number;
   portion?: number;
   portionUnit?: string;
+  fiber?: number;
   description?: string;
   calculatedNutrients?: {
     calories: number;
@@ -20,6 +21,11 @@ export interface ProtocolFood {
   vitamins_minerals?: Record<string, number>;
   substitution_group?: string;
   nutritional_category?: string[];
+  nutritionix_data?: {
+    serving_unit: string;
+    serving_qty: number;
+    serving_weight_grams: number;
+  };
 }
 
 export interface MealFood {

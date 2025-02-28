@@ -6,8 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const NUTRITIONIX_APP_ID = Deno.env.get('NUTRITIONIX_APP_ID');
-const NUTRITIONIX_API_KEY = Deno.env.get('NUTRITIONIX_API_KEY');
+// Configurar chaves da API Nutritionix
+const NUTRITIONIX_APP_ID = Deno.env.get('NUTRITIONIX_APP_ID') || "75c8c0ea";
+const NUTRITIONIX_API_KEY = Deno.env.get('NUTRITIONIX_API_KEY') || "636f7a3146b09d140b5353ef030fb2a4";
 
 serve(async (req) => {
   // Handle CORS preflight requests
