@@ -28,29 +28,40 @@ export const DietaryPreferencesForm = ({ onSubmit, onBack }: DietaryPreferencesF
   };
 
   const handleAllergiesInput = (value: string) => {
+    const allergiesList = value ? value.split(',').map(item => item.trim()).filter(Boolean) : [];
     setPreferences(prev => ({
       ...prev,
-      allergies: value.split(',').map(item => item.trim())
+      allergies: allergiesList
     }));
   };
 
   const handleRestrictionsInput = (value: string) => {
+    const restrictionsList = value ? value.split(',').map(item => item.trim()).filter(Boolean) : [];
     setPreferences(prev => ({
       ...prev,
-      dietaryRestrictions: value.split(',').map(item => item.trim())
+      dietaryRestrictions: restrictionsList
     }));
   };
 
   const handleTimeChange = (value: string) => {
     setPreferences(prev => ({
       ...prev,
-      trainingTime: value
+      trainingTime: value || null
     }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(preferences);
+    
+    // Ensure all fields are properly formatted before submission
+    const sanitizedPreferences: DietaryPreferences = {
+      hasAllergies: Boolean(preferences.hasAllergies),
+      allergies: Array.isArray(preferences.allergies) ? preferences.allergies : [],
+      dietaryRestrictions: Array.isArray(preferences.dietaryRestrictions) ? preferences.dietaryRestrictions : [],
+      trainingTime: preferences.trainingTime || null,
+    };
+    
+    onSubmit(sanitizedPreferences);
   };
 
   return (
