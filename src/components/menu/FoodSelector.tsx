@@ -78,6 +78,7 @@ export const FoodSelector = ({
   const { isProcessingPayment, hasPaid, handlePaymentAndContinue } = usePaymentHandling();
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [paymentRequired, setPaymentRequired] = useState(true);
+  const [confirmClicked, setConfirmClicked] = useState(false);
 
   useEffect(() => {
     const checkPaymentRequirement = async () => {
@@ -124,18 +125,37 @@ export const FoodSelector = ({
   const handleConfirm = async () => {
     console.log("Botão Confirmar Seleção clicado");
     
+    if (confirmClicked) {
+      console.log("Botão já foi clicado, evitando duplo clique");
+      return;
+    }
+    
+    setConfirmClicked(true);
+    
     if (selectedFoods.length === 0) {
       toast.error("Selecione pelo menos um alimento");
+      setConfirmClicked(false);
       return;
     }
 
     if (paymentRequired && !hasPaid) {
       setShowPaymentDialog(true);
+      setConfirmClicked(false);
       return;
     }
 
     try {
       console.log("Chamando função onConfirm...");
+      // Tornar os botões menos reativos durante o processamento
+      document.querySelectorAll('button').forEach(btn => {
+        if (btn.textContent?.includes('Confirmar Seleção')) {
+          btn.setAttribute('disabled', 'true');
+        }
+      });
+      
+      // Feedback visual para o usuário
+      toast.success("Processando sua seleção...");
+      
       // Salvar os alimentos selecionados e prosseguir
       const result = await onConfirm();
       
@@ -145,13 +165,28 @@ export const FoodSelector = ({
       if (result === false) {
         console.error("Falha ao confirmar seleção de alimentos");
         toast.error("Erro ao salvar suas preferências alimentares. Tente novamente.");
+        
+        // Reativar botões
+        document.querySelectorAll('button').forEach(btn => {
+          if (btn.textContent?.includes('Confirmar Seleção')) {
+            btn.removeAttribute('disabled');
+          }
+        });
       } else {
         console.log("Confirmação de seleção de alimentos bem-sucedida");
-        toast.success("Seleção de alimentos confirmada! Avançando para próxima etapa...");
       }
     } catch (error) {
       console.error("Erro ao processar a confirmação:", error);
       toast.error("Erro ao processar sua seleção. Tente novamente.");
+      
+      // Reativar botões
+      document.querySelectorAll('button').forEach(btn => {
+        if (btn.textContent?.includes('Confirmar Seleção')) {
+          btn.removeAttribute('disabled');
+        }
+      });
+    } finally {
+      setConfirmClicked(false);
     }
   };
 
@@ -247,8 +282,9 @@ export const FoodSelector = ({
           onClick={handleConfirm}
           className="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 text-lg font-bold rounded-md shadow-sm"
           size="lg"
+          disabled={confirmClicked}
         >
-          ✓ Confirmar Seleção e Continuar
+          {confirmClicked ? "Processando..." : "✓ Confirmar Seleção e Continuar"}
         </Button>
       </div>
 
@@ -259,6 +295,7 @@ export const FoodSelector = ({
             variant="outline" 
             onClick={onBack}
             className="shrink-0"
+            disabled={confirmClicked}
           >
             Voltar
           </Button>
@@ -266,8 +303,9 @@ export const FoodSelector = ({
             onClick={handleConfirm}
             className="flex-1 bg-green-500 hover:bg-green-600 text-white max-w-sm font-semibold animate-pulse"
             size="lg"
+            disabled={confirmClicked}
           >
-            Confirmar Seleção ({selectedFoods.length} alimentos)
+            {confirmClicked ? "Processando..." : `Confirmar Seleção (${selectedFoods.length} alimentos)`}
           </Button>
         </div>
       </div>

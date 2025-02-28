@@ -197,7 +197,9 @@ export const useMenuController = () => {
       return false;
     }
     
-    // Salvar seleção de alimentos na tabela
+    // Mostramos um feedback imediato ao usuário
+    toast.success("Processando sua seleção de alimentos...");
+    
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -265,9 +267,15 @@ export const useMenuController = () => {
       }
 
       if (updateSuccess) {
-        toast.success("Preferências de alimentos salvas com sucesso!");
+        console.log("Preferências de alimentos salvas com sucesso!");
         console.log("Avançando para a etapa 3 (restrições dietéticas)");
-        setCurrentStep(3);
+        
+        // Forçamos a transição para a etapa 3 com um pequeno atraso para garantir que o estado foi atualizado
+        setTimeout(() => {
+          setCurrentStep(3);
+          toast.success("Preferências de alimentos salvas! Agora informe suas restrições dietéticas.");
+        }, 300);
+        
         return true;
       }
       
