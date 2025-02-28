@@ -117,16 +117,25 @@ serve(async (req) => {
 
     // Gerar o plano alimentar
     console.log("Iniciando geração do plano alimentar");
-    const generatedMealPlan = await generateMealPlan(userData, foodsByMealType, dietaryPreferences, req.url, customPrompt);
-
-    return new Response(JSON.stringify({ 
-      mealPlan: generatedMealPlan 
-    }), {
-      headers: { 
-        ...corsHeaders,
-        'Content-Type': 'application/json' 
-      }
-    });
+    
+    // Tentar diretamente com OpenAI primeiro, já que estamos tendo problemas com Llama
+    try {
+      console.log("Tentando gerar plano diretamente com OpenAI");
+      const result = await generateWithOpenAI(userData, foodsByMealType, dietaryPreferences, customPrompt);
+      return new Response(JSON.stringify({ mealPlan: result }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    } catch (openaiError) {
+      console.error("Erro ao gerar plano com OpenAI:", openaiError);
+      
+      // Se OpenAI falhar, gerar plano básico
+      console.log("Gerando plano básico com dados locais");
+      const basicPlan = generateBasicMealPlan(userData, foodsByMealType, dietaryPreferences);
+      
+      return new Response(JSON.stringify({ mealPlan: basicPlan }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
   } catch (error) {
     console.error("Erro no processamento da solicitação:", error);
     return new Response(JSON.stringify({ 
@@ -238,111 +247,6 @@ async function enhanceFoodsWithNutritionixData(foods) {
   }
   
   return enhancedFoods;
-}
-
-async function generateMealPlan(userData, foodsByMealType, dietaryPreferences, requestUrl, customPrompt) {
-  try {
-    console.log("Tentando gerar plano com o modelo Llama via Groq");
-    const result = await generateWithLlama(userData, foodsByMealType, dietaryPreferences, requestUrl, customPrompt);
-    return result;
-  } catch (llamaError) {
-    console.error("Erro ao gerar plano com o modelo Llama:", llamaError);
-    
-    try {
-      console.log("Tentando gerar plano com OpenAI como alternativa");
-      const result = await generateWithOpenAI(userData, foodsByMealType, dietaryPreferences, customPrompt);
-      return result;
-    } catch (openaiError) {
-      console.error("Erro ao gerar plano com OpenAI:", openaiError);
-      
-      // Se ambos os modelos falharem, tente um plano básico
-      console.log("Gerando plano básico com dados locais");
-      return generateBasicMealPlan(userData, foodsByMealType, dietaryPreferences);
-    }
-  }
-}
-
-async function generateWithLlama(userData, foodsByMealType, dietaryPreferences, requestUrl, customPrompt) {
-  try {
-    console.log("Preparando dados para o modelo Llama");
-    
-    // Preparar os dados por tipo de refeição para o prompt
-    const promptData = {};
-    for (const [mealType, foods] of Object.entries(foodsByMealType)) {
-      promptData[mealType] = foods.map(food => ({
-        name: food.name,
-        calories: food.calories,
-        protein: food.protein,
-        carbs: food.carbs,
-        fats: food.fats,
-        food_group_id: food.food_group_id
-      }));
-    }
-
-    // Construir o prompt para o modelo (usar customPrompt se disponível)
-    const prompt = customPrompt 
-      ? prepareCustomPrompt(customPrompt, userData, promptData, dietaryPreferences)
-      : generateMealPlanPrompt(userData, promptData, dietaryPreferences);
-    
-    console.log("Enviando requisição para llama-completion");
-    
-    // Extrair a URL base para chamar a função llama-completion
-    let llamaEndpoint = `${new URL(requestUrl).origin}/functions/v1/llama-completion`;
-    console.log(`Usando endpoint: ${llamaEndpoint}`);
-    
-    const llamaResponse = await fetch(llamaEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        prompt: prompt,
-        max_tokens: 4000,
-        temperature: 0.7
-      })
-    });
-
-    if (!llamaResponse.ok) {
-      const errorData = await llamaResponse.json();
-      throw new Error(`Erro na chamada da função llama-completion: ${JSON.stringify(errorData)}`);
-    }
-
-    const data = await llamaResponse.json();
-    console.log("Resposta recebida do modelo Llama");
-
-    if (!data.completion) {
-      throw new Error("Falha ao processar a resposta do modelo");
-    }
-
-    // Processar o JSON gerado pelo modelo
-    try {
-      // Tente extrair o JSON da resposta
-      const jsonStart = data.completion.indexOf('{');
-      const jsonEnd = data.completion.lastIndexOf('}') + 1;
-      
-      if (jsonStart === -1 || jsonEnd === -1 || jsonStart >= jsonEnd) {
-        throw new Error("Formato JSON inválido na resposta");
-      }
-      
-      const jsonStr = data.completion.substring(jsonStart, jsonEnd);
-      const mealPlan = JSON.parse(jsonStr);
-      
-      // Adicionar recomendações
-      mealPlan.recommendations = generateRecommendations(
-        userData.dailyCalories,
-        userData.goal,
-        dietaryPreferences.trainingTime
-      );
-      
-      return mealPlan;
-    } catch (jsonError) {
-      console.error("Erro ao processar JSON da resposta:", jsonError);
-      throw new Error("Falha ao processar o JSON do plano alimentar");
-    }
-  } catch (error) {
-    console.error("Erro ao gerar com Llama:", error);
-    throw error;
-  }
 }
 
 async function generateWithOpenAI(userData, foodsByMealType, dietaryPreferences, customPrompt) {
