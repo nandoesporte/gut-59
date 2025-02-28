@@ -56,13 +56,14 @@ export interface MealPlanResult {
 }
 
 export interface UserData {
+  id?: string;
   weight: number;
   height: number;
   age: number;
   gender: string;
   activityLevel: string;
   goal: string;
-  userId: string;
+  userId?: string;
   dailyCalories: number;
 }
 

@@ -1,164 +1,359 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { Food, FoodWithPortion, MacroTargets } from "./types.ts";
-import { calculatePortionSize } from "./portion-calculator.ts";
-import { analyzeMeal } from "./meal-analyzer.ts";
+import { MacroTargets, Food, FoodWithPortion, MealPlanResult, UserData, DietaryPreferences } from "./types.ts";
+import { calculatePortions } from "./portion-calculator.ts";
+import { scoreFoodCombination } from "./nutritional-scorer.ts";
 
-// Find optimal combinations of foods for a meal
-export function optimizeMeal(
-  availableFoods: Food[],
-  targetCalories: number,
+export async function optimizeMealPlan(
+  userData: UserData,
+  selectedFoods: Food[],
   macroTargets: MacroTargets,
-  mealType: string,
-  options: {
-    allergens?: string[],
-    restrictions?: string[],
-    preferredFoods?: string[],
-    mealTypeFoods?: Food[]
-  } = {}
-): FoodWithPortion[] {
-  if (!availableFoods || availableFoods.length === 0) {
-    console.log("No foods available for optimization");
-    return [];
-  }
+  dietaryPreferences: DietaryPreferences,
+  foodsByMealType?: Record<string, Food[]>
+): Promise<MealPlanResult> {
+  console.log("Starting meal plan optimization");
 
-  // Filter out foods that match allergens or restrictions
-  let filteredFoods = [...availableFoods];
-  
-  if (options.allergens && options.allergens.length > 0) {
-    filteredFoods = filteredFoods.filter(food => {
-      // Simple string matching for allergens in food name
-      return !options.allergens?.some(allergen => 
-        food.name.toLowerCase().includes(allergen.toLowerCase())
-      );
-    });
-  }
-  
-  if (options.restrictions && options.restrictions.length > 0) {
-    filteredFoods = filteredFoods.filter(food => {
-      // Simple string matching for restrictions in food name
-      return !options.restrictions?.some(restriction => 
-        food.name.toLowerCase().includes(restriction.toLowerCase())
-      );
-    });
-  }
+  try {
+    const filteredFoods = filterFoodsByPreferences(selectedFoods, dietaryPreferences);
+    console.log(`Filtered foods based on preferences: ${filteredFoods.length} foods remaining`);
 
-  // Prioritize foods appropriate for this meal type if available
-  let mealTypeFoods = options.mealTypeFoods || [];
-  if (mealTypeFoods.length === 0 && mealType) {
-    // Map meal types to likely food groups if specific meal type foods weren't provided
-    if (mealType === 'breakfast') {
-      mealTypeFoods = filteredFoods.filter(f => f.food_group_id === 1);
-    } else if (mealType === 'lunch' || mealType === 'dinner') {
-      mealTypeFoods = filteredFoods.filter(f => f.food_group_id === 2 || f.food_group_id === 4);
-    } else if (mealType.includes('snack')) {
-      mealTypeFoods = filteredFoods.filter(f => f.food_group_id === 3);
-    }
-  }
-
-  // Prioritize preferred foods if specified
-  let prioritizedFoods = [...filteredFoods];
-  if (options.preferredFoods && options.preferredFoods.length > 0) {
-    // Sort to put preferred foods first
-    prioritizedFoods.sort((a, b) => {
-      const aPreferred = options.preferredFoods?.includes(a.id) || false;
-      const bPreferred = options.preferredFoods?.includes(b.id) || false;
-      return aPreferred === bPreferred ? 0 : aPreferred ? -1 : 1;
-    });
-  }
-
-  // Create a balanced meal
-  // This is a simplified algorithm - in a real system, you'd use more advanced optimization
-  const result: FoodWithPortion[] = [];
-  let currentCalories = 0;
-  let currentProtein = 0;
-  let currentCarbs = 0;
-  let currentFats = 0;
-  
-  // First try to add meal-appropriate foods
-  if (mealTypeFoods.length > 0) {
-    // Shuffle to get variety
-    mealTypeFoods = shuffle(mealTypeFoods);
+    // Categorize foods
+    const categorizedFoods = categorizeFoods(filteredFoods);
     
-    // Take 2-3 foods from the meal type appropriate list
-    const foodCount = Math.min(Math.floor(Math.random() * 2) + 2, mealTypeFoods.length);
-    for (let i = 0; i < foodCount; i++) {
-      if (currentCalories >= targetCalories * 0.8) break;
-      
-      const food = mealTypeFoods[i];
-      const portion = calculatePortionSize(food, targetCalories / foodCount);
-      
-      result.push({
-        ...food,
-        portion,
-        portionUnit: food.portionUnit || 'g',
-        calculatedNutrients: {
-          calories: Math.round((food.calories / 100) * portion),
-          protein: Math.round((food.protein / 100) * portion),
-          carbs: Math.round((food.carbs / 100) * portion),
-          fats: Math.round((food.fats / 100) * portion),
-          fiber: Math.round(((food.fiber || 0) / 100) * portion)
-        }
-      });
-      
-      currentCalories += (food.calories / 100) * portion;
-      currentProtein += (food.protein / 100) * portion;
-      currentCarbs += (food.carbs / 100) * portion;
-      currentFats += (food.fats / 100) * portion;
-    }
-  }
-  
-  // If we still need more calories, add from the general list
-  if (currentCalories < targetCalories * 0.8) {
-    // Shuffle for variety
-    prioritizedFoods = shuffle(prioritizedFoods);
+    // Use foodsByMealType if provided
+    let breakfast: FoodWithPortion[] = [];
+    let morningSnack: FoodWithPortion[] = [];
+    let lunch: FoodWithPortion[] = [];
+    let afternoonSnack: FoodWithPortion[] = [];
+    let dinner: FoodWithPortion[] = [];
     
-    for (const food of prioritizedFoods) {
-      // Skip foods we've already added
-      if (result.some(f => f.id === food.id)) continue;
+    if (foodsByMealType) {
+      console.log("Using provided foods by meal type");
       
-      // Stop if we've reached enough calories
-      if (currentCalories >= targetCalories * 0.95) break;
+      // Process each meal type with the provided foods
+      if (foodsByMealType.breakfast && foodsByMealType.breakfast.length > 0) {
+        breakfast = await calculatePortions(
+          foodsByMealType.breakfast,
+          userData.dailyCalories * 0.25, // 25% of daily calories for breakfast
+          macroTargets
+        );
+      }
       
-      // Decide portion based on remaining calories and macro targets
-      const remainingCalories = targetCalories - currentCalories;
-      const portion = calculatePortionSize(food, remainingCalories * 0.5);
+      if (foodsByMealType.morning_snack && foodsByMealType.morning_snack.length > 0) {
+        morningSnack = await calculatePortions(
+          foodsByMealType.morning_snack,
+          userData.dailyCalories * 0.1, // 10% of daily calories for morning snack
+          macroTargets
+        );
+      }
       
-      result.push({
-        ...food,
-        portion,
-        portionUnit: food.portionUnit || 'g',
-        calculatedNutrients: {
-          calories: Math.round((food.calories / 100) * portion),
-          protein: Math.round((food.protein / 100) * portion),
-          carbs: Math.round((food.carbs / 100) * portion),
-          fats: Math.round((food.fats / 100) * portion),
-          fiber: Math.round(((food.fiber || 0) / 100) * portion)
-        }
-      });
+      if (foodsByMealType.lunch && foodsByMealType.lunch.length > 0) {
+        lunch = await calculatePortions(
+          foodsByMealType.lunch,
+          userData.dailyCalories * 0.3, // 30% of daily calories for lunch
+          macroTargets
+        );
+      }
       
-      currentCalories += (food.calories / 100) * portion;
-      currentProtein += (food.protein / 100) * portion;
-      currentCarbs += (food.carbs / 100) * portion;
-      currentFats += (food.fats / 100) * portion;
+      if (foodsByMealType.afternoon_snack && foodsByMealType.afternoon_snack.length > 0) {
+        afternoonSnack = await calculatePortions(
+          foodsByMealType.afternoon_snack,
+          userData.dailyCalories * 0.1, // 10% of daily calories for afternoon snack
+          macroTargets
+        );
+      }
       
-      // Don't add too many foods
-      if (result.length >= 5) break;
+      if (foodsByMealType.dinner && foodsByMealType.dinner.length > 0) {
+        dinner = await calculatePortions(
+          foodsByMealType.dinner,
+          userData.dailyCalories * 0.25, // 25% of daily calories for dinner
+          macroTargets
+        );
+      }
     }
+    
+    // If any meal type is still empty, use categorized foods to fill
+    if (breakfast.length === 0) {
+      const breakfastFoods = selectFoodsForMeal(categorizedFoods, "breakfast", 4);
+      breakfast = await calculatePortions(
+        breakfastFoods,
+        userData.dailyCalories * 0.25,
+        macroTargets
+      );
+    }
+    
+    if (morningSnack.length === 0) {
+      const morningSnackFoods = selectFoodsForMeal(categorizedFoods, "snack", 2);
+      morningSnack = await calculatePortions(
+        morningSnackFoods,
+        userData.dailyCalories * 0.1,
+        macroTargets
+      );
+    }
+    
+    if (lunch.length === 0) {
+      const lunchFoods = selectFoodsForMeal(categorizedFoods, "lunch", 5);
+      lunch = await calculatePortions(
+        lunchFoods,
+        userData.dailyCalories * 0.3,
+        macroTargets
+      );
+    }
+    
+    if (afternoonSnack.length === 0) {
+      const afternoonSnackFoods = selectFoodsForMeal(categorizedFoods, "snack", 2);
+      afternoonSnack = await calculatePortions(
+        afternoonSnackFoods,
+        userData.dailyCalories * 0.1,
+        macroTargets
+      );
+    }
+    
+    if (dinner.length === 0) {
+      const dinnerFoods = selectFoodsForMeal(categorizedFoods, "dinner", 5);
+      dinner = await calculatePortions(
+        dinnerFoods,
+        userData.dailyCalories * 0.25,
+        macroTargets
+      );
+    }
+    
+    // Calculate total nutritional values
+    const totalCalories = calculateTotalCalories([...breakfast, ...morningSnack, ...lunch, ...afternoonSnack, ...dinner]);
+    const macroDistribution = calculateMacroDistribution([...breakfast, ...morningSnack, ...lunch, ...afternoonSnack, ...dinner]);
+    
+    console.log("Meal plan optimization completed successfully");
+    console.log(`Total calories: ${totalCalories}, Protein: ${macroDistribution.protein}g, Carbs: ${macroDistribution.carbs}g, Fats: ${macroDistribution.fats}g`);
+
+    return {
+      breakfast,
+      morning_snack: morningSnack,
+      lunch,
+      afternoon_snack: afternoonSnack,
+      dinner,
+      nutritionalAnalysis: {
+        totalCalories,
+        macroDistribution
+      }
+    };
+  } catch (error) {
+    console.error("Error in optimizeMealPlan:", error);
+    throw new Error(`Failed to optimize meal plan: ${error.message}`);
   }
-  
-  // Analyze the meal for optimization feedback
-  const analysis = analyzeMeal(result);
-  
-  return result;
 }
 
-// Helper function to shuffle array
-function shuffle<T>(array: T[]): T[] {
-  const newArray = [...array];
-  for (let i = newArray.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+function filterFoodsByPreferences(foods: Food[], preferences: DietaryPreferences): Food[] {
+  return foods.filter(food => {
+    // Filter out foods user is allergic to
+    if (preferences.hasAllergies && preferences.allergies.length > 0) {
+      const foodName = food.name.toLowerCase();
+      for (const allergen of preferences.allergies) {
+        if (foodName.includes(allergen.toLowerCase())) {
+          return false;
+        }
+      }
+    }
+    
+    // Filter based on dietary restrictions
+    if (preferences.dietaryRestrictions.length > 0) {
+      // Implement filtering based on dietary restrictions
+      // This is a simplified example - real implementation would need more complex logic
+      if (preferences.dietaryRestrictions.includes('vegetarian')) {
+        // Skip foods that are meat or contain meat
+        const meats = ['carne', 'frango', 'peixe', 'atum', 'bacon', 'presunto'];
+        if (meats.some(meat => food.name.toLowerCase().includes(meat))) {
+          return false;
+        }
+      }
+      
+      if (preferences.dietaryRestrictions.includes('lactose-free')) {
+        // Skip dairy products
+        const dairy = ['leite', 'queijo', 'iogurte', 'requeijão', 'cream cheese'];
+        if (dairy.some(item => food.name.toLowerCase().includes(item))) {
+          return false;
+        }
+      }
+      
+      // Add more restrictions as needed
+    }
+    
+    return true;
+  });
+}
+
+function categorizeFoods(foods: Food[]): Record<string, Food[]> {
+  const categories = {
+    protein: [],
+    carbs: [],
+    fats: [],
+    vegetables: [],
+    fruits: [],
+    dairy: [],
+    breakfast: [],
+    lunch: [],
+    dinner: [],
+    snack: []
+  } as Record<string, Food[]>;
+  
+  for (const food of foods) {
+    // Categorize by nutritional composition
+    if (food.protein > food.carbs && food.protein > food.fats) {
+      categories.protein.push(food);
+    } else if (food.carbs > food.protein && food.carbs > food.fats) {
+      categories.carbs.push(food);
+    } else if (food.fats > food.protein && food.fats > food.carbs) {
+      categories.fats.push(food);
+    }
+    
+    // Categorize by food group
+    if (food.food_group_id === 1) { // Assume 1 is vegetables
+      categories.vegetables.push(food);
+    } else if (food.food_group_id === 2) { // Assume 2 is fruits
+      categories.fruits.push(food);
+    } else if (food.food_group_id === 3) { // Assume 3 is dairy
+      categories.dairy.push(food);
+    }
+    
+    // Categorize by meal type if nutritional_category is available
+    if (food.nutritional_category) {
+      for (const category of food.nutritional_category) {
+        if (category === 'breakfast' || category === 'lunch' || 
+            category === 'dinner' || category === 'snack') {
+          categories[category].push(food);
+        }
+      }
+    } else {
+      // Simple heuristic if nutritional_category is not available
+      const name = food.name.toLowerCase();
+      if (name.includes('pão') || name.includes('cereal') || name.includes('aveia')) {
+        categories.breakfast.push(food);
+      }
+      if (name.includes('arroz') || name.includes('feijão') || name.includes('carne')) {
+        categories.lunch.push(food);
+        categories.dinner.push(food);
+      }
+      if (name.includes('fruta') || name.includes('barra') || name.includes('castanha')) {
+        categories.snack.push(food);
+      }
+    }
   }
-  return newArray;
+  
+  return categories;
+}
+
+function selectFoodsForMeal(categorizedFoods: Record<string, Food[]>, mealType: string, count: number): Food[] {
+  const selectedFoods: Food[] = [];
+  
+  // First, try to select foods specifically categorized for this meal type
+  if (categorizedFoods[mealType] && categorizedFoods[mealType].length > 0) {
+    const typeFoods = [...categorizedFoods[mealType]];
+    shuffleArray(typeFoods);
+    
+    while (selectedFoods.length < count && typeFoods.length > 0) {
+      selectedFoods.push(typeFoods.pop() as Food);
+    }
+  }
+  
+  // If we still need more foods, select based on nutritional composition
+  if (selectedFoods.length < count) {
+    const neededCount = count - selectedFoods.length;
+    
+    // Different balance for different meal types
+    let proteinCount = 0;
+    let carbsCount = 0;
+    let fatsCount = 0;
+    let vegFruitCount = 0;
+    
+    if (mealType === 'breakfast') {
+      proteinCount = Math.ceil(neededCount * 0.3);
+      carbsCount = Math.ceil(neededCount * 0.4);
+      fatsCount = Math.ceil(neededCount * 0.2);
+      vegFruitCount = Math.floor(neededCount * 0.1);
+    } else if (mealType === 'lunch' || mealType === 'dinner') {
+      proteinCount = Math.ceil(neededCount * 0.4);
+      carbsCount = Math.ceil(neededCount * 0.3);
+      fatsCount = Math.ceil(neededCount * 0.1);
+      vegFruitCount = Math.floor(neededCount * 0.2);
+    } else { // snack
+      proteinCount = Math.ceil(neededCount * 0.2);
+      carbsCount = Math.ceil(neededCount * 0.3);
+      fatsCount = Math.ceil(neededCount * 0.2);
+      vegFruitCount = Math.floor(neededCount * 0.3);
+    }
+    
+    // Add protein foods
+    addFoodsFromCategory(categorizedFoods.protein, selectedFoods, proteinCount);
+    
+    // Add carb foods
+    addFoodsFromCategory(categorizedFoods.carbs, selectedFoods, carbsCount);
+    
+    // Add fat foods
+    addFoodsFromCategory(categorizedFoods.fats, selectedFoods, fatsCount);
+    
+    // Add vegetables or fruits
+    if (mealType === 'breakfast' || mealType === 'snack') {
+      addFoodsFromCategory(categorizedFoods.fruits, selectedFoods, vegFruitCount);
+    } else {
+      addFoodsFromCategory(categorizedFoods.vegetables, selectedFoods, vegFruitCount);
+    }
+  }
+  
+  // If we still don't have enough foods, just add random ones
+  if (selectedFoods.length < count) {
+    const allFoods = [
+      ...categorizedFoods.protein,
+      ...categorizedFoods.carbs,
+      ...categorizedFoods.fats,
+      ...categorizedFoods.vegetables,
+      ...categorizedFoods.fruits
+    ];
+    
+    shuffleArray(allFoods);
+    
+    while (selectedFoods.length < count && allFoods.length > 0) {
+      const food = allFoods.pop() as Food;
+      if (!selectedFoods.find(f => f.id === food.id)) {
+        selectedFoods.push(food);
+      }
+    }
+  }
+  
+  return selectedFoods;
+}
+
+function addFoodsFromCategory(categoryFoods: Food[], selectedFoods: Food[], count: number): void {
+  if (!categoryFoods || categoryFoods.length === 0) return;
+  
+  const foods = [...categoryFoods];
+  shuffleArray(foods);
+  
+  let added = 0;
+  while (added < count && foods.length > 0) {
+    const food = foods.pop() as Food;
+    if (!selectedFoods.find(f => f.id === food.id)) {
+      selectedFoods.push(food);
+      added++;
+    }
+  }
+}
+
+function shuffleArray(array: any[]): void {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+}
+
+function calculateTotalCalories(foods: FoodWithPortion[]): number {
+  return foods.reduce((total, food) => total + food.calculatedNutrients.calories, 0);
+}
+
+function calculateMacroDistribution(foods: FoodWithPortion[]): MacroTargets {
+  return foods.reduce((totals, food) => {
+    return {
+      protein: totals.protein + food.calculatedNutrients.protein,
+      carbs: totals.carbs + food.calculatedNutrients.carbs,
+      fats: totals.fats + food.calculatedNutrients.fats,
+      fiber: totals.fiber + (food.calculatedNutrients.fiber || 0)
+    };
+  }, { protein: 0, carbs: 0, fats: 0, fiber: 0 });
 }

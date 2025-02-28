@@ -1,131 +1,163 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { Food, FoodWithPortion, MealPlanResult } from "./types.ts";
-import { calculateNutritionalScore } from "./nutritional-scorer.ts";
-import { calculatePortionSize } from "./portion-calculator.ts";
+import { MacroTargets, Food, FoodWithPortion, MealPlanResult } from "./types.ts";
 
-export interface MealAnalysis {
-  totalCalories: number;
-  macroDistribution: {
-    protein: number;
-    carbs: number;
-    fats: number;
-    fiber: number;
-  };
-  nutritionalScore: number;
-  balanceScore: number;
-  varietyScore: number;
-}
+export function analyzeMealDistribution(
+  dailyMealPlan: MealPlanResult,
+  macroTargets: MacroTargets
+): { score: number; feedback: string[] } {
+  try {
+    const { totalCalories, macroDistribution } = dailyMealPlan.nutritionalAnalysis;
 
-// Analyze a meal for its nutritional content
-export function analyzeMeal(foods: FoodWithPortion[]): MealAnalysis {
-  if (!foods || foods.length === 0) {
-    return {
-      totalCalories: 0,
-      macroDistribution: { protein: 0, carbs: 0, fats: 0, fiber: 0 },
-      nutritionalScore: 0,
-      balanceScore: 0,
-      varietyScore: 0
-    };
-  }
+    // Initialize scoring
+    let score = 0;
+    const feedback: string[] = [];
 
-  // Calculate total calories and macros
-  const totalCalories = foods.reduce((sum, food) => sum + food.calculatedNutrients.calories, 0);
-  const totalProtein = foods.reduce((sum, food) => sum + food.calculatedNutrients.protein, 0);
-  const totalCarbs = foods.reduce((sum, food) => sum + food.calculatedNutrients.carbs, 0);
-  const totalFats = foods.reduce((sum, food) => sum + food.calculatedNutrients.fats, 0);
-  const totalFiber = foods.reduce((sum, food) => sum + food.calculatedNutrients.fiber, 0);
-
-  // Calculate macro percentages
-  const proteinCalories = totalProtein * 4;
-  const carbsCalories = totalCarbs * 4;
-  const fatsCalories = totalFats * 9;
-
-  const proteinPct = totalCalories > 0 ? (proteinCalories / totalCalories) * 100 : 0;
-  const carbsPct = totalCalories > 0 ? (carbsCalories / totalCalories) * 100 : 0;
-  const fatsPct = totalCalories > 0 ? (fatsCalories / totalCalories) * 100 : 0;
-
-  // Calculate nutritional score
-  const nutritionalScore = calculateNutritionalScore(foods);
-
-  // Calculate balance score (how well it adheres to macro guidelines)
-  let balanceScore = 0;
-  if (totalCalories > 0) {
-    // Ideal macro ranges
-    const idealProteinPct = { min: 20, max: 35 };
-    const idealCarbsPct = { min: 45, max: 65 };
-    const idealFatsPct = { min: 20, max: 35 };
-
-    // Score based on how close macros are to ideal ranges
-    const proteinScore = proteinPct >= idealProteinPct.min && proteinPct <= idealProteinPct.max ? 
-      100 : (100 - Math.min(Math.abs(proteinPct - idealProteinPct.min), Math.abs(proteinPct - idealProteinPct.max)));
-
-    const carbsScore = carbsPct >= idealCarbsPct.min && carbsPct <= idealCarbsPct.max ? 
-      100 : (100 - Math.min(Math.abs(carbsPct - idealCarbsPct.min), Math.abs(carbsPct - idealCarbsPct.max)));
-
-    const fatsScore = fatsPct >= idealFatsPct.min && fatsPct <= idealFatsPct.max ? 
-      100 : (100 - Math.min(Math.abs(fatsPct - idealFatsPct.min), Math.abs(fatsPct - idealFatsPct.max)));
-
-    balanceScore = (proteinScore + carbsScore + fatsScore) / 3;
-  }
-
-  // Calculate variety score based on unique food categories
-  const uniqueFoodCategories = new Set<string>();
-  foods.forEach(food => {
-    if (food.nutritional_category && Array.isArray(food.nutritional_category)) {
-      food.nutritional_category.forEach(category => uniqueFoodCategories.add(category));
-    } else if (food.substitution_group) {
-      uniqueFoodCategories.add(food.substitution_group);
+    // Analyze protein distribution
+    const proteinPercentage = (macroDistribution.protein * 4 / totalCalories) * 100;
+    if (proteinPercentage >= 25 && proteinPercentage <= 35) {
+      score += 30;
+      feedback.push("Boa distribuição de proteínas nas refeições");
+    } else if (proteinPercentage >= 20 && proteinPercentage <= 40) {
+      score += 20;
+      feedback.push("Distribuição de proteínas satisfatória");
+    } else {
+      score += 10;
+      feedback.push("Distribuição de proteínas pode ser melhorada");
     }
-  });
 
-  // More unique categories = better variety
-  const varietyScore = Math.min(100, uniqueFoodCategories.size * 20);
+    // Analyze carb distribution
+    const carbPercentage = (macroDistribution.carbs * 4 / totalCalories) * 100;
+    if (carbPercentage >= 40 && carbPercentage <= 55) {
+      score += 30;
+      feedback.push("Boa distribuição de carboidratos nas refeições");
+    } else if (carbPercentage >= 35 && carbPercentage <= 60) {
+      score += 20;
+      feedback.push("Distribuição de carboidratos satisfatória");
+    } else {
+      score += 10;
+      feedback.push("Distribuição de carboidratos pode ser melhorada");
+    }
 
-  return {
-    totalCalories,
-    macroDistribution: {
-      protein: totalProtein,
-      carbs: totalCarbs,
-      fats: totalFats,
-      fiber: totalFiber
-    },
-    nutritionalScore,
-    balanceScore,
-    varietyScore
-  };
+    // Analyze fat distribution
+    const fatPercentage = (macroDistribution.fats * 9 / totalCalories) * 100;
+    if (fatPercentage >= 20 && fatPercentage <= 35) {
+      score += 30;
+      feedback.push("Boa distribuição de gorduras nas refeições");
+    } else if (fatPercentage >= 15 && fatPercentage <= 40) {
+      score += 20;
+      feedback.push("Distribuição de gorduras satisfatória");
+    } else {
+      score += 10;
+      feedback.push("Distribuição de gorduras pode ser melhorada");
+    }
+
+    // Analyze fiber
+    if (macroDistribution.fiber >= 25) {
+      score += 10;
+      feedback.push("Excelente quantidade de fibra no plano");
+    } else if (macroDistribution.fiber >= 20) {
+      score += 5;
+      feedback.push("Boa quantidade de fibra no plano");
+    } else {
+      feedback.push("Aumente o consumo de alimentos ricos em fibras");
+    }
+
+    return { score, feedback };
+  } catch (error) {
+    console.error("Error during meal distribution analysis:", error);
+    return { score: 50, feedback: ["Não foi possível analisar completamente a distribuição nutricional"] };
+  }
 }
 
-// Analyze an entire meal plan
-export function analyzeMealPlan(mealPlan: MealPlanResult): {
-  dailyTotals: {
-    calories: number;
-    protein: number;
-    carbs: number;
-    fats: number;
-    fiber: number;
-  };
-  overallScore: number;
-} {
-  const allFoods: FoodWithPortion[] = [
-    ...mealPlan.breakfast,
-    ...mealPlan.morning_snack,
-    ...mealPlan.lunch,
-    ...mealPlan.afternoon_snack,
-    ...mealPlan.dinner
-  ];
-
-  const analysis = analyzeMeal(allFoods);
+export function analyzeNutrientBalance(
+  mealPlan: MealPlanResult,
+  dailyCalorieTarget: number
+): { score: number; feedback: string[] } {
+  const feedback: string[] = [];
+  let score = 0;
   
-  // Overall score is a weighted average of all factors
-  const overallScore = (
-    analysis.nutritionalScore * 0.4 + 
-    analysis.balanceScore * 0.4 + 
-    analysis.varietyScore * 0.2
-  );
+  const { totalCalories } = mealPlan.nutritionalAnalysis;
+  
+  // Check if total calories are within 10% of target
+  const calorieDeviation = Math.abs(totalCalories - dailyCalorieTarget) / dailyCalorieTarget;
+  
+  if (calorieDeviation <= 0.05) {
+    score += 30;
+    feedback.push("Excelente equilíbrio calórico, muito próximo do ideal");
+  } else if (calorieDeviation <= 0.1) {
+    score += 20;
+    feedback.push("Bom equilíbrio calórico, próximo do ideal");
+  } else if (calorieDeviation <= 0.15) {
+    score += 10;
+    feedback.push("Equilíbrio calórico razoável, mas poderia ser melhor ajustado");
+  } else {
+    feedback.push("O plano se desvia significativamente do alvo calórico diário");
+  }
+  
+  // Check meal distribution
+  const breakfastCals = calculateMealCalories(mealPlan.breakfast);
+  const morningSnackCals = calculateMealCalories(mealPlan.morning_snack);
+  const lunchCals = calculateMealCalories(mealPlan.lunch);
+  const afternoonSnackCals = calculateMealCalories(mealPlan.afternoon_snack);
+  const dinnerCals = calculateMealCalories(mealPlan.dinner);
+  
+  const idealBreakfastPct = 0.25;
+  const idealLunchPct = 0.35;
+  const idealDinnerPct = 0.25;
+  const idealSnackPct = 0.075; // For each snack
+  
+  const actualBreakfastPct = breakfastCals / totalCalories;
+  const actualLunchPct = lunchCals / totalCalories;
+  const actualDinnerPct = dinnerCals / totalCalories;
+  const actualMorningSnackPct = morningSnackCals / totalCalories;
+  const actualAfternoonSnackPct = afternoonSnackCals / totalCalories;
+  
+  if (Math.abs(actualBreakfastPct - idealBreakfastPct) <= 0.05 &&
+      Math.abs(actualLunchPct - idealLunchPct) <= 0.05 &&
+      Math.abs(actualDinnerPct - idealDinnerPct) <= 0.05) {
+    score += 30;
+    feedback.push("Excelente distribuição calórica entre as refeições principais");
+  } else if (Math.abs(actualBreakfastPct - idealBreakfastPct) <= 0.1 &&
+             Math.abs(actualLunchPct - idealLunchPct) <= 0.1 &&
+             Math.abs(actualDinnerPct - idealDinnerPct) <= 0.1) {
+    score += 20;
+    feedback.push("Boa distribuição calórica entre as refeições principais");
+  } else {
+    score += 10;
+    feedback.push("A distribuição calórica entre as refeições pode ser melhorada");
+  }
+  
+  // Check for extremes
+  const maxMealPct = Math.max(actualBreakfastPct, actualLunchPct, actualDinnerPct);
+  const minMealPct = Math.min(actualBreakfastPct, actualLunchPct, actualDinnerPct);
+  
+  if (maxMealPct > 0.5) {
+    feedback.push("Uma refeição contém mais de 50% das calorias diárias, o que não é ideal");
+    score -= 10;
+  }
+  
+  if (minMealPct < 0.15) {
+    feedback.push("Uma refeição principal é muito pequena, o que pode causar fome e lanches não planejados");
+    score -= 10;
+  }
+  
+  // Check snacks
+  if (Math.abs(actualMorningSnackPct - idealSnackPct) <= 0.03 &&
+      Math.abs(actualAfternoonSnackPct - idealSnackPct) <= 0.03) {
+    score += 20;
+    feedback.push("Lanches bem equilibrados em relação ao total calórico");
+  } else if (Math.abs(actualMorningSnackPct - idealSnackPct) <= 0.05 &&
+             Math.abs(actualAfternoonSnackPct - idealSnackPct) <= 0.05) {
+    score += 10;
+    feedback.push("Lanches razoavelmente equilibrados");
+  }
+  
+  // Cap the score at 100
+  score = Math.min(score, 100);
+  
+  return { score, feedback };
+}
 
-  return {
-    dailyTotals: analysis.macroDistribution,
-    overallScore
-  };
+function calculateMealCalories(foods: FoodWithPortion[]): number {
+  return foods.reduce((sum, food) => sum + food.calculatedNutrients.calories, 0);
 }
