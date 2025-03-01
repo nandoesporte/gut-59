@@ -39,10 +39,14 @@ export const useCalorieCalculator = () => {
       const activityMultiplier = selectedLevel ? selectedLevel.multiplier : 1.2;
       const dailyCalories = Math.round(bmr * activityMultiplier);
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast.error("Usuário não autenticado");
-        return null;
+      // Don't require authentication for calculating calories
+      // This allows the calculator to work even if the user is not logged in
+      let userId = null;
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        userId = userData.user?.id;
+      } catch (authError) {
+        console.warn("User not authenticated, proceeding with calculation only:", authError);
       }
 
       if (!formData.goal) {
@@ -50,23 +54,26 @@ export const useCalorieCalculator = () => {
         return null;
       }
 
-      const nutritionPreference: NutritionPreference = {
-        weight: parseFloat(formData.weight),
-        height: parseFloat(formData.height),
-        age: parseFloat(formData.age),
-        gender: formData.gender,
-        activity_level: formData.activityLevel as Database['public']['Enums']['activity_level'],
-        goal: mapGoalToEnum(formData.goal),
-        user_id: user.id
-      };
+      // Only save to database if user is logged in
+      if (userId) {
+        const nutritionPreference: NutritionPreference = {
+          weight: parseFloat(formData.weight),
+          height: parseFloat(formData.height),
+          age: parseFloat(formData.age),
+          gender: formData.gender,
+          activity_level: formData.activityLevel as Database['public']['Enums']['activity_level'],
+          goal: mapGoalToEnum(formData.goal),
+          user_id: userId
+        };
 
-      const { error: nutritionError } = await supabase
-        .from('nutrition_preferences')
-        .upsert(nutritionPreference);
+        const { error: nutritionError } = await supabase
+          .from('nutrition_preferences')
+          .upsert(nutritionPreference);
 
-      if (nutritionError) {
-        console.error('Error saving nutrition preferences:', nutritionError);
-        throw nutritionError;
+        if (nutritionError) {
+          console.error('Error saving nutrition preferences:', nutritionError);
+          // Continue anyway, this shouldn't block the calculation
+        }
       }
 
       setCalorieNeeds(dailyCalories);

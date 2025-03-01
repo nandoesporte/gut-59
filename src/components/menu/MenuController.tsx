@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -110,83 +111,105 @@ export const useMenuController = () => {
     }
 
     try {
+      console.log("Calculating calories with form data:", formData);
       const calories = await calculateCalories(formData, selectedLevel);
-      if (calories) {
-        toast.success("Calorias calculadas com sucesso!");
-        
+      
+      if (!calories) {
+        console.error("No calories returned from calculation");
+        return false;
+      }
+      
+      console.log("Calories calculated successfully:", calories);
+      toast.success("Calorias calculadas com sucesso!");
+      
+      try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          console.log("Salvando preferências para o usuário:", user.id);
-          console.log("Dados do formulário:", formData);
-          
-          const { data: existingRecord, error: selectError } = await supabase
-            .from('nutrition_preferences')
-            .select('id')
-            .eq('user_id', user.id)
-            .maybeSingle();
-          
-          if (selectError) {
-            console.error('Erro ao verificar preferências existentes:', selectError);
-          }
-          
-          const activityLevel = formData.activityLevel as "sedentary" | "light" | "moderate" | "intense";
-          const goal = mapGoalToDbValue(formData.goal);
-          
-          console.log("Mapeamento de objetivo:", formData.goal, "->", goal);
-          
-          if (existingRecord) {
-            console.log("Atualizando registro existente:", existingRecord.id);
-            const { error } = await supabase
-              .from('nutrition_preferences')
-              .update({
-                weight: Number(formData.weight),
-                height: Number(formData.height),
-                age: Number(formData.age),
-                gender: formData.gender,
-                activity_level: activityLevel,
-                goal: goal,
-                calories_needed: calories,
-                selected_foods: selectedFoods
-              })
-              .eq('id', existingRecord.id);
-            
-            if (error) {
-              console.error('Erro ao atualizar preferências nutricionais:', error);
-            } else {
-              console.log("Preferências atualizadas com sucesso");
-            }
-          } else {
-            console.log("Criando novo registro de preferências");
-            const { error } = await supabase
-              .from('nutrition_preferences')
-              .insert({
-                user_id: user.id,
-                weight: Number(formData.weight),
-                height: Number(formData.height),
-                age: Number(formData.age),
-                gender: formData.gender,
-                activity_level: activityLevel,
-                goal: goal,
-                calories_needed: calories,
-                selected_foods: selectedFoods
-              });
-            
-            if (error) {
-              console.error('Erro ao inserir preferências nutricionais:', error);
-            } else {
-              console.log("Novas preferências criadas com sucesso");
-            }
-          }
+          console.log("Saving preferences for user:", user.id);
+          await saveUserPreferences(user.id, calories);
+        } else {
+          console.log("User not authenticated, skipping preference save");
         }
-        
-        setCurrentStep(2);
-        console.log("Avançando para a etapa 2 (seleção de alimentos)");
+      } catch (authError) {
+        console.warn("Error checking authentication, proceeding to next step anyway:", authError);
       }
-      return calories !== null;
+      
+      // Always proceed to next step after successful calorie calculation
+      console.log("Advancing to step 2 (food selection)");
+      setCurrentStep(2);
+      return true;
     } catch (error) {
-      console.error('Erro ao calcular calorias:', error);
+      console.error('Error in handleCalculateCalories:', error);
       toast.error("Erro ao calcular as calorias necessárias");
       return false;
+    }
+  };
+
+  const saveUserPreferences = async (userId: string, calories: number) => {
+    try {
+      console.log("Saving form data:", formData);
+      
+      const { data: existingRecord, error: selectError } = await supabase
+        .from('nutrition_preferences')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle();
+      
+      if (selectError) {
+        console.error('Error checking existing preferences:', selectError);
+        return;
+      }
+      
+      const activityLevel = formData.activityLevel as "sedentary" | "light" | "moderate" | "intense";
+      const goal = mapGoalToDbValue(formData.goal);
+      
+      console.log("Goal mapping:", formData.goal, "->", goal);
+      
+      if (existingRecord) {
+        console.log("Updating existing record:", existingRecord.id);
+        const { error } = await supabase
+          .from('nutrition_preferences')
+          .update({
+            weight: Number(formData.weight),
+            height: Number(formData.height),
+            age: Number(formData.age),
+            gender: formData.gender,
+            activity_level: activityLevel,
+            goal: goal,
+            calories_needed: calories,
+            selected_foods: selectedFoods
+          })
+          .eq('id', existingRecord.id);
+        
+        if (error) {
+          console.error('Error updating nutrition preferences:', error);
+        } else {
+          console.log("Preferences updated successfully");
+        }
+      } else {
+        console.log("Creating new preferences record");
+        const { error } = await supabase
+          .from('nutrition_preferences')
+          .insert({
+            user_id: userId,
+            weight: Number(formData.weight),
+            height: Number(formData.height),
+            age: Number(formData.age),
+            gender: formData.gender,
+            activity_level: activityLevel,
+            goal: goal,
+            calories_needed: calories,
+            selected_foods: selectedFoods
+          });
+        
+        if (error) {
+          console.error('Error inserting nutrition preferences:', error);
+        } else {
+          console.log("New preferences created successfully");
+        }
+      }
+    } catch (dbError) {
+      console.error("Database error while saving preferences:", dbError);
     }
   };
 
@@ -396,9 +419,9 @@ export const useMenuController = () => {
 
   useEffect(() => {
     if (mealPlan) {
-      console.log("PLANO ALIMENTAR ATUALIZADO:", mealPlan);
-      console.log("Plano possui weeklyPlan?", !!mealPlan.weeklyPlan);
-      console.log("Step atual:", currentStep);
+      console.log("MEAL PLAN UPDATED:", mealPlan);
+      console.log("Plan has weeklyPlan?", !!mealPlan.weeklyPlan);
+      console.log("Current step:", currentStep);
     }
   }, [mealPlan, currentStep]);
 
