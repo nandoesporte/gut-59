@@ -329,47 +329,50 @@ export const useMenuController = () => {
       return false;
     }
 
-    console.log('Preferências alimentares recebidas:', JSON.stringify(preferences, null, 2));
-    console.log('Alimentos selecionados:', selectedFoods);
+    console.log('[MenuController] Preferências alimentares recebidas:', JSON.stringify(preferences, null, 2));
+    console.log('[MenuController] Alimentos selecionados:', selectedFoods);
 
     setLoading(true);
 
     try {
       const selectedFoodsData = protocolFoods.filter(food => selectedFoods.includes(String(food.id)));
-      console.log('Dados dos alimentos selecionados:', selectedFoodsData.map(f => ({ id: f.id, name: f.name })));
+      console.log('[MenuController] Dados dos alimentos selecionados:', selectedFoodsData.map(f => ({ id: f.id, name: f.name })));
       
       const sanitizedFoodsByMealType: Record<string, string[]> = {};
-      Object.keys(foodsByMealType).forEach(mealType => {
-        sanitizedFoodsByMealType[mealType] = foodsByMealType[mealType].map(id => String(id));
-      });
       
-      console.log('foodsByMealType sanitized:', JSON.stringify(sanitizedFoodsByMealType, null, 2));
+      if (foodsByMealType) {
+        Object.keys(foodsByMealType).forEach(mealType => {
+          sanitizedFoodsByMealType[mealType] = foodsByMealType[mealType].map(id => String(id));
+        });
+      }
+      
+      console.log('[MenuController] foodsByMealType sanitized:', JSON.stringify(sanitizedFoodsByMealType, null, 2));
 
       const { error: prefsError } = await supabase
         .from('dietary_preferences')
         .upsert({
           user_id: userData.user.id,
           has_allergies: Boolean(preferences.hasAllergies),
-          allergies: Array.isArray(preferences.allergies) ? preferences.allergies : [],
-          dietary_restrictions: Array.isArray(preferences.dietaryRestrictions) ? preferences.dietaryRestrictions : [],
-          training_time: preferences.trainingTime
+          allergies: Array.isArray(preferences.allergies) ? preferences.allergies.map(String) : [],
+          dietary_restrictions: Array.isArray(preferences.dietaryRestrictions) ? preferences.dietaryRestrictions.map(String) : [],
+          training_time: preferences.trainingTime || null
         }, { onConflict: 'user_id' });
           
       if (prefsError) {
-        console.error('Erro ao salvar preferências dietéticas:', prefsError);
-        console.error('Erro completo:', JSON.stringify(prefsError, null, 2));
+        console.error('[MenuController] Erro ao salvar preferências dietéticas:', prefsError);
+        console.error('[MenuController] Erro completo:', JSON.stringify(prefsError, null, 2));
       } else {
-        console.log('Preferências dietéticas salvas com sucesso');
+        console.log('[MenuController] Preferências dietéticas salvas com sucesso');
       }
       
       const sanitizedPreferences: DietaryPreferences = {
         hasAllergies: Boolean(preferences.hasAllergies),
-        allergies: Array.isArray(preferences.allergies) ? preferences.allergies : [],
-        dietaryRestrictions: Array.isArray(preferences.dietaryRestrictions) ? preferences.dietaryRestrictions : [],
-        trainingTime: preferences.trainingTime
+        allergies: Array.isArray(preferences.allergies) ? preferences.allergies.map(String) : [],
+        dietaryRestrictions: Array.isArray(preferences.dietaryRestrictions) ? preferences.dietaryRestrictions.map(String) : [],
+        trainingTime: typeof preferences.trainingTime === 'string' ? preferences.trainingTime : null
       };
       
-      console.log('Preferências sanitizadas para o Edge Function:', JSON.stringify(sanitizedPreferences, null, 2));
+      console.log('[MenuController] Preferências sanitizadas para o Edge Function:', JSON.stringify(sanitizedPreferences, null, 2));
       
       const generatedMealPlan = await generateMealPlan({
         userData: {
@@ -392,18 +395,18 @@ export const useMenuController = () => {
         throw new Error('Plano alimentar não foi gerado corretamente');
       }
 
-      console.log('Plano gerado:', generatedMealPlan);
+      console.log('[MenuController] Plano gerado:', generatedMealPlan);
       
       setMealPlan(generatedMealPlan);
       
       setDietaryPreferences(preferences);
       
-      console.log("Avançando para a etapa 4 (exibição do plano alimentar)");
+      console.log("[MenuController] Avançando para a etapa 4 (exibição do plano alimentar)");
       setCurrentStep(4);
       
       return true;
     } catch (error) {
-      console.error('Erro completo:', error);
+      console.error('[MenuController] Erro completo:', error);
       toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
       return false;
     } finally {
