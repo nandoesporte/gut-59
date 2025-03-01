@@ -29,6 +29,11 @@ serve(async (req) => {
       throw new Error("Missing required parameter: message");
     }
 
+    if (!LLAMA_API_KEY) {
+      console.error("LLAMA_API_KEY environment variable is not set");
+      throw new Error("API configuration error: Missing API key");
+    }
+
     // System prompt for mental health guidance
     const systemPrompt = `Você é um assistente de saúde mental empático e compassivo. 
 Você oferece apoio, orientação e estratégias para lidar com questões de saúde mental.
@@ -49,50 +54,55 @@ Responda em português do Brasil com um tom caloroso e acolhedor. Se a pessoa es
       { role: "user", content: message }
     ];
 
-    console.log("Sending request to LlamaAPI");
+    console.log("Sending request to LlamaAPI with model: nous-hermes-2-mixtral-8x7b-dpo");
     
-    // Make the request to the LlamaAPI (Nous-Hermes-2-Mixtral-8x7B-DPO model)
-    const response = await fetch(LLAMA_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${LLAMA_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: "nous-hermes-2-mixtral-8x7b-dpo",
-        messages: messages,
-        max_tokens: 1000,
-        temperature: 0.7,
-        top_p: 0.9,
-        stream: false
-      })
-    });
+    // Make the request to the LlamaAPI
+    try {
+      const response = await fetch(LLAMA_API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${LLAMA_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: "nous-hermes-2-mixtral-8x7b-dpo",
+          messages: messages,
+          max_tokens: 1000,
+          temperature: 0.7,
+          top_p: 0.9,
+          stream: false
+        })
+      });
 
-    // Handle API response
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`LlamaAPI error (${response.status}): ${errorText}`);
-      throw new Error(`LlamaAPI error: ${response.status} - ${errorText}`);
-    }
-
-    // Parse the response
-    const data = await response.json();
-    console.log(`LlamaAPI response received`);
-
-    // Extract the assistant's response
-    const assistantResponse = data.choices[0].message.content;
-    console.log(`Assistant response: ${assistantResponse.substring(0, 100)}...`);
-
-    // Return the response
-    return new Response(
-      JSON.stringify({ response: assistantResponse }),
-      { 
-        headers: { 
-          ...corsHeaders,
-          "Content-Type": "application/json" 
-        }
+      // Handle API response
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`LlamaAPI error (${response.status}): ${errorText}`);
+        throw new Error(`LlamaAPI error: ${response.status} - ${errorText}`);
       }
-    );
+
+      // Parse the response
+      const data = await response.json();
+      console.log(`LlamaAPI response received: status ${response.status}`);
+
+      // Extract the assistant's response
+      const assistantResponse = data.choices[0].message.content;
+      console.log(`Assistant response: ${assistantResponse.substring(0, 100)}...`);
+
+      // Return the response
+      return new Response(
+        JSON.stringify({ response: assistantResponse }),
+        { 
+          headers: { 
+            ...corsHeaders,
+            "Content-Type": "application/json" 
+          }
+        }
+      );
+    } catch (fetchError) {
+      console.error("Fetch error:", fetchError);
+      throw new Error(`Erro na conexão com LlamaAPI: ${fetchError.message}`);
+    }
   } catch (error) {
     console.error("Error in mental-health-chat-llama function:", error.message);
     

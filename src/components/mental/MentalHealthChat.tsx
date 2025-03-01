@@ -50,7 +50,7 @@ export const MentalHealthChat = () => {
       const { data, error } = await supabase.functions.invoke("mental-health-chat-llama", {
         body: { 
           message: input,
-          history: messages
+          history: messages.slice(-5) // Send only last 5 messages to avoid token limit issues
         },
       });
 
