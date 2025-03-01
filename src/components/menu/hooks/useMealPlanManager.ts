@@ -19,15 +19,23 @@ const saveMealPlanData = async (
   try {
     console.log('Salvando plano alimentar no banco de dados para usuário:', userId);
     
-    // Fixed: Use an array with a single object for the insert method
+    // Convert preferences to JSON format
+    const sanitizedPreferences = {
+      hasAllergies: Boolean(preferences.hasAllergies),
+      allergies: Array.isArray(preferences.allergies) ? preferences.allergies : [],
+      dietaryRestrictions: Array.isArray(preferences.dietaryRestrictions) ? preferences.dietaryRestrictions : [],
+      trainingTime: preferences.trainingTime || null
+    };
+    
+    // Use insert with a single object for better type matching
     const { error } = await supabase
       .from('meal_plans')
-      .insert([{
+      .insert({
         user_id: userId,
         plan_data: mealPlan,
         calories: calorieNeeds,
-        dietary_preferences: preferences
-      }]);
+        dietary_preferences: sanitizedPreferences
+      });
     
     if (error) {
       console.error('Erro ao salvar plano alimentar:', error);
@@ -116,7 +124,19 @@ export const useMealPlanManager = () => {
       
       console.log('Distribuição de alimentos por refeição:', sanitizedFoodsByMealType);
 
-      await menuDatabase.saveDietaryPreferences(preferences, userData.user.id);
+      // Save dietary preferences before generating the meal plan
+      const savedPrefs = await menuDatabase.saveDietaryPreferences(preferences, userData.user.id);
+      
+      if (!savedPrefs) {
+        console.warn('Não foi possível salvar preferências dietéticas. Usando valores padrão.');
+        // Set default values if saving failed
+        preferences = {
+          hasAllergies: false,
+          allergies: [],
+          dietaryRestrictions: [],
+          trainingTime: null
+        };
+      }
       
       const sanitizedPreferences: DietaryPreferences = {
         hasAllergies: Boolean(preferences.hasAllergies),
