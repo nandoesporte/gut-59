@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -405,29 +406,321 @@ export const useMenuController = () => {
       } else {
         console.log("Usuário não autenticado. Criando plano básico.");
         
+        // Create a basic meal plan for unauthenticated users with the correct structure
         const basicMealPlan: MealPlan = {
           userCalories: calorieNeeds,
           weeklyPlan: {
-            "Segunda": {
-              "Café da Manhã": [
-                { name: "Escolha um dos alimentos selecionados", portion: "1 porção", calories: 0 }
-              ],
-              "Almoço": [
-                { name: "Escolha um dos alimentos selecionados", portion: "1 porção", calories: 0 }
-              ],
-              "Lanche": [
-                { name: "Escolha um dos alimentos selecionados", portion: "1 porção", calories: 0 }
-              ],
-              "Jantar": [
-                { name: "Escolha um dos alimentos selecionados", portion: "1 porção", calories: 0 }
-              ]
+            monday: {
+              dayName: "Segunda",
+              meals: {
+                breakfast: {
+                  description: "Café da Manhã",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                morningSnack: {
+                  description: "Lanche da Manhã",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                lunch: {
+                  description: "Almoço",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                afternoonSnack: {
+                  description: "Lanche da Tarde",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                dinner: {
+                  description: "Jantar",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                }
+              },
+              dailyTotals: {
+                calories: 0,
+                protein: 0,
+                carbs: 0,
+                fats: 0,
+                fiber: 0
+              }
+            },
+            tuesday: {
+              dayName: "Terça",
+              meals: {
+                breakfast: {
+                  description: "Café da Manhã",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                morningSnack: {
+                  description: "Lanche da Manhã",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                lunch: {
+                  description: "Almoço",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                afternoonSnack: {
+                  description: "Lanche da Tarde",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                dinner: {
+                  description: "Jantar",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                }
+              },
+              dailyTotals: {
+                calories: 0,
+                protein: 0,
+                carbs: 0,
+                fats: 0,
+                fiber: 0
+              }
+            },
+            wednesday: {
+              dayName: "Quarta",
+              meals: {
+                breakfast: {
+                  description: "Café da Manhã",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                morningSnack: {
+                  description: "Lanche da Manhã",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                lunch: {
+                  description: "Almoço",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                afternoonSnack: {
+                  description: "Lanche da Tarde",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                dinner: {
+                  description: "Jantar",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                }
+              },
+              dailyTotals: {
+                calories: 0,
+                protein: 0,
+                carbs: 0,
+                fats: 0,
+                fiber: 0
+              }
+            },
+            thursday: {
+              dayName: "Quinta",
+              meals: {
+                breakfast: {
+                  description: "Café da Manhã",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                morningSnack: {
+                  description: "Lanche da Manhã",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                lunch: {
+                  description: "Almoço",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                afternoonSnack: {
+                  description: "Lanche da Tarde",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                dinner: {
+                  description: "Jantar",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                }
+              },
+              dailyTotals: {
+                calories: 0,
+                protein: 0,
+                carbs: 0,
+                fats: 0,
+                fiber: 0
+              }
+            },
+            friday: {
+              dayName: "Sexta",
+              meals: {
+                breakfast: {
+                  description: "Café da Manhã",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                morningSnack: {
+                  description: "Lanche da Manhã",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                lunch: {
+                  description: "Almoço",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                afternoonSnack: {
+                  description: "Lanche da Tarde",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                dinner: {
+                  description: "Jantar",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                }
+              },
+              dailyTotals: {
+                calories: 0,
+                protein: 0,
+                carbs: 0,
+                fats: 0,
+                fiber: 0
+              }
+            },
+            saturday: {
+              dayName: "Sábado",
+              meals: {
+                breakfast: {
+                  description: "Café da Manhã",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                morningSnack: {
+                  description: "Lanche da Manhã",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                lunch: {
+                  description: "Almoço",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                afternoonSnack: {
+                  description: "Lanche da Tarde",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                dinner: {
+                  description: "Jantar",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                }
+              },
+              dailyTotals: {
+                calories: 0,
+                protein: 0,
+                carbs: 0,
+                fats: 0,
+                fiber: 0
+              }
+            },
+            sunday: {
+              dayName: "Domingo",
+              meals: {
+                breakfast: {
+                  description: "Café da Manhã",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                morningSnack: {
+                  description: "Lanche da Manhã",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                lunch: {
+                  description: "Almoço",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                afternoonSnack: {
+                  description: "Lanche da Tarde",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                dinner: {
+                  description: "Jantar",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                }
+              },
+              dailyTotals: {
+                calories: 0,
+                protein: 0,
+                carbs: 0,
+                fats: 0,
+                fiber: 0
+              }
             }
           },
-          recommendations: [
-            "Para um plano personalizado completo, faça login na plataforma.",
-            "Mantenha uma alimentação balanceada com proteínas, carboidratos e gorduras boas.",
-            "Beba pelo menos 2 litros de água por dia."
-          ]
+          weeklyTotals: {
+            averageCalories: 0,
+            averageProtein: 0,
+            averageCarbs: 0,
+            averageFats: 0,
+            averageFiber: 0
+          },
+          recommendations: {
+            general: "Para um plano personalizado completo, faça login na plataforma.",
+            preworkout: "Consuma carboidratos de fácil digestão 30-60 minutos antes do treino.",
+            postworkout: "Consuma proteínas e carboidratos até 30 minutos após o treino para melhor recuperação.",
+            timing: [
+              "Mantenha uma alimentação balanceada com proteínas, carboidratos e gorduras boas.",
+              "Beba pelo menos 2 litros de água por dia."
+            ]
+          }
         };
         
         setMealPlan(basicMealPlan);
