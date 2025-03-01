@@ -17,7 +17,7 @@ const handleCors = (req: Request) => {
 
 // Main function to handle requests
 serve(async (req) => {
-  console.log("Received request to generate meal plan with Llama model");
+  console.log("Received request to generate meal plan with Groq API model");
   
   // Handle CORS preflight request
   const corsResponse = handleCors(req);
@@ -34,10 +34,10 @@ serve(async (req) => {
     // Get request data
     const requestData = await req.json();
     console.log("Processing request with user data:", JSON.stringify({
-      weight: requestData.userData.weight,
-      height: requestData.userData.height,
-      age: requestData.userData.age,
-      goal: requestData.userData.goal
+      weight: requestData.userData?.weight,
+      height: requestData.userData?.height,
+      age: requestData.userData?.age,
+      goal: requestData.userData?.goal
     }));
 
     // Extract the data needed for the meal plan
@@ -52,7 +52,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Using model configuration: ${requestData.modelConfig?.model || 'llama-3.1-8b-chat'}`);
+    console.log(`Using model configuration: ${requestData.modelConfig?.model || 'Default Groq model'}`);
     
     // Get the Groq API key from environment variables
     const groqApiKey = Deno.env.get('GROQ_API_KEY');
@@ -60,14 +60,13 @@ serve(async (req) => {
       throw new Error('GROQ_API_KEY is not set in environment variables');
     }
 
-    // Construct the prompt for the Llama model
+    // Construct the prompt for the model
     const prompt = constructPrompt(userData, selectedFoods, foodsByMealType, dietaryPreferences);
     
-    console.log("Sending request to Groq API for Llama model");
+    console.log("Sending request to Groq API");
     
-    // Define model - update to use an available model in Groq's API
-    // Fixed: Changed from 'llama-3.2-1b-chat-8k' to 'llama-3.1-8b-chat'
-    const modelName = "llama-3.1-8b-chat";
+    // Define model - using LLaMA 3 70B Instruct model which is available in Groq
+    const modelName = "llama3-70b-8192";
     
     // Prepare the message for the chat API
     const messages = [
@@ -81,7 +80,9 @@ serve(async (req) => {
       }
     ];
 
-    // Call Groq API to get response from Llama model
+    console.log(`Using Groq model: ${modelName}`);
+
+    // Call Groq API to get response from the model
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -111,11 +112,14 @@ serve(async (req) => {
       throw new Error('No content in Groq API response');
     }
 
+    console.log("Attempting to parse response as JSON");
+    
     // Extract JSON from the content
     let mealPlan;
     try {
       // First try to parse it directly if it's already JSON
       mealPlan = JSON.parse(content);
+      console.log("Successfully parsed response as direct JSON");
     } catch (parseError) {
       console.error("Failed to parse response as pure JSON, attempting to extract JSON from text:", parseError);
       
@@ -126,7 +130,10 @@ serve(async (req) => {
       
       if (jsonMatch) {
         try {
-          mealPlan = JSON.parse(jsonMatch[1] || jsonMatch[0]);
+          const jsonContent = jsonMatch[1] || jsonMatch[0];
+          console.log("Extracted JSON-like content:", jsonContent.substring(0, 200) + "...");
+          mealPlan = JSON.parse(jsonContent);
+          console.log("Successfully extracted and parsed JSON from content");
         } catch (extractError) {
           console.error("Failed to extract JSON from content:", extractError);
           throw new Error('Failed to parse meal plan JSON from response');
@@ -139,14 +146,14 @@ serve(async (req) => {
 
     // Validate the meal plan structure
     if (!mealPlan || !mealPlan.weeklyPlan) {
-      console.error("Invalid meal plan structure:", JSON.stringify(mealPlan));
+      console.error("Invalid meal plan structure:", JSON.stringify(mealPlan).substring(0, 500) + "...");
       throw new Error('Invalid meal plan structure');
     }
 
     // Add the user's daily calories to the response
     mealPlan.userCalories = userData.dailyCalories;
     
-    console.log("Successfully generated meal plan with Llama model");
+    console.log("Successfully generated meal plan with Groq model");
     
     return new Response(
       JSON.stringify({ mealPlan }),
@@ -165,7 +172,7 @@ serve(async (req) => {
   }
 });
 
-// Function to construct the prompt for the Llama model
+// Function to construct the prompt for the model
 function constructPrompt(userData, selectedFoods, foodsByMealType, dietaryPreferences) {
   return `
 Create a detailed 7-day meal plan with the following specifications:
