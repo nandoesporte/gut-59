@@ -33,18 +33,23 @@ export const useMenuController = () => {
 
   useEffect(() => {
     const loadSavedPreferences = async () => {
-      const savedFoods = await menuDatabase.loadSavedFoodPreferences();
-      
-      if (savedFoods && Array.isArray(savedFoods)) {
-        savedFoods.forEach(foodId => {
-          if (typeof foodId === 'string' && !selectedFoods.includes(foodId)) {
-            handleFoodSelection(foodId);
-          }
-        });
+      try {
+        const savedFoods = await menuDatabase.loadSavedFoodPreferences();
         
-        if (savedFoods.length > 0) {
-          categorizeFoodsByMealType(protocolFoods);
+        if (savedFoods && Array.isArray(savedFoods)) {
+          savedFoods.forEach(foodId => {
+            if (typeof foodId === 'string' && !selectedFoods.includes(foodId)) {
+              handleFoodSelection(foodId);
+            }
+          });
+          
+          if (savedFoods.length > 0) {
+            categorizeFoodsByMealType(protocolFoods);
+          }
         }
+      } catch (error) {
+        console.error('Erro ao carregar preferências alimentares:', error);
+        // Don't show toast here as it might be annoying on every load
       }
     };
 
@@ -65,14 +70,20 @@ export const useMenuController = () => {
       if (calories) {
         toast.success("Calorias calculadas com sucesso!");
         
-        const success = await menuDatabase.saveCalorieCalculation(formData, calories, selectedFoods);
-        
-        if (success) {
-          setCurrentStep(2);
-          console.log("Avançando para a etapa 2 (seleção de alimentos)");
+        try {
+          // Try to save the calculation, but proceed even if it fails
+          await menuDatabase.saveCalorieCalculation(formData, calories, selectedFoods);
+        } catch (dbError) {
+          console.error('Erro ao salvar cálculo de calorias:', dbError);
+          // Continue despite database error
         }
+        
+        // Move to next step regardless of database operations
+        setCurrentStep(2);
+        console.log("Avançando para a etapa 2 (seleção de alimentos)");
+        return true;
       }
-      return calories !== null;
+      return false;
     } catch (error) {
       console.error('Erro ao calcular calorias:', error);
       toast.error("Erro ao calcular as calorias necessárias");
@@ -91,39 +102,53 @@ export const useMenuController = () => {
     
     toast.success("Processando sua seleção de alimentos...");
     
-    const success = await menuDatabase.saveFoodSelection(selectedFoods, formData);
-    
-    if (success) {
-      console.log("Preferências de alimentos salvas com sucesso!");
-      console.log("Avançando para a etapa 3 (restrições dietéticas)");
+    try {
+      const success = await menuDatabase.saveFoodSelection(selectedFoods, formData);
       
+      if (success) {
+        console.log("Preferências de alimentos salvas com sucesso!");
+        console.log("Avançando para a etapa 3 (restrições dietéticas)");
+        
+        setCurrentStep(3);
+        
+        toast.success("Preferências de alimentos salvas! Agora informe suas restrições dietéticas.");
+        return true;
+      }
+      
+      console.error("Falha ao salvar preferências de alimentos");
+      return false;
+    } catch (error) {
+      console.error("Erro ao salvar seleção de alimentos:", error);
+      toast.error("Ocorreu um erro ao salvar suas preferências de alimentos");
+      // Still proceed to next step even if database operation fails
       setCurrentStep(3);
-      
-      toast.success("Preferências de alimentos salvas! Agora informe suas restrições dietéticas.");
       return true;
     }
-    
-    console.error("Falha ao salvar preferências de alimentos");
-    return false;
   };
 
   const handleDietaryPreferences = async (preferences: DietaryPreferences) => {
-    const result = await generateUserMealPlan({
-      formData,
-      calorieNeeds,
-      selectedFoods,
-      foodsByMealType,
-      protocolFoods,
-      preferences
-    });
-    
-    if (result) {
-      setDietaryPreferences(preferences);
-      setCurrentStep(4);
-      return true;
+    try {
+      const result = await generateUserMealPlan({
+        formData,
+        calorieNeeds,
+        selectedFoods,
+        foodsByMealType,
+        protocolFoods,
+        preferences
+      });
+      
+      if (result) {
+        setDietaryPreferences(preferences);
+        setCurrentStep(4);
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error("Erro ao processar preferências dietéticas:", error);
+      toast.error("Ocorreu um erro ao processar suas preferências dietéticas");
+      return false;
     }
-    
-    return false;
   };
 
   const handleRegenerateMealPlan = async () => {
