@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { DietaryPreferences, ProtocolFood } from "../types";
@@ -672,3 +673,130 @@ const createDefaultMealPlan = (
           macros: {
             protein: Math.round(protein * 0.25),
             carbs: Math.round(carbs * 0.3),
+            fats: Math.round(fats * 0.2),
+            fiber: 6
+          },
+          description: `Café da manhã balanceado com aproximadamente ${breakfastCals} calorias.`
+        },
+        morningSnack: {
+          foods: getRandomFood(foodsForSnack, 2),
+          calories: Math.round(snackCals * 0.5),
+          macros: {
+            protein: Math.round(protein * 0.1),
+            carbs: Math.round(carbs * 0.1),
+            fats: Math.round(fats * 0.1),
+            fiber: 3
+          },
+          description: "Lanche da manhã para manter o metabolismo ativo."
+        },
+        lunch: {
+          foods: getRandomFood(foodsForLunch, 4),
+          calories: lunchCals,
+          macros: {
+            protein: Math.round(protein * 0.35),
+            carbs: Math.round(carbs * 0.3),
+            fats: Math.round(fats * 0.3),
+            fiber: 8
+          },
+          description: `Almoço completo com aproximadamente ${lunchCals} calorias.`
+        },
+        afternoonSnack: {
+          foods: getRandomFood(foodsForSnack, 2),
+          calories: Math.round(snackCals * 0.5),
+          macros: {
+            protein: Math.round(protein * 0.15),
+            carbs: Math.round(carbs * 0.1),
+            fats: Math.round(fats * 0.1),
+            fiber: 3
+          },
+          description: "Lanche da tarde para evitar fome excessiva no jantar."
+        },
+        dinner: {
+          foods: getRandomFood(foodsForDinner, 3),
+          calories: dinnerCals,
+          macros: {
+            protein: Math.round(protein * 0.25),
+            carbs: Math.round(carbs * 0.2),
+            fats: Math.round(fats * 0.3),
+            fiber: 6
+          },
+          description: `Jantar balanceado com aproximadamente ${dinnerCals} calorias.`
+        }
+      },
+      // Calcular totais diários
+      dailyTotals: {
+        calories: breakfastCals + lunchCals + dinnerCals + snackCals,
+        protein: protein,
+        carbs: carbs,
+        fats: fats,
+        fiber: 26
+      }
+    };
+  });
+  
+  // Calcular totais semanais
+  const weeklyTotals = {
+    averageCalories: dailyCalories,
+    averageProtein: protein,
+    averageCarbs: carbs,
+    averageFats: fats,
+    averageFiber: 26
+  };
+  
+  // Obter recomendações padrão
+  const recommendations = getDefaultRecommendations(userData.goal);
+  
+  // Retornar plano completo
+  return {
+    weeklyPlan,
+    weeklyTotals,
+    recommendations,
+    goalCalories: dailyCalories,
+    macroDistribution: {
+      protein: Math.round(protein * 4 * 100 / dailyCalories), // percentual
+      carbs: Math.round(carbs * 4 * 100 / dailyCalories),     // percentual
+      fats: Math.round(fats * 9 * 100 / dailyCalories)        // percentual
+    }
+  };
+};
+
+// Função para salvar os dados do plano de refeição no banco de dados
+const saveMealPlanData = async (
+  userId: string, 
+  mealPlan: any, 
+  dailyCalories: number, 
+  preferences: DietaryPreferences
+) => {
+  try {
+    console.log('[MEAL PLAN] Salvando plano alimentar no banco de dados');
+    
+    // Sanitizar preferências dietéticas
+    const sanitizedPreferences = {
+      hasAllergies: Boolean(preferences.hasAllergies),
+      allergies: Array.isArray(preferences.allergies) ? preferences.allergies.map(String) : [],
+      dietaryRestrictions: Array.isArray(preferences.dietaryRestrictions) ? preferences.dietaryRestrictions.map(String) : [],
+      trainingTime: preferences.trainingTime || null
+    };
+    
+    // Garantir que o plano de refeição é serializável para JSON
+    const planDataForStorage = JSON.parse(JSON.stringify(mealPlan));
+    
+    const { error } = await supabase.from('meal_plans').insert({
+      user_id: userId,
+      plan_data: planDataForStorage,
+      calories: dailyCalories,
+      dietary_preferences: sanitizedPreferences
+    });
+    
+    if (error) {
+      console.error('[MEAL PLAN] Erro ao salvar plano alimentar:', error);
+      return false;
+    }
+    
+    console.log('[MEAL PLAN] Plano alimentar salvo com sucesso');
+    return true;
+  } catch (error) {
+    console.error('[MEAL PLAN] Erro ao salvar plano alimentar:', error);
+    return false;
+  }
+};
