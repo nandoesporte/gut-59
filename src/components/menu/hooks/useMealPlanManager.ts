@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,6 +7,36 @@ import { generateMealPlan } from "./useMealPlanGeneration";
 import { useMenuDatabase } from "./useMenuDatabase";
 import { useWallet } from "@/hooks/useWallet";
 import type { CalorieCalculatorForm } from "../CalorieCalculator";
+import { REWARDS } from "@/constants/rewards";
+
+// Helper function to save meal plan data to the database
+const saveMealPlanData = async (
+  userId: string, 
+  mealPlan: MealPlan, 
+  calorieNeeds: number,
+  preferences: DietaryPreferences
+) => {
+  try {
+    console.log('Salvando plano alimentar no banco de dados para usuário:', userId);
+    
+    const { error } = await supabase.from('meal_plans').insert({
+      user_id: userId,
+      meal_plan: mealPlan,
+      calorie_needs: calorieNeeds,
+      preferences: preferences
+    });
+    
+    if (error) {
+      console.error('Erro ao salvar plano alimentar:', error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Erro ao salvar dados do plano alimentar:', error);
+    return false;
+  }
+};
 
 export const useMealPlanManager = () => {
   const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
@@ -138,7 +169,7 @@ export const useMealPlanManager = () => {
       }
 
       try {
-        await addTransaction({
+        await addTransactionAsync({
           amount: REWARDS.MEAL_PLAN,
           type: 'meal_plan',
           description: 'Geração de plano alimentar personalizado'
