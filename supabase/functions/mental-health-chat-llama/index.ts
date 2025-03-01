@@ -55,25 +55,34 @@ Responda em português do Brasil com um tom caloroso e acolhedor. Se a pessoa es
     ];
 
     console.log("Sending request to LlamaAPI with model: nous-hermes-2-mixtral-8x7b-dpo");
+    console.log(`Request URL: ${LLAMA_API_URL}`);
     
     // Make the request to the LlamaAPI
     try {
+      console.log("Initiating fetch request to LlamaAPI...");
+      
+      const requestBody = {
+        model: "nous-hermes-2-mixtral-8x7b-dpo",
+        messages: messages,
+        max_tokens: 1000,
+        temperature: 0.7,
+        top_p: 0.9,
+        stream: false
+      };
+      
+      console.log(`Request body: ${JSON.stringify(requestBody, null, 2)}`);
+      
       const response = await fetch(LLAMA_API_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${LLAMA_API_KEY}`
         },
-        body: JSON.stringify({
-          model: "nous-hermes-2-mixtral-8x7b-dpo",
-          messages: messages,
-          max_tokens: 1000,
-          temperature: 0.7,
-          top_p: 0.9,
-          stream: false
-        })
+        body: JSON.stringify(requestBody)
       });
 
+      console.log(`Response status: ${response.status}`);
+      
       // Handle API response
       if (!response.ok) {
         const errorText = await response.text();
@@ -105,6 +114,7 @@ Responda em português do Brasil com um tom caloroso e acolhedor. Se a pessoa es
     }
   } catch (error) {
     console.error("Error in mental-health-chat-llama function:", error.message);
+    console.error("Full error:", error);
     
     return new Response(
       JSON.stringify({ 

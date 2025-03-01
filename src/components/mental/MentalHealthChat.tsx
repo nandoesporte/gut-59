@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowUp, Loader2, AlertTriangle, BrainCircuit } from "lucide-react";
+import { ArrowUp, Loader2, AlertTriangle, BrainCircuit, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -23,6 +23,7 @@ export const MentalHealthChat = () => {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -59,22 +60,36 @@ export const MentalHealthChat = () => {
         throw new Error(error.message || "Erro ao chamar a função mental-health-chat-llama");
       }
 
+      if (!data) {
+        throw new Error("Resposta vazia recebida da API");
+      }
+
       if (data?.error) {
         console.error("Erro na resposta da função:", data.error);
         throw new Error(data.error);
       }
 
       if (data?.response) {
+        // Validate response is not empty
+        if (!data.response.trim()) {
+          throw new Error("A resposta recebida está vazia");
+        }
+        
         setMessages((prev) => [
           ...prev,
           { role: "assistant", content: data.response },
         ]);
+        
+        // Reset retry count on successful response
+        setRetryCount(0);
       } else {
         throw new Error("Resposta não recebida");
       }
     } catch (error) {
       console.error("Erro ao enviar mensagem:", error);
-      setErrorMessage("Não foi possível obter resposta. A API pode estar temporariamente indisponível.");
+      setErrorMessage(
+        "Não foi possível obter resposta. A API pode estar temporariamente indisponível."
+      );
       
       toast({
         title: "Erro na comunicação",
@@ -83,6 +98,31 @@ export const MentalHealthChat = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleRetry = () => {
+    setRetryCount((prev) => prev + 1);
+    setErrorMessage(null);
+    
+    // Find the last user message
+    const lastUserMessageIndex = [...messages].reverse().findIndex(m => m.role === "user");
+    
+    if (lastUserMessageIndex !== -1) {
+      const lastUserMessage = messages[messages.length - 1 - lastUserMessageIndex];
+      setInput(lastUserMessage.content);
+      
+      // If we've already retried multiple times, truncate the conversation history
+      if (retryCount > 1) {
+        const reducedMessages = messages.slice(0, Math.max(2, messages.length - retryCount * 2));
+        setMessages(reducedMessages);
+        toast({
+          title: "Reiniciando conversa",
+          description: "Reiniciamos parte da conversa para tentar resolver problemas de comunicação.",
+        });
+      }
+    } else {
+      setInput("");
     }
   };
 
@@ -128,7 +168,17 @@ export const MentalHealthChat = () => {
         {errorMessage && (
           <Alert variant="destructive" className="mt-4">
             <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{errorMessage}</AlertDescription>
+            <AlertDescription className="flex items-center justify-between">
+              <span>{errorMessage}</span>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="ml-2 bg-transparent" 
+                onClick={handleRetry}
+              >
+                <RefreshCw className="h-4 w-4 mr-1" /> Tentar novamente
+              </Button>
+            </AlertDescription>
           </Alert>
         )}
         <div ref={messagesEndRef} />
