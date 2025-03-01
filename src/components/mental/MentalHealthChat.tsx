@@ -79,7 +79,7 @@ export const MentalHealthChat = () => {
       <Alert variant="default" className="mb-4 bg-blue-50 border-blue-200">
         <BrainCircuit className="h-4 w-4 text-blue-600" />
         <AlertDescription className="text-blue-800">
-          Conselheira virtual agora com o modelo de IA Mixtral para respostas mais precisas e humanas.
+          Essa mensagem será excluida imediatmanete apos fechar esse chat, não armazenamos suas mensagens!
         </AlertDescription>
       </Alert>
       
