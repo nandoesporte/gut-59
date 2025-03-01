@@ -38,6 +38,7 @@ export const MentalHealthResources = () => {
   const [dailyLimit, setDailyLimit] = useState(5);
   const [isLoading, setIsLoading] = useState(true);
   const [timer, setTimer] = useState<NodeJS.Timeout | null>(null);
+  const [isStarting, setIsStarting] = useState(false);
   const wallet = useWallet();
   const isMobile = useIsMobile();
 
@@ -47,10 +48,13 @@ export const MentalHealthResources = () => {
         const { data: settings, error } = await supabase
           .from('mental_health_settings')
           .select('*')
-          .single();
+          .maybeSingle();
 
         if (error) throw error;
-        setDailyLimit((settings as MentalHealthSettings).breathing_exercise_daily_limit);
+        
+        if (settings) {
+          setDailyLimit((settings as MentalHealthSettings).breathing_exercise_daily_limit);
+        }
         
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -60,7 +64,7 @@ export const MentalHealthResources = () => {
           .select('count')
           .eq('transaction_type', 'breathing_exercise')
           .gte('created_at', today.toISOString())
-          .single();
+          .maybeSingle();
 
         if (countError && countError.code !== 'PGRST116') throw countError;
         setDailyExercisesCount(exerciseCount?.count || 0);
@@ -88,15 +92,25 @@ export const MentalHealthResources = () => {
       toast.error(`Você atingiu o limite diário de ${dailyLimit} exercícios`);
       return;
     }
-    setExercise({
-      phase: "inhale",
-      count: 0,
-      totalBreaths: 3, // Reduced to fit in 1 minute
-      isComplete: false,
-      secondsLeft: 4,
-      elapsedTime: 0,
-    });
-    breathe("inhale", 4, 0);
+    
+    // Set starting state to show feedback immediately
+    setIsStarting(true);
+    
+    // Use setTimeout with 0ms to move exercise initialization to the next event loop
+    // This allows the UI to update with the loading state first
+    setTimeout(() => {
+      setExercise({
+        phase: "inhale",
+        count: 0,
+        totalBreaths: 3, // Reduced to fit in 1 minute
+        isComplete: false,
+        secondsLeft: 4,
+        elapsedTime: 0,
+      });
+      
+      breathe("inhale", 4, 0);
+      setIsStarting(false);
+    }, 0);
   };
 
   const breathe = (phase: "inhale" | "hold" | "exhale", duration: number, elapsedTime: number) => {
@@ -266,13 +280,19 @@ export const MentalHealthResources = () => {
               <div className="space-y-4">
                 <Button 
                   onClick={startBreathing}
-                  disabled={dailyExercisesCount >= dailyLimit}
-                  className="w-full py-4 sm:py-6 text-base sm:text-lg"
+                  disabled={dailyExercisesCount >= dailyLimit || isStarting}
+                  className="w-full py-4 sm:py-6 text-base sm:text-lg relative"
                   size="lg"
                 >
-                  {dailyExercisesCount >= dailyLimit 
-                    ? 'Limite diário atingido' 
-                    : 'Iniciar Exercício de Respiração'}
+                  {isStarting ? 'Preparando exercício...' : 
+                   dailyExercisesCount >= dailyLimit ? 'Limite diário atingido' : 
+                   'Iniciar Exercício de Respiração'}
+                  
+                  {isStarting && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-primary/90 rounded-md">
+                      <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                  )}
                 </Button>
                 
                 {exercise.isComplete && (
