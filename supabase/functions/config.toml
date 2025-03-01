@@ -3,3 +3,6 @@ project_id = "sxjafhzikftdenqnkcri"
 
 [functions.mental-health-chat]
 verify_jwt = false
+
+[functions.groq-chat]
+verify_jwt = false

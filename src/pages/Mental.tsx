@@ -47,7 +47,7 @@ const Mental = () => {
     try {
       const emotionLabel = emotions.find(e => e.id === emotion)?.label || '';
       
-      const { data, error } = await supabase.functions.invoke("mental-health-chat", {
+      const { data, error } = await supabase.functions.invoke("groq-chat", {
         body: { 
           message: `Dê um breve conselho ou orientação para alguém que está se sentindo ${emotionLabel.toLowerCase()} hoje. Não mais que 2 parágrafos.`,
           history: [
