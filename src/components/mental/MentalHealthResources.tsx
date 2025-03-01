@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useWallet } from "@/hooks/useWallet";
 import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
 import "react-circular-progressbar/dist/styles.css";
-import { Info, Timer, Clock } from "lucide-react";
+import { Info, Timer, ArrowUp, ArrowDown } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Progress } from "@/components/ui/progress";
 
@@ -202,6 +202,15 @@ export const MentalHealthResources = () => {
     }
   };
 
+  const getPhaseIcon = () => {
+    switch (exercise.phase) {
+      case "inhale": return <ArrowDown className="w-6 h-6 animate-bounce text-green-500" />;
+      case "hold": return <div className="w-6 h-1 bg-amber-500 rounded-full animate-pulse"></div>;
+      case "exhale": return <ArrowUp className="w-6 h-6 animate-bounce text-blue-500" />;
+      default: return null;
+    }
+  };
+
   if (isLoading) {
     return <div>Carregando...</div>;
   }
@@ -238,13 +247,19 @@ export const MentalHealthResources = () => {
               </p>
             )}
             
-            {/* Timer Preview for Quick Start - Always visible */}
+            {/* Dynamic Breathing Preview for Quick Start - Always visible */}
             {exercise.count === 0 && !exercise.isComplete && !isStarting && (
-              <div className="flex justify-center mb-2">
-                <div className="flex items-center gap-2 bg-primary-50 px-4 py-2 rounded-full shadow-sm">
-                  <Clock className="w-5 h-5 text-primary" />
-                  <span className="font-medium text-primary">1:00</span>
+              <div className="flex flex-col items-center justify-center mb-2 py-2">
+                <div className="flex items-center gap-2 bg-primary-50 px-6 py-3 rounded-full shadow-sm">
+                  <div className="relative w-10 h-10 flex items-center justify-center">
+                    <div className="absolute inset-0 bg-primary/10 rounded-full animate-ping opacity-50" style={{ animationDuration: '3s' }}></div>
+                    <div className="absolute inset-1 bg-primary/20 rounded-full animate-ping opacity-50" style={{ animationDuration: '2.5s' }}></div>
+                    <span className="relative font-medium text-primary">1:00</span>
+                  </div>
                 </div>
+                <p className="text-xs text-center text-muted-foreground mt-2">
+                  Clique para começar o exercício de respiração
+                </p>
               </div>
             )}
             
@@ -279,6 +294,14 @@ export const MentalHealthResources = () => {
                       strokeLinecap: 'round',
                     })}
                   />
+                  
+                  {/* Dynamic visual indicator */}
+                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
+                    <div className="bg-white/80 rounded-full p-6 shadow-sm">
+                      {getPhaseIcon()}
+                    </div>
+                  </div>
+                  
                   <div className="absolute top-3/4 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
                     <span className="text-xs sm:text-sm font-medium text-muted-foreground">
                       Ciclo {exercise.count + 1} de {exercise.totalBreaths}
