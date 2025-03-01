@@ -44,7 +44,8 @@ export const MentalHealthChat = () => {
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke("mental-health-chat", {
+      // Using the new groq-chat edge function instead of mental-health-chat
+      const { data, error } = await supabase.functions.invoke("groq-chat", {
         body: { 
           message: input,
           history: messages
