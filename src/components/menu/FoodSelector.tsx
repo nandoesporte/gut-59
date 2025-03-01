@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Coffee, Utensils, Apple, Moon } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -7,7 +6,7 @@ import { usePaymentHandling } from "./hooks/usePaymentHandling";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { ProtocolFood } from "./types"; // Corrigido o caminho de importação
+import { ProtocolFood } from "./types";
 
 interface FoodSelectorProps {
   protocolFoods: ProtocolFood[];
@@ -69,12 +68,11 @@ export const FoodSelector = ({
   const { isProcessingPayment, hasPaid, handlePaymentAndContinue } = usePaymentHandling();
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [paymentRequired, setPaymentRequired] = useState(true);
-  const [confirmClicked, setConfirmClicked] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
 
   useEffect(() => {
     const checkPaymentRequirement = async () => {
       try {
-        // Verificar configuração global de pagamento
         const { data: paymentSettings, error: settingsError } = await supabase
           .from('payment_settings')
           .select('is_active')
@@ -86,13 +84,11 @@ export const FoodSelector = ({
           return;
         }
 
-        // Se o pagamento não estiver ativo globalmente
         if (!paymentSettings?.is_active) {
           setPaymentRequired(false);
           return;
         }
 
-        // Verificar acesso específico do usuário
         const { data: { user } } = await supabase.auth.getUser();
         if (!user?.id) return;
 
@@ -103,7 +99,6 @@ export const FoodSelector = ({
           .eq('plan_type', 'nutrition')
           .maybeSingle();
 
-        // Se o usuário tiver acesso especial sem necessidade de pagamento
         setPaymentRequired(planAccess?.payment_required !== false);
       } catch (error) {
         console.error('Erro ao verificar requisito de pagamento:', error);
@@ -116,68 +111,53 @@ export const FoodSelector = ({
   const handleConfirm = async () => {
     console.log("Botão Confirmar Seleção clicado");
     
-    if (confirmClicked) {
+    if (isConfirming) {
       console.log("Botão já foi clicado, evitando duplo clique");
       return;
     }
     
-    setConfirmClicked(true);
-    
     if (selectedFoods.length === 0) {
       toast.error("Selecione pelo menos um alimento");
-      setConfirmClicked(false);
       return;
     }
 
     if (paymentRequired && !hasPaid) {
       setShowPaymentDialog(true);
-      setConfirmClicked(false);
       return;
     }
 
     try {
       console.log("Chamando função onConfirm...");
-      // Tornar os botões menos reativos durante o processamento
+      setIsConfirming(true);
+      toast.loading("Processando sua seleção...");
+      
       document.querySelectorAll('button').forEach(btn => {
         if (btn.textContent?.includes('Confirmar Seleção')) {
           btn.setAttribute('disabled', 'true');
         }
       });
       
-      // Feedback visual para o usuário
-      toast.success("Processando sua seleção...");
-      
-      // Salvar os alimentos selecionados e prosseguir
       const result = await onConfirm();
       
       console.log("Resultado da função onConfirm:", result);
       
-      // Se retornar um booleano, verificamos se é verdadeiro
       if (result === false) {
         console.error("Falha ao confirmar seleção de alimentos");
         toast.error("Erro ao salvar suas preferências alimentares. Tente novamente.");
-        
-        // Reativar botões
-        document.querySelectorAll('button').forEach(btn => {
-          if (btn.textContent?.includes('Confirmar Seleção')) {
-            btn.removeAttribute('disabled');
-          }
-        });
       } else {
         console.log("Confirmação de seleção de alimentos bem-sucedida");
+        toast.success("Seleção confirmada com sucesso!");
       }
     } catch (error) {
       console.error("Erro ao processar a confirmação:", error);
       toast.error("Erro ao processar sua seleção. Tente novamente.");
-      
-      // Reativar botões
+    } finally {
+      setIsConfirming(false);
       document.querySelectorAll('button').forEach(btn => {
         if (btn.textContent?.includes('Confirmar Seleção')) {
           btn.removeAttribute('disabled');
         }
       });
-    } finally {
-      setConfirmClicked(false);
     }
   };
 
@@ -187,7 +167,7 @@ export const FoodSelector = ({
   const dinnerFoods = protocolFoods.filter(food => food.food_group_id === 4);
 
   return (
-    <div className="space-y-8 w-full pb-24"> {/* Padding-bottom para evitar que o conteúdo fique atrás da barra fixa */}
+    <div className="space-y-8 w-full pb-24">
       <div className="text-center space-y-3">
         <h2 className="text-2xl font-semibold text-gray-900">Opções de Preferência dos Alimentos</h2>
         <p className="text-gray-600 max-w-2xl mx-auto">
@@ -263,7 +243,6 @@ export const FoodSelector = ({
         />
       </div>
 
-      {/* Área de confirmação */}
       <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4 text-center">
         <p className="text-sm text-green-700 mb-3">
           <strong>Você selecionou {selectedFoods.length} alimentos.</strong><br/>
@@ -273,20 +252,19 @@ export const FoodSelector = ({
           onClick={handleConfirm}
           className="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 text-lg font-bold rounded-md shadow-sm"
           size="lg"
-          disabled={confirmClicked}
+          disabled={isConfirming}
         >
-          {confirmClicked ? "Processando..." : "✓ Confirmar Seleção e Continuar"}
+          {isConfirming ? "Processando..." : "✓ Confirmar Seleção e Continuar"}
         </Button>
       </div>
 
-      {/* Barra de ações inferior */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t py-4 px-4 md:px-8 shadow-md z-10">
         <div className="max-w-4xl mx-auto flex justify-between items-center gap-4">
           <Button 
             variant="outline" 
             onClick={onBack}
             className="shrink-0"
-            disabled={confirmClicked}
+            disabled={isConfirming}
           >
             Voltar
           </Button>
@@ -294,9 +272,9 @@ export const FoodSelector = ({
             onClick={handleConfirm}
             className="flex-1 bg-green-500 hover:bg-green-600 text-white max-w-sm font-semibold animate-pulse"
             size="lg"
-            disabled={confirmClicked}
+            disabled={isConfirming}
           >
-            {confirmClicked ? "Processando..." : `Confirmar Seleção (${selectedFoods.length} alimentos)`}
+            {isConfirming ? "Processando..." : `Confirmar Seleção (${selectedFoods.length} alimentos)`}
           </Button>
         </div>
       </div>

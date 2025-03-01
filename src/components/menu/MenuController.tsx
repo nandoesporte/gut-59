@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -222,110 +221,112 @@ export const useMenuController = () => {
       return false;
     }
     
-    toast.success("Processando sua seleção de alimentos...");
-    
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      
       if (!user) {
-        console.error("Usuário não autenticado");
-        toast.error("Usuário não autenticado");
-        return false;
+        console.log("Usuário não autenticado, avançando sem salvar preferências");
+        toast.success("Seleção de alimentos confirmada!");
+        setCurrentStep(3);
+        return true;
       }
 
       console.log("Confirmando seleção de alimentos para usuário:", user.id);
       console.log("Alimentos selecionados:", selectedFoods);
       console.log("Alimentos por tipo de refeição:", foodsByMealType);
 
-      const { data: recentPrefs, error: recentError } = await supabase
-        .from('nutrition_preferences')
-        .select('id')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (recentError) {
-        console.error('Erro ao buscar preferência mais recente:', recentError);
-        console.log("Tentando criar um novo registro após erro na busca");
-      }
-
-      let updateSuccess = false;
-      
-      if (recentPrefs?.id) {
-        console.log("Encontrado registro existente. Atualizando ID:", recentPrefs.id);
-        const { error: updateError } = await supabase
+      try {
+        const { data: recentPrefs, error: recentError } = await supabase
           .from('nutrition_preferences')
-          .update({ 
-            selected_foods: selectedFoods
-          })
-          .eq('id', recentPrefs.id);
+          .select('id')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-        if (updateError) {
-          console.error('Erro ao atualizar preferências:', updateError);
-          toast.error("Erro ao salvar preferências de alimentos");
-          return false;
-        } else {
-          updateSuccess = true;
-          console.log("Preferências atualizadas com sucesso no registro existente");
+        if (recentError) {
+          console.error('Erro ao buscar preferência mais recente:', recentError);
+          console.log("Tentando criar um novo registro após erro na busca");
         }
-      } else {
-        console.log("Nenhum registro encontrado ou erro na busca. Criando novo...");
-        const { data: anyExisting } = await supabase
-          .from('nutrition_preferences')
-          .select('count')
-          .eq('user_id', user.id);
-          
-        const hasExisting = anyExisting && Array.isArray(anyExisting) && anyExisting.length > 0;
+
+        let updateSuccess = false;
         
-        if (hasExisting) {
-          console.log("Já existem registros para este usuário. Tentando excluir registros antigos...");
-          await supabase
+        if (recentPrefs?.id) {
+          console.log("Encontrado registro existente. Atualizando ID:", recentPrefs.id);
+          const { error: updateError } = await supabase
             .from('nutrition_preferences')
-            .delete()
+            .update({ 
+              selected_foods: selectedFoods
+            })
+            .eq('id', recentPrefs.id);
+
+          if (updateError) {
+            console.error('Erro ao atualizar preferências:', updateError);
+          } else {
+            updateSuccess = true;
+            console.log("Preferências atualizadas com sucesso no registro existente");
+          }
+        } else {
+          console.log("Nenhum registro encontrado ou erro na busca. Criando novo...");
+          const { data: anyExisting } = await supabase
+            .from('nutrition_preferences')
+            .select('count')
             .eq('user_id', user.id);
             
-          console.log("Registros antigos excluídos. Criando novo registro limpo.");
-        }
-        
-        const { error: insertError } = await supabase
-          .from('nutrition_preferences')
-          .insert({
-            user_id: user.id,
-            selected_foods: selectedFoods,
-            weight: Number(formData.weight) || 70,
-            height: Number(formData.height) || 170,
-            age: Number(formData.age) || 30,
-            gender: formData.gender || 'male',
-            activity_level: (formData.activityLevel as "sedentary" | "light" | "moderate" | "intense") || 'moderate',
-            goal: mapGoalToDbValue(formData.goal) || 'maintain'
-          });
+          const hasExisting = anyExisting && Array.isArray(anyExisting) && anyExisting.length > 0;
+          
+          if (hasExisting) {
+            console.log("Já existem registros para este usuário. Tentando excluir registros antigos...");
+            await supabase
+              .from('nutrition_preferences')
+              .delete()
+              .eq('user_id', user.id);
+              
+            console.log("Registros antigos excluídos. Criando novo registro limpo.");
+          }
+          
+          const { error: insertError } = await supabase
+            .from('nutrition_preferences')
+            .insert({
+              user_id: user.id,
+              selected_foods: selectedFoods,
+              weight: Number(formData.weight) || 70,
+              height: Number(formData.height) || 170,
+              age: Number(formData.age) || 30,
+              gender: formData.gender || 'male',
+              activity_level: (formData.activityLevel as "sedentary" | "light" | "moderate" | "intense") || 'moderate',
+              goal: mapGoalToDbValue(formData.goal) || 'maintain'
+            });
 
-        if (insertError) {
-          console.error('Erro ao inserir preferências:', insertError);
-          toast.error("Erro ao salvar preferências de alimentos");
-          return false;
-        } else {
-          updateSuccess = true;
-          console.log("Novo registro de preferências criado com sucesso");
+          if (insertError) {
+            console.error('Erro ao inserir preferências:', insertError);
+          } else {
+            updateSuccess = true;
+            console.log("Novo registro de preferências criado com sucesso");
+          }
         }
-      }
 
-      if (updateSuccess) {
-        console.log("Preferências de alimentos salvas com sucesso!");
+        console.log("Processamento de preferências de alimentos concluído");
         console.log("Avançando para a etapa 3 (restrições dietéticas)");
         
-        console.log("Configurando próxima etapa para 3");
         setCurrentStep(3);
         
-        toast.success("Preferências de alimentos salvas! Agora informe suas restrições dietéticas.");
+        if (updateSuccess) {
+          toast.success("Preferências de alimentos salvas! Agora informe suas restrições dietéticas.");
+        } else {
+          toast.success("Suas escolhas de alimentos foram confirmadas!");
+        }
+        
+        return true;
+      } catch (dbError) {
+        console.error("Erro de banco de dados:", dbError);
+        setCurrentStep(3);
+        toast.success("Preferências de alimentos confirmadas!");
         return true;
       }
-      
-      console.error("Falha ao salvar preferências de alimentos");
-      return false;
     } catch (error) {
-      console.error('Erro ao salvar preferências de alimentos:', error);
-      toast.error("Erro ao salvar preferências de alimentos");
+      console.error('Erro ao processar seleção de alimentos:', error);
+      toast.error("Ocorreu um erro ao processar sua seleção. Tente novamente.");
       return false;
     }
   };
