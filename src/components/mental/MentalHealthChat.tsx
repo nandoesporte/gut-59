@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowUp, Loader2, AlertTriangle, BrainCircuit, RefreshCw } from "lucide-react";
+import { ArrowUp, Loader2, AlertTriangle, BrainCircuit, RefreshCw, WifiOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -24,6 +24,7 @@ export const MentalHealthChat = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [networkError, setNetworkError] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -41,22 +42,31 @@ export const MentalHealthChat = () => {
     if (!input.trim()) return;
 
     setErrorMessage(null);
+    setNetworkError(false);
     const userMessage = { role: "user" as const, content: input };
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsLoading(true);
 
     try {
+      // Calculate how many messages to send based on retry count
+      // If we've retried multiple times, reduce the history to avoid token issues
+      const historyLimit = Math.max(3, 6 - retryCount);
+      const historyToSend = messages.slice(-historyLimit);
+      
       // Using the LlamaAPI with Nous-Hermes-2-Mixtral-8x7B-DPO model
       const { data, error } = await supabase.functions.invoke("mental-health-chat-llama", {
         body: { 
           message: input,
-          history: messages.slice(-5) // Send only last 5 messages to avoid token limit issues
+          history: historyToSend
         },
       });
 
       if (error) {
         console.error("Função retornou erro:", error);
+        if (error.message?.includes("network") || error.message?.includes("failed to fetch")) {
+          setNetworkError(true);
+        }
         throw new Error(error.message || "Erro ao chamar a função mental-health-chat-llama");
       }
 
@@ -66,10 +76,16 @@ export const MentalHealthChat = () => {
 
       if (data?.error) {
         console.error("Erro na resposta da função:", data.error);
-        throw new Error(data.error);
-      }
-
-      if (data?.response) {
+        if (data.fallbackResponse) {
+          // If we have a fallback response from the edge function, use it
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: data.fallbackResponse },
+          ]);
+        } else {
+          throw new Error(data.error);
+        }
+      } else if (data?.response) {
         // Validate response is not empty
         if (!data.response.trim()) {
           throw new Error("A resposta recebida está vazia");
@@ -87,13 +103,30 @@ export const MentalHealthChat = () => {
       }
     } catch (error) {
       console.error("Erro ao enviar mensagem:", error);
-      setErrorMessage(
-        "Não foi possível obter resposta. A API pode estar temporariamente indisponível."
-      );
+      
+      // Check for network-related errors
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      const isNetworkError = 
+        errorMsg.includes("network") || 
+        errorMsg.includes("failed to fetch") || 
+        errorMsg.includes("sending request");
+      
+      if (isNetworkError) {
+        setNetworkError(true);
+        setErrorMessage(
+          "Parece que estamos com problemas de conexão. Verifique sua internet ou tente novamente mais tarde."
+        );
+      } else {
+        setErrorMessage(
+          "Não foi possível obter resposta. O serviço pode estar temporariamente indisponível."
+        );
+      }
       
       toast({
         title: "Erro na comunicação",
-        description: "Não foi possível obter resposta do modelo Nous-Hermes-2-Mixtral-8x7B-DPO. Tente novamente mais tarde.",
+        description: isNetworkError 
+          ? "Problemas de conexão detectados. Verifique sua internet."
+          : "Não foi possível obter resposta do modelo. Tente novamente mais tarde.",
         variant: "destructive",
       });
     } finally {
@@ -104,6 +137,7 @@ export const MentalHealthChat = () => {
   const handleRetry = () => {
     setRetryCount((prev) => prev + 1);
     setErrorMessage(null);
+    setNetworkError(false);
     
     // Find the last user message
     const lastUserMessageIndex = [...messages].reverse().findIndex(m => m.role === "user");
@@ -167,7 +201,11 @@ export const MentalHealthChat = () => {
         ))}
         {errorMessage && (
           <Alert variant="destructive" className="mt-4">
-            <AlertTriangle className="h-4 w-4" />
+            {networkError ? (
+              <WifiOff className="h-4 w-4" />
+            ) : (
+              <AlertTriangle className="h-4 w-4" />
+            )}
             <AlertDescription className="flex items-center justify-between">
               <span>{errorMessage}</span>
               <Button 

@@ -55,70 +55,100 @@ Responda em português do Brasil com um tom caloroso e acolhedor. Se a pessoa es
     ];
 
     console.log("Sending request to LlamaAPI with model: nous-hermes-2-mixtral-8x7b-dpo");
-    console.log(`Request URL: ${LLAMA_API_URL}`);
     
-    // Make the request to the LlamaAPI
-    try {
-      console.log("Initiating fetch request to LlamaAPI...");
-      
-      const requestBody = {
-        model: "nous-hermes-2-mixtral-8x7b-dpo",
-        messages: messages,
-        max_tokens: 1000,
-        temperature: 0.7,
-        top_p: 0.9,
-        stream: false
-      };
-      
-      console.log(`Request body: ${JSON.stringify(requestBody, null, 2)}`);
-      
-      const response = await fetch(LLAMA_API_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${LLAMA_API_KEY}`
-        },
-        body: JSON.stringify(requestBody)
-      });
-
-      console.log(`Response status: ${response.status}`);
-      
-      // Handle API response
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`LlamaAPI error (${response.status}): ${errorText}`);
-        throw new Error(`LlamaAPI error: ${response.status} - ${errorText}`);
-      }
-
-      // Parse the response
-      const data = await response.json();
-      console.log(`LlamaAPI response received: status ${response.status}`);
-
-      // Extract the assistant's response
-      const assistantResponse = data.choices[0].message.content;
-      console.log(`Assistant response: ${assistantResponse.substring(0, 100)}...`);
-
-      // Return the response
-      return new Response(
-        JSON.stringify({ response: assistantResponse }),
-        { 
-          headers: { 
-            ...corsHeaders,
-            "Content-Type": "application/json" 
-          }
+    // Make the request to the LlamaAPI with retry logic
+    let response = null;
+    let retryCount = 0;
+    const maxRetries = 2;
+    
+    while (retryCount <= maxRetries && !response) {
+      try {
+        if (retryCount > 0) {
+          console.log(`Retry attempt ${retryCount}/${maxRetries}`);
         }
-      );
-    } catch (fetchError) {
-      console.error("Fetch error:", fetchError);
-      throw new Error(`Erro na conexão com LlamaAPI: ${fetchError.message}`);
+        
+        const requestBody = {
+          model: "nous-hermes-2-mixtral-8x7b-dpo",
+          messages: messages,
+          max_tokens: 800,
+          temperature: 0.7,
+          top_p: 0.9,
+          stream: false
+        };
+        
+        console.log(`Sending request to ${LLAMA_API_URL}`);
+        
+        const fetchResponse = await fetch(LLAMA_API_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${LLAMA_API_KEY}`
+          },
+          body: JSON.stringify(requestBody)
+        });
+        
+        console.log(`Response status: ${fetchResponse.status}`);
+        
+        // Handle non-200 responses
+        if (!fetchResponse.ok) {
+          const errorText = await fetchResponse.text();
+          console.error(`LlamaAPI error (${fetchResponse.status}): ${errorText}`);
+          
+          // If we're on the last retry, throw the error so we can handle it
+          if (retryCount === maxRetries) {
+            throw new Error(`LlamaAPI returned status ${fetchResponse.status}: ${errorText}`);
+          }
+        } else {
+          // Parse the successful response
+          response = await fetchResponse.json();
+          console.log(`LlamaAPI response received successfully`);
+        }
+      } catch (fetchError) {
+        console.error(`Fetch error (attempt ${retryCount}/${maxRetries}):`, fetchError.message);
+        
+        // On last retry, rethrow
+        if (retryCount === maxRetries) {
+          throw new Error(`Failed to connect to LlamaAPI after ${maxRetries} attempts: ${fetchError.message}`);
+        }
+      }
+      
+      retryCount++;
+      
+      // If we need to retry, wait a bit before trying again (exponential backoff)
+      if (!response && retryCount <= maxRetries) {
+        const backoffMs = Math.pow(2, retryCount) * 500; // 1s, 2s, 4s
+        console.log(`Waiting ${backoffMs}ms before retry ${retryCount}`);
+        await new Promise(resolve => setTimeout(resolve, backoffMs));
+      }
     }
+    
+    // If we still don't have a response after all retries
+    if (!response) {
+      throw new Error("Failed to get a response from LlamaAPI after all retry attempts");
+    }
+
+    // Extract the assistant's response
+    const assistantResponse = response.choices[0].message.content;
+    console.log(`Assistant response generated (${assistantResponse.length} chars)`);
+
+    // Return the response
+    return new Response(
+      JSON.stringify({ response: assistantResponse }),
+      { 
+        headers: { 
+          ...corsHeaders,
+          "Content-Type": "application/json" 
+        }
+      }
+    );
   } catch (error) {
     console.error("Error in mental-health-chat-llama function:", error.message);
-    console.error("Full error:", error);
     
+    // Provide a helpful response to the client
     return new Response(
       JSON.stringify({ 
-        error: error.message || "Erro interno no processamento da solicitação" 
+        error: error.message || "Erro interno no processamento da solicitação",
+        fallbackResponse: "Desculpe, estou enfrentando dificuldades técnicas no momento. Por favor, tente novamente mais tarde ou entre em contato com um profissional de saúde mental se precisar de assistência imediata."
       }),
       { 
         status: 500,
