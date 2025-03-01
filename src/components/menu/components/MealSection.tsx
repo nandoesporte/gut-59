@@ -44,7 +44,7 @@ export const MealSection = ({
           <div key={index} className="text-gray-700">
             <div className="flex justify-between items-start">
               <div className="flex-1">
-                <div className="flex items-baseline gap-1">
+                <div className="flex items-baseline gap-1 flex-wrap">
                   <span className="font-medium">{food.portion} {food.unit}</span>
                   <span className="text-gray-600">de</span>
                   <span>{food.name}</span>
@@ -65,7 +65,7 @@ export const MealSection = ({
         <div className="mb-2 text-md font-medium">
           Total: {safeFood.calories} kcal
         </div>
-        <div className="grid grid-cols-4 gap-2 mt-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
           <div className="font-medium">Proteínas: {safeFood.macros.protein}g</div>
           <div className="font-medium">Carbos: {safeFood.macros.carbs}g</div>
           <div className="font-medium">Gorduras: {safeFood.macros.fats}g</div>
