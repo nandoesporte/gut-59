@@ -6,7 +6,6 @@ import { FoodSelector } from "@/components/menu/FoodSelector";
 import { DietaryPreferencesForm } from "@/components/menu/DietaryPreferencesForm";
 import { MealPlanDisplay } from "@/components/menu/MealPlanDisplay";
 import { MealPlanHistory } from "@/components/menu/MealPlanHistory";
-import { Button } from "@/components/ui/button";
 import type { ProtocolFood, MealPlan } from "./types";
 import type { CalorieCalculatorForm } from "./CalorieCalculator";
 
@@ -21,7 +20,7 @@ interface MenuStepsProps {
   formData: CalorieCalculatorForm;
   handleCalculateCalories: () => Promise<boolean | null> | boolean;
   handleFoodSelection: (foodId: string, food?: ProtocolFood) => void;
-  handleConfirmFoodSelection: () => Promise<boolean> | boolean;
+  handleConfirmFoodSelection: () => Promise<boolean> | boolean; // Updated type here to match implementation
   handleDietaryPreferences: (preferences: any) => Promise<boolean>;
   setFormData: (formData: CalorieCalculatorForm | ((prev: CalorieCalculatorForm) => CalorieCalculatorForm)) => void;
   regenerateMealPlan: () => Promise<void>;
