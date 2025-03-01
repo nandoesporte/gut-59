@@ -44,6 +44,7 @@ serve(async (req) => {
 
     console.log("Sending request to Groq API with messages:", JSON.stringify(messages));
 
+    // Using Mixtral 8x7B model instead of llama3-2-1b-8192-preview
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -51,7 +52,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama3-2-1b-8192-preview',
+        model: 'mixtral-8x7b-32768',
         messages: messages,
         max_tokens: 1024,
         temperature: 0.7,
