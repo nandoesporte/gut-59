@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { DietaryPreferences, ProtocolFood } from "../types";
@@ -115,7 +114,7 @@ export const generateMealPlan = async ({
 
     toastId = toast.loading("Gerando seu plano alimentar personalizado...");
 
-    console.log('[MEAL PLAN] Iniciando chamada para a Edge Function');
+    console.log('[MEAL PLAN] Iniciando chamada para a Edge Function Groq');
     
     // Mapear o objetivo para o formato esperado pela API
     const goalMapping = {
@@ -175,46 +174,38 @@ export const generateMealPlan = async ({
         allergies: (preferences.allergies || []).slice(0, 3), // Limitar alergias
         dietaryRestrictions: (preferences.dietaryRestrictions || []).slice(0, 3), // Limitar restrições
         trainingTime: preferences.trainingTime
-      },
-      options: {
-        agentVersion: "nutri+",  // Sinalizar versão específica do agente
-        includeRecipes: true,    // Solicitar receitas detalhadas
-        followNutritionalGuidelines: true, // Seguir diretrizes nutricionais
-        optimizeForMacros: true, // Otimizar para macronutrientes
-        enhanceNutritionalVariety: true, // Melhorar a variedade nutricional
-        useSimplifiedTerms: false // Usar terminologia nutricional completa
       }
     };
     
-    console.log('[MEAL PLAN] Enviando payload aprimorado:', JSON.stringify(enhancedPayload, null, 2));
+    console.log('[MEAL PLAN] Enviando payload para Groq:', JSON.stringify(enhancedPayload, null, 2));
     
     // Definir timeout para capturar falhas por timeout (30 segundos - aumentado para dar mais tempo ao processamento)
-    const edgeFunctionTimeout = 30000;
+    const edgeFunctionTimeout = 60000; // 60 segundos para o modelo Groq processar
     
     // Implementar timeout manual com Promise.race
     let resultData: EdgeFunctionResponse | null = null;
     try {
       // Criar uma promessa que rejeita após o timeout
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("Timeout na chamada à Edge Function")), edgeFunctionTimeout);
+        setTimeout(() => reject(new Error("Timeout na chamada à Edge Function Groq")), edgeFunctionTimeout);
       });
       
       // Corrida entre o timeout e a chamada à Edge Function
       const result = await Promise.race([
-        supabase.functions.invoke('generate-meal-plan', { body: enhancedPayload }),
+        supabase.functions.invoke('generate-meal-plan-groq', { body: enhancedPayload }),
         timeoutPromise
       ]);
       
       // Verificar se temos resultado e se ele contém um plano válido
       if (result && 'data' in result && result.data && typeof result.data === 'object' && 'mealPlan' in result.data) {
-        console.log('[MEAL PLAN] Chamada à Edge Function bem-sucedida!');
+        console.log('[MEAL PLAN] Chamada à Edge Function Groq bem-sucedida!');
         resultData = result.data as EdgeFunctionResponse;
       } else {
-        console.error('[MEAL PLAN] Resposta da Edge Function sem dados válidos:', result);
-        throw new Error("Resposta da Edge Function inválida");
+        console.error('[MEAL PLAN] Resposta da Edge Function Groq sem dados válidos:', result);
+        throw new Error("Resposta da Edge Function Groq inválida");
       }
     } catch (edgeFunctionError) {
-      console.error('[MEAL PLAN] Erro na chamada à Edge Function:', edgeFunctionError);
+      console.error('[MEAL PLAN] Erro na chamada à Edge Function Groq:', edgeFunctionError);
       
       if (edgeFunctionError instanceof Error) {
         console.error('[MEAL PLAN] Detalhes do erro:', edgeFunctionError.message);
@@ -223,35 +214,22 @@ export const generateMealPlan = async ({
         }
       }
       
-      // Tentar uma segunda tentativa com payload simplificado
-      console.log('[MEAL PLAN] Tentando novamente com payload simplificado...');
-      
-      // Tentar uma segunda chamada com payload ainda mais simplificado, mas ainda considerando alimentos por refeição
+      // Tentar utilizar a função anterior para casos de falha
+      console.log('[MEAL PLAN] Tentando com sistema alternativo...');
       try {
-        const simplifiedPayload = {
-          userData: enhancedPayload.userData,
-          selectedFoods: selectedFoodsDetails.slice(0, 15), // Reduzir para 15 alimentos
-          foodsByMealType: foodsByMealTypeFormatted, // Manter a estrutura de alimentos por refeição que é a chave para melhorar o desempenho
-          dietaryPreferences: enhancedPayload.dietaryPreferences,
-          options: {
-            agentVersion: "nutri+",
-            useSimplifiedTerms: true // Simplificar para melhorar desempenho
-          }
-        };
-        
         const fallbackResult = await supabase.functions.invoke('generate-meal-plan', { 
-          body: simplifiedPayload 
+          body: enhancedPayload 
         });
         
         if (fallbackResult && fallbackResult.data && fallbackResult.data.mealPlan) {
-          console.log('[MEAL PLAN] Segunda tentativa bem-sucedida!');
+          console.log('[MEAL PLAN] Sistema alternativo bem-sucedido!');
           resultData = fallbackResult.data as EdgeFunctionResponse;
         } else {
-          console.error('[MEAL PLAN] Segunda tentativa falhou:', fallbackResult);
+          console.error('[MEAL PLAN] Sistema alternativo falhou:', fallbackResult);
           throw new Error("Não foi possível gerar o plano alimentar");
         }
       } catch (fallbackError) {
-        console.error('[MEAL PLAN] Erro na segunda tentativa:', fallbackError);
+        console.error('[MEAL PLAN] Erro no sistema alternativo:', fallbackError);
         
         // Usar plano padrão quando edge function falha
         console.log('[MEAL PLAN] Usando plano padrão devido a falha na Edge Function');
@@ -332,7 +310,7 @@ export const generateMealPlan = async ({
       await addTransaction({
         amount: REWARDS.MEAL_PLAN,
         type: 'meal_plan',
-        description: 'Geração de plano alimentar personalizado'
+        description: 'Geração de plano alimentar personalizado com Groq'
       });
       console.log('[MEAL PLAN] Transação de recompensa adicionada');
     } catch (transactionError) {
@@ -350,7 +328,7 @@ export const generateMealPlan = async ({
     }
 
     toast.dismiss(toastId);
-    toast.success(`Cardápio personalizado gerado com sucesso! +${REWARDS.MEAL_PLAN} FITs`);
+    toast.success(`Cardápio personalizado gerado com Groq com sucesso! +${REWARDS.MEAL_PLAN} FITs`);
 
     return resultData.mealPlan;
   } catch (error) {

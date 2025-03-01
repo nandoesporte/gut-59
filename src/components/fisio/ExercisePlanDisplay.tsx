@@ -31,8 +31,13 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
         return;
       }
 
+      // Use Groq API via Edge Function for rehab plan generation
       const { data: response, error } = await supabase.functions.invoke('generate-rehab-plan', {
-        body: { preferences, userId: user.id }
+        body: { 
+          preferences, 
+          userId: user.id,
+          useGroq: true // Flag to indicate the backend should use Groq instead of OpenAI
+        }
       });
 
       if (error) throw error;
@@ -42,7 +47,7 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
         await addTransaction({
           amount: REWARDS.REHAB_PLAN,
           type: 'physio_plan',
-          description: 'Geração de plano de reabilitação'
+          description: 'Geração de plano de reabilitação com Groq'
         });
         
         setRehabPlan(response);

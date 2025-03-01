@@ -6,3 +6,10 @@ verify_jwt = false
 
 [functions.groq-chat]
 verify_jwt = false
+
+[functions.generate-meal-plan-groq]
+verify_jwt = false
+
+[functions.generate-rehab-plan-groq]
+verify_jwt = false
+
