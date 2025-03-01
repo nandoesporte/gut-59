@@ -31,6 +31,9 @@ verify_jwt = true
 [functions.generate-meal-plan]
 verify_jwt = true
 
+[functions.generate-meal-plan-groq]
+verify_jwt = true
+
 [functions.grant-plan-access]
 verify_jwt = true
 

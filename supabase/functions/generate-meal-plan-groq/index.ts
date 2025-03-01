@@ -1,264 +1,229 @@
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
-import { Groq } from 'https://esm.sh/@groq/groq-sdk@0.4.0'
-import { corsHeaders } from '../_shared/cors.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
-// Initialize Groq client
-const groq = new Groq({
-  apiKey: Deno.env.get('GROQ_API_KEY'),
-})
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
-// Initialize Supabase client
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
-const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
-const supabase = createClient(supabaseUrl, supabaseKey)
+// Create a Supabase client with the auth context of the function
+async function createSupabaseClient(req: Request) {
+  const authHeader = req.headers.get('Authorization');
+  
+  if (!authHeader) {
+    throw new Error('Missing Authorization header');
+  }
+  
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+  
+  return createClient(supabaseUrl, supabaseKey, {
+    global: { headers: { Authorization: authHeader } },
+  });
+}
+
+// Generate meal plan using Groq API
+async function generateMealPlanWithGroq(userData: any, selectedFoods: any[], preferences: any) {
+  try {
+    console.log("Iniciando geração de plano alimentar com Groq API");
+    
+    const groqApiKey = Deno.env.get('GROQ_API_KEY');
+    if (!groqApiKey) {
+      throw new Error('GROQ_API_KEY não encontrada nas variáveis de ambiente');
+    }
+
+    const apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
+    
+    // Prepare the prompt with user data
+    const prompt = `Gere um plano alimentar semanal para um usuário com as seguintes características:
+    - Peso: ${userData.weight}kg
+    - Altura: ${userData.height}cm
+    - Idade: ${userData.age} anos
+    - Gênero: ${userData.gender === 'male' ? 'Masculino' : 'Feminino'}
+    - Nível de atividade: ${userData.activityLevel}
+    - Objetivo: ${userData.goal}
+    - Calorias diárias: ${userData.dailyCalories} kcal
+    
+    Alimentos selecionados:
+    ${selectedFoods.map(food => `- ${food.name} (${food.calories} kcal por porção)`).join('\n')}
+    
+    Preferências dietéticas:
+    - Alergias: ${preferences.hasAllergies ? preferences.allergies.join(', ') : 'Nenhuma'}
+    - Restrições alimentares: ${preferences.dietaryRestrictions.length > 0 ? preferences.dietaryRestrictions.join(', ') : 'Nenhuma'}
+    - Horário de treino: ${preferences.trainingTime || 'Não especificado'}
+    
+    O plano deve incluir:
+    1. Café da manhã, lanche da manhã, almoço, lanche da tarde e jantar para cada dia da semana.
+    2. Descrição detalhada de cada refeição com porções e quantidades.
+    3. Contagem de calorias e macronutrientes para cada refeição e total diário.
+    4. Recomendações gerais, pré e pós-treino e sugestões de horários.
+    
+    Formate a resposta como um objeto JSON válido seguindo exatamente esta estrutura:
+    {
+      "weeklyPlan": {
+        "monday": {
+          "meals": {
+            "breakfast": {
+              "description": "",
+              "foods": [
+                { "name": "", "portion": 0, "unit": "", "details": "" }
+              ],
+              "calories": 0,
+              "macros": { "protein": 0, "carbs": 0, "fats": 0, "fiber": 0 }
+            },
+            "morningSnack": { ... },
+            "lunch": { ... },
+            "afternoonSnack": { ... },
+            "dinner": { ... }
+          },
+          "dailyTotals": { "calories": 0, "protein": 0, "carbs": 0, "fats": 0, "fiber": 0 }
+        },
+        // Repita para tuesday, wednesday, thursday, friday, saturday, sunday
+      },
+      "weeklyTotals": {
+        "averageCalories": 0,
+        "averageProtein": 0,
+        "averageCarbs": 0,
+        "averageFats": 0,
+        "averageFiber": 0
+      },
+      "recommendations": {
+        "general": "",
+        "preworkout": "",
+        "postworkout": "",
+        "timing": [""]
+      }
+    }`;
+
+    console.log("Enviando requisição para Groq API");
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${groqApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: "llama3-70b-8192",
+        messages: [
+          {
+            role: "system",
+            content: "Você é um nutricionista especialista em criar planos alimentares personalizados. Forneça respostas apenas no formato JSON solicitado."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.3,
+        max_tokens: 4000
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Erro na API da Groq: ${response.status} - ${errorText}`);
+      throw new Error(`Erro na API da Groq: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log("Resposta recebida da API Groq");
+    
+    try {
+      const mealPlanJson = JSON.parse(data.choices[0].message.content);
+      console.log("Plano alimentar JSON parseado com sucesso");
+      return mealPlanJson;
+    } catch (parseError) {
+      console.error("Erro ao fazer parse do JSON retornado pela API:", parseError);
+      throw new Error("O modelo retornou um JSON inválido");
+    }
+  } catch (error) {
+    console.error("Erro na geração do plano alimentar com Groq:", error);
+    throw error;
+  }
+}
 
 Deno.serve(async (req) => {
-  console.log("generate-meal-plan-groq function called at:", new Date().toISOString())
-  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    console.log("Handling CORS preflight request")
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
-
+  
   try {
-    // Get request body
-    const requestData = await req.json()
-    console.log("Request received with user ID:", requestData.userData?.userId || "No user ID provided")
-    console.log("Request data structure:", Object.keys(requestData).join(", "))
-    
-    // Log selected foods count
-    if (requestData.selectedFoods) {
-      console.log(`Selected food count: ${requestData.selectedFoods.length}`)
-      console.log(`First few foods: ${requestData.selectedFoods.slice(0, 3).map(f => f.name).join(', ')}...`)
+    // Validating request method
+    if (req.method !== 'POST') {
+      return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+        status: 405,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
     
-    // Log dietary preferences
-    if (requestData.dietaryPreferences) {
-      console.log("Dietary preferences received:", JSON.stringify({
-        hasAllergies: requestData.dietaryPreferences.hasAllergies,
-        allergiesCount: requestData.dietaryPreferences.allergies?.length || 0,
-        dietaryRestrictionsCount: requestData.dietaryPreferences.dietaryRestrictions?.length || 0,
-        trainingTime: requestData.dietaryPreferences.trainingTime
-      }))
+    // Getting request body
+    const requestBody = await req.json();
+    const { userData, selectedFoods, preferences } = requestBody;
+    
+    // Input validation
+    if (!userData || !selectedFoods || !preferences) {
+      return new Response(JSON.stringify({ error: 'Missing required parameters' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
-
-    // Check for required data
-    if (!requestData.userData || !requestData.selectedFoods) {
-      console.error("Missing required data")
-      return new Response(
-        JSON.stringify({
-          error: "Missing required data",
-          detail: "userData and selectedFoods are required"
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      )
-    }
-
-    console.log("Calling Groq API for meal plan generation")
     
-    // Format the prompt for Groq API with improved structure
-    const prompt = `
-You are a professional nutritionist and dietitian. Create a personalized weekly meal plan based on the following information:
-
-USER INFORMATION:
-- Weight: ${requestData.userData.weight} kg
-- Height: ${requestData.userData.height} cm
-- Age: ${requestData.userData.age} years
-- Gender: ${requestData.userData.gender}
-- Activity Level: ${requestData.userData.activityLevel}
-- Goal: ${requestData.userData.goal}
-- Daily Calorie Target: ${requestData.userData.dailyCalories} kcal
-
-FOOD PREFERENCES:
-The user has selected the following foods they like to eat:
-${requestData.selectedFoods.map(food => 
-  `- ${food.name} (${food.calories} kcal, Protein: ${food.protein}g, Carbs: ${food.carbs}g, Fats: ${food.fats}g)`
-).join('\n')}
-
-DIETARY RESTRICTIONS:
-${requestData.dietaryPreferences?.hasAllergies ? 
-  `The user has the following allergies: ${requestData.dietaryPreferences.allergies?.join(', ') || 'None specified'}` : 
-  'The user has no allergies.'
-}
-${requestData.dietaryPreferences?.dietaryRestrictions?.length > 0 ? 
-  `The user has the following dietary restrictions: ${requestData.dietaryPreferences.dietaryRestrictions.join(', ')}` : 
-  'The user has no dietary restrictions.'
-}
-${requestData.dietaryPreferences?.trainingTime ? 
-  `The user typically trains at: ${requestData.dietaryPreferences.trainingTime}` : 
-  'No specific training time provided.'
-}
-
-INSTRUCTIONS:
-1. Create a complete 7-day meal plan with 5 meals per day (breakfast, morning snack, lunch, afternoon snack, dinner).
-2. For each meal, include:
-   - A descriptive name/title for the meal
-   - List of foods with portions in grams or standard units
-   - Estimated calories and macronutrients (protein, carbs, fats, fiber)
-   - A brief description of the meal's benefits
-3. Use primarily the foods from the user's preferences, but you can add complementary foods when necessary.
-4. Each day should meet the target calorie goal and have proper macronutrient distribution.
-5. Provide daily nutritional totals for each day.
-6. Include weekly average nutritional totals.
-7. Add general recommendations, pre-workout and post-workout nutrition advice, and meal timing guidelines.
-8. Format your response as a structured JSON object following this exact schema:
-
-{
-  "weeklyPlan": {
-    "monday": {
-      "dayName": "Segunda-feira",
-      "meals": {
-        "breakfast": {
-          "foods": [
-            { "name": "Food name", "portion": 100, "unit": "g", "details": "Description" }
-          ],
-          "calories": 400,
-          "macros": { "protein": 20, "carbs": 40, "fats": 10, "fiber": 5 },
-          "description": "Description of this meal"
-        },
-        "morningSnack": { similar structure },
-        "lunch": { similar structure },
-        "afternoonSnack": { similar structure },
-        "dinner": { similar structure }
-      },
-      "dailyTotals": { "calories": 2000, "protein": 150, "carbs": 200, "fats": 60, "fiber": 30 }
-    },
-    "tuesday": { similar structure },
-    "wednesday": { similar structure },
-    "thursday": { similar structure },
-    "friday": { similar structure },
-    "saturday": { similar structure },
-    "sunday": { similar structure }
-  },
-  "weeklyTotals": {
-    "averageCalories": 2000,
-    "averageProtein": 150,
-    "averageCarbs": 200,
-    "averageFats": 60,
-    "averageFiber": 30
-  },
-  "recommendations": {
-    "general": "General nutrition recommendations",
-    "preworkout": "Pre-workout nutrition advice",
-    "postworkout": "Post-workout nutrition advice",
-    "timing": ["Timing recommendation 1", "Timing recommendation 2"]
-  }
-}
-
-Remember to adapt the plan to the user's preferences, lifestyle, goal, and dietary restrictions.
-`
-
-    console.log("Sending prompt to Groq API, length:", prompt.length)
+    console.log("Iniciando processamento do plano alimentar com Groq");
+    console.log("Dados do usuário:", userData);
+    console.log("Número de alimentos selecionados:", selectedFoods.length);
     
-    // Call Groq API with Mixtral model
-    const completion = await groq.chat.completions.create({
-      model: "llama3-70b-8192",
-      messages: [
-        {
-          role: "system",
-          content: "You are a nutritionist specializing in personalized meal plans. Always respond with valid JSON following the exact schema specified."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.3,
-      max_tokens: 4096,
-      response_format: { type: "json_object" }
-    })
-
-    console.log("Received response from Groq API, processing...")
+    // Initialize Supabase client
+    const supabase = await createSupabaseClient(req);
     
-    try {
-      // Get the response content
-      const responseContent = completion.choices[0]?.message?.content || ""
-      console.log("Response content length:", responseContent.length)
+    // Record the plan generation in database
+    if (userData.id) {
+      const { error: updateError } = await supabase
+        .from('plan_generation_counts')
+        .upsert(
+          { 
+            user_id: userData.id, 
+            nutrition_count: supabase.rpc('increment_counter', { row_id: userData.id, column_name: 'nutrition_count' })
+          },
+          { onConflict: 'user_id' }
+        );
       
-      // Parse JSON response
-      let mealPlan
-      try {
-        mealPlan = JSON.parse(responseContent)
-        console.log("Successfully parsed JSON response")
-      } catch (parseError) {
-        console.error("Failed to parse response as JSON", parseError)
-        throw new Error("Invalid response format from AI model")
+      if (updateError) {
+        console.error("Erro ao atualizar contagem de gerações:", updateError);
       }
-
-      // Validate meal plan structure
-      if (!mealPlan.weeklyPlan || !mealPlan.recommendations) {
-        console.error("Invalid meal plan structure - missing required fields")
-        throw new Error("Invalid meal plan structure")
-      }
-
-      console.log("Validation passed. Day count:", Object.keys(mealPlan.weeklyPlan).length)
-      console.log("Responding with successful meal plan")
-      
-      // Log success to database (optional)
-      try {
-        const { error: logError } = await supabase
-          .from('ai_generation_logs')
-          .insert({
-            user_id: requestData.userData.userId,
-            generation_type: 'meal_plan',
-            model: 'llama3-70b-8192',
-            status: 'success',
-            tokens_used: completion.usage?.total_tokens || 0
-          })
-          
-        if (logError) {
-          console.error("Failed to log generation to database:", logError)
-        } else {
-          console.log("Successfully logged generation to database")
-        }
-      } catch (logDbError) {
-        console.error("Database logging error:", logDbError)
-      }
-
-      // Return the meal plan
-      return new Response(
-        JSON.stringify({ mealPlan }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    } catch (processingError) {
-      console.error("Error processing model response:", processingError)
-      throw processingError
     }
-
+    
+    // Generate the meal plan
+    const mealPlan = await generateMealPlanWithGroq(userData, selectedFoods, preferences);
+    
+    // Save the meal plan to database
+    if (userData.id && mealPlan) {
+      const { error: saveError } = await supabase
+        .from('meal_plans')
+        .insert({
+          user_id: userData.id,
+          plan_data: mealPlan,
+          daily_calories: userData.dailyCalories,
+          selected_foods: selectedFoods.map(food => food.id)
+        });
+      
+      if (saveError) {
+        console.error("Erro ao salvar plano alimentar:", saveError);
+      }
+    }
+    
+    return new Response(JSON.stringify(mealPlan), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+    
   } catch (error) {
-    console.error("Error in generate-meal-plan-groq edge function:", error)
+    console.error("Erro na função generate-meal-plan-groq:", error);
     
-    // Log error to database
-    try {
-      if (requestData?.userData?.userId) {
-        const { error: logError } = await supabase
-          .from('ai_generation_logs')
-          .insert({
-            user_id: requestData.userData.userId,
-            generation_type: 'meal_plan',
-            model: 'llama3-70b-8192',
-            status: 'error',
-            error_message: error.message || 'Unknown error'
-          })
-          
-        if (logError) {
-          console.error("Failed to log error to database:", logError)
-        }
-      }
-    } catch (logDbError) {
-      console.error("Database error logging error:", logDbError)
-    }
-
-    return new Response(
-      JSON.stringify({
-        error: error.message || "An unknown error occurred",
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500 
-      }
-    )
+    return new Response(JSON.stringify({ error: error.message || 'Internal server error' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
   }
-})
+});
