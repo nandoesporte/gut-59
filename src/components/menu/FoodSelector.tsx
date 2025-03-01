@@ -132,7 +132,16 @@ export const FoodSelector = ({
       return;
     }
 
-    onConfirm();
+    // Salvar os alimentos selecionados e prosseguir
+    const success = await onConfirm();
+    
+    // Adicionar verificação explícita de sucesso
+    if (success) {
+      console.log("Confirmação de seleção de alimentos bem-sucedida, avançando para próxima etapa");
+    } else {
+      console.error("Falha ao confirmar seleção de alimentos");
+      toast.error("Erro ao salvar suas preferências alimentares. Tente novamente.");
+    }
   };
 
   const breakfastFoods = protocolFoods.filter(food => food.food_group_id === 1);
