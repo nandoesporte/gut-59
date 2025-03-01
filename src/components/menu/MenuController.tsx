@@ -45,6 +45,7 @@ export const useMenuController = () => {
     activityLevel: "",
     goal: undefined,
   });
+  const [useNutriPlus, setUseNutriPlus] = useState(false);
 
   const protocolFoods = useProtocolFoods();
   const { calorieNeeds, calculateCalories } = useCalorieCalculator();
@@ -355,11 +356,43 @@ export const useMenuController = () => {
 
     try {
       setLoading(true);
-      setLoadingMessage("Gerando seu plano alimentar personalizado...");
       
+      // Verificar se o usuário tem acesso premium ou se a solicitação é complexa
+      const isComplexRequest = selectedFoods.length > 10 || 
+                             (preferences.allergies && preferences.allergies.length > 0) ||
+                             (preferences.dietaryRestrictions && preferences.dietaryRestrictions.length > 0);
+      
+      let shouldUseNutriPlus = isComplexRequest || useNutriPlus;
+      
+      // Verificar se o usuário tem assinatura premium
       const { data: userData } = await supabase.auth.getUser();
-      
       if (userData.user) {
+        const { data: planAccess } = await supabase
+          .from('plan_access')
+          .select('*')
+          .eq('user_id', userData.user.id)
+          .eq('plan_type', 'premium')
+          .eq('is_active', true)
+          .maybeSingle();
+          
+        if (planAccess) {
+          console.log('Usuário premium detectado. Habilitando Nutri+ por padrão.');
+          shouldUseNutriPlus = true;
+        }
+        
+        // Verificar se tem requisitos para Nutri+ mas não está usando
+        if (isComplexRequest && !shouldUseNutriPlus) {
+          setUseNutriPlus(true);
+          shouldUseNutriPlus = true;
+        }
+        
+        // Definir mensagem de loading apropriada
+        if (shouldUseNutriPlus) {
+          setLoadingMessage("Gerando seu plano alimentar avançado com Nutri+...");
+        } else {
+          setLoadingMessage("Gerando seu plano alimentar personalizado...");
+        }
+        
         const { error: prefsError } = await supabase
           .from('dietary_preferences')
           .upsert({
@@ -373,9 +406,6 @@ export const useMenuController = () => {
         if (prefsError) {
           console.error('Erro ao salvar preferências dietéticas:', prefsError);
         }
-        
-        // Primeiro tentamos com modelo Groq para maior confiabilidade
-        setLoadingMessage("Gerando plano alimentar personalizado com modelo Groq...");
         
         try {
           const generatedMealPlan = await generateMealPlan({
@@ -783,6 +813,8 @@ export const useMenuController = () => {
     formData,
     loading,
     loadingMessage,
+    useNutriPlus,
+    setUseNutriPlus,
     handleCalculateCalories,
     handleFoodSelection,
     handleConfirmFoodSelection,

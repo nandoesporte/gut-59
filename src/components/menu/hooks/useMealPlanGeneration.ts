@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { DietaryPreferences, ProtocolFood } from "../types";
@@ -112,10 +113,45 @@ export const generateMealPlan = async ({
       }
     });
 
-    // Alteração: Usamos Groq como modelo principal para maior confiabilidade
-    toastId = toast.loading("Gerando seu plano alimentar personalizado com Groq...");
+    // Verificar se o usuário tem planos Nutri+ utilizados anteriormente
+    // Considerar usar o Nutri+ se o usuário tiver mais de 10 alimentos selecionados ou restrições alimentares complexas
+    const isComplexRequest = selectedFoodsDetails.length > 10 || 
+                            (preferences.allergies && preferences.allergies.length > 0) ||
+                            (preferences.dietaryRestrictions && preferences.dietaryRestrictions.length > 0);
+    
+    // Decidir qual modelo usar com base na complexidade da solicitação
+    let useNutriPlus = isComplexRequest;
+    
+    // Se o usuário tem assinatura premium ou fez pagamento, sempre oferecemos o Nutri+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: planAccess } = await supabase
+          .from('plan_access')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('plan_type', 'premium')
+          .eq('is_active', true)
+          .maybeSingle();
+          
+        if (planAccess) {
+          console.log('[MEAL PLAN] Usuário premium detectado. Usando Nutri+ por padrão.');
+          useNutriPlus = true;
+        }
+      }
+    } catch (userError) {
+      console.error('[MEAL PLAN] Erro ao verificar status premium do usuário:', userError);
+      // Continuar com a decisão baseada na complexidade
+    }
 
-    console.log('[MEAL PLAN] Iniciando chamada para a Edge Function com modelo Groq');
+    // Começar com o modelo mais avançado disponível
+    if (useNutriPlus) {
+      toastId = toast.loading("Gerando seu plano alimentar personalizado com Nutri+...");
+      console.log('[MEAL PLAN] Iniciando geração com modelo avançado Nutri+');
+    } else {
+      toastId = toast.loading("Gerando seu plano alimentar personalizado com Groq...");
+      console.log('[MEAL PLAN] Iniciando geração com modelo Groq padrão');
+    }
     
     // Mapear o objetivo para o formato esperado pela API
     const goalMapping = {
@@ -177,40 +213,42 @@ export const generateMealPlan = async ({
         trainingTime: preferences.trainingTime
       },
       modelConfig: {
-        model: "mixtral-8x7b-32768", // Modelo Mixtral via Groq
-        provider: "groq"
+        model: useNutriPlus ? "nutriplus-advanced" : "mixtral-8x7b-32768",
+        provider: useNutriPlus ? "nutriplus" : "groq"
       }
     };
     
-    console.log('[MEAL PLAN] Enviando payload para Groq:', JSON.stringify(enhancedPayload, null, 2));
+    console.log(`[MEAL PLAN] Enviando payload para ${useNutriPlus ? 'Nutri+' : 'Groq'}:`, JSON.stringify(enhancedPayload, null, 2));
     
     // Definir timeout para capturar falhas por timeout
-    const edgeFunctionTimeout = 60000; 
+    const edgeFunctionTimeout = useNutriPlus ? 150000 : 60000; // Timeout maior para Nutri+
     
     // Implementar timeout manual com Promise.race
     let resultData: EdgeFunctionResponse | null = null;
+    
     try {
       // Criar uma promessa que rejeita após o timeout
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("Timeout na chamada à Edge Function Groq")), edgeFunctionTimeout);
+        setTimeout(() => reject(new Error(`Timeout na chamada à Edge Function ${useNutriPlus ? 'Nutri+' : 'Groq'}`)), edgeFunctionTimeout);
       });
       
-      // Chamar primeiro a edge function com o modelo Groq (mais confiável)
+      // Chamar a edge function apropriada com base na decisão
+      const endpoint = useNutriPlus ? 'generate-meal-plan-nutri-plus' : 'generate-meal-plan-groq';
       const result = await Promise.race([
-        supabase.functions.invoke('generate-meal-plan-groq', { body: enhancedPayload }),
+        supabase.functions.invoke(endpoint, { body: enhancedPayload }),
         timeoutPromise
       ]);
       
       // Verificar se temos resultado e se ele contém um plano válido
       if (result && 'data' in result && result.data && typeof result.data === 'object' && 'mealPlan' in result.data) {
-        console.log('[MEAL PLAN] Chamada à Edge Function Groq bem-sucedida!');
+        console.log(`[MEAL PLAN] Chamada à Edge Function ${useNutriPlus ? 'Nutri+' : 'Groq'} bem-sucedida!`);
         resultData = result.data as EdgeFunctionResponse;
       } else {
-        console.error('[MEAL PLAN] Resposta da Edge Function Groq sem dados válidos:', result);
-        throw new Error("Resposta da Edge Function Groq inválida");
+        console.error(`[MEAL PLAN] Resposta da Edge Function ${useNutriPlus ? 'Nutri+' : 'Groq'} sem dados válidos:`, result);
+        throw new Error(`Resposta da Edge Function ${useNutriPlus ? 'Nutri+' : 'Groq'} inválida`);
       }
     } catch (edgeFunctionError) {
-      console.error('[MEAL PLAN] Erro na chamada à Edge Function Groq:', edgeFunctionError);
+      console.error(`[MEAL PLAN] Erro na chamada à Edge Function ${useNutriPlus ? 'Nutri+' : 'Groq'}:`, edgeFunctionError);
       
       if (edgeFunctionError instanceof Error) {
         console.error('[MEAL PLAN] Detalhes do erro:', edgeFunctionError.message);
@@ -220,35 +258,96 @@ export const generateMealPlan = async ({
       }
       
       toast.dismiss(toastId);
-      toastId = toast.loading("Usando modelo alternativo para gerar plano alimentar...");
       
-      // Tentar usar a edge function Llama existente como fallback (com melhor configuração de timeout)
-      console.log('[MEAL PLAN] Tentando usar Llama como fallback após falha no Groq');
-      try {
-        enhancedPayload.modelConfig = {
-          model: "llama3:8b", // Usando Llama 3 8B como fallback
-          provider: "llama"
-        };
+      // Se usamos Nutri+ e falhou, tentar Groq como fallback
+      if (useNutriPlus) {
+        toastId = toast.loading("Usando modelo alternativo para gerar plano alimentar...");
+        console.log('[MEAL PLAN] Tentando usar Groq como fallback após falha no Nutri+');
         
-        const result = await Promise.race([
-          supabase.functions.invoke('generate-meal-plan-llama', { 
-            body: enhancedPayload
-          }),
-          new Promise<never>((_, reject) => setTimeout(() => 
-            reject(new Error("Timeout na chamada à Edge Function Llama")), 90000))
-        ]);
-        
-        if (result && 'data' in result && result.data && typeof result.data === 'object' && 'mealPlan' in result.data) {
-          console.log('[MEAL PLAN] Chamada de fallback à Edge Function Llama bem-sucedida!');
-          resultData = result.data as EdgeFunctionResponse;
-        } else {
-          throw new Error("Resposta da Edge Function Llama inválida no fallback");
+        try {
+          enhancedPayload.modelConfig = {
+            model: "mixtral-8x7b-32768",
+            provider: "groq"
+          };
+          
+          const result = await Promise.race([
+            supabase.functions.invoke('generate-meal-plan-groq', { body: enhancedPayload }),
+            new Promise<never>((_, reject) => setTimeout(() => 
+              reject(new Error("Timeout na chamada à Edge Function Groq")), 60000))
+          ]);
+          
+          if (result && 'data' in result && result.data && typeof result.data === 'object' && 'mealPlan' in result.data) {
+            console.log('[MEAL PLAN] Chamada de fallback à Edge Function Groq bem-sucedida!');
+            resultData = result.data as EdgeFunctionResponse;
+          } else {
+            throw new Error("Resposta da Edge Function Groq inválida no fallback");
+          }
+        } catch (fallbackGroqError) {
+          console.error('[MEAL PLAN] Erro no fallback com Groq:', fallbackGroqError);
+          
+          // Tentar usar Llama como segundo fallback
+          try {
+            toast.dismiss(toastId);
+            toastId = toast.loading("Tentando última alternativa para gerar plano alimentar...");
+            console.log('[MEAL PLAN] Tentando usar Llama como segundo fallback');
+            
+            enhancedPayload.modelConfig = {
+              model: "llama3:8b",
+              provider: "llama"
+            };
+            
+            const result = await Promise.race([
+              supabase.functions.invoke('generate-meal-plan-llama', { 
+                body: enhancedPayload
+              }),
+              new Promise<never>((_, reject) => setTimeout(() => 
+                reject(new Error("Timeout na chamada à Edge Function Llama")), 90000))
+            ]);
+            
+            if (result && 'data' in result && result.data && typeof result.data === 'object' && 'mealPlan' in result.data) {
+              console.log('[MEAL PLAN] Chamada de fallback à Edge Function Llama bem-sucedida!');
+              resultData = result.data as EdgeFunctionResponse;
+            } else {
+              throw new Error("Resposta da Edge Function Llama inválida no fallback");
+            }
+          } catch (fallbackLlamaError) {
+            console.error('[MEAL PLAN] Erro no fallback com Llama:', fallbackLlamaError);
+            // Tentar usar o gerador local como último recurso
+            console.log('[MEAL PLAN] Usando plano local devido a falhas em todos os modelos');
+            return createDefaultMealPlan(userData, selectedFoodsDetails, foodsByMealTypeFormatted);
+          }
         }
-      } catch (fallbackError) {
-        console.error('[MEAL PLAN] Erro no fallback com Llama:', fallbackError);
-        // Tentar usar o gerador local como último recurso
-        console.log('[MEAL PLAN] Usando plano local devido a falhas em ambos modelos');
-        return createDefaultMealPlan(userData, selectedFoodsDetails, foodsByMealTypeFormatted);
+      } else {
+        // Se começamos com Groq e falhou, tentar Llama diretamente
+        toastId = toast.loading("Usando modelo alternativo para gerar plano alimentar...");
+        console.log('[MEAL PLAN] Tentando usar Llama como fallback após falha no Groq');
+        
+        try {
+          enhancedPayload.modelConfig = {
+            model: "llama3:8b",
+            provider: "llama"
+          };
+          
+          const result = await Promise.race([
+            supabase.functions.invoke('generate-meal-plan-llama', { 
+              body: enhancedPayload
+            }),
+            new Promise<never>((_, reject) => setTimeout(() => 
+              reject(new Error("Timeout na chamada à Edge Function Llama")), 90000))
+          ]);
+          
+          if (result && 'data' in result && result.data && typeof result.data === 'object' && 'mealPlan' in result.data) {
+            console.log('[MEAL PLAN] Chamada de fallback à Edge Function Llama bem-sucedida!');
+            resultData = result.data as EdgeFunctionResponse;
+          } else {
+            throw new Error("Resposta da Edge Function Llama inválida no fallback");
+          }
+        } catch (fallbackError) {
+          console.error('[MEAL PLAN] Erro no fallback com Llama:', fallbackError);
+          // Tentar usar o gerador local como último recurso
+          console.log('[MEAL PLAN] Usando plano local devido a falhas em ambos modelos');
+          return createDefaultMealPlan(userData, selectedFoodsDetails, foodsByMealTypeFormatted);
+        }
       }
     }
 
@@ -339,7 +438,7 @@ export const generateMealPlan = async ({
       await addTransaction({
         amount: REWARDS.MEAL_PLAN,
         type: 'meal_plan',
-        description: 'Geração de plano alimentar personalizado com IA'
+        description: `Geração de plano alimentar personalizado com ${useNutriPlus ? 'Nutri+' : 'IA'}`
       });
       console.log('[MEAL PLAN] Transação de recompensa adicionada');
     } catch (transactionError) {

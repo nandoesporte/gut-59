@@ -1,4 +1,3 @@
-
 export interface ProtocolFood {
   id: string;
   name: string;
@@ -78,6 +77,7 @@ export interface DietaryPreferences {
   allergies: string[];
   dietaryRestrictions: string[];
   trainingTime: string | null;
+  useNutriPlus?: boolean;
 }
 
 export interface MealPlan {

@@ -28,6 +28,8 @@ const Menu = () => {
     formData,
     loading,
     loadingMessage,
+    useNutriPlus,
+    setUseNutriPlus,
     handleCalculateCalories,
     handleFoodSelection,
     handleConfirmFoodSelection,
@@ -177,6 +179,8 @@ const Menu = () => {
                   <DietaryPreferencesForm
                     onSubmit={handleDietaryPreferences}
                     onBack={() => setCurrentStep(2)}
+                    useNutriPlus={useNutriPlus}
+                    setUseNutriPlus={setUseNutriPlus}
                   />
                 )}
                 {currentStep > 3 && (

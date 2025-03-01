@@ -23,3 +23,8 @@ verify_jwt = false
 verify_jwt = false
 timeoutMs = 120000
 importMapPath = "./import_map.json"
+
+[functions.generate-meal-plan-nutri-plus]
+verify_jwt = false
+timeoutMs = 180000
+importMapPath = "./import_map.json"
