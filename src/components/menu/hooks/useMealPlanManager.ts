@@ -19,15 +19,15 @@ const saveMealPlanData = async (
   try {
     console.log('Salvando plano alimentar no banco de dados para usuário:', userId);
     
-    // Use a single object for the insert call, not an array
+    // Use a single object for the insert call, wrapped in an array as expected by Supabase
     const { error } = await supabase
       .from('meal_plans')
-      .insert({
+      .insert([{
         user_id: userId,
         plan_data: mealPlan,
         calories: calorieNeeds,
         dietary_preferences: preferences
-      });
+      }]);
     
     if (error) {
       console.error('Erro ao salvar plano alimentar:', error);
