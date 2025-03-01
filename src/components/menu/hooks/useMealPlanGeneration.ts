@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { DietaryPreferences, ProtocolFood } from "../types";
@@ -113,9 +112,9 @@ export const generateMealPlan = async ({
       }
     });
 
-    toastId = toast.loading("Gerando seu plano alimentar personalizado com Llama 3.2 1B...");
+    toastId = toast.loading("Gerando seu plano alimentar personalizado com Llama 3 8B 8k...");
 
-    console.log('[MEAL PLAN] Iniciando chamada para a Edge Function com modelo Llama 3.2 1B');
+    console.log('[MEAL PLAN] Iniciando chamada para a Edge Function com modelo Llama 3 8B 8k');
     
     // Mapear o objetivo para o formato esperado pela API
     const goalMapping = {
@@ -177,12 +176,12 @@ export const generateMealPlan = async ({
         trainingTime: preferences.trainingTime
       },
       modelConfig: {
-        model: "llama-3.2-1b-chat-8k", // Especifica o modelo Llama 3.2 1B 8k
+        model: "llama3-8b-8k", // Especifica o modelo Llama 3 8B 8k
         provider: "groq"
       }
     };
     
-    console.log('[MEAL PLAN] Enviando payload para Llama 3.2 1B via Groq:', JSON.stringify(enhancedPayload, null, 2));
+    console.log('[MEAL PLAN] Enviando payload para Llama 3 8B 8k via Groq:', JSON.stringify(enhancedPayload, null, 2));
     
     // Definir timeout para capturar falhas por timeout (60 segundos para o modelo processar)
     const edgeFunctionTimeout = 60000; 
@@ -195,7 +194,7 @@ export const generateMealPlan = async ({
         setTimeout(() => reject(new Error("Timeout na chamada à Edge Function Llama")), edgeFunctionTimeout);
       });
       
-      // Chamar a edge function com o modelo Llama 3.2 1B
+      // Chamar a edge function com o modelo Llama 3 8B 8k
       const result = await Promise.race([
         supabase.functions.invoke('generate-meal-plan-llama', { body: enhancedPayload }),
         timeoutPromise
@@ -311,7 +310,7 @@ export const generateMealPlan = async ({
       await addTransaction({
         amount: REWARDS.MEAL_PLAN,
         type: 'meal_plan',
-        description: 'Geração de plano alimentar personalizado com Llama 3.2 1B'
+        description: 'Geração de plano alimentar personalizado com Llama 3 8B 8k'
       });
       console.log('[MEAL PLAN] Transação de recompensa adicionada');
     } catch (transactionError) {
@@ -329,7 +328,7 @@ export const generateMealPlan = async ({
     }
 
     toast.dismiss(toastId);
-    toast.success(`Cardápio personalizado gerado com Llama 3.2 1B com sucesso! +${REWARDS.MEAL_PLAN} FITs`);
+    toast.success(`Cardápio personalizado gerado com Llama 3 8B 8k com sucesso! +${REWARDS.MEAL_PLAN} FITs`);
 
     return resultData.mealPlan;
   } catch (error) {

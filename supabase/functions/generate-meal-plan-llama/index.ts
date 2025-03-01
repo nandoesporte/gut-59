@@ -17,7 +17,7 @@ const handleCors = (req: Request) => {
 
 // Main function to handle requests
 serve(async (req) => {
-  console.log("Received request to generate meal plan with Groq API model");
+  console.log("Received request to generate meal plan with Llama 3 8B 8k model");
   
   // Handle CORS preflight request
   const corsResponse = handleCors(req);
@@ -52,7 +52,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Using model configuration: ${requestData.modelConfig?.model || 'Default Groq model'}`);
+    console.log(`Using model configuration: Llama 3 8B 8k`);
     
     // Get the Groq API key from environment variables
     const groqApiKey = Deno.env.get('GROQ_API_KEY');
@@ -63,10 +63,10 @@ serve(async (req) => {
     // Construct the prompt for the model
     const prompt = constructPrompt(userData, selectedFoods, foodsByMealType, dietaryPreferences);
     
-    console.log("Sending request to Groq API");
+    console.log("Sending request to Groq API with Llama 3 8B 8k model");
     
-    // Define model - using LLaMA 3 70B Instruct model which is available in Groq
-    const modelName = "llama3-70b-8192";
+    // Define model - using Llama 3 8B 8k model which is available in Groq
+    const modelName = "llama3-8b-8k";
     
     // Prepare the message for the chat API
     const messages = [
@@ -153,7 +153,7 @@ serve(async (req) => {
     // Add the user's daily calories to the response
     mealPlan.userCalories = userData.dailyCalories;
     
-    console.log("Successfully generated meal plan with Groq model");
+    console.log("Successfully generated meal plan with Llama 3 8B 8k model");
     
     return new Response(
       JSON.stringify({ mealPlan }),
