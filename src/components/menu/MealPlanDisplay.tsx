@@ -48,6 +48,10 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
 
     return (
       <div className="space-y-6">
+        <div className="p-4 bg-muted rounded-md mb-6">
+          <h2 className="text-xl font-bold">📅 {dayNameMap[dayKey]} – Plano Alimentar</h2>
+        </div>
+
         {dayPlan.meals.breakfast && (
           <MealSection
             title="Café da Manhã"

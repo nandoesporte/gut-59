@@ -23,7 +23,7 @@ export const MealSection = ({
     description: meal?.description || "",
     foods: meal?.foods || [],
     macros: {
-      protein: meal?.macros?.protein || 0,
+      protein: meal?.macros?.protein || a0,
       carbs: meal?.macros?.carbs || 0,
       fats: meal?.macros?.fats || 0,
       fiber: meal?.macros?.fiber || 0
@@ -32,10 +32,10 @@ export const MealSection = ({
 
   return (
     <div className="bg-white rounded-lg shadow-sm p-6">
-      <h2 className="text-lg font-semibold flex items-center gap-2 text-gray-900 mb-4">
+      <h3 className="text-lg font-semibold flex items-center gap-2 text-gray-900 mb-4">
         {icon}
-        {title} ({safeFood.calories} kcal)
-      </h2>
+        {title}
+      </h3>
 
       <div className="mb-4">
         <p className="text-gray-600 italic">
@@ -66,6 +66,9 @@ export const MealSection = ({
       </div>
 
       <div className="mt-6 text-sm text-gray-600 border-t pt-4">
+        <div className="mb-2 text-md font-medium">
+          Total: {safeFood.calories} kcal
+        </div>
         <div className="grid grid-cols-4 gap-2 mt-2">
           <div className="font-medium">Proteínas: {safeFood.macros.protein}g</div>
           <div className="font-medium">Carbos: {safeFood.macros.carbs}g</div>

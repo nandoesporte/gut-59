@@ -17,7 +17,7 @@ export const DailyTotals = ({ totalNutrition }: DailyTotalsProps) => {
       <div className="flex justify-between items-center">
         <div>
           <h3 className="font-semibold text-lg text-green-700">Totais Diários</h3>
-          <div className="grid grid-cols-4 gap-4 mt-2 text-sm text-gray-600">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-2 text-sm text-gray-600">
             <div>Proteínas: {totalNutrition.protein}g</div>
             <div>Carboidratos: {totalNutrition.carbs}g</div>
             <div>Gorduras: {totalNutrition.fats}g</div>
