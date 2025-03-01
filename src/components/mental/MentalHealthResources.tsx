@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useWallet } from "@/hooks/useWallet";
 import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
 import "react-circular-progressbar/dist/styles.css";
-import { Info } from "lucide-react";
+import { Info, Timer, Clock } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Progress } from "@/components/ui/progress";
 
@@ -238,14 +238,32 @@ export const MentalHealthResources = () => {
               </p>
             )}
             
+            {/* Timer Preview for Quick Start - Always visible */}
+            {exercise.count === 0 && !exercise.isComplete && !isStarting && (
+              <div className="flex justify-center mb-2">
+                <div className="flex items-center gap-2 bg-primary-50 px-4 py-2 rounded-full shadow-sm">
+                  <Clock className="w-5 h-5 text-primary" />
+                  <span className="font-medium text-primary">1:00</span>
+                </div>
+              </div>
+            )}
+            
             {exercise.count > 0 && !exercise.isComplete ? (
               <div className="flex flex-col items-center space-y-4 sm:space-y-6">
-                {/* Progress bar for overall exercise */}
-                <div className="w-full">
-                  <Progress value={progressPercentage} className="h-2" />
-                  <p className="text-xs text-center mt-1 text-muted-foreground">
-                    {Math.floor(exercise.elapsedTime)}s / {totalExerciseTime}s
-                  </p>
+                {/* Improved Progress bar for overall exercise */}
+                <div className="w-full relative mt-2">
+                  <Progress 
+                    value={progressPercentage} 
+                    className="h-3 sm:h-4 bg-gray-100"
+                  />
+                  <div className="flex justify-between mt-1">
+                    <p className="text-xs text-muted-foreground">
+                      {Math.floor(exercise.elapsedTime)}s
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {totalExerciseTime}s
+                    </p>
+                  </div>
                 </div>
                 
                 <div className={`w-48 h-48 sm:w-64 sm:h-64 relative ${isMobile ? 'mt-2' : 'mt-4'}`}>
@@ -256,8 +274,9 @@ export const MentalHealthResources = () => {
                       pathColor: getPhaseColor(),
                       textColor: getPhaseColor(),
                       trailColor: '#e6e6e6',
-                      textSize: '20px',
+                      textSize: '24px',
                       pathTransition: 'stroke-dashoffset 0.5s ease 0s',
+                      strokeLinecap: 'round',
                     })}
                   />
                   <div className="absolute top-3/4 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
@@ -271,7 +290,7 @@ export const MentalHealthResources = () => {
                   <div className="text-xl sm:text-2xl font-medium mb-1 sm:mb-2" style={{ color: getPhaseColor() }}>
                     {getPhaseText()}
                   </div>
-                  <div className="text-xs sm:text-sm text-muted-foreground">
+                  <div className="text-sm sm:text-base text-muted-foreground">
                     {getInstructionText()}
                   </div>
                 </div>
@@ -284,9 +303,12 @@ export const MentalHealthResources = () => {
                   className="w-full py-4 sm:py-6 text-base sm:text-lg relative"
                   size="lg"
                 >
-                  {isStarting ? 'Preparando exercício...' : 
-                   dailyExercisesCount >= dailyLimit ? 'Limite diário atingido' : 
-                   'Iniciar Exercício de Respiração'}
+                  <div className="flex items-center justify-center gap-2">
+                    <Timer className="h-5 w-5" />
+                    {isStarting ? 'Preparando exercício...' : 
+                     dailyExercisesCount >= dailyLimit ? 'Limite diário atingido' : 
+                     'Iniciar Exercício de Respiração'}
+                  </div>
                   
                   {isStarting && (
                     <div className="absolute inset-0 flex items-center justify-center bg-primary/90 rounded-md">
