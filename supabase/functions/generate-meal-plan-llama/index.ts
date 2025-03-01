@@ -2,437 +2,402 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Define CORS headers for the API
+// CORS headers for browser requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Define the structure of the meal plan generator request
-interface MealPlanRequest {
-  userData: {
-    id: string;
-    weight: number;
-    height: number;
-    age: number;
-    gender: string;
-    activityLevel: string;
-    goal: string;
-    dailyCalories: number;
-  };
-  preferences: {
-    hasAllergies: boolean;
-    allergies: string[];
-    dietaryRestrictions: string[];
-    trainingTime: string | null;
-  };
-  selectedFoods: any[];
-  foodsByMealType: Record<string, string[]>;
-}
+// Groq API configuration
+const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY") || "";
+const LLAMA_MODEL = "llama-3.2-1b-chat-8k";
 
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
-  
+
   try {
-    // Validate request method
-    if (req.method !== 'POST') {
-      return new Response(
-        JSON.stringify({ error: 'Method not allowed' }),
-        { 
-          status: 405, 
-          headers: { ...corsHeaders, "Content-Type": "application/json" } 
-        }
-      );
-    }
+    console.log('Meal Plan Llama Generation - Request received');
     
     // Parse the request body
-    const requestData: MealPlanRequest = await req.json();
-    console.log('Received request with:', JSON.stringify(requestData, null, 2));
-    
-    // Extract user data and preferences
-    const { userData, preferences, selectedFoods, foodsByMealType } = requestData;
+    const requestData = await req.json();
+    console.log('Request payload received:', JSON.stringify(requestData));
     
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
     const supabase = createClient(supabaseUrl, supabaseKey);
     
-    // Prepare the prompt for the LLM
-    const prompt = generateMealPlanPrompt(userData, preferences, selectedFoods, foodsByMealType);
-    console.log('Generated prompt:', prompt);
+    const { userData, selectedFoods, foodsByMealType, dietaryPreferences } = requestData;
     
-    try {
-      // Call Llama 3.2 1B model using Groq API
-      console.log('Starting to generate meal plan with LLM');
-      
-      // Send the request to Llama model endpoint
-      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${Deno.env.get('GROQ_API_KEY')}`,
-        },
-        body: JSON.stringify({
-          model: "llama3-8b-8192",
-          messages: [
-            { 
-              role: "system", 
-              content: "You are a helpful meal plan generator. Create a complete 7-day meal plan based on the user's nutritional needs and preferences."
-            },
-            { 
-              role: "user", 
-              content: prompt 
-            }
-          ],
-          temperature: 0.3,
-          max_tokens: 4000,
-        }),
-      });
-      
-      // Process the LLM response
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error from LLM API:', errorText);
-        throw new Error(`LLM API error: ${response.status} ${errorText}`);
-      }
-      
-      const llamaResponse = await response.json();
-      console.log('Received LLM response successfully');
-      
-      let mealPlanContent = llamaResponse.choices[0].message.content;
-      console.log('Raw meal plan content:', mealPlanContent.substring(0, 200) + '...');
-      
-      // Try to extract JSON from the response
-      let mealPlan;
-      try {
-        // Look for JSON in the response
-        const jsonMatch = mealPlanContent.match(/```json\n([\s\S]*?)\n```/) || 
-                         mealPlanContent.match(/```\n([\s\S]*?)\n```/) ||
-                         mealPlanContent.match(/\{[\s\S]*\}/);
-                         
-        const jsonString = jsonMatch ? jsonMatch[1] || jsonMatch[0] : mealPlanContent;
-        console.log('Extracted JSON string:', jsonString.substring(0, 200) + '...');
-        
-        // Parse the JSON
-        mealPlan = JSON.parse(jsonString.replace(/```json|```/g, '').trim());
-        
-        // Add user calories to the plan
-        mealPlan.userCalories = userData.dailyCalories;
-        
-        // Validate the meal plan structure
-        validateMealPlan(mealPlan);
-        
-        console.log('Meal plan parsed and validated successfully');
-      } catch (parseError) {
-        console.error('Error parsing meal plan JSON:', parseError);
-        console.log('Falling back to generating a basic plan structure');
-        
-        // Create a basic fallback meal plan structure
-        mealPlan = createFallbackMealPlan(userData.dailyCalories);
-      }
-      
-      // Store the meal plan in the database if user is authenticated
-      if (userData.id) {
-        try {
-          const { error } = await supabase
-            .from('meal_plans')
-            .insert({
-              user_id: userData.id,
-              plan_data: mealPlan,
-              calorie_target: userData.dailyCalories,
-              created_at: new Date().toISOString(),
-            });
-            
-          if (error) {
-            console.error('Error storing meal plan:', error);
-          } else {
-            console.log('Meal plan stored in database successfully');
-          }
-        } catch (dbError) {
-          console.error('Database error when storing meal plan:', dbError);
-        }
-      }
-      
-      // Return the generated meal plan
-      return new Response(
-        JSON.stringify({ mealPlan }),
-        { 
-          headers: { ...corsHeaders, "Content-Type": "application/json" } 
-        }
-      );
-    } catch (llamaError) {
-      console.error('Error calling LLM:', llamaError);
+    if (!userData || !selectedFoods) {
+      console.error('Missing required data in request');
       return new Response(
         JSON.stringify({ 
-          error: 'Error generating meal plan', 
-          message: llamaError.message,
-          fallbackPlan: createFallbackMealPlan(userData.dailyCalories)
+          error: 'Missing required user data or food selections'
         }),
         { 
-          status: 500, 
-          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400 
         }
       );
     }
-  } catch (error) {
-    console.error('General error processing request:', error);
+    
+    // Log input data for debugging
+    console.log('User data:', JSON.stringify(userData));
+    console.log('Dietary preferences:', JSON.stringify(dietaryPreferences));
+    console.log(`Selected foods count: ${selectedFoods.length}`);
+    
+    // Generate the meal plan using Llama 3.2 1B
+    const mealPlan = await generateMealPlanWithLLM(
+      userData,
+      selectedFoods,
+      foodsByMealType,
+      dietaryPreferences
+    );
+    
+    // Add the userCalories to the response to satisfy the interface
+    if (mealPlan && !mealPlan.userCalories && userData.dailyCalories) {
+      mealPlan.userCalories = userData.dailyCalories;
+    }
+    
+    // Log the successful response
+    console.log('Meal plan generated successfully');
+    
     return new Response(
-      JSON.stringify({ error: 'Internal server error', message: error.message }),
+      JSON.stringify({ 
+        mealPlan,
+        message: 'Meal plan generated successfully with Llama 3.2 1B'
+      }),
       { 
-        status: 500, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
+      }
+    );
+  } catch (error) {
+    console.error('Error generating meal plan:', error);
+    
+    // Return a fallback meal plan in case of error
+    const fallbackPlan = createFallbackMealPlan(requestData?.userData);
+    
+    return new Response(
+      JSON.stringify({ 
+        mealPlan: fallbackPlan,
+        error: 'Error generating meal plan. Using fallback plan.',
+        details: error.message 
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200 // Still return 200 with fallback plan
       }
     );
   }
 });
 
-// Function to generate the prompt for the LLM
-function generateMealPlanPrompt(
-  userData: MealPlanRequest['userData'],
-  preferences: MealPlanRequest['preferences'],
-  selectedFoods: any[],
-  foodsByMealType: Record<string, string[]>
-): string {
-  const { weight, height, age, gender, activityLevel, goal, dailyCalories } = userData;
-  const { hasAllergies, allergies, dietaryRestrictions, trainingTime } = preferences;
+// Function to generate the meal plan using LLM
+async function generateMealPlanWithLLM(
+  userData,
+  selectedFoods,
+  foodsByMealType,
+  dietaryPreferences
+) {
+  try {
+    console.log('Starting meal plan generation with Llama 3.2 1B');
+    
+    // Create the prompt with detailed instructions for the model
+    const prompt = createPrompt(userData, selectedFoods, foodsByMealType, dietaryPreferences);
+    
+    // Check if we have API key for Groq
+    if (!GROQ_API_KEY) {
+      throw new Error('GROQ_API_KEY is not set in environment variables');
+    }
+    
+    console.log('Sending request to Groq API with Llama 3.2 1B model');
+    
+    // Call Groq API with Llama 3.2 1B model
+    const completion = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: LLAMA_MODEL,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a professional nutritionist AI that creates personalized meal plans.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.6,
+        max_tokens: 4000
+      })
+    });
+    
+    if (!completion.ok) {
+      const errorText = await completion.text();
+      console.error('Groq API error:', errorText);
+      throw new Error(`Groq API returned status ${completion.status}: ${errorText}`);
+    }
+    
+    const result = await completion.json();
+    console.log('Received response from Groq API');
+    
+    if (!result.choices || !result.choices[0] || !result.choices[0].message) {
+      throw new Error('Invalid response format from Groq API');
+    }
+    
+    // Parse the response to extract the meal plan
+    const responseText = result.choices[0].message.content;
+    console.log('Model response size:', responseText.length, 'characters');
+    
+    // Try to extract and parse JSON from the response
+    const mealPlan = extractMealPlanFromResponse(responseText, userData.dailyCalories);
+    
+    // Validate the extracted meal plan
+    if (!isValidMealPlan(mealPlan)) {
+      console.error('Invalid meal plan structure:', JSON.stringify(mealPlan));
+      throw new Error('Generated meal plan does not have the expected structure');
+    }
+    
+    return mealPlan;
+  } catch (error) {
+    console.error('Error in generateMealPlanWithLLM:', error);
+    throw error;
+  }
+}
+
+// Function to create the prompt for the model
+function createPrompt(userData, selectedFoods, foodsByMealType, dietaryPreferences) {
+  const { dailyCalories, weight, height, age, gender, goal } = userData;
   
-  // Calculate macro distributions based on goal
-  let proteinPercentage, carbsPercentage, fatsPercentage;
+  // Format food information for the prompt
+  const foodsInfo = selectedFoods.map(food => {
+    return `- ${food.name}: ${food.calories} calories, ${food.protein}g protein, ${food.carbs}g carbs, ${food.fats}g fats${food.fiber ? `, ${food.fiber}g fiber` : ''}`;
+  }).join('\n');
   
-  switch (goal) {
-    case 'lose':
-      proteinPercentage = 35;
-      carbsPercentage = 35;
-      fatsPercentage = 30;
-      break;
-    case 'gain':
-      proteinPercentage = 30;
-      carbsPercentage = 45;
-      fatsPercentage = 25;
-      break;
-    default: // maintain
-      proteinPercentage = 30;
-      carbsPercentage = 40;
-      fatsPercentage = 30;
+  // Format meal type associations for the prompt if available
+  let mealTypeInfo = '';
+  if (foodsByMealType) {
+    const mealTypes = Object.keys(foodsByMealType);
+    if (mealTypes.length > 0) {
+      mealTypeInfo = '\nFoods categorized by meal type:\n';
+      
+      for (const mealType of mealTypes) {
+        if (foodsByMealType[mealType] && foodsByMealType[mealType].length > 0) {
+          const foodNames = foodsByMealType[mealType].map(food => food.name).join(', ');
+          mealTypeInfo += `- ${mealType}: ${foodNames}\n`;
+        }
+      }
+    }
   }
   
-  // Calculate daily macros in grams
-  const dailyProtein = Math.round((dailyCalories * (proteinPercentage / 100)) / 4);
-  const dailyCarbs = Math.round((dailyCalories * (carbsPercentage / 100)) / 4);
-  const dailyFats = Math.round((dailyCalories * (fatsPercentage / 100)) / 9);
+  // Format dietary preferences for the prompt
+  const allergiesInfo = dietaryPreferences.hasAllergies && dietaryPreferences.allergies.length > 0
+    ? `Allergies: ${dietaryPreferences.allergies.join(', ')}\n`
+    : 'No food allergies\n';
+    
+  const restrictionsInfo = dietaryPreferences.dietaryRestrictions && dietaryPreferences.dietaryRestrictions.length > 0
+    ? `Dietary restrictions: ${dietaryPreferences.dietaryRestrictions.join(', ')}\n`
+    : 'No dietary restrictions\n';
+    
+  const trainingTimeInfo = dietaryPreferences.trainingTime
+    ? `Training time: ${dietaryPreferences.trainingTime}\n`
+    : 'No specific training time\n';
   
-  // Format selected foods info
-  const foodsList = selectedFoods.map(food => 
-    `${food.name}: ${food.calories} calories, ${food.protein}g protein, ${food.carbs}g carbs, ${food.fats}g fats`
-  ).join('\n');
-  
-  // Format foods by meal type
-  const mealTypeInfo = Object.entries(foodsByMealType)
-    .map(([mealType, foodIds]) => {
-      const foods = selectedFoods.filter(food => foodIds.includes(food.id));
-      return `${mealType}: ${foods.map(f => f.name).join(', ')}`;
-    })
-    .join('\n');
-  
-  // Build the complete prompt
-  return `
-Create a 7-day meal plan for a person with the following characteristics:
-- Weight: ${weight} kg
-- Height: ${height} cm
-- Age: ${age} years
-- Gender: ${gender}
-- Activity level: ${activityLevel}
-- Goal: ${goal}
-- Daily calorie target: ${dailyCalories} calories
+  // Construct the full prompt
+  return `Create a detailed weekly meal plan for a ${age}-year-old ${gender}, weight ${weight}kg, height ${height}cm with a daily calorie target of ${dailyCalories} calories. The goal is to ${goal === 'lose_weight' ? 'lose weight' : goal === 'gain_mass' ? 'gain muscle mass' : 'maintain weight'}.
 
-Daily macronutrient targets:
-- Protein: ${dailyProtein}g (${proteinPercentage}%)
-- Carbohydrates: ${dailyCarbs}g (${carbsPercentage}%)
-- Fats: ${dailyFats}g (${fatsPercentage}%)
+${allergiesInfo}${restrictionsInfo}${trainingTimeInfo}
 
-${hasAllergies ? `Allergies: ${allergies.join(', ')}` : 'No food allergies.'}
-${dietaryRestrictions.length > 0 ? `Dietary restrictions: ${dietaryRestrictions.join(', ')}` : 'No dietary restrictions.'}
-${trainingTime ? `Training time: ${trainingTime}` : 'No specific training time.'}
-
-The meal plan should be based on these selected foods:
-${foodsList}
-
-Preferred foods for specific meal types:
+Use ONLY the following foods to create the meal plan:
+${foodsInfo}
 ${mealTypeInfo}
 
-Please provide a structured meal plan with 5 meals per day (breakfast, morning snack, lunch, afternoon snack, dinner) for all 7 days of the week.
-For each meal, include the name, portion size, and a brief description of how to prepare it.
-Calculate and include the calories and macronutrients (protein, carbs, fats) for each meal.
-Also provide daily totals and recommendations for optimal nutrition.
+The meal plan should be structured as follows:
+1. A weekly plan with 7 days (monday through sunday)
+2. Each day should have 5 meals: breakfast, morningSnack, lunch, afternoonSnack, and dinner
+3. Each meal should list specific foods with portions in grams or units
+4. Calculate calories and macros (protein, carbs, fats, fiber) for each meal
+5. Calculate daily totals for each day
+6. Calculate weekly averages
 
-Return the meal plan as a valid JSON object with the following structure:
+Include nutritional recommendations based on the user's goal.
 
+Your response should be a structured JSON object with the following format:
 {
   "weeklyPlan": {
-    "monday": {
+    "monday": { 
       "dayName": "Monday",
       "meals": {
-        "breakfast": {
-          "description": "Breakfast description",
-          "foods": [
-            {
-              "name": "Food name",
-              "portion": 100,
-              "unit": "g",
-              "details": "Preparation details"
-            }
-          ],
-          "calories": 500,
-          "macros": {
-            "protein": 30,
-            "carbs": 40,
-            "fats": 15,
-            "fiber": 5
-          }
+        "breakfast": { 
+          "foods": [{"name": "Food name", "portion": 100, "unit": "g", "details": "Additional details"}],
+          "calories": 400,
+          "macros": {"protein": 20, "carbs": 40, "fats": 15, "fiber": 5},
+          "description": "Meal description"
         },
-        "morningSnack": { similar structure },
-        "lunch": { similar structure },
-        "afternoonSnack": { similar structure },
-        "dinner": { similar structure }
+        "morningSnack": { /* similar structure */ },
+        "lunch": { /* similar structure */ },
+        "afternoonSnack": { /* similar structure */ },
+        "dinner": { /* similar structure */ }
       },
-      "dailyTotals": {
-        "calories": 2000,
-        "protein": 150,
-        "carbs": 200,
-        "fats": 55,
-        "fiber": 30
-      }
+      "dailyTotals": {"calories": 2000, "protein": 150, "carbs": 200, "fats": 60, "fiber": 25}
     },
-    "tuesday": { similar structure },
-    "wednesday": { similar structure },
-    "thursday": { similar structure },
-    "friday": { similar structure },
-    "saturday": { similar structure },
-    "sunday": { similar structure }
+    "tuesday": { /* similar structure */ },
+    /* remaining days following the same structure */
   },
   "weeklyTotals": {
     "averageCalories": 2000,
     "averageProtein": 150,
     "averageCarbs": 200,
-    "averageFats": 55,
-    "averageFiber": 30
+    "averageFats": 60,
+    "averageFiber": 25
   },
   "recommendations": {
-    "general": "General nutrition advice based on the goals",
+    "general": "General nutrition advice",
     "preworkout": "Pre-workout nutrition advice",
     "postworkout": "Post-workout nutrition advice",
-    "timing": ["Meal timing recommendation 1", "Meal timing recommendation 2"]
+    "timing": ["Timing recommendation 1", "Timing recommendation 2"]
   }
 }
-`;
+
+Ensure all portions make sense and the daily totals match the target calories.`;
+}
+
+// Function to extract meal plan from the model's response
+function extractMealPlanFromResponse(responseText, userCalories) {
+  try {
+    // Try to find a JSON object in the response
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    
+    if (jsonMatch) {
+      const jsonStr = jsonMatch[0];
+      console.log('Found JSON in response');
+      
+      try {
+        // Parse the JSON structure
+        const mealPlan = JSON.parse(jsonStr);
+        
+        // Add userCalories field if not present
+        if (!mealPlan.userCalories && userCalories) {
+          mealPlan.userCalories = userCalories;
+        }
+        
+        return mealPlan;
+      } catch (jsonError) {
+        console.error('Error parsing JSON:', jsonError);
+        // Fall back to simpler extraction if JSON parsing fails
+      }
+    }
+    
+    // If we couldn't extract valid JSON, return null
+    console.error('Could not extract valid JSON from response');
+    return null;
+  } catch (error) {
+    console.error('Error extracting meal plan:', error);
+    return null;
+  }
 }
 
 // Function to validate the meal plan structure
-function validateMealPlan(mealPlan: any): void {
-  // Check weeklyPlan exists
-  if (!mealPlan.weeklyPlan) {
-    throw new Error('Missing weeklyPlan in meal plan');
-  }
+function isValidMealPlan(mealPlan) {
+  if (!mealPlan || typeof mealPlan !== 'object') return false;
   
-  // Check each day exists
-  const requiredDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-  for (const day of requiredDays) {
-    if (!mealPlan.weeklyPlan[day]) {
-      throw new Error(`Missing ${day} in weeklyPlan`);
-    }
-  }
+  // Check for weeklyPlan property
+  if (!mealPlan.weeklyPlan) return false;
   
-  // Check recommendations exist
-  if (!mealPlan.recommendations || 
-      !mealPlan.recommendations.general || 
-      !mealPlan.recommendations.preworkout || 
-      !mealPlan.recommendations.postworkout || 
-      !Array.isArray(mealPlan.recommendations.timing)) {
-    throw new Error('Missing or invalid recommendations structure');
-  }
+  // Check for at least one day in the weekly plan
+  const days = Object.keys(mealPlan.weeklyPlan);
+  if (days.length === 0) return false;
   
-  // Check weeklyTotals exist
-  if (!mealPlan.weeklyTotals) {
-    throw new Error('Missing weeklyTotals in meal plan');
-  }
+  // Check the structure of the first day
+  const firstDay = mealPlan.weeklyPlan[days[0]];
+  if (!firstDay || !firstDay.meals) return false;
+  
+  // Check for the presence of at least one meal in the first day
+  const mealTypes = Object.keys(firstDay.meals);
+  if (mealTypes.length === 0) return false;
+  
+  return true;
 }
 
-// Function to create a fallback meal plan
-function createFallbackMealPlan(dailyCalories: number): any {
-  const basicMealPlan = {
-    userCalories: dailyCalories,
-    weeklyPlan: {
-      monday: createBasicDailyPlan("Monday"),
-      tuesday: createBasicDailyPlan("Tuesday"),
-      wednesday: createBasicDailyPlan("Wednesday"),
-      thursday: createBasicDailyPlan("Thursday"),
-      friday: createBasicDailyPlan("Friday"),
-      saturday: createBasicDailyPlan("Saturday"),
-      sunday: createBasicDailyPlan("Sunday")
-    },
-    weeklyTotals: {
-      averageCalories: dailyCalories,
-      averageProtein: Math.round((dailyCalories * 0.3) / 4), // 30% of calories from protein
-      averageCarbs: Math.round((dailyCalories * 0.4) / 4),   // 40% of calories from carbs
-      averageFats: Math.round((dailyCalories * 0.3) / 9),    // 30% of calories from fats
-      averageFiber: 30
-    },
-    recommendations: {
-      general: "For optimal results, focus on whole foods, adequate protein intake, and staying hydrated.",
-      preworkout: "Consume a balanced meal with carbs and protein 1-2 hours before exercise.",
-      postworkout: "Have a protein-rich meal or shake within 30-60 minutes after training.",
-      timing: [
-        "Space your meals 3-4 hours apart for better digestion and energy levels.",
-        "Consider having your largest meals around your workout time."
-      ]
-    }
-  };
+// Function to create a fallback meal plan in case of errors
+function createFallbackMealPlan(userData) {
+  const dailyCalories = userData?.dailyCalories || 2000;
   
-  return basicMealPlan;
-}
-
-// Helper function to create a basic daily plan structure
-function createBasicDailyPlan(dayName: string): any {
-  return {
-    dayName: dayName,
+  // Calculate basic macros
+  const protein = Math.round(dailyCalories * 0.3 / 4); // 30% protein (4 cal/g)
+  const carbs = Math.round(dailyCalories * 0.45 / 4);  // 45% carbs (4 cal/g)
+  const fats = Math.round(dailyCalories * 0.25 / 9);   // 25% fats (9 cal/g)
+  
+  // Create a basic meal structure
+  const createMeal = (calories, name) => ({
+    foods: [{ name: "Alimentos variados", portion: 100, unit: "g", details: "Consulte um nutricionista para personalização" }],
+    calories,
+    macros: { 
+      protein: Math.round(protein * (calories / dailyCalories)), 
+      carbs: Math.round(carbs * (calories / dailyCalories)),
+      fats: Math.round(fats * (calories / dailyCalories)),
+      fiber: Math.round(25 * (calories / dailyCalories))
+    },
+    description: `${name} com aproximadamente ${calories} calorias`
+  });
+  
+  // Create daily structure
+  const createDay = (dayName) => ({
+    dayName,
     meals: {
-      breakfast: createBasicMeal("Breakfast"),
-      morningSnack: createBasicMeal("Morning Snack"),
-      lunch: createBasicMeal("Lunch"),
-      afternoonSnack: createBasicMeal("Afternoon Snack"),
-      dinner: createBasicMeal("Dinner")
+      breakfast: createMeal(Math.round(dailyCalories * 0.25), "Café da manhã"),
+      morningSnack: createMeal(Math.round(dailyCalories * 0.1), "Lanche da manhã"),
+      lunch: createMeal(Math.round(dailyCalories * 0.35), "Almoço"),
+      afternoonSnack: createMeal(Math.round(dailyCalories * 0.1), "Lanche da tarde"),
+      dinner: createMeal(Math.round(dailyCalories * 0.2), "Jantar")
     },
     dailyTotals: {
-      calories: 0,
-      protein: 0,
-      carbs: 0,
-      fats: 0,
-      fiber: 0
+      calories: dailyCalories,
+      protein,
+      carbs,
+      fats,
+      fiber: 25
     }
+  });
+  
+  // Create weekly plan
+  const weeklyPlan = {
+    monday: createDay("Segunda-feira"),
+    tuesday: createDay("Terça-feira"),
+    wednesday: createDay("Quarta-feira"),
+    thursday: createDay("Quinta-feira"),
+    friday: createDay("Sexta-feira"),
+    saturday: createDay("Sábado"),
+    sunday: createDay("Domingo")
   };
-}
-
-// Helper function to create a basic meal structure
-function createBasicMeal(description: string): any {
+  
   return {
-    description: description,
-    foods: [
-      {
-        name: "Please try again later",
-        portion: 1,
-        unit: "serving",
-        details: "The meal plan generation service is temporarily unavailable."
-      }
-    ],
-    calories: 0,
-    macros: {
-      protein: 0,
-      carbs: 0,
-      fats: 0,
-      fiber: 0
-    }
+    userCalories: dailyCalories,
+    weeklyPlan,
+    weeklyTotals: {
+      averageCalories: dailyCalories,
+      averageProtein: protein,
+      averageCarbs: carbs,
+      averageFats: fats,
+      averageFiber: 25
+    },
+    recommendations: {
+      general: "É recomendável consultar um nutricionista para um plano personalizado baseado em suas necessidades específicas.",
+      preworkout: "Consuma carboidratos de fácil digestão 30-60 minutos antes do treino para energia.",
+      postworkout: "Após o treino, combine proteínas e carboidratos para recuperação muscular.",
+      timing: [
+        "Distribua suas refeições a cada 3-4 horas ao longo do dia.",
+        "Mantenha-se hidratado bebendo pelo menos 2 litros de água diariamente."
+      ]
+    },
+    isFallbackPlan: true
   };
 }
