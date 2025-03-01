@@ -3,23 +3,26 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Brain, Clock, Headphones, BookOpen, MessageCircle, Smile, SmilePlus, Frown, Meh, Angry, Loader2 } from "lucide-react";
+import { Brain, Clock, Headphones, BookOpen, MessageCircle, Smile, SmilePlus, Frown, Meh, Angry, Loader2, CalendarIcon } from "lucide-react";
 import { MentalHealthResources } from '@/components/mental/MentalHealthResources';
 import { MentalModules } from '@/components/mental/MentalModules';
 import { MentalHealthChat } from '@/components/mental/MentalHealthChat';
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
+interface EmotionLog {
+  date: Date;
+  emotion: string;
+}
+
 const Mental = () => {
-  const [date] = useState<Date>(new Date());
-  const [mood, setMood] = useState('');
   const [selectedEmotion, setSelectedEmotion] = useState('');
   const [activeTab, setActiveTab] = useState('breathing');
   const [emotionGuidance, setEmotionGuidance] = useState('');
   const [isLoadingGuidance, setIsLoadingGuidance] = useState(false);
+  const [emotionHistory, setEmotionHistory] = useState<EmotionLog[]>([]);
 
   const menuItems = [
     { id: 'breathing', icon: <Clock className="w-6 h-6" />, label: 'Respiração', color: 'bg-[#D3E4FD]' },
@@ -74,6 +77,22 @@ const Mental = () => {
   const handleEmotionSelect = (emotion: string) => {
     setSelectedEmotion(emotion);
     getEmotionGuidance(emotion);
+    
+    // Add current emotion to history
+    const newEntry: EmotionLog = {
+      date: new Date(),
+      emotion: emotion
+    };
+    
+    setEmotionHistory(prev => [newEntry, ...prev].slice(0, 10)); // Keep last 10 entries
+  };
+
+  const getEmotionLabel = (emotionId: string) => {
+    return emotions.find(e => e.id === emotionId)?.label || '';
+  };
+  
+  const getEmotionColor = (emotionId: string) => {
+    return emotions.find(e => e.id === emotionId)?.color || '';
   };
 
   return (
@@ -167,32 +186,29 @@ const Mental = () => {
               )}
 
               <div className="bg-card rounded-lg p-4 shadow-sm">
-                <div className="w-full max-w-md mx-auto">
-                  <div className={`p-4 rounded-xl bg-[#F6F9FE] hover:bg-[#E6F8FC] transition-colors cursor-pointer shadow-sm`}>
-                    <div className="text-center space-y-1">
-                      <div className="text-sm text-muted-foreground">
-                        {format(date, 'EEEE', { locale: ptBR })}
+                <h3 className="font-semibold text-primary mb-3 flex items-center gap-2">
+                  <CalendarIcon className="h-4 w-4" /> 
+                  Histórico de Emoções
+                </h3>
+                <div className="space-y-3">
+                  {emotionHistory.length > 0 ? (
+                    emotionHistory.map((entry, index) => (
+                      <div key={index} className={`flex justify-between items-center p-3 rounded-lg ${getEmotionColor(entry.emotion)}`}>
+                        <div className="flex items-center gap-2">
+                          {emotions.find(e => e.id === entry.emotion)?.icon}
+                          <span className="font-medium">{getEmotionLabel(entry.emotion)}</span>
+                        </div>
+                        <span className="text-sm text-muted-foreground">
+                          {format(entry.date, "dd 'de' MMMM", { locale: ptBR })}
+                        </span>
                       </div>
-                      <div className="text-2xl font-semibold text-primary">
-                        {format(date, 'd', { locale: ptBR })}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {format(date, 'MMMM yyyy', { locale: ptBR })}
-                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center text-muted-foreground py-4">
+                      Seu histórico de emoções aparecerá aqui. Selecione uma emoção acima para registrar como você se sente hoje.
                     </div>
-                  </div>
+                  )}
                 </div>
-              </div>
-
-              <div className="space-y-3">
-                <label className="text-sm font-medium block text-muted-foreground">Como você está se sentindo hoje?</label>
-                <Textarea
-                  placeholder="Escreva sobre suas emoções..."
-                  value={mood}
-                  onChange={(e) => setMood(e.target.value)}
-                  className="min-h-[120px] resize-none"
-                />
-                <Button className="w-full shadow-md">Salvar Registro</Button>
               </div>
             </CardContent>
           </Card>
