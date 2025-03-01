@@ -27,12 +27,15 @@ const saveMealPlanData = async (
       trainingTime: preferences.trainingTime || null
     };
     
+    // Convert MealPlan to a plain object that can be safely stored as JSON
+    const planDataForStorage = JSON.parse(JSON.stringify(mealPlan));
+    
     // Use insert with a single object for better type matching
     const { error } = await supabase
       .from('meal_plans')
       .insert({
         user_id: userId,
-        plan_data: mealPlan,
+        plan_data: planDataForStorage,
         calories: calorieNeeds,
         dietary_preferences: sanitizedPreferences
       });
