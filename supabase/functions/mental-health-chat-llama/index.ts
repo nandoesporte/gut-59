@@ -1,259 +1,183 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { corsHeaders } from "../_shared/cors.ts";
 
-// Get API key from environment variables
-const LLAMA_API_KEY = Deno.env.get("LLAMA_API_KEY");
-const LLAMA_API_URL = "https://api.llama.cloud/chat/completions";
+// Function to implement exponential backoff for retries
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  retries = 3,
+  backoff = 300
+): Promise<Response> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 40000); // 40-second timeout
+    
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
+    return response;
+  } catch (err) {
+    if (retries <= 1) throw err;
+    
+    // Calculate backoff with jitter
+    const jitter = Math.random() * 0.3 + 0.85; // 0.85-1.15
+    const delay = Math.min(backoff * jitter, 10000);
+    
+    console.log(`Retry attempt in ${delay}ms. Retries left: ${retries - 1}`);
+    await new Promise(resolve => setTimeout(resolve, delay));
+    
+    return fetchWithRetry(url, options, retries - 1, backoff * 2);
+  }
+}
 
-// Define CORS headers
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-// Utility function to add delay for retry
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-// Function to check if error is related to network connectivity
-const isNetworkError = (error: Error): boolean => {
-  const errorMessage = error.message.toLowerCase();
-  return (
-    errorMessage.includes('network') ||
-    errorMessage.includes('failed to fetch') ||
-    errorMessage.includes('sending request') ||
-    errorMessage.includes('timeout') ||
-    errorMessage.includes('connection') ||
-    errorMessage.includes('unreachable') ||
-    errorMessage.includes('dns') ||
-    errorMessage.includes('connect')
-  );
-};
-
-// Static fallback responses for when all retries fail
-const getFallbackResponse = () => {
+// Function to get a random fallback response
+function getFallbackResponse(): string {
   const fallbackResponses = [
-    "Desculpe, estou enfrentando problemas de conexão neste momento. Por favor, tente novamente mais tarde. Se precisar de ajuda imediata com questões de saúde mental, considere ligar para um serviço de apoio como o CVV (Centro de Valorização da Vida) pelo número 188.",
-    
-    "Parece que estou tendo dificuldades para me conectar aos meus serviços. Enquanto isso, lembre-se que práticas como respiração profunda, meditação por 5 minutos, ou uma caminhada curta podem ajudar a reduzir a ansiedade momentânea.",
-    
-    "Não consegui processar sua mensagem devido a problemas técnicos. Por favor, tente novamente em alguns minutos. Lembre-se que o autocuidado é importante - beber água, descansar adequadamente e fazer pausas das telas são práticas que podem ajudar seu bem-estar.",
-    
-    "Estou com dificuldades técnicas no momento. Se você está passando por uma situação difícil, considere conversar com alguém de confiança ou buscar ajuda profissional. Voltarei a funcionar normalmente assim que possível."
+    "Estou com dificuldades técnicas no momento. Se você está passando por uma situação difícil, considere conversar com alguém de confiança ou buscar ajuda profissional. Voltarei a funcionar normalmente assim que possível.",
+    "Parece que estou enfrentando problemas de conexão. Enquanto isso, lembre-se que praticar respiração profunda e exercícios de atenção plena podem ajudar em momentos de ansiedade.",
+    "Desculpe pela interrupção. Nossos sistemas estão tendo dificuldades. Neste meio tempo, considere escrever seus pensamentos em um diário ou praticar uma atividade que lhe traga calma.",
+    "Não estou conseguindo me conectar aos servidores. Durante esta pausa, você poderia experimentar técnicas de auto-cuidado como tomar um copo de água, fazer uma caminhada curta ou praticar respiração profunda."
   ];
-  
-  // Randomly select one of the fallback responses
-  return fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
-};
+
+  const randomIndex = Math.floor(Math.random() * fallbackResponses.length);
+  return fallbackResponses[randomIndex];
+}
 
 serve(async (req) => {
   // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const requestData = await req.json();
+    const { message, history, checkConfiguration } = await req.json();
     
-    // Special case: If the client is checking configuration
-    if (requestData.checkConfiguration) {
-      const configStatus = {
-        apiKeySet: !!LLAMA_API_KEY,
-        missingApiKey: !LLAMA_API_KEY
-      };
-      
+    // Endpoint for checking API key configuration
+    if (checkConfiguration) {
+      const apiKey = Deno.env.get("LLAMA_API_KEY");
       return new Response(
-        JSON.stringify(configStatus),
+        JSON.stringify({
+          apiKeySet: Boolean(apiKey),
+          missingApiKey: !apiKey
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    
-    const { message, history = [] } = requestData;
-    console.log(`Received message: ${message?.substring(0, 50)}...`);
-    console.log(`History length: ${history.length}`);
-    
-    if (!message) {
-      throw new Error("Missing required parameter: message");
-    }
 
-    // Verify API key is set before making any API calls
-    if (!LLAMA_API_KEY) {
-      console.error("LLAMA_API_KEY environment variable is not set");
+    if (!message) {
       return new Response(
-        JSON.stringify({
-          error: "API configuration error: Missing API key",
-          missingApiKey: true,
-          fallbackResponse: "O serviço de chat de saúde mental não está configurado corretamente. Por favor, entre em contato com o suporte."
-        }),
-        { 
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        }
+        JSON.stringify({ error: "Message is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // System prompt for mental health guidance
-    const systemPrompt = `Você é um assistente de saúde mental empático e compassivo. 
-Você oferece apoio, orientação e estratégias para lidar com questões de saúde mental.
-Suas respostas devem ser:
-- Empáticas e acolhedoras, reconhecendo os sentimentos da pessoa
-- Informativas, oferecendo insights sobre saúde mental
-- Construtivas, sugerindo estratégias práticas e exercícios
-- Responsáveis, nunca diagnosticando condições médicas
-- Encorajadoras, promovendo autocompaixão e autocuidado
-- Respeitosas dos limites profissionais, recomendando buscar ajuda profissional quando apropriado
-
-Responda em português do Brasil com um tom caloroso e acolhedor. Se a pessoa estiver em crise ou risco, sempre priorize sua segurança e recomende recursos de emergência.`;
-
-    // Prepare the conversation for the LlamaAPI - limit history to prevent token issues
-    const messages = [
-      { role: "system", content: systemPrompt },
-      ...history,
-      { role: "user", content: message }
-    ];
-
-    console.log("Sending request to LlamaAPI with model: nous-hermes-2-mixtral-8x7b-dpo");
+    const apiKey = Deno.env.get("LLAMA_API_KEY");
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({ 
+          error: "LLAMA_API_KEY is not set",
+          fallbackResponse: "O serviço de chat está temporariamente indisponível. Entre em contato com o administrador."
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     
-    // Make the request to the LlamaAPI with retry logic
-    let response = null;
-    let retryCount = 0;
-    const maxRetries = 3;
-    let lastError = null;
+    // Format history for the API
+    const conversationHistory = history?.map((item: any) => ({
+      role: item.role,
+      content: item.content
+    })) || [];
     
-    while (retryCount <= maxRetries && !response) {
-      try {
-        if (retryCount > 0) {
-          console.log(`Retry attempt ${retryCount}/${maxRetries}`);
-          
-          // For retries, trim the message history to reduce token count
-          if (messages.length > 3) {
-            // Keep system prompt and last 2 exchanges
-            const trimmedMessages = [
-              messages[0], // System prompt
-              ...messages.slice(-4) // Last 2 exchanges (2 messages per exchange)
-            ];
-            console.log(`Reduced message history from ${messages.length} to ${trimmedMessages.length} for retry`);
-            messages.splice(0, messages.length, ...trimmedMessages);
-          }
-        }
-        
-        // Construct request body with consistent parameters
-        const requestBody = {
-          model: "nous-hermes-2-mixtral-8x7b-dpo",
-          messages: messages,
-          max_tokens: 800,
-          temperature: 0.7,
-          top_p: 0.9,
-          stream: false
-        };
-        
-        console.log(`Sending request to ${LLAMA_API_URL}`);
-        
-        // Set longer timeout for fetch request and use appropriate fetch options
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 35000); // 35-second timeout
-        
-        const fetchResponse = await fetch(LLAMA_API_URL, {
+    // Add the new user message
+    conversationHistory.push({
+      role: "user",
+      content: message
+    });
+
+    console.log(`Sending request to LlamaAPI with ${conversationHistory.length} messages`);
+    
+    // Add system prompt
+    const systemPrompt = `Você é uma assistente de saúde mental que fala português. Você é gentil, empática e fornece suporte emocional e orientações sobre saúde mental. Você não é uma médica e não fornece diagnósticos médicos, apenas apoio e orientações gerais. Você sempre responde em português, de forma respeitosa e compreensiva. Suas respostas são concisas e práticas, com no máximo 3 parágrafos.`;
+
+    try {
+      // Make multiple attempts with exponential backoff
+      const response = await fetchWithRetry(
+        "https://api.llama.cloud/chat/completions",
+        {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${LLAMA_API_KEY}`
+            "Authorization": `Bearer ${apiKey}`
           },
-          body: JSON.stringify(requestBody),
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        console.log(`Response status: ${fetchResponse.status}`);
-        
-        // Handle non-200 responses
-        if (!fetchResponse.ok) {
-          const errorText = await fetchResponse.text();
-          console.error(`LlamaAPI error (${fetchResponse.status}): ${errorText}`);
-          
-          throw new Error(`LlamaAPI returned status ${fetchResponse.status}: ${errorText}`);
-        } else {
-          // Parse the successful response
-          response = await fetchResponse.json();
-          console.log(`LlamaAPI response received successfully`);
-        }
-      } catch (fetchError) {
-        lastError = fetchError;
-        console.error(`Fetch error (attempt ${retryCount + 1}/${maxRetries + 1}): ${fetchError.message}`);
-        
-        // Check if this is a network error
-        const isNetwork = isNetworkError(fetchError);
-        if (isNetwork) {
-          console.log("Network-related error detected");
-        }
-        
-        // Continue with the retry loop
-        if (retryCount < maxRetries) {
-          const backoffMs = Math.pow(2, retryCount + 1) * 1000; // 2s, 4s, 8s
-          console.log(`Waiting ${backoffMs}ms before retry ${retryCount + 1}`);
-          await delay(backoffMs);
-        }
+          body: JSON.stringify({
+            model: "llama-3-8b-8192",
+            messages: [
+              {
+                role: "system",
+                content: systemPrompt
+              },
+              ...conversationHistory
+            ],
+            temperature: 0.7,
+            max_tokens: 800
+          }),
+        },
+        4,  // 4 retry attempts
+        500  // starting backoff of 500ms
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error("API error:", data);
+        throw new Error(`API error: ${JSON.stringify(data)}`);
       }
+
+      const reply = data.choices?.[0]?.message?.content || "";
+
+      if (!reply) {
+        throw new Error("Empty response from API");
+      }
+
+      return new Response(
+        JSON.stringify({ response: reply }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    } catch (error) {
+      console.error("Error calling LlamaAPI:", error);
       
-      retryCount++;
-    }
-    
-    // If we have an error after all retries, use fallback
-    if (!response) {
-      const isNetworkIssue = lastError && isNetworkError(lastError);
-      const errorType = isNetworkIssue ? "network" : "api";
-      const errorMsg = lastError ? lastError.message : "Unknown error occurred";
-      
-      console.error(`Failed after ${maxRetries} retries: ${errorMsg}`);
-      console.log(`Using fallback response with error type: ${errorType}`);
+      // Check if the error is network-related
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      const isNetworkError = 
+        errorMsg.includes("network") || 
+        errorMsg.includes("fetch") || 
+        errorMsg.includes("connection") ||
+        errorMsg.includes("ECONNREFUSED") ||
+        errorMsg.includes("ETIMEDOUT") ||
+        errorMsg.includes("aborted") ||
+        errorMsg.includes("timeout");
       
       return new Response(
-        JSON.stringify({ 
-          error: errorMsg,
-          errorType: errorType, 
+        JSON.stringify({
+          error: `Error calling LlamaAPI: ${errorMsg}`,
+          errorType: isNetworkError ? "network" : "api",
           fallbackResponse: getFallbackResponse()
         }),
-        { 
-          status: 502, // Bad Gateway for network issues
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        }
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    // Extract the assistant's response
-    const assistantResponse = response.choices[0].message.content;
-    console.log(`Assistant response generated (${assistantResponse.length} chars)`);
-
-    // Return the response
-    return new Response(
-      JSON.stringify({ response: assistantResponse }),
-      { 
-        headers: { 
-          ...corsHeaders,
-          "Content-Type": "application/json" 
-        }
-      }
-    );
   } catch (error) {
-    console.error("Error in mental-health-chat-llama function:", error.message);
-    
-    // Check if this is a network-related error
-    const isNetworkIssue = isNetworkError(error);
-    
-    // Provide a helpful response to the client with specific error type
+    console.error("Unexpected error:", error);
     return new Response(
       JSON.stringify({ 
-        error: error.message || "Erro interno no processamento da solicitação",
-        errorType: isNetworkIssue ? "network" : "api",
+        error: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
         fallbackResponse: getFallbackResponse()
       }),
-      { 
-        status: 500,
-        headers: { 
-          ...corsHeaders, 
-          "Content-Type": "application/json" 
-        }
-      }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

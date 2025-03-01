@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,8 +25,16 @@ export const MentalHealthChat = () => {
   const [retryCount, setRetryCount] = useState(0);
   const [networkError, setNetworkError] = useState(false);
   const [apiUrlChecked, setApiUrlChecked] = useState(false);
+  const [useGroqFallback, setUseGroqFallback] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  const fallbackResponses = [
+    "Estou com dificuldades técnicas no momento. Se você está passando por uma situação difícil, considere conversar com alguém de confiança ou buscar ajuda profissional. Voltarei a funcionar normalmente assim que possível.",
+    "Parece que estou enfrentando problemas de conexão. Enquanto isso, lembre-se que praticar respiração profunda e exercícios de atenção plena podem ajudar em momentos de ansiedade.",
+    "Desculpe pela interrupção. Nossos sistemas estão tendo dificuldades. Neste meio tempo, considere escrever seus pensamentos em um diário ou praticar uma atividade que lhe traga calma.",
+    "Não estou conseguindo me conectar aos servidores. Durante esta pausa, você poderia experimentar técnicas de auto-cuidado como tomar um copo de água, fazer uma caminhada curta ou praticar respiração profunda."
+  ];
 
   useEffect(() => {
     scrollToBottom();
@@ -35,6 +42,31 @@ export const MentalHealthChat = () => {
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const getFallbackResponse = () => {
+    const index = Math.min(retryCount, fallbackResponses.length - 1);
+    return fallbackResponses[index];
+  };
+
+  const switchToGroq = () => {
+    setUseGroqFallback(true);
+    setNetworkError(false);
+    setErrorMessage(null);
+    toast({
+      title: "Alternando para API secundária",
+      description: "Tentaremos usar um serviço alternativo para processar sua mensagem.",
+    });
+    
+    if (input) {
+      handleSubmit();
+    } else {
+      const lastUserMessageIndex = [...messages].reverse().findIndex(m => m.role === "user");
+      if (lastUserMessageIndex !== -1) {
+        const lastUserMessage = messages[messages.length - 1 - lastUserMessageIndex];
+        setInput(lastUserMessage.content);
+      }
+    }
   };
 
   const handleSubmit = async (e?: React.FormEvent) => {
@@ -50,13 +82,12 @@ export const MentalHealthChat = () => {
     setIsLoading(true);
 
     try {
-      // Calculate how many messages to send based on retry count
-      // If we've retried multiple times, reduce the history to avoid token issues
       const historyLimit = Math.max(3, 6 - retryCount);
       const historyToSend = messages.slice(-historyLimit);
       
-      // Using the LlamaAPI with Nous-Hermes-2-Mixtral-8x7B-DPO model
-      const { data, error } = await supabase.functions.invoke("mental-health-chat-llama", {
+      const endpoint = useGroqFallback ? "groq-chat" : "mental-health-chat-llama";
+      
+      const { data, error } = await supabase.functions.invoke(endpoint, {
         body: { 
           message: input,
           history: historyToSend
@@ -70,7 +101,7 @@ export const MentalHealthChat = () => {
             error.message?.includes("sending request")) {
           setNetworkError(true);
         }
-        throw new Error(error.message || "Erro ao chamar a função mental-health-chat-llama");
+        throw new Error(error.message || `Erro ao chamar a função ${endpoint}`);
       }
 
       if (!data) {
@@ -80,19 +111,24 @@ export const MentalHealthChat = () => {
       if (data?.error) {
         console.error("Erro na resposta da função:", data.error);
         
-        // Check if this is a network-related error
         if (data.errorType === "network") {
           setNetworkError(true);
+          
+          if (!useGroqFallback) {
+            toast({
+              title: "Problemas de conexão detectados",
+              description: "Podemos tentar uma API alternativa. Clique no botão 'Usar serviço alternativo'.",
+              duration: 8000,
+            });
+          }
         }
         
         if (data.fallbackResponse) {
-          // If we have a fallback response from the edge function, use it
           setMessages((prev) => [
             ...prev,
             { role: "assistant", content: data.fallbackResponse },
           ]);
           
-          // Also show a toast about connectivity issues
           toast({
             title: "Problemas de conexão detectados",
             description: "Estamos enfrentando dificuldades para acessar nossos servidores de IA. Fornecemos uma resposta alternativa.",
@@ -102,7 +138,6 @@ export const MentalHealthChat = () => {
           throw new Error(data.error);
         }
       } else if (data?.response) {
-        // Validate response is not empty
         if (!data.response.trim()) {
           throw new Error("A resposta recebida está vazia");
         }
@@ -112,15 +147,20 @@ export const MentalHealthChat = () => {
           { role: "assistant", content: data.response },
         ]);
         
-        // Reset retry count on successful response
         setRetryCount(0);
+        
+        if (useGroqFallback) {
+          toast({
+            title: "Serviço alternativo funcionando",
+            description: "Continuaremos usando o serviço alternativo para processar suas mensagens.",
+          });
+        }
       } else {
         throw new Error("Resposta não recebida");
       }
     } catch (error) {
       console.error("Erro ao enviar mensagem:", error);
       
-      // Check for network-related errors
       const errorMsg = error instanceof Error ? error.message : String(error);
       const isNetworkError = 
         errorMsg.includes("network") || 
@@ -141,6 +181,16 @@ export const MentalHealthChat = () => {
         );
       }
       
+      if (retryCount > 0) {
+        setMessages((prev) => [
+          ...prev,
+          { 
+            role: "assistant", 
+            content: getFallbackResponse()
+          },
+        ]);
+      }
+      
       toast({
         title: "Erro na comunicação",
         description: isNetworkError 
@@ -148,6 +198,8 @@ export const MentalHealthChat = () => {
           : "Não foi possível obter resposta do modelo. Tente novamente mais tarde.",
         variant: "destructive",
       });
+      
+      setRetryCount((prev) => prev + 1);
     } finally {
       setIsLoading(false);
     }
@@ -158,14 +210,12 @@ export const MentalHealthChat = () => {
     setErrorMessage(null);
     setNetworkError(false);
     
-    // Find the last user message
     const lastUserMessageIndex = [...messages].reverse().findIndex(m => m.role === "user");
     
     if (lastUserMessageIndex !== -1) {
       const lastUserMessage = messages[messages.length - 1 - lastUserMessageIndex];
       setInput(lastUserMessage.content);
       
-      // If we've already retried multiple times, truncate the conversation history
       if (retryCount > 1) {
         const reducedMessages = messages.slice(0, Math.max(2, messages.length - retryCount * 2));
         setMessages(reducedMessages);
@@ -179,7 +229,6 @@ export const MentalHealthChat = () => {
     }
   };
 
-  // Check if API key is set
   const checkApiConfiguration = async () => {
     if (apiUrlChecked) return;
     
@@ -200,7 +249,6 @@ export const MentalHealthChat = () => {
     }
   };
 
-  // Check API configuration on component mount
   useEffect(() => {
     checkApiConfiguration();
   }, []);
@@ -251,16 +299,29 @@ export const MentalHealthChat = () => {
             ) : (
               <AlertTriangle className="h-4 w-4" />
             )}
-            <AlertDescription className="flex items-center justify-between">
+            <AlertDescription className="flex flex-col space-y-2">
               <span>{errorMessage}</span>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="ml-2 bg-transparent" 
-                onClick={handleRetry}
-              >
-                <RefreshCw className="h-4 w-4 mr-1" /> Tentar novamente
-              </Button>
+              <div className="flex space-x-2 mt-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="bg-transparent" 
+                  onClick={handleRetry}
+                >
+                  <RefreshCw className="h-4 w-4 mr-1" /> Tentar novamente
+                </Button>
+                
+                {networkError && !useGroqFallback && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="bg-transparent" 
+                    onClick={switchToGroq}
+                  >
+                    <Network className="h-4 w-4 mr-1" /> Usar serviço alternativo
+                  </Button>
+                )}
+              </div>
             </AlertDescription>
           </Alert>
         )}
