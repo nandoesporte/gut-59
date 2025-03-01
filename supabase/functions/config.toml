@@ -12,4 +12,3 @@ verify_jwt = false
 
 [functions.generate-rehab-plan-groq]
 verify_jwt = false
-

@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { DietaryPreferences, ProtocolFood } from "../types";
@@ -190,6 +191,7 @@ export const generateMealPlan = async ({
         setTimeout(() => reject(new Error("Timeout na chamada à Edge Function Groq")), edgeFunctionTimeout);
       });
       
+      // ALTERAÇÃO PRINCIPAL: Chamar a edge function Groq em vez da OpenAI
       // Corrida entre o timeout e a chamada à Edge Function
       const result = await Promise.race([
         supabase.functions.invoke('generate-meal-plan-groq', { body: enhancedPayload }),
