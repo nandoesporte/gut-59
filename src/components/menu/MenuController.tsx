@@ -26,6 +26,13 @@ const mapGoalToDbValue = (goal: string | undefined): "maintain" | "lose_weight" 
   }
 };
 
+// Interface para os dados retornados da consulta ao banco
+interface NutritionPreferences {
+  id?: string;
+  selected_foods?: string[];
+  food_by_meal_type?: Record<string, string[]>;
+}
+
 export const useMenuController = () => {
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [dietaryPreferences, setDietaryPreferences] = useState<DietaryPreferences | null>(null);
@@ -68,9 +75,11 @@ export const useMenuController = () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
+        // Modificação para lidar com a possibilidade de que o campo food_by_meal_type ainda não exista
+        // no banco de dados. Verificamos apenas selected_foods inicialmente.
         const { data: nutritionPrefs, error } = await supabase
           .from('nutrition_preferences')
-          .select('selected_foods, food_by_meal_type')
+          .select('selected_foods')
           .eq('user_id', user.id)
           .maybeSingle();
 
@@ -86,14 +95,9 @@ export const useMenuController = () => {
               handleFoodSelection(foodId);
             }
           });
-        }
-        
-        // Se temos alimentos categorizados por refeição, usamos essa estrutura
-        if (nutritionPrefs?.food_by_meal_type && typeof nutritionPrefs.food_by_meal_type === 'object') {
-          console.log('Carregando preferências de alimentos categorizadas por refeição:', nutritionPrefs.food_by_meal_type);
-        } else {
-          // Se não temos, categorizamos os alimentos existentes
-          if (nutritionPrefs?.selected_foods && nutritionPrefs.selected_foods.length > 0) {
+          
+          // Categorizar os alimentos existentes
+          if (nutritionPrefs.selected_foods.length > 0) {
             categorizeFoodsByMealType(protocolFoods);
           }
         }
@@ -155,8 +159,7 @@ export const useMenuController = () => {
                 activity_level: activityLevel,
                 goal: goal,
                 calories_needed: calories,
-                selected_foods: selectedFoods,
-                food_by_meal_type: foodsByMealType
+                selected_foods: selectedFoods
               })
               .eq('id', existingRecord.id);
             
@@ -179,8 +182,7 @@ export const useMenuController = () => {
                 activity_level: activityLevel,
                 goal: goal,
                 calories_needed: calories,
-                selected_foods: selectedFoods,
-                food_by_meal_type: foodsByMealType
+                selected_foods: selectedFoods
               });
             
             if (error) {
@@ -247,11 +249,11 @@ export const useMenuController = () => {
       if (recentPrefs?.id) {
         console.log("Encontrado registro existente. Atualizando ID:", recentPrefs.id);
         // Atualizar o registro existente
+        // Nota: Removido o campo food_by_meal_type até que seja adicionado ao banco de dados
         const { error: updateError } = await supabase
           .from('nutrition_preferences')
           .update({ 
-            selected_foods: selectedFoods,
-            food_by_meal_type: foodsByMealType
+            selected_foods: selectedFoods
           })
           .eq('id', recentPrefs.id);
 
@@ -292,7 +294,6 @@ export const useMenuController = () => {
           .insert({
             user_id: user.id,
             selected_foods: selectedFoods,
-            food_by_meal_type: foodsByMealType,
             weight: Number(formData.weight) || 70, // Usar valor do formulário se disponível
             height: Number(formData.height) || 170,
             age: Number(formData.age) || 30,
