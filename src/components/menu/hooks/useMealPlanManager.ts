@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,9 +20,9 @@ const saveMealPlanData = async (
     
     const { error } = await supabase.from('meal_plans').insert({
       user_id: userId,
-      meal_plan: mealPlan,
-      calorie_needs: calorieNeeds,
-      preferences: preferences
+      plan_data: mealPlan,
+      calories: calorieNeeds,
+      dietary_preferences: preferences
     });
     
     if (error) {
