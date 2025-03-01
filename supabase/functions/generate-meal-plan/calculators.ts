@@ -1,153 +1,210 @@
 
-import type { MacroTargets } from "./types.ts";
+export function calculateHarrisBenedict(
+  weight: number,
+  height: number,
+  age: number,
+  gender: string,
+  activityFactor: number
+): number {
+  let bmr;
+  if (gender === 'male') {
+    bmr = 66 + (13.7 * weight) + (5 * height) - (6.8 * age);
+  } else {
+    bmr = 655 + (9.6 * weight) + (1.8 * height) - (4.7 * age);
+  }
+  return Math.round(bmr * activityFactor);
+}
 
-/**
- * Calculates daily calorie needs using the Mifflin-St Jeor equation
- * @param weight Weight in kg
- * @param height Height in cm
- * @param age Age in years
- * @param gender 'male' or 'female'
- * @param activityLevel Activity level factor
- * @returns Estimated daily calories
- */
+export function calculateMifflinStJeor(
+  weight: number,
+  height: number,
+  age: number,
+  gender: string,
+  activityFactor: number
+): number {
+  let bmr;
+  if (gender === 'male') {
+    bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5;
+  } else {
+    bmr = (10 * weight) + (6.25 * height) - (5 * age) - 161;
+  }
+  return Math.round(bmr * activityFactor);
+}
+
 export function calculateDailyCalories(
   weight: number,
   height: number,
   age: number,
   gender: string,
-  activityLevel: string
+  activityLevel: string,
+  goal: string
 ): number {
-  // Base metabolic rate (BMR) calculation using Mifflin-St Jeor Equation
-  let bmr = 10 * weight + 6.25 * height - 5 * age;
-  
-  // Gender adjustment
-  if (gender === 'male') {
-    bmr += 5;
-  } else {
-    bmr -= 161;
-  }
-  
-  // Activity level multiplier
-  const activityMultipliers: Record<string, number> = {
-    'sedentary': 1.2,      // Little or no exercise
-    'light': 1.375,        // Light exercise 1-3 days/week
-    'moderate': 1.55,      // Moderate exercise 3-5 days/week
-    'active': 1.725,       // Hard exercise 6-7 days/week
-    'very_active': 1.9     // Very hard exercise & physical job or 2x training
+  // Mapear níveis de atividade para fatores
+  const activityFactors: {[key: string]: number} = {
+    sedentary: 1.2,      // Pouco ou nenhum exercício
+    light: 1.375,        // Exercício leve (1-3 dias por semana)
+    moderate: 1.55,      // Exercício moderado (3-5 dias por semana)
+    active: 1.725,       // Exercício intenso (6-7 dias por semana)
+    very_active: 1.9     // Exercício muito intenso (2x por dia, treinos intensos)
   };
   
-  const multiplier = activityMultipliers[activityLevel] || 1.55; // Default to moderate if not specified
+  // Obter fator de atividade apropriado ou usar valor padrão
+  const activityFactor = activityFactors[activityLevel] || 1.55;
   
-  return Math.round(bmr * multiplier);
+  // Calcular necessidades calóricas básicas usando Mifflin-St Jeor
+  const bmr = calculateMifflinStJeor(weight, height, age, gender, 1.0);
+  const maintenanceCalories = bmr * activityFactor;
+  
+  // Ajustar com base no objetivo
+  switch (goal) {
+    case 'lose_weight':
+      return Math.round(maintenanceCalories * 0.85); // Déficit de 15%
+    case 'gain_weight':
+      return Math.round(maintenanceCalories * 1.15); // Superávit de 15%
+    case 'maintain':
+    default:
+      return Math.round(maintenanceCalories);
+  }
 }
 
-/**
- * Calculates macro targets based on user data and goal
- * @param userData User data including weight, height, age, gender, etc.
- * @returns Object with protein, carbs, and fat targets in grams
- */
-export function calculateMacroTargets(userData: any): MacroTargets {
-  // Use provided daily calories or calculate them
-  const dailyCalories = userData.dailyCalories || 
-    calculateDailyCalories(
-      userData.weight,
-      userData.height,
-      userData.age,
-      userData.gender,
-      userData.activityLevel || 'moderate'
-    );
-  
-  // Adjust calories based on goal
-  let adjustedCalories = dailyCalories;
-  
-  if (userData.goal === 'lose_weight') {
-    adjustedCalories = Math.round(dailyCalories * 0.85); // 15% deficit for weight loss
-  } else if (userData.goal === 'gain_weight' || userData.goal === 'gain_mass') {
-    adjustedCalories = Math.round(dailyCalories * 1.1); // 10% surplus for weight gain
+export function adjustCaloriesForGoal(baseCalories: number, goal: string): number {
+  switch (goal) {
+    case 'lose':
+      return baseCalories - 500; // Déficit calórico para perda
+    case 'gain':
+      return baseCalories + 500; // Superávit calórico para ganho
+    default:
+      return baseCalories; // Manutenção
   }
+}
+
+export function calculateMacroDistribution(calories: number, goal: string, weight: number) {
+  // Proteína baseada no peso corporal
+  const proteinPerKg = {
+    lose: 2.2,    // Maior proteína para preservar massa
+    maintain: 1.8,
+    gain: 2.0     // Alto para suporte ao ganho muscular
+  };
+
+  const baseProtein = Math.round(weight * (proteinPerKg[goal as keyof typeof proteinPerKg] || 1.8));
+  const proteinCalories = baseProtein * 4;
   
-  // Default macro distribution (balanced)
-  let proteinPercentage = 0.3; // 30% of calories from protein
-  let carbsPercentage = 0.4;   // 40% of calories from carbs
-  let fatsPercentage = 0.3;    // 30% of calories from fats
+  let carbsPercentage, fatsPercentage;
   
-  // Adjust macros based on goal
-  if (userData.goal === 'lose_weight') {
-    // Higher protein, moderate fat, lower carb for weight loss
-    proteinPercentage = 0.35;
-    carbsPercentage = 0.35;
-    fatsPercentage = 0.3;
-  } else if (userData.goal === 'gain_weight' || userData.goal === 'gain_mass') {
-    // Higher carb, moderate protein, moderate fat for muscle gain
-    proteinPercentage = 0.25;
-    carbsPercentage = 0.5;
-    fatsPercentage = 0.25;
+  switch (goal) {
+    case 'lose':
+      carbsPercentage = 0.40; // 40% carbs
+      fatsPercentage = 0.25;  // 25% gorduras
+      break;
+    case 'gain':
+      carbsPercentage = 0.50; // 50% carbs
+      fatsPercentage = 0.20;  // 20% gorduras
+      break;
+    default:
+      carbsPercentage = 0.45; // 45% carbs
+      fatsPercentage = 0.25;  // 25% gorduras
   }
-  
-  // Calculate grams of each macro
-  // Protein: 4 calories per gram
-  // Carbs: 4 calories per gram
-  // Fat: 9 calories per gram
-  const proteinGrams = Math.round((adjustedCalories * proteinPercentage) / 4);
-  const carbsGrams = Math.round((adjustedCalories * carbsPercentage) / 4);
-  const fatsGrams = Math.round((adjustedCalories * fatsPercentage) / 9);
-  
-  // Calculate fiber target (general recommendation: 14g per 1000 calories)
-  const fiberGrams = Math.round(adjustedCalories * 0.014);
-  
+
+  const remainingCalories = calories - proteinCalories;
+  const carbCalories = Math.round(calories * carbsPercentage);
+  const fatCalories = Math.round(calories * fatsPercentage);
+
   return {
-    calories: adjustedCalories,
-    protein: proteinGrams,
-    carbs: carbsGrams,
-    fats: fatsGrams,
-    fiber: fiberGrams
+    protein: baseProtein,
+    carbs: Math.round(carbCalories / 4),
+    fats: Math.round(fatCalories / 9),
+    fiber: Math.round(calories / 1000 * 14) // 14g de fibra por 1000kcal
   };
 }
 
-/**
- * Calculates BMI (Body Mass Index)
- * @param weight Weight in kg
- * @param height Height in cm
- * @returns BMI value
- */
-export function calculateBMI(weight: number, height: number): number {
-  // Convert height from cm to meters
-  const heightInMeters = height / 100;
-  // BMI formula: weight (kg) / (height (m))^2
-  return weight / (heightInMeters * heightInMeters);
+export interface Food {
+  id: string;
+  name: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  fiber: number;
+  serving_size: number;
+  serving_unit: string;
+  food_group_id: number;
 }
 
-/**
- * Gets BMI category based on BMI value
- * @param bmi BMI value
- * @returns BMI category description
- */
-export function getBMICategory(bmi: number): string {
-  if (bmi < 18.5) return "Abaixo do peso";
-  if (bmi < 25) return "Peso normal";
-  if (bmi < 30) return "Sobrepeso";
-  if (bmi < 35) return "Obesidade Grau I";
-  if (bmi < 40) return "Obesidade Grau II";
-  return "Obesidade Grau III";
+export interface FoodWithPortion extends Food {
+  portion: number;
+  portionUnit: string;
+  calculatedNutrients: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fats: number;
+    fiber: number;
+  };
 }
 
-/**
- * Calculates Basal Metabolic Rate using Harris-Benedict Equation
- * @param weight Weight in kg
- * @param height Height in cm
- * @param age Age in years
- * @param gender 'male' or 'female'
- * @returns BMR value in calories
- */
-export function calculateBMR(
-  weight: number,
-  height: number,
-  age: number,
-  gender: string
-): number {
-  if (gender === 'male') {
-    return 88.362 + (13.397 * weight) + (4.799 * height) - (5.677 * age);
-  } else {
-    return 447.593 + (9.247 * weight) + (3.098 * height) - (4.330 * age);
+export interface MacroTargets {
+  protein: number;
+  carbs: number;
+  fats: number;
+  fiber: number;
+}
+
+export function calculatePortion(
+  food: Food,
+  targetCalories: number,
+  macroTargets: MacroTargets
+): FoodWithPortion {
+  const caloriesPerGram = food.calories / food.serving_size;
+  let portion = (targetCalories / caloriesPerGram);
+
+  // Ajustar porção baseado nos macros
+  if (food.protein) {
+    const proteinPortion = (macroTargets.protein / food.protein) * food.serving_size;
+    portion = Math.min(portion, proteinPortion);
   }
+  
+  if (food.carbs) {
+    const carbsPortion = (macroTargets.carbs / food.carbs) * food.serving_size;
+    portion = Math.min(portion, carbsPortion);
+  }
+
+  portion = Math.round(portion);
+
+  return {
+    ...food,
+    portion,
+    portionUnit: food.serving_unit,
+    calculatedNutrients: {
+      calories: Math.round((food.calories / food.serving_size) * portion),
+      protein: Math.round((food.protein / food.serving_size) * portion),
+      carbs: Math.round((food.carbs / food.serving_size) * portion),
+      fats: Math.round((food.fats / food.serving_size) * portion),
+      fiber: Math.round((food.fiber / food.serving_size) * portion)
+    }
+  };
+}
+
+export function validateNutrition(
+  foods: FoodWithPortion[],
+  macroTargets: MacroTargets
+): boolean {
+  const totals = foods.reduce(
+    (acc, food) => ({
+      calories: acc.calories + food.calculatedNutrients.calories,
+      protein: acc.protein + food.calculatedNutrients.protein,
+      carbs: acc.carbs + food.calculatedNutrients.carbs,
+      fats: acc.fats + food.calculatedNutrients.fats,
+      fiber: acc.fiber + food.calculatedNutrients.fiber
+    }),
+    { calories: 0, protein: 0, carbs: 0, fats: 0, fiber: 0 }
+  );
+
+  const tolerancePercentage = 0.1; // 10% de tolerância
+
+  return (
+    Math.abs(totals.protein - macroTargets.protein) / macroTargets.protein <= tolerancePercentage &&
+    Math.abs(totals.carbs - macroTargets.carbs) / macroTargets.carbs <= tolerancePercentage &&
+    Math.abs(totals.fats - macroTargets.fats) / macroTargets.fats <= tolerancePercentage &&
+    totals.fiber >= macroTargets.fiber
+  );
 }

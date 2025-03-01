@@ -19,7 +19,6 @@ interface MealPlanGenerationProps {
     dailyCalories: number;
   };
   selectedFoods: ProtocolFood[];
-  foodsByMealType?: Record<string, string[]>; // Alimentos categorizados por refeição
   preferences: DietaryPreferences;
   addTransaction: UseMutateFunction<void, Error, {
     amount: number;
@@ -30,50 +29,9 @@ interface MealPlanGenerationProps {
   }>;
 }
 
-// Interface para a resposta da edge function
-interface EdgeFunctionResponse {
-  mealPlan: any;
-  [key: string]: any;
-}
-
-// Interface for meal plan data to save
-interface MealPlanSaveData {
-  user_id: string;
-  meal_plan: object;
-  daily_calories: number;
-  preferences: object;
-}
-
-// Function to save meal plan to database
-const saveMealPlanData = async (
-  userId: string, 
-  mealPlan: any, 
-  dailyCalories: number, 
-  preferences: DietaryPreferences
-) => {
-  try {
-    const { error } = await supabase
-      .from('meal_plans')
-      .insert({
-        user_id: userId,
-        meal_plan: JSON.stringify(mealPlan),
-        daily_calories: dailyCalories,
-        preferences: JSON.stringify(preferences)
-      });
-      
-    if (error) throw error;
-    
-    return true;
-  } catch (error) {
-    console.error('[MEAL PLAN] Error saving plan data:', error);
-    return false;
-  }
-};
-
 export const generateMealPlan = async ({
   userData,
   selectedFoods,
-  foodsByMealType,
   preferences,
   addTransaction
 }: MealPlanGenerationProps) => {
@@ -90,7 +48,6 @@ export const generateMealPlan = async ({
       dailyCalories: userData.dailyCalories
     });
     console.log('[MEAL PLAN] Preferências:', JSON.stringify(preferences, null, 2));
-    console.log('[MEAL PLAN] Alimentos por refeição:', foodsByMealType);
     
     // Tentar enriquecer os dados nutricionais dos alimentos selecionados
     console.log('[MEAL PLAN] Verificando dados nutricionais precisos...');
@@ -126,9 +83,8 @@ export const generateMealPlan = async ({
       // Continuar com os dados originais
     }
 
-    // Garantir que todos os IDs são strings
     const selectedFoodsDetails = enhancedFoods.map(food => ({
-      id: String(food.id), // Garantir que o ID é uma string
+      id: food.id,
       name: food.name,
       calories: food.calories,
       protein: food.protein || 0,
@@ -143,9 +99,7 @@ export const generateMealPlan = async ({
 
     console.log(`[MEAL PLAN] Total de alimentos selecionados: ${selectedFoodsDetails.length}`);
     selectedFoodsDetails.forEach((food, index) => {
-      if (index < 5) { // Limitando o log para não sobrecarregar
-        console.log(`[MEAL PLAN] Alimento ${index + 1}: ${food.name} (${food.calories} kcal, P:${food.protein}g, C:${food.carbs}g, G:${food.fats}g)`);
-      }
+      console.log(`[MEAL PLAN] Alimento ${index + 1}: ${food.name} (${food.calories} kcal, P:${food.protein}g, C:${food.carbs}g, G:${food.fats}g)`);
     });
 
     toastId = toast.loading("Gerando seu plano alimentar personalizado...");
@@ -162,177 +116,128 @@ export const generateMealPlan = async ({
     const mappedGoal = goalMapping[userData.goal as keyof typeof goalMapping] || "maintain";
     console.log(`[MEAL PLAN] Objetivo mapeado: ${userData.goal} -> ${mappedGoal}`);
     
-    // Preparar alimentos agrupados por refeição para otimização da IA
-    const mealTypeMapping = {
-      breakfast: 'breakfast', 
-      lunch: 'lunch',
-      snack: 'snack',
-      dinner: 'dinner'
-    };
-    
-    // Organizar alimentos por refeição para enviar à edge function
-    // Garantir que foodsByMealTypeFormatted contém apenas arrays de strings como IDs de alimentos
-    const foodsByMealTypeFormatted: Record<string, any[]> = {};
-    
-    if (foodsByMealType) {
-      // Garantir que estamos recebendo apenas IDs de alimentos como strings
-      Object.entries(foodsByMealType).forEach(([mealType, foodIds]) => {
-        const mealTypeMapped = mealTypeMapping[mealType as keyof typeof mealTypeMapping] || mealType;
-        
-        // Validar a estrutura de foodIds
-        if (Array.isArray(foodIds)) {
-          // Filtrar apenas os IDs que existem na lista de alimentos selecionados
-          // e garantir que tudo seja string
-          const validFoodIds = foodIds.map(id => String(id))
-                                   .filter(id => selectedFoodsDetails.some(food => String(food.id) === id));
-              
-          // Buscar os detalhes completos dos alimentos usando os IDs
-          foodsByMealTypeFormatted[mealTypeMapped] = selectedFoodsDetails.filter(food => 
-            validFoodIds.includes(String(food.id))
-          );
-          
-          console.log(`[MEAL PLAN] Refeição ${mealType} tem ${foodsByMealTypeFormatted[mealTypeMapped].length} alimentos válidos`);
-        } else {
-          console.warn(`[MEAL PLAN] foodsByMealType[${mealType}] não é um array:`, foodIds);
-          foodsByMealTypeFormatted[mealTypeMapped] = [];
-        }
-      });
-    } else {
-      // Categorização automática baseada no food_group_id se não tivermos categorizados
-      foodsByMealTypeFormatted.breakfast = selectedFoodsDetails.filter(food => food.food_group_id === 1);
-      foodsByMealTypeFormatted.lunch = selectedFoodsDetails.filter(food => food.food_group_id === 2);
-      foodsByMealTypeFormatted.snack = selectedFoodsDetails.filter(food => food.food_group_id === 3);
-      foodsByMealTypeFormatted.dinner = selectedFoodsDetails.filter(food => food.food_group_id === 4);
-    }
-    
-    console.log('[MEAL PLAN] Alimentos formatados por refeição:', 
-      Object.entries(foodsByMealTypeFormatted).map(([type, foods]) => 
-        `${type}: ${foods.length} alimentos`
-      )
-    );
-    
-    // Debug para verificar a estrutura exata enviada
-    for (const mealType in foodsByMealTypeFormatted) {
-      console.log(`[MEAL PLAN] Verificando estrutura da refeição ${mealType}:`);
-      if (foodsByMealTypeFormatted[mealType].length > 0) {
-        console.log(`Primeiro item: ${JSON.stringify(foodsByMealTypeFormatted[mealType][0])}`);
-      } else {
-        console.log('Nenhum alimento nesta refeição');
-      }
-    }
-    
-    // Melhorar a solicitação enviada à edge function com alimentos organizados por refeição
-    const enhancedPayload = {
+    const payload = {
       userData: {
-        id: userData.id, // Garantir que o ID do usuário está incluído
-        weight: Math.round(userData.weight),
-        height: Math.round(userData.height),
+        weight: userData.weight,
+        height: userData.height,
         age: userData.age,
-        gender: userData.gender === "male" ? "male" : "female",
-        activityLevel: userData.activityLevel || "moderate",
+        gender: userData.gender,
+        activityLevel: userData.activityLevel,
         goal: mappedGoal,
         userId: userData.id,
-        dailyCalories: Math.round(userData.dailyCalories)
+        dailyCalories: userData.dailyCalories
       },
       selectedFoods: selectedFoodsDetails,
-      foodsByMealType: foodsByMealTypeFormatted, // Enviando alimentos organizados por refeição
-      dietaryPreferences: {
-        hasAllergies: preferences.hasAllergies || false,
-        allergies: (preferences.allergies || []).slice(0, 3), // Limitar alergias
-        dietaryRestrictions: (preferences.dietaryRestrictions || []).slice(0, 3), // Limitar restrições
-        trainingTime: preferences.trainingTime
-      },
-      options: {
-        agentVersion: "nutri+",  // Sinalizar versão específica do agente
-        includeRecipes: true,    // Solicitar receitas detalhadas
-        followNutritionalGuidelines: true, // Seguir diretrizes nutricionais
-        optimizeForMacros: true, // Otimizar para macronutrientes
-        enhanceNutritionalVariety: true, // Melhorar a variedade nutricional
-        useSimplifiedTerms: false // Usar terminologia nutricional completa
-      }
+      dietaryPreferences: preferences
     };
     
-    console.log('[MEAL PLAN] Enviando payload aprimorado:', JSON.stringify(enhancedPayload.foodsByMealType, null, 2));
+    console.log('[MEAL PLAN] Enviando payload:', JSON.stringify(payload, null, 2));
     
-    // Definir timeout para capturar falhas por timeout (30 segundos - aumentado para dar mais tempo ao processamento)
-    const edgeFunctionTimeout = 30000;
+    // Usando um objeto temporário para armazenar o resultado final
+    let resultData = null;
     
-    // Implementar timeout manual com Promise.race
-    let resultData: EdgeFunctionResponse | null = null;
+    // Primeira tentativa - usar .then para evitar problemas com constantes
     try {
-      // Criar uma promessa que rejeita após o timeout
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("Timeout na chamada à Edge Function")), edgeFunctionTimeout);
+      console.log('[MEAL PLAN] Iniciando primeira tentativa');
+      const firstResult = await supabase.functions.invoke('generate-meal-plan', { 
+        body: payload 
       });
       
-      // Corrida entre o timeout e a chamada à Edge Function
-      const result = await Promise.race([
-        supabase.functions.invoke('generate-meal-plan', { body: enhancedPayload }),
-        timeoutPromise
-      ]);
+      if (firstResult.error) {
+        console.error('[MEAL PLAN] Erro na Edge Function:', firstResult.error);
+        console.error('[MEAL PLAN] Código do erro:', firstResult.error?.code);
+        console.error('[MEAL PLAN] Mensagem completa:', firstResult.error?.message);
+        throw new Error(firstResult.error.message || "Falha na chamada à Edge Function");
+      }
       
-      // Verificar se temos resultado e se ele contém um plano válido
-      if (result && 'data' in result && result.data && typeof result.data === 'object' && 'mealPlan' in result.data) {
-        console.log('[MEAL PLAN] Chamada à Edge Function bem-sucedida!');
-        resultData = result.data as EdgeFunctionResponse;
+      if (firstResult.data && firstResult.data.mealPlan) {
+        console.log('[MEAL PLAN] Primeira tentativa bem-sucedida!');
+        resultData = firstResult.data;
       } else {
-        console.error('[MEAL PLAN] Resposta da Edge Function sem dados válidos:', result);
-        throw new Error("Resposta da Edge Function inválida");
+        console.error('[MEAL PLAN] Resposta da primeira tentativa sem dados válidos');
+        throw new Error("Resposta da primeira tentativa inválida");
       }
-    } catch (edgeFunctionError) {
-      console.error('[MEAL PLAN] Erro na chamada à Edge Function:', edgeFunctionError);
+    } catch (firstAttemptError) {
+      console.error('[MEAL PLAN] Erro capturado na primeira tentativa:', firstAttemptError);
+      toast.dismiss(toastId);
+      toast.error("Falha na geração do plano. Tentando novamente...");
       
-      if (edgeFunctionError instanceof Error) {
-        console.error('[MEAL PLAN] Detalhes do erro:', edgeFunctionError.message);
-        if (edgeFunctionError.stack) {
-          console.error('[MEAL PLAN] Stack:', edgeFunctionError.stack);
+      // Tentar novamente com ajustes no payload
+      console.log('[MEAL PLAN] Tentando novamente com ajustes...');
+      
+      // Simplificar o payload para reduzir chances de erro
+      const simplifiedPayload = {
+        userData: {
+          weight: Math.round(userData.weight),
+          height: Math.round(userData.height),
+          age: userData.age,
+          gender: userData.gender === "male" ? "male" : "female",
+          activityLevel: userData.activityLevel || "moderate",
+          goal: mappedGoal,
+          userId: userData.id,
+          dailyCalories: Math.round(userData.dailyCalories)
+        },
+        selectedFoods: selectedFoodsDetails.slice(0, 30), // Limitar número de alimentos
+        dietaryPreferences: {
+          hasAllergies: preferences.hasAllergies || false,
+          allergies: (preferences.allergies || []).slice(0, 5), // Limitar alergias
+          dietaryRestrictions: (preferences.dietaryRestrictions || []).slice(0, 5), // Limitar restrições
+          trainingTime: preferences.trainingTime
         }
-      }
+      };
       
-      // Tentar uma segunda tentativa com payload simplificado
-      console.log('[MEAL PLAN] Tentando novamente com payload simplificado...');
+      console.log('[MEAL PLAN] Tentando com payload simplificado:', JSON.stringify(simplifiedPayload, null, 2));
       
-      // Tentar uma segunda chamada com payload ainda mais simplificado, mas ainda considerando alimentos por refeição
+      toastId = toast.loading("Otimizando seu plano alimentar...");
+      
+      // Segunda tentativa com payload simplificado
       try {
-        const simplifiedPayload = {
-          userData: enhancedPayload.userData,
-          selectedFoods: selectedFoodsDetails.slice(0, 15), // Reduzir para 15 alimentos
-          foodsByMealType: foodsByMealTypeFormatted, // Manter a estrutura de alimentos por refeição que é a chave para melhorar o desempenho
-          dietaryPreferences: enhancedPayload.dietaryPreferences,
-          options: {
-            agentVersion: "nutri+",
-            useSimplifiedTerms: true // Simplificar para melhorar desempenho
-          }
-        };
-        
-        const fallbackResult = await supabase.functions.invoke('generate-meal-plan', { 
+        console.log('[MEAL PLAN] Iniciando segunda tentativa');
+        const secondResult = await supabase.functions.invoke('generate-meal-plan', { 
           body: simplifiedPayload 
         });
         
-        if (fallbackResult && fallbackResult.data && fallbackResult.data.mealPlan) {
-          console.log('[MEAL PLAN] Segunda tentativa bem-sucedida!');
-          resultData = fallbackResult.data as EdgeFunctionResponse;
-        } else {
-          console.error('[MEAL PLAN] Segunda tentativa falhou:', fallbackResult);
-          throw new Error("Não foi possível gerar o plano alimentar");
+        if (secondResult.error) {
+          console.error('[MEAL PLAN] Erro na segunda tentativa:', secondResult.error);
+          toast.dismiss(toastId);
+          toast.error("Não foi possível gerar seu plano personalizado. Por favor, tente novamente.");
+          throw new Error(secondResult.error.message || "Falha na segunda tentativa");
         }
-      } catch (fallbackError) {
-        console.error('[MEAL PLAN] Erro na segunda tentativa:', fallbackError);
         
-        // Usar plano padrão quando edge function falha
-        console.log('[MEAL PLAN] Usando plano padrão devido a falha na Edge Function');
-        return createDefaultMealPlan(userData, selectedFoodsDetails, foodsByMealTypeFormatted);
+        if (!secondResult.data || !secondResult.data.mealPlan) {
+          console.error('[MEAL PLAN] Resposta inválida na segunda tentativa:', secondResult.data);
+          toast.dismiss(toastId);
+          toast.error("Resposta inválida do servidor. Por favor, tente novamente.");
+          throw new Error("Resposta inválida na segunda tentativa");
+        }
+        
+        console.log('[MEAL PLAN] Segunda tentativa bem-sucedida!');
+        resultData = secondResult.data;
+      } catch (secondAttemptError) {
+        console.error('[MEAL PLAN] Erro na segunda tentativa:', secondAttemptError);
+        toast.dismiss(toastId);
+        toast.error("Não foi possível gerar seu plano personalizado. Por favor, tente novamente.");
+        throw secondAttemptError;
       }
     }
 
-    // Verificar se o plano tem a estrutura completa esperada
-    if (!resultData || !resultData.mealPlan || !resultData.mealPlan.weeklyPlan) {
-      console.error('[MEAL PLAN] Estrutura do plano incompleta:', JSON.stringify(resultData, null, 2));
+    // Validar que temos dados resultantes
+    if (!resultData || !resultData.mealPlan) {
+      console.error('[MEAL PLAN] Resposta final inválida:', JSON.stringify(resultData, null, 2));
       toast.dismiss(toastId);
-      
-      // Usar plano padrão como fallback
-      console.log('[MEAL PLAN] Usando plano padrão como fallback para estrutura incompleta');
-      return createDefaultMealPlan(userData, selectedFoodsDetails, foodsByMealTypeFormatted);
+      toast.error("Resposta inválida do servidor. Por favor, tente novamente.");
+      throw new Error("Resposta final inválida");
+    }
+
+    console.log('[MEAL PLAN] Resposta recebida com sucesso');
+    console.log('[MEAL PLAN] Estrutura do plano:', Object.keys(resultData.mealPlan).join(', '));
+
+    // Verificar se o plano tem a estrutura esperada
+    if (!resultData.mealPlan.weeklyPlan || !resultData.mealPlan.recommendations) {
+      console.error('[MEAL PLAN] Estrutura do plano incompleta:', JSON.stringify(resultData.mealPlan, null, 2));
+      toast.dismiss(toastId);
+      toast.error("Plano gerado com estrutura incompleta. Por favor, tente novamente.");
+      throw new Error("Estrutura do plano incompleta");
     }
 
     // Verificar se todos os dias da semana estão presentes
@@ -341,7 +246,6 @@ export const generateMealPlan = async ({
     
     if (missingDays.length > 0) {
       console.error(`[MEAL PLAN] Dias ausentes no plano: ${missingDays.join(', ')}`);
-      
       // Tentar completar os dias faltantes copiando de outros dias existentes
       const availableDays = requiredDays.filter(day => resultData.mealPlan.weeklyPlan[day]);
       
@@ -356,64 +260,24 @@ export const generateMealPlan = async ({
         
         console.log('[MEAL PLAN] Dias faltantes foram complementados');
       } else {
-        // Se não houver nenhum dia para copiar, usar plano padrão
-        console.log('[MEAL PLAN] Nenhum dia válido encontrado. Usando plano padrão');
-        return createDefaultMealPlan(userData, selectedFoodsDetails, foodsByMealTypeFormatted);
+        toast.dismiss(toastId);
+        toast.error("Plano incompleto gerado. Por favor, tente novamente.");
+        throw new Error("Nenhum dia válido encontrado no plano");
       }
     }
-
-    // Garantir que as recomendações existam e estejam no formato esperado
-    if (!resultData.mealPlan.recommendations) {
-      console.log('[MEAL PLAN] Adicionando recomendações padrão ao plano');
-      resultData.mealPlan.recommendations = getDefaultRecommendations(userData.goal);
-    }
-    
-    // Conferir estrutura completa do plano para garantir exibição na UI
-    Object.keys(resultData.mealPlan.weeklyPlan).forEach(day => {
-      const dayPlan = resultData.mealPlan.weeklyPlan[day];
-      
-      // Garantir que cada dia possui todas as refeições
-      if (!dayPlan.meals) {
-        dayPlan.meals = {};
-      }
-      
-      // Verificar cada refeição
-      const requiredMeals = ['breakfast', 'morningSnack', 'lunch', 'afternoonSnack', 'dinner'];
-      requiredMeals.forEach(mealType => {
-        if (!dayPlan.meals[mealType]) {
-          console.log(`[MEAL PLAN] Adicionando refeição padrão: ${mealType} para ${day}`);
-          dayPlan.meals[mealType] = createDefaultMeal(mealType, userData.dailyCalories);
-        }
-      });
-      
-      // Garantir totais diários
-      if (!dayPlan.dailyTotals) {
-        console.log(`[MEAL PLAN] Adicionando totais diários para ${day}`);
-        dayPlan.dailyTotals = calculateDailyTotals(dayPlan.meals);
-      }
-    });
 
     // Adicionar a transação de recompensa
-    try {
-      await addTransaction({
-        amount: REWARDS.MEAL_PLAN,
-        type: 'meal_plan',
-        description: 'Geração de plano alimentar personalizado'
-      });
-      console.log('[MEAL PLAN] Transação de recompensa adicionada');
-    } catch (transactionError) {
-      console.error('[MEAL PLAN] Erro ao adicionar transação:', transactionError);
-      // Continuar mesmo com erro na transação
-    }
+    await addTransaction({
+      amount: REWARDS.MEAL_PLAN,
+      type: 'meal_plan',
+      description: 'Geração de plano alimentar personalizado'
+    });
+
+    console.log('[MEAL PLAN] Transação de recompensa adicionada');
 
     // Salvar os dados do plano
-    try {
-      await saveMealPlanData(userData.id, resultData.mealPlan, userData.dailyCalories, preferences);
-      console.log('[MEAL PLAN] Dados do plano e preferências salvos com sucesso');
-    } catch (saveError) {
-      console.error('[MEAL PLAN] Erro ao salvar plano:', saveError);
-      // Continuar mesmo com erro no salvamento
-    }
+    await saveMealPlanData(userData.id, resultData.mealPlan, userData.dailyCalories, preferences);
+    console.log('[MEAL PLAN] Dados do plano e preferências salvos com sucesso');
 
     toast.dismiss(toastId);
     toast.success(`Cardápio personalizado gerado com sucesso! +${REWARDS.MEAL_PLAN} FITs`);
@@ -432,362 +296,69 @@ export const generateMealPlan = async ({
       console.error('[MEAL PLAN] Erro não padronizado:', JSON.stringify(error, null, 2));
     }
     
-    toast.error("Não foi possível gerar o plano alimentar personalizado. Usando plano básico.");
+    toast.error("Não foi possível gerar o plano alimentar personalizado. Por favor, tente novamente mais tarde.");
+    throw error;
+  }
+};
+
+const saveMealPlanData = async (userId: string, mealPlan: any, calories: number, preferences: DietaryPreferences) => {
+  try {
+    console.log('[MEAL PLAN/DB] Iniciando salvamento das preferências dietéticas');
     
-    // Retornar um plano padrão em caso de falha
-    return createDefaultMealPlan(userData, selectedFoods, foodsByMealType ? 
-      {
-        breakfast: selectedFoods.filter(food => 
-          foodsByMealType.breakfast.includes(String(food.id))
-        ),
-        lunch: selectedFoods.filter(food => 
-          foodsByMealType.lunch.includes(String(food.id))
-        ),
-        snack: selectedFoods.filter(food => 
-          foodsByMealType.snack.includes(String(food.id))
-        ),
-        dinner: selectedFoods.filter(food => 
-          foodsByMealType.dinner.includes(String(food.id))
-        )
-      } : undefined);
-  }
-};
+    // Salvar preferências dietéticas
+    const { error: dietaryError } = await supabase
+      .from('dietary_preferences')
+      .upsert({
+        user_id: userId,
+        has_allergies: preferences.hasAllergies || false,
+        allergies: preferences.allergies || [],
+        dietary_restrictions: preferences.dietaryRestrictions || [],
+        training_time: preferences.trainingTime || null
+      });
 
-// Função para criar uma refeição padrão
-const createDefaultMeal = (mealType: string, dailyCalories: number) => {
-  const totalCals = dailyCalories || 2000;
-  let calories, protein, carbs, fats, fiber;
-  let foods = [];
-  let description = '';
-  
-  switch(mealType) {
-    case 'breakfast':
-      calories = Math.round(totalCals * 0.25);
-      protein = Math.round(calories * 0.25 / 4);
-      carbs = Math.round(calories * 0.55 / 4);
-      fats = Math.round(calories * 0.2 / 9);
-      fiber = 5;
-      foods = [
-        { name: "Pão integral", portion: 50, unit: "g", details: "Fonte de carboidratos complexos" },
-        { name: "Ovos", portion: 100, unit: "g", details: "Fonte de proteína de alta qualidade" },
-        { name: "Banana", portion: 100, unit: "g", details: "Fonte de potássio e fibras" }
-      ];
-      description = `Café da manhã balanceado com aproximadamente ${calories} calorias.`;
-      break;
-      
-    case 'morningSnack':
-      calories = Math.round(totalCals * 0.1);
-      protein = Math.round(calories * 0.2 / 4);
-      carbs = Math.round(calories * 0.6 / 4);
-      fats = Math.round(calories * 0.2 / 9);
-      fiber = 3;
-      foods = [
-        { name: "Iogurte natural", portion: 150, unit: "g", details: "Fonte de probióticos e proteínas" },
-        { name: "Frutas vermelhas", portion: 50, unit: "g", details: "Ricas em antioxidantes" }
-      ];
-      description = `Lanche leve e nutritivo com aproximadamente ${calories} calorias.`;
-      break;
-      
-    case 'lunch':
-      calories = Math.round(totalCals * 0.35);
-      protein = Math.round(calories * 0.3 / 4);
-      carbs = Math.round(calories * 0.45 / 4);
-      fats = Math.round(calories * 0.25 / 9);
-      fiber = 8;
-      foods = [
-        { name: "Arroz integral", portion: 100, unit: "g", details: "Fonte de carboidratos complexos" },
-        { name: "Feijão", portion: 80, unit: "g", details: "Fonte de proteínas vegetais e fibras" },
-        { name: "Peito de frango grelhado", portion: 120, unit: "g", details: "Proteína magra de alta qualidade" },
-        { name: "Salada verde", portion: 100, unit: "g", details: "Rica em vitaminas e minerais" }
-      ];
-      description = `Almoço completo e balanceado com aproximadamente ${calories} calorias.`;
-      break;
-      
-    case 'afternoonSnack':
-      calories = Math.round(totalCals * 0.1);
-      protein = Math.round(calories * 0.15 / 4);
-      carbs = Math.round(calories * 0.5 / 4);
-      fats = Math.round(calories * 0.35 / 9);
-      fiber = 3;
-      foods = [
-        { name: "Castanhas", portion: 30, unit: "g", details: "Fonte de gorduras saudáveis e antioxidantes" },
-        { name: "Maçã", portion: 100, unit: "g", details: "Rica em fibras e baixo índice glicêmico" }
-      ];
-      description = `Lanche da tarde nutritivo com aproximadamente ${calories} calorias.`;
-      break;
-      
-    case 'dinner':
-      calories = Math.round(totalCals * 0.2);
-      protein = Math.round(calories * 0.35 / 4);
-      carbs = Math.round(calories * 0.35 / 4);
-      fats = Math.round(calories * 0.3 / 9);
-      fiber = 6;
-      foods = [
-        { name: "Batata doce", portion: 100, unit: "g", details: "Carboidrato complexo de baixo índice glicêmico" },
-        { name: "Filé de peixe", portion: 120, unit: "g", details: "Rico em ômega-3 e proteína de alta qualidade" },
-        { name: "Legumes no vapor", portion: 100, unit: "g", details: "Ricos em fibras, vitaminas e minerais" }
-      ];
-      description = `Jantar leve e nutritivo com aproximadamente ${calories} calorias.`;
-      break;
-      
-    default:
-      calories = Math.round(totalCals * 0.15);
-      protein = Math.round(calories * 0.2 / 4);
-      carbs = Math.round(calories * 0.5 / 4);
-      fats = Math.round(calories * 0.3 / 9);
-      fiber = 4;
-      foods = [
-        { name: "Frutas", portion: 150, unit: "g", details: "Vitaminas e minerais essenciais" },
-        { name: "Grãos integrais", portion: 50, unit: "g", details: "Fonte de energia de liberação lenta" }
-      ];
-      description = `Refeição balanceada com aproximadamente ${calories} calorias.`;
-  }
-  
-  return {
-    foods,
-    calories,
-    macros: { protein, carbs, fats, fiber },
-    description
-  };
-};
-
-// Função para calcular totais diários
-const calculateDailyTotals = (meals: any) => {
-  let calories = 0;
-  let protein = 0;
-  let carbs = 0;
-  let fats = 0;
-  let fiber = 0;
-  
-  Object.values(meals).forEach((meal: any) => {
-    if (meal && meal.calories) {
-      calories += meal.calories;
-      protein += meal.macros?.protein || 0;
-      carbs += meal.macros?.carbs || 0;
-      fats += meal.macros?.fats || 0;
-      fiber += meal.macros?.fiber || 0;
+    if (dietaryError) {
+      console.error('[MEAL PLAN/DB] Erro ao salvar preferências:', dietaryError);
+      console.error('[MEAL PLAN/DB] Código:', dietaryError.code);
+      console.error('[MEAL PLAN/DB] Detalhes:', dietaryError.details);
+      console.error('[MEAL PLAN/DB] Mensagem:', dietaryError.message);
+      throw dietaryError;
     }
-  });
-  
-  return {
-    calories,
-    protein,
-    carbs,
-    fats,
-    fiber
-  };
-};
 
-// Função para obter recomendações padrão baseadas no objetivo
-const getDefaultRecommendations = (goal: string) => {
-  const generalRecs = [
-    "Mantenha-se hidratado bebendo pelo menos 2 litros de água por dia.",
-    "Tente consumir alimentos integrais em vez de processados sempre que possível.",
-    "Inclua uma variedade de frutas e vegetais coloridos em sua dieta.",
-    "Consuma proteínas de qualidade em todas as refeições principais.",
-    "Prefira gorduras saudáveis como azeite de oliva, abacate e castanhas."
-  ];
-  
-  const preworkoutRecs = "Consuma uma refeição rica em carboidratos e moderada em proteínas 1-2 horas antes do treino. Opções como batata doce com frango, pão integral com ovos ou banana com pasta de amendoim são boas escolhas.";
-  
-  const postworkoutRecs = "Após o treino, consuma uma combinação de proteínas e carboidratos para auxiliar na recuperação muscular. Whey protein com banana, iogurte com frutas ou peito de frango com arroz são excelentes opções.";
-  
-  const timingRecs = [
-    "Tome café da manhã dentro de 1 hora após acordar.",
-    "Mantenha um intervalo de 3-4 horas entre as refeições principais.",
-    "Evite refeições pesadas nas 2-3 horas antes de dormir."
-  ];
-  
-  // Adicionar recomendações específicas baseadas no objetivo
-  if (goal === "lose" || goal === "lose_weight") {
-    generalRecs.push("Crie um déficit calórico moderado, priorizando a redução de alimentos processados e açúcares.");
-    generalRecs.push("Aumente a ingestão de alimentos ricos em fibras para promover saciedade.");
-    timingRecs.push("Considere uma janela de alimentação restrita de 10-12 horas para potencializar a perda de peso.");
-  } else if (goal === "gain" || goal === "gain_weight") {
-    generalRecs.push("Aumente gradualmente a ingestão calórica, priorizando proteínas de alta qualidade.");
-    generalRecs.push("Distribua bem as refeições ao longo do dia, evitando ficar longos períodos sem se alimentar.");
-    timingRecs.push("Considere uma refeição adicional antes de dormir rica em proteínas de absorção lenta como caseína.");
-  } else {
-    generalRecs.push("Mantenha o equilíbrio energético, ajustando a ingestão calórica conforme seu nível de atividade diária.");
-    generalRecs.push("Priorize a variedade alimentar para garantir a ingestão adequada de todos os nutrientes.");
-  }
-  
-  return {
-    general: generalRecs.join(" "),
-    preworkout: preworkoutRecs,
-    postworkout: postworkoutRecs,
-    timing: timingRecs
-  };
-};
+    console.log('[MEAL PLAN/DB] Preferências dietéticas salvas com sucesso');
 
-// Função para criar um plano de refeição padrão de fallback
-const createDefaultMealPlan = (
-  userData: MealPlanGenerationProps['userData'], 
-  selectedFoods: any[],
-  foodsByMealType?: Record<string, any[]>
-) => {
-  console.log('[MEAL PLAN] Criando plano padrão de fallback com', userData.dailyCalories, 'calorias/dia');
-  
-  const dailyCalories = userData.dailyCalories || 2000;
-  
-  // Cálculo básico de macronutrientes
-  const protein = Math.round(dailyCalories * 0.3 / 4); // 30% proteína (4 cal/g)
-  const carbs = Math.round(dailyCalories * 0.45 / 4);  // 45% carboidratos (4 cal/g)
-  const fats = Math.round(dailyCalories * 0.25 / 9);   // 25% gorduras (9 cal/g)
-  
-  // Distribuição por refeição
-  const breakfastCals = Math.round(dailyCalories * 0.25);
-  const lunchCals = Math.round(dailyCalories * 0.35);
-  const dinnerCals = Math.round(dailyCalories * 0.25);
-  const snackCals = Math.round(dailyCalories * 0.15);
-  
-  // Criar um plano semanal padrão
-  const weeklyPlan: any = {};
-  
-  const dayNames = {
-    monday: "Segunda-feira",
-    tuesday: "Terça-feira",
-    wednesday: "Quarta-feira",
-    thursday: "Quinta-feira",
-    friday: "Sexta-feira",
-    saturday: "Sábado",
-    sunday: "Domingo"
-  };
-  
-  // Inicializar comida por tipo de refeição
-  const foodsForBreakfast = foodsByMealType?.breakfast || 
-    selectedFoods.filter(food => food.food_group_id === 1);
-  const foodsForLunch = foodsByMealType?.lunch || 
-    selectedFoods.filter(food => food.food_group_id === 2);
-  const foodsForSnack = foodsByMealType?.snack || 
-    selectedFoods.filter(food => food.food_group_id === 3);
-  const foodsForDinner = foodsByMealType?.dinner || 
-    selectedFoods.filter(food => food.food_group_id === 4);
-    
-  // Usar alimentos categorizados por refeição quando disponíveis
-  console.log('[MEAL PLAN] Usando alimentos categorizados para o plano padrão:', {
-    breakfast: foodsForBreakfast.length,
-    lunch: foodsForLunch.length, 
-    snack: foodsForSnack.length,
-    dinner: foodsForDinner.length
-  });
-  
-  // Seleção de alimentos para o plano padrão por refeição
-  const getRandomFood = (foods: any[], count: number = 1) => {
-    if (!foods || foods.length === 0) return [{ name: "Opção variada", portion: 100, unit: "g", details: "Consulte um nutricionista" }];
-    // Embaralhar o array e retornar N itens
-    const shuffled = [...foods].sort(() => 0.5 - Math.random());
-    const selected = shuffled.slice(0, Math.min(count, foods.length));
-    // Mapear para o formato esperado
-    return selected.map(food => ({
-      name: food.name,
-      portion: food.portion || 100,
-      unit: food.portionUnit || "g",
-      details: getFoodDetail(food)
-    }));
-  };
-  
-  // Gerar descrição para o alimento
-  const getFoodDetail = (food: any) => {
-    if (food.food_group_id === 1) return "Fonte de carboidratos para o café da manhã";
-    if (food.food_group_id === 2) return "Alimento recomendado para o almoço";
-    if (food.food_group_id === 3) return "Opção saudável para lanches";
-    if (food.food_group_id === 4) return "Alimento recomendado para o jantar";
-    return "Alimento personalizado baseado em suas preferências";
-  };
-  
-  // Criar cada dia da semana usando os alimentos preferidos do usuário
-  Object.entries(dayNames).forEach(([day, dayName]) => {
-    weeklyPlan[day] = {
-      dayName,
-      meals: {
-        breakfast: {
-          foods: getRandomFood(foodsForBreakfast, 3),
-          calories: breakfastCals,
-          macros: {
-            protein: Math.round(protein * 0.25),
-            carbs: Math.round(carbs * 0.3),
-            fats: Math.round(fats * 0.15),
-            fiber: 5
-          },
-          description: "Café da manhã balanceado para iniciar o dia com energia."
-        },
-        morningSnack: {
-          foods: getRandomFood(foodsForSnack, 2),
-          calories: Math.round(snackCals / 2),
-          macros: {
-            protein: Math.round(protein * 0.1),
-            carbs: Math.round(carbs * 0.15),
-            fats: Math.round(fats * 0.1),
-            fiber: 2
-          },
-          description: "Lanche leve para manter a energia durante a manhã."
-        },
-        lunch: {
-          foods: getRandomFood(foodsForLunch, 4),
-          calories: lunchCals,
-          macros: {
-            protein: Math.round(protein * 0.35),
-            carbs: Math.round(carbs * 0.3),
-            fats: Math.round(fats * 0.3),
-            fiber: 8
-          },
-          description: "Almoço completo e nutritivo para o meio do dia."
-        },
-        afternoonSnack: {
-          foods: getRandomFood(foodsForSnack, 2),
-          calories: Math.round(snackCals / 2),
-          macros: {
-            protein: Math.round(protein * 0.1),
-            carbs: Math.round(carbs * 0.1),
-            fats: Math.round(fats * 0.15),
-            fiber: 3
-          },
-          description: "Lanche da tarde para manter o metabolismo ativo."
-        },
-        dinner: {
-          foods: getRandomFood(foodsForDinner, 3),
-          calories: dinnerCals,
-          macros: {
-            protein: Math.round(protein * 0.2),
-            carbs: Math.round(carbs * 0.15),
-            fats: Math.round(fats * 0.3),
-            fiber: 6
-          },
-          description: "Jantar equilibrado para encerrar o dia com nutrientes de qualidade."
+    // Salvar plano alimentar
+    const { error: saveError } = await supabase
+      .from('meal_plans')
+      .insert({
+        user_id: userId,
+        plan_data: mealPlan,
+        calories: calories,
+        dietary_preferences: {
+          hasAllergies: preferences.hasAllergies || false,
+          allergies: preferences.allergies || [],
+          dietaryRestrictions: preferences.dietaryRestrictions || [],
+          training_time: preferences.trainingTime || null
         }
-      },
-      dailyTotals: {
-        calories: dailyCalories,
-        protein,
-        carbs,
-        fats,
-        fiber: 24
-      }
-    };
-  });
-  
-  // Calcular totais semanais
-  const weeklyTotals = {
-    averageCalories: dailyCalories,
-    averageProtein: protein,
-    averageCarbs: carbs,
-    averageFats: fats,
-    averageFiber: 24
-  };
-  
-  // Obter recomendações baseadas no objetivo
-  const recommendations = getDefaultRecommendations(userData.goal);
-  
-  // Montar o plano completo
-  return {
-    weeklyPlan,
-    weeklyTotals,
-    recommendations,
-    metadata: {
-      generationMethod: "fallback",
-      generatedAt: new Date().toISOString(),
-      calorieTarget: dailyCalories
+      });
+
+    if (saveError) {
+      console.error('[MEAL PLAN/DB] Erro ao salvar cardápio:', saveError);
+      console.error('[MEAL PLAN/DB] Código:', saveError.code);
+      console.error('[MEAL PLAN/DB] Detalhes:', saveError.details);
+      console.error('[MEAL PLAN/DB] Mensagem:', saveError.message);
+      throw saveError;
     }
-  };
+
+    console.log('[MEAL PLAN/DB] Plano alimentar salvo com sucesso');
+  } catch (error) {
+    console.error('[MEAL PLAN/DB] Erro ao salvar dados do plano:');
+    if (error instanceof Error) {
+      console.error('[MEAL PLAN/DB] Nome do erro:', error.name);
+      console.error('[MEAL PLAN/DB] Mensagem:', error.message);
+      console.error('[MEAL PLAN/DB] Stack trace:', error.stack);
+    } else {
+      console.error('[MEAL PLAN/DB] Erro não padronizado:', JSON.stringify(error, null, 2));
+    }
+    throw error;
+  }
 };

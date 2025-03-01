@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import type { DietaryPreferences } from "./types";
-import { toast } from "sonner";
 
 interface DietaryPreferencesFormProps {
   onSubmit: (preferences: DietaryPreferences) => void;
@@ -29,56 +28,29 @@ export const DietaryPreferencesForm = ({ onSubmit, onBack }: DietaryPreferencesF
   };
 
   const handleAllergiesInput = (value: string) => {
-    const allergiesList = value ? value.split(',').map(item => item.trim()).filter(Boolean) : [];
     setPreferences(prev => ({
       ...prev,
-      allergies: allergiesList
+      allergies: value.split(',').map(item => item.trim())
     }));
   };
 
   const handleRestrictionsInput = (value: string) => {
-    const restrictionsList = value ? value.split(',').map(item => item.trim()).filter(Boolean) : [];
     setPreferences(prev => ({
       ...prev,
-      dietaryRestrictions: restrictionsList
+      dietaryRestrictions: value.split(',').map(item => item.trim())
     }));
   };
 
   const handleTimeChange = (value: string) => {
     setPreferences(prev => ({
       ...prev,
-      trainingTime: value || null
+      trainingTime: value
     }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Garantir que todos os campos estão com formato adequado
-    const sanitizedPreferences: DietaryPreferences = {
-      // Converter explicitamente para boolean para evitar problemas de tipo
-      hasAllergies: Boolean(preferences.hasAllergies),
-      // Garantir que é um array e que todos os elementos são strings
-      allergies: Array.isArray(preferences.allergies) 
-        ? preferences.allergies.map(String) 
-        : [],
-      // Garantir que é um array e que todos os elementos são strings
-      dietaryRestrictions: Array.isArray(preferences.dietaryRestrictions) 
-        ? preferences.dietaryRestrictions.map(String) 
-        : [],
-      // Garantir que é uma string ou null
-      trainingTime: typeof preferences.trainingTime === 'string' ? preferences.trainingTime : null,
-    };
-    
-    // Log do que está sendo enviado para depuração
-    console.log("[DietaryPreferences] Enviando preferências sanitizadas:", JSON.stringify(sanitizedPreferences, null, 2));
-    
-    if (!sanitizedPreferences.hasAllergies && !sanitizedPreferences.allergies.length && !sanitizedPreferences.dietaryRestrictions.length) {
-      console.log("[DietaryPreferences] Adicionando valores padrão, pois nenhuma restrição foi informada");
-      toast.info("Nenhuma restrição alimentar informada. Prosseguindo com valores padrão.");
-    }
-    
-    onSubmit(sanitizedPreferences);
+    onSubmit(preferences);
   };
 
   return (

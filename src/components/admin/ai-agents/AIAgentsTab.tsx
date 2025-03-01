@@ -7,24 +7,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AgentPromptForm } from "./AgentPromptForm";
 import type { AIAgentPrompt } from "./types";
-import { Apple, Activity, Stethoscope, Trash2 } from "lucide-react";
-import { toast } from "sonner";
-import { 
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { Apple, Activity, Stethoscope } from "lucide-react";
 
 export const AIAgentsTab = () => {
   const [editingPrompt, setEditingPrompt] = useState<AIAgentPrompt | null>(null);
   const [selectedType, setSelectedType] = useState<AIAgentPrompt["agent_type"]>("meal_plan");
-  const [promptToDelete, setPromptToDelete] = useState<AIAgentPrompt | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const { data: prompts, refetch } = useQuery({
     queryKey: ['ai-agent-prompts'],
@@ -53,33 +40,6 @@ export const AIAgentsTab = () => {
     setSelectedType(prompt.agent_type);
   };
 
-  const handleDeleteClick = (prompt: AIAgentPrompt) => {
-    setPromptToDelete(prompt);
-    setDeleteDialogOpen(true);
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (!promptToDelete) return;
-    
-    try {
-      const { error } = await supabase
-        .from('ai_agent_prompts')
-        .delete()
-        .eq('id', promptToDelete.id);
-        
-      if (error) throw error;
-      
-      toast.success('Agente excluído com sucesso!');
-      refetch();
-    } catch (error) {
-      console.error('Erro ao excluir agente:', error);
-      toast.error('Erro ao excluir agente');
-    } finally {
-      setPromptToDelete(null);
-      setDeleteDialogOpen(false);
-    }
-  };
-
   const renderPromptsList = (type: AIAgentPrompt["agent_type"]) => {
     const typePrompts = getPromptsForType(type);
 
@@ -95,22 +55,13 @@ export const AIAgentsTab = () => {
                     <p className="text-sm text-gray-600">{prompt.description}</p>
                   )}
                 </div>
-                <div className="flex gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => handleEdit(prompt)}
-                  >
-                    Editar
-                  </Button>
-                  <Button 
-                    variant="destructive" 
-                    size="sm"
-                    onClick={() => handleDeleteClick(prompt)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => handleEdit(prompt)}
+                >
+                  Editar
+                </Button>
               </div>
               <pre className="text-sm bg-gray-50 p-2 rounded mt-2 whitespace-pre-wrap">
                 {prompt.prompt}
@@ -204,24 +155,6 @@ export const AIAgentsTab = () => {
           Cancelar Edição
         </Button>
       )}
-
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir Agente</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja excluir o agente "{promptToDelete?.name}"? 
-              Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-red-600 hover:bg-red-700">
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 };

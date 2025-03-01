@@ -1,67 +1,89 @@
 
-import { Food, FoodWithPortion, MacroTargets } from "./types.ts";
+import type { Food, MacroTargets, FoodWithPortion } from './types';
 
-// Function to calculate appropriate portions based on calorie and macro targets
-export function calculatePortions(
-  foods: Food[],
-  dailyCalories: number,
+const STANDARD_PORTIONS = {
+  'pão': {
+    unit: 'fatia',
+    grams: 30
+  },
+  'arroz': {
+    unit: 'xícara',
+    grams: 100
+  },
+  'azeite': {
+    unit: 'colher de sopa',
+    grams: 15
+  },
+  'granola': {
+    unit: 'colher de sopa',
+    grams: 15
+  },
+  'quinoa': {
+    unit: 'xícara',
+    grams: 100
+  },
+  'feijão': {
+    unit: 'xícara',
+    grams: 100
+  },
+  'grão-de-bico': {
+    unit: 'xícara',
+    grams: 100
+  },
+  'legumes': {
+    unit: 'xícara',
+    grams: 100
+  },
+  'verduras': {
+    unit: 'xícara',
+    grams: 50
+  },
+  'frutas': {
+    unit: 'unidade',
+    grams: 100
+  },
+  'iogurte': {
+    unit: 'unidade',
+    grams: 170
+  }
+};
+
+export function calculatePortionSize(
+  food: Food,
+  targetCalories: number,
   macroTargets: MacroTargets
-): FoodWithPortion[] {
-  console.log("Calculating portions for", foods.length, "foods");
-  
-  // If no foods are provided, return an empty array
-  if (!foods || foods.length === 0) {
-    return [];
+): FoodWithPortion {
+  const caloriesPerGram = food.calories / food.serving_size;
+  let targetPortion = Math.round((targetCalories / caloriesPerGram) * 100) / 100;
+
+  let portionUnit = food.serving_unit;
+  let friendlyPortion = targetPortion;
+
+  // Encontra a unidade de medida mais apropriada
+  for (const [keyword, standard] of Object.entries(STANDARD_PORTIONS)) {
+    if (food.name.toLowerCase().includes(keyword)) {
+      portionUnit = standard.unit;
+      friendlyPortion = Math.round((targetPortion / standard.grams) * 10) / 10;
+      break;
+    }
   }
 
-  // Basic calculation: Distribute calories evenly among foods
-  const caloriesPerFood = dailyCalories / foods.length;
-  
-  return foods.map(food => {
-    // Skip foods with zero calories to avoid division by zero
-    if (!food.calories || food.calories <= 0) {
-      return {
-        ...food,
-        portion: 100, // Default portion
-        portionUnit: "g",
-        calculatedNutrients: {
-          calories: food.calories || 0,
-          protein: food.protein || 0,
-          carbs: food.carbs || 0,
-          fats: food.fats || 0,
-          fiber: food.fiber || 0
-        }
-      };
-    }
-    
-    // Calculate portion size to achieve target calories for this food
-    const portionMultiplier = caloriesPerFood / food.calories;
-    const portion = Math.round(100 * portionMultiplier); // Base portion is 100g
-    
-    // Calculate actual nutrients based on the new portion
-    const calculatedNutrients = {
-      calories: Math.round(food.calories * portionMultiplier),
-      protein: Math.round((food.protein || 0) * portionMultiplier),
-      carbs: Math.round((food.carbs || 0) * portionMultiplier),
-      fats: Math.round((food.fats || 0) * portionMultiplier),
-      fiber: Math.round((food.fiber || 0) * portionMultiplier)
-    };
-    
-    return {
-      ...food,
-      portion,
-      portionUnit: "g",
-      calculatedNutrients
-    };
-  });
-}
+  const calculatedCalories = Math.round((food.calories / food.serving_size) * targetPortion);
+  const calculatedProtein = Math.round((food.protein / food.serving_size) * targetPortion * 10) / 10;
+  const calculatedCarbs = Math.round((food.carbs / food.serving_size) * targetPortion * 10) / 10;
+  const calculatedFats = Math.round((food.fats / food.serving_size) * targetPortion * 10) / 10;
+  const calculatedFiber = Math.round((food.fiber / food.serving_size) * targetPortion * 10) / 10;
 
-// Function to optimize portion sizes to meet macro targets
-export function optimizePortions(
-  foods: FoodWithPortion[],
-  macroTargets: MacroTargets
-): FoodWithPortion[] {
-  // Simple implementation for now
-  // In a real implementation, this could use more sophisticated algorithms
-  return foods;
+  return {
+    ...food,
+    portion: friendlyPortion,
+    portionUnit,
+    calculatedNutrients: {
+      calories: calculatedCalories,
+      protein: calculatedProtein,
+      carbs: calculatedCarbs,
+      fats: calculatedFats,
+      fiber: calculatedFiber
+    }
+  };
 }

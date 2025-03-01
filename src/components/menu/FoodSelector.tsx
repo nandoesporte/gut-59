@@ -7,15 +7,24 @@ import { usePaymentHandling } from "./hooks/usePaymentHandling";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { ProtocolFood } from "./types"; // Corrigido o caminho de importação
+
+interface ProtocolFood {
+  id: string;
+  name: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  food_group_id: number;
+}
 
 interface FoodSelectorProps {
   protocolFoods: ProtocolFood[];
   selectedFoods: string[];
-  onFoodSelection: (foodId: string, food?: ProtocolFood) => void;
+  onFoodSelection: (foodId: string) => void;
   totalCalories: number;
   onBack: () => void;
-  onConfirm: () => Promise<boolean> | void;
+  onConfirm: () => void;
 }
 
 const MealSection = ({
@@ -29,7 +38,7 @@ const MealSection = ({
   icon: React.ReactNode;
   foods: ProtocolFood[];
   selectedFoods: string[];
-  onFoodSelection: (foodId: string, food?: ProtocolFood) => void;
+  onFoodSelection: (foodId: string) => void;
 }) => (
   <Card className="p-6 space-y-4 shadow-lg hover:shadow-xl transition-shadow">
     <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
@@ -42,11 +51,11 @@ const MealSection = ({
       {foods.map((food) => (
         <Button
           key={food.id}
-          variant={selectedFoods.includes(String(food.id)) ? "default" : "outline"}
-          onClick={() => onFoodSelection(String(food.id), food)}
+          variant={selectedFoods.includes(food.id) ? "default" : "outline"}
+          onClick={() => onFoodSelection(food.id)}
           className={`
             h-auto py-3 px-4 w-full text-left justify-start
-            ${selectedFoods.includes(String(food.id))
+            ${selectedFoods.includes(food.id)
               ? 'bg-green-100 border-green-500 text-green-700 hover:bg-green-200 hover:text-green-800'
               : 'hover:bg-green-50 hover:border-green-200'}
           `}
@@ -69,7 +78,6 @@ export const FoodSelector = ({
   const { isProcessingPayment, hasPaid, handlePaymentAndContinue } = usePaymentHandling();
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [paymentRequired, setPaymentRequired] = useState(true);
-  const [confirmClicked, setConfirmClicked] = useState(false);
 
   useEffect(() => {
     const checkPaymentRequirement = async () => {
@@ -114,71 +122,17 @@ export const FoodSelector = ({
   }, []);
 
   const handleConfirm = async () => {
-    console.log("Botão Confirmar Seleção clicado");
-    
-    if (confirmClicked) {
-      console.log("Botão já foi clicado, evitando duplo clique");
-      return;
-    }
-    
-    setConfirmClicked(true);
-    
     if (selectedFoods.length === 0) {
       toast.error("Selecione pelo menos um alimento");
-      setConfirmClicked(false);
       return;
     }
 
     if (paymentRequired && !hasPaid) {
       setShowPaymentDialog(true);
-      setConfirmClicked(false);
       return;
     }
 
-    try {
-      console.log("Chamando função onConfirm...");
-      // Tornar os botões menos reativos durante o processamento
-      document.querySelectorAll('button').forEach(btn => {
-        if (btn.textContent?.includes('Confirmar Seleção')) {
-          btn.setAttribute('disabled', 'true');
-        }
-      });
-      
-      // Feedback visual para o usuário
-      toast.success("Processando sua seleção...");
-      
-      // Salvar os alimentos selecionados e prosseguir
-      const result = await onConfirm();
-      
-      console.log("Resultado da função onConfirm:", result);
-      
-      // Se retornar um booleano, verificamos se é verdadeiro
-      if (result === false) {
-        console.error("Falha ao confirmar seleção de alimentos");
-        toast.error("Erro ao salvar suas preferências alimentares. Tente novamente.");
-        
-        // Reativar botões
-        document.querySelectorAll('button').forEach(btn => {
-          if (btn.textContent?.includes('Confirmar Seleção')) {
-            btn.removeAttribute('disabled');
-          }
-        });
-      } else {
-        console.log("Confirmação de seleção de alimentos bem-sucedida");
-      }
-    } catch (error) {
-      console.error("Erro ao processar a confirmação:", error);
-      toast.error("Erro ao processar sua seleção. Tente novamente.");
-      
-      // Reativar botões
-      document.querySelectorAll('button').forEach(btn => {
-        if (btn.textContent?.includes('Confirmar Seleção')) {
-          btn.removeAttribute('disabled');
-        }
-      });
-    } finally {
-      setConfirmClicked(false);
-    }
+    onConfirm();
   };
 
   const breakfastFoods = protocolFoods.filter(food => food.food_group_id === 1);
@@ -187,18 +141,12 @@ export const FoodSelector = ({
   const dinnerFoods = protocolFoods.filter(food => food.food_group_id === 4);
 
   return (
-    <div className="space-y-8 w-full pb-24"> {/* Padding-bottom para evitar que o conteúdo fique atrás da barra fixa */}
+    <div className="space-y-8 w-full">
       <div className="text-center space-y-3">
         <h2 className="text-2xl font-semibold text-gray-900">Opções de Preferência dos Alimentos</h2>
         <p className="text-gray-600 max-w-2xl mx-auto">
           Selecione suas opções preferidas de alimentos para cada refeição. A IA utilizará suas escolhas para gerar um cardápio personalizado e balanceado.
         </p>
-        <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 max-w-xl mx-auto">
-          <p className="text-sm text-yellow-700">
-            <strong>Dica:</strong> Após selecionar seus alimentos preferidos, clique no botão "Confirmar Seleção" 
-            no final da página ou na barra inferior para avançar para a próxima etapa.
-          </p>
-        </div>
       </div>
 
       {paymentRequired && (
@@ -263,40 +211,20 @@ export const FoodSelector = ({
         />
       </div>
 
-      {/* Área de confirmação */}
-      <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4 text-center">
-        <p className="text-sm text-green-700 mb-3">
-          <strong>Você selecionou {selectedFoods.length} alimentos.</strong><br/>
-          Clique abaixo para confirmar sua seleção e prosseguir para a próxima etapa.
-        </p>
-        <Button 
-          onClick={handleConfirm}
-          className="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 text-lg font-bold rounded-md shadow-sm"
-          size="lg"
-          disabled={confirmClicked}
-        >
-          {confirmClicked ? "Processando..." : "✓ Confirmar Seleção e Continuar"}
-        </Button>
-      </div>
-
-      {/* Barra de ações inferior */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t py-4 px-4 md:px-8 shadow-md z-10">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t py-4 px-4 md:px-8">
         <div className="max-w-4xl mx-auto flex justify-between items-center gap-4">
           <Button 
             variant="outline" 
             onClick={onBack}
             className="shrink-0"
-            disabled={confirmClicked}
           >
             Voltar
           </Button>
           <Button 
             onClick={handleConfirm}
-            className="flex-1 bg-green-500 hover:bg-green-600 text-white max-w-sm font-semibold animate-pulse"
-            size="lg"
-            disabled={confirmClicked}
+            className="flex-1 bg-green-500 hover:bg-green-600 text-white max-w-sm"
           >
-            {confirmClicked ? "Processando..." : `Confirmar Seleção (${selectedFoods.length} alimentos)`}
+            Confirmar Seleção ({selectedFoods.length} alimentos)
           </Button>
         </div>
       </div>
