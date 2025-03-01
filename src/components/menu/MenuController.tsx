@@ -36,6 +36,7 @@ export const useMenuController = () => {
   const [dietaryPreferences, setDietaryPreferences] = useState<DietaryPreferences | null>(null);
   const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("Gerando seu plano alimentar personalizado...");
   const [formData, setFormData] = useState<CalorieCalculatorForm>({
     weight: "",
     height: "",
@@ -353,6 +354,9 @@ export const useMenuController = () => {
     }
 
     try {
+      setLoading(true);
+      setLoadingMessage("Gerando seu plano alimentar personalizado...");
+      
       const { data: userData } = await supabase.auth.getUser();
       
       if (userData.user) {
@@ -370,7 +374,8 @@ export const useMenuController = () => {
           console.error('Erro ao salvar preferências dietéticas:', prefsError);
         }
         
-        toast.loading("Gerando plano alimentar personalizado com Llama 3.2 1B...");
+        // Primeiro tentamos com modelo Groq para maior confiabilidade
+        setLoadingMessage("Gerando plano alimentar personalizado com modelo Groq...");
         
         try {
           const generatedMealPlan = await generateMealPlan({
@@ -393,6 +398,25 @@ export const useMenuController = () => {
           if (generatedMealPlan) {
             setMealPlan(generatedMealPlan);
             console.log('Plano gerado:', generatedMealPlan);
+            
+            // Atualizar o histórico de planos gerados
+            try {
+              const { error: countError } = await supabase
+                .from('plan_generation_counts')
+                .upsert({
+                  user_id: userData.user.id,
+                  meal_plan_count: 1
+                }, { 
+                  onConflict: 'user_id',
+                  ignoreDuplicates: false
+                });
+              
+              if (countError) {
+                console.error('Erro ao atualizar contagem de planos:', countError);
+              }
+            } catch (countErr) {
+              console.error('Erro ao atualizar estatísticas:', countErr);
+            }
           } else {
             console.error('Plano alimentar não foi gerado corretamente');
             toast.error("Falha ao gerar plano alimentar. Tente novamente.");
@@ -725,6 +749,7 @@ export const useMenuController = () => {
         
         setMealPlan(basicMealPlan);
         toast.success("Plano básico criado! Para um plano personalizado completo, faça login.");
+        setLoading(false);
       }
       
       console.log("Avançando para a etapa 4 (exibição do plano alimentar)");
@@ -733,9 +758,8 @@ export const useMenuController = () => {
     } catch (error) {
       console.error('Erro completo:', error);
       toast.error("Erro ao processar suas preferências. Tente novamente.");
-      return false;
-    } finally {
       setLoading(false);
+      return false;
     }
   };
 
@@ -758,6 +782,7 @@ export const useMenuController = () => {
     mealPlan,
     formData,
     loading,
+    loadingMessage,
     handleCalculateCalories,
     handleFoodSelection,
     handleConfirmFoodSelection,

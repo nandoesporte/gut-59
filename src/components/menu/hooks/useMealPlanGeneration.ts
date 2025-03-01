@@ -113,9 +113,10 @@ export const generateMealPlan = async ({
       }
     });
 
-    toastId = toast.loading("Gerando seu plano alimentar personalizado com Nous-Hermes-2-Mixtral-8x7B-DPO...");
+    // Alteração: Usamos Groq como modelo principal para maior confiabilidade
+    toastId = toast.loading("Gerando seu plano alimentar personalizado com Groq...");
 
-    console.log('[MEAL PLAN] Iniciando chamada para a Edge Function com modelo Nous-Hermes-2-Mixtral-8x7B-DPO');
+    console.log('[MEAL PLAN] Iniciando chamada para a Edge Function com modelo Groq');
     
     // Mapear o objetivo para o formato esperado pela API
     const goalMapping = {
@@ -177,14 +178,14 @@ export const generateMealPlan = async ({
         trainingTime: preferences.trainingTime
       },
       modelConfig: {
-        model: "nous-hermes-2-mixtral-8x7b-dpo", // Especifica o modelo Nous-Hermes-2-Mixtral-8x7B-DPO
+        model: "mixtral-8x7b-32768", // Modelo Mixtral via Groq
         provider: "groq"
       }
     };
     
-    console.log('[MEAL PLAN] Enviando payload para Nous-Hermes-2-Mixtral-8x7B-DPO via Groq:', JSON.stringify(enhancedPayload, null, 2));
+    console.log('[MEAL PLAN] Enviando payload para Groq:', JSON.stringify(enhancedPayload, null, 2));
     
-    // Definir timeout para capturar falhas por timeout (60 segundos para o modelo processar)
+    // Definir timeout para capturar falhas por timeout
     const edgeFunctionTimeout = 60000; 
     
     // Implementar timeout manual com Promise.race
@@ -192,25 +193,25 @@ export const generateMealPlan = async ({
     try {
       // Criar uma promessa que rejeita após o timeout
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("Timeout na chamada à Edge Function Llama")), edgeFunctionTimeout);
+        setTimeout(() => reject(new Error("Timeout na chamada à Edge Function Groq")), edgeFunctionTimeout);
       });
       
-      // Chamar a edge function com o modelo Nous-Hermes-2-Mixtral-8x7B-DPO
+      // Chamar primeiro a edge function com o modelo Groq (mais confiável)
       const result = await Promise.race([
-        supabase.functions.invoke('generate-meal-plan-llama', { body: enhancedPayload }),
+        supabase.functions.invoke('generate-meal-plan-groq', { body: enhancedPayload }),
         timeoutPromise
       ]);
       
       // Verificar se temos resultado e se ele contém um plano válido
       if (result && 'data' in result && result.data && typeof result.data === 'object' && 'mealPlan' in result.data) {
-        console.log('[MEAL PLAN] Chamada à Edge Function Llama bem-sucedida!');
+        console.log('[MEAL PLAN] Chamada à Edge Function Groq bem-sucedida!');
         resultData = result.data as EdgeFunctionResponse;
       } else {
-        console.error('[MEAL PLAN] Resposta da Edge Function Llama sem dados válidos:', result);
-        throw new Error("Resposta da Edge Function Llama inválida");
+        console.error('[MEAL PLAN] Resposta da Edge Function Groq sem dados válidos:', result);
+        throw new Error("Resposta da Edge Function Groq inválida");
       }
     } catch (edgeFunctionError) {
-      console.error('[MEAL PLAN] Erro na chamada à Edge Function Llama:', edgeFunctionError);
+      console.error('[MEAL PLAN] Erro na chamada à Edge Function Groq:', edgeFunctionError);
       
       if (edgeFunctionError instanceof Error) {
         console.error('[MEAL PLAN] Detalhes do erro:', edgeFunctionError.message);
@@ -219,21 +220,36 @@ export const generateMealPlan = async ({
         }
       }
       
-      // Tentar usar a edge function Groq existente como fallback
-      console.log('[MEAL PLAN] Tentando usar Groq como fallback após falha no Llama');
+      toast.dismiss(toastId);
+      toastId = toast.loading("Usando modelo alternativo para gerar plano alimentar...");
+      
+      // Tentar usar a edge function Llama existente como fallback (com melhor configuração de timeout)
+      console.log('[MEAL PLAN] Tentando usar Llama como fallback após falha no Groq');
       try {
-        const result = await supabase.functions.invoke('generate-meal-plan-groq', { body: enhancedPayload });
+        enhancedPayload.modelConfig = {
+          model: "llama3:8b", // Usando Llama 3 8B como fallback
+          provider: "llama"
+        };
+        
+        const result = await Promise.race([
+          supabase.functions.invoke('generate-meal-plan-llama', { 
+            body: enhancedPayload,
+            options: { deadlineMs: 100000 } // Aumentar deadline para Supabase function
+          }),
+          new Promise<never>((_, reject) => setTimeout(() => 
+            reject(new Error("Timeout na chamada à Edge Function Llama")), 90000))
+        ]);
         
         if (result && 'data' in result && result.data && typeof result.data === 'object' && 'mealPlan' in result.data) {
-          console.log('[MEAL PLAN] Chamada de fallback à Edge Function Groq bem-sucedida!');
+          console.log('[MEAL PLAN] Chamada de fallback à Edge Function Llama bem-sucedida!');
           resultData = result.data as EdgeFunctionResponse;
         } else {
-          throw new Error("Resposta da Edge Function Groq inválida no fallback");
+          throw new Error("Resposta da Edge Function Llama inválida no fallback");
         }
       } catch (fallbackError) {
-        console.error('[MEAL PLAN] Erro no fallback com Groq:', fallbackError);
-        // Usar plano padrão quando todas as edge functions falham
-        console.log('[MEAL PLAN] Usando plano padrão devido a falhas em todos os modelos');
+        console.error('[MEAL PLAN] Erro no fallback com Llama:', fallbackError);
+        // Tentar usar o gerador local como último recurso
+        console.log('[MEAL PLAN] Usando plano local devido a falhas em ambos modelos');
         return createDefaultMealPlan(userData, selectedFoodsDetails, foodsByMealTypeFormatted);
       }
     }
@@ -297,6 +313,14 @@ export const generateMealPlan = async ({
           console.log(`[MEAL PLAN] Adicionando refeição padrão: ${mealType} para ${day}`);
           dayPlan.meals[mealType] = createDefaultMeal(mealType, userData.dailyCalories);
         }
+        
+        // Verificar se macros e calorias estão presentes para cada refeição
+        if (!dayPlan.meals[mealType].macros || typeof dayPlan.meals[mealType].calories === 'undefined') {
+          console.log(`[MEAL PLAN] Adicionando macros/calorias padrão para: ${mealType} em ${day}`);
+          const defaultMeal = createDefaultMeal(mealType, userData.dailyCalories);
+          dayPlan.meals[mealType].macros = dayPlan.meals[mealType].macros || defaultMeal.macros;
+          dayPlan.meals[mealType].calories = dayPlan.meals[mealType].calories || defaultMeal.calories;
+        }
       });
       
       // Garantir totais diários
@@ -305,13 +329,19 @@ export const generateMealPlan = async ({
         dayPlan.dailyTotals = calculateDailyTotals(dayPlan.meals);
       }
     });
+    
+    // Calcular e verificar médias semanais
+    if (!resultData.mealPlan.weeklyTotals) {
+      console.log('[MEAL PLAN] Calculando totais semanais');
+      resultData.mealPlan.weeklyTotals = calculateWeeklyAverages(resultData.mealPlan.weeklyPlan);
+    }
 
     // Adicionar a transação de recompensa
     try {
       await addTransaction({
         amount: REWARDS.MEAL_PLAN,
         type: 'meal_plan',
-        description: 'Geração de plano alimentar personalizado com Nous-Hermes-2-Mixtral-8x7B-DPO'
+        description: 'Geração de plano alimentar personalizado com IA'
       });
       console.log('[MEAL PLAN] Transação de recompensa adicionada');
     } catch (transactionError) {
@@ -329,7 +359,7 @@ export const generateMealPlan = async ({
     }
 
     toast.dismiss(toastId);
-    toast.success(`Cardápio personalizado gerado com Nous-Hermes-2-Mixtral-8x7B-DPO com sucesso! +${REWARDS.MEAL_PLAN} FITs`);
+    toast.success(`Cardápio personalizado gerado com sucesso! +${REWARDS.MEAL_PLAN} FITs`);
 
     return resultData.mealPlan;
   } catch (error) {
@@ -350,12 +380,43 @@ export const generateMealPlan = async ({
     // Retornar um plano padrão em caso de falha
     return createDefaultMealPlan(userData, selectedFoods, foodsByMealType ? 
       {
-        breakfast: selectedFoods.filter(food => foodsByMealType.breakfast.includes(food.id)),
-        lunch: selectedFoods.filter(food => foodsByMealType.lunch.includes(food.id)),
-        snack: selectedFoods.filter(food => foodsByMealType.snack.includes(food.id)),
-        dinner: selectedFoods.filter(food => foodsByMealType.dinner.includes(food.id))
+        breakfast: selectedFoods.filter(food => foodsByMealType.breakfast?.includes(food.id) || false),
+        lunch: selectedFoods.filter(food => foodsByMealType.lunch?.includes(food.id) || false),
+        snack: selectedFoods.filter(food => foodsByMealType.snack?.includes(food.id) || false),
+        dinner: selectedFoods.filter(food => foodsByMealType.dinner?.includes(food.id) || false)
       } : undefined);
   }
+};
+
+// Função para calcular médias semanais
+const calculateWeeklyAverages = (weeklyPlan: any) => {
+  const days = Object.keys(weeklyPlan);
+  let totalCalories = 0;
+  let totalProtein = 0;
+  let totalCarbs = 0;
+  let totalFats = 0;
+  let totalFiber = 0;
+  
+  days.forEach(day => {
+    const dayPlan = weeklyPlan[day];
+    if (dayPlan.dailyTotals) {
+      totalCalories += dayPlan.dailyTotals.calories || 0;
+      totalProtein += dayPlan.dailyTotals.protein || 0;
+      totalCarbs += dayPlan.dailyTotals.carbs || 0;
+      totalFats += dayPlan.dailyTotals.fats || 0;
+      totalFiber += dayPlan.dailyTotals.fiber || 0;
+    }
+  });
+  
+  const dayCount = days.length || 1;
+  
+  return {
+    averageCalories: Math.round(totalCalories / dayCount),
+    averageProtein: Math.round(totalProtein / dayCount),
+    averageCarbs: Math.round(totalCarbs / dayCount),
+    averageFats: Math.round(totalFats / dayCount),
+    averageFiber: Math.round(totalFiber / dayCount)
+  };
 };
 
 // Função para criar uma refeição padrão
@@ -686,6 +747,7 @@ const createDefaultMealPlan = (
 
   // Montar o plano alimentar completo
   return {
+    userCalories: dailyCalories,
     weeklyPlan,
     weeklyTotals,
     recommendations,

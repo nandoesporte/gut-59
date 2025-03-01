@@ -27,6 +27,7 @@ const Menu = () => {
     mealPlan,
     formData,
     loading,
+    loadingMessage,
     handleCalculateCalories,
     handleFoodSelection,
     handleConfirmFoodSelection,
@@ -87,7 +88,7 @@ const Menu = () => {
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
         <div className="text-center px-4">
           <h3 className="text-lg font-semibold text-gray-900">
-            Gerando seu plano alimentar personalizado...
+            {loadingMessage || "Gerando seu plano alimentar personalizado..."}
           </h3>
           <p className="text-sm text-gray-500 mt-1">
             Este processo pode levar de 1 a 2 minutos.

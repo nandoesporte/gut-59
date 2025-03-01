@@ -21,3 +21,5 @@ verify_jwt = false
 
 [functions.generate-meal-plan-llama]
 verify_jwt = false
+timeoutMs = 120000
+importMapPath = "./import_map.json"
