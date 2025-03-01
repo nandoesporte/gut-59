@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import type { DietaryPreferences, MealPlan } from "./types";
@@ -71,14 +70,11 @@ export const useMenuController = () => {
         toast.success("Calorias calculadas com sucesso!");
         
         try {
-          // Try to save the calculation, but proceed even if it fails
           await menuDatabase.saveCalorieCalculation(formData, calories, selectedFoods);
         } catch (dbError) {
           console.error('Erro ao salvar cálculo de calorias:', dbError);
-          // Continue despite database error
         }
         
-        // Move to next step regardless of database operations
         setCurrentStep(2);
         console.log("Avançando para a etapa 2 (seleção de alimentos)");
         return true;
@@ -103,24 +99,13 @@ export const useMenuController = () => {
     toast.success("Processando sua seleção de alimentos...");
     
     try {
-      const success = await menuDatabase.saveFoodSelection(selectedFoods, formData);
-      
-      if (success) {
-        console.log("Preferências de alimentos salvas com sucesso!");
-        console.log("Avançando para a etapa 3 (restrições dietéticas)");
-        
-        setCurrentStep(3);
-        
-        toast.success("Preferências de alimentos salvas! Agora informe suas restrições dietéticas.");
-        return true;
-      }
-      
-      console.error("Falha ao salvar preferências de alimentos");
-      return false;
+      await menuDatabase.saveFoodSelection(selectedFoods, formData);
+      setCurrentStep(3);
+      toast.success("Preferências de alimentos salvas! Agora informe suas restrições dietéticas.");
+      return true;
     } catch (error) {
       console.error("Erro ao salvar seleção de alimentos:", error);
       toast.error("Ocorreu um erro ao salvar suas preferências de alimentos");
-      // Still proceed to next step even if database operation fails
       setCurrentStep(3);
       return true;
     }
@@ -128,6 +113,11 @@ export const useMenuController = () => {
 
   const handleDietaryPreferences = async (preferences: DietaryPreferences) => {
     try {
+      console.log("Iniciando geração do plano alimentar com preferências:", preferences);
+      console.log("Dados do formulário:", formData);
+      console.log("Alimentos selecionados:", selectedFoods);
+      console.log("Distribuição por refeição:", foodsByMealType);
+      
       const result = await generateUserMealPlan({
         formData,
         calorieNeeds,
@@ -137,16 +127,27 @@ export const useMenuController = () => {
         preferences
       });
       
-      if (result) {
+      console.log("Resultado da geração do plano:", result);
+      
+      if (result && result.weeklyPlan) {
+        console.log("Plano alimentar gerado com sucesso!");
+        console.log("Estrutura do plano:", {
+          temRefeicoes: !!result.weeklyPlan.monday?.meals,
+          temTotais: !!result.weeklyPlan.monday?.dailyTotals,
+          temRecomendacoes: !!result.recommendations
+        });
+        
         setDietaryPreferences(preferences);
         setCurrentStep(4);
         return true;
+      } else {
+        console.error("Plano gerado sem estrutura válida:", result);
+        toast.error("O plano gerado não possui a estrutura esperada. Tentando novamente...");
+        return false;
       }
-      
-      return false;
     } catch (error) {
-      console.error("Erro ao processar preferências dietéticas:", error);
-      toast.error("Ocorreu um erro ao processar suas preferências dietéticas");
+      console.error("Erro detalhado ao gerar plano:", error);
+      toast.error("Ocorreu um erro ao gerar seu plano alimentar. Por favor, tente novamente.");
       return false;
     }
   };
@@ -154,6 +155,12 @@ export const useMenuController = () => {
   const handleRegenerateMealPlan = async () => {
     try {
       toast.info("Gerando novo plano alimentar...");
+      console.log("Iniciando regeneração do plano com:", {
+        formData,
+        calorieNeeds,
+        foodsByMealType
+      });
+      
       const success = await regenerateMealPlan(
         formData, 
         calorieNeeds,
@@ -161,21 +168,33 @@ export const useMenuController = () => {
         foodsByMealType
       );
       
+      if (!success) {
+        throw new Error("Falha ao regenerar o plano alimentar");
+      }
+      
       return success;
     } catch (error) {
-      console.error('Erro ao atualizar cardápio:', error);
-      toast.error("Erro ao atualizar o cardápio");
+      console.error('Erro detalhado ao atualizar cardápio:', error);
+      toast.error("Erro ao atualizar o cardápio. Tente novamente.");
       throw error;
     }
   };
 
   useEffect(() => {
     if (mealPlan) {
-      console.log("PLANO ALIMENTAR ATUALIZADO:", mealPlan);
-      console.log("Plano possui weeklyPlan?", !!mealPlan.weeklyPlan);
-      console.log("Step atual:", currentStep);
+      console.log("DETALHES DO PLANO ALIMENTAR:", {
+        possuiPlanoSemanal: !!mealPlan.weeklyPlan,
+        diasDisponiveis: mealPlan.weeklyPlan ? Object.keys(mealPlan.weeklyPlan) : [],
+        possuiRecomendacoes: !!mealPlan.recommendations,
+        possuiTotaisSemanais: !!mealPlan.weeklyTotals,
+        primeiroDia: mealPlan.weeklyPlan?.monday ? {
+          possuiRefeicoes: !!mealPlan.weeklyPlan.monday.meals,
+          numeroRefeicoes: Object.keys(mealPlan.weeklyPlan.monday.meals || {}).length,
+          possuiTotaisDiarios: !!mealPlan.weeklyPlan.monday.dailyTotals
+        } : null
+      });
     }
-  }, [mealPlan, currentStep]);
+  }, [mealPlan]);
 
   return {
     currentStep,

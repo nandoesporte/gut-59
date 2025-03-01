@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -61,14 +60,17 @@ export const useMealPlanManager = () => {
       return false;
     }
 
-    console.log('[MealPlanManager] Preferências alimentares recebidas:', JSON.stringify(preferences, null, 2));
-    console.log('[MealPlanManager] Alimentos selecionados:', selectedFoods);
+    console.log('Iniciando geração do plano alimentar com dados:', {
+      calorieNeeds,
+      selectedFoodsCount: selectedFoods.length,
+      preferences
+    });
 
     setLoading(true);
 
     try {
       const selectedFoodsData = protocolFoods.filter(food => selectedFoods.includes(String(food.id)));
-      console.log('[MealPlanManager] Dados dos alimentos selecionados:', selectedFoodsData.map(f => ({ id: f.id, name: f.name })));
+      console.log('Alimentos selecionados processados:', selectedFoodsData.map(f => ({ id: f.id, name: f.name })));
       
       const sanitizedFoodsByMealType: Record<string, string[]> = {};
       
@@ -78,9 +80,8 @@ export const useMealPlanManager = () => {
         });
       }
       
-      console.log('[MealPlanManager] foodsByMealType sanitized:', JSON.stringify(sanitizedFoodsByMealType, null, 2));
+      console.log('Distribuição de alimentos por refeição:', sanitizedFoodsByMealType);
 
-      // Save dietary preferences to database
       await menuDatabase.saveDietaryPreferences(preferences, userData.user.id);
       
       const sanitizedPreferences: DietaryPreferences = {
@@ -90,37 +91,69 @@ export const useMealPlanManager = () => {
         trainingTime: typeof preferences.trainingTime === 'string' ? preferences.trainingTime : null
       };
       
-      console.log('[MealPlanManager] Preferências sanitizadas para o Edge Function:', JSON.stringify(sanitizedPreferences, null, 2));
+      console.log('Chamando Edge Function com preferências:', sanitizedPreferences);
       
-      const generatedMealPlan = await generateMealPlan({
-        userData: {
-          id: userData.user.id,
-          weight: Number(formData.weight),
-          height: Number(formData.height),
-          age: Number(formData.age),
-          gender: formData.gender,
-          activityLevel: formData.activityLevel,
-          goal: formData.goal,
-          dailyCalories: calorieNeeds
-        },
-        selectedFoods: selectedFoodsData,
-        foodsByMealType: sanitizedFoodsByMealType,
-        preferences: sanitizedPreferences,
-        addTransaction: addTransactionAsync
+      const response = await supabase.functions.invoke('generate-meal-plan', {
+        body: {
+          userData: {
+            id: userData.user.id,
+            weight: Number(formData.weight),
+            height: Number(formData.height),
+            age: Number(formData.age),
+            gender: formData.gender,
+            activityLevel: formData.activityLevel,
+            goal: formData.goal,
+            dailyCalories: calorieNeeds
+          },
+          selectedFoods: selectedFoodsData,
+          foodsByMealType: sanitizedFoodsByMealType,
+          preferences: sanitizedPreferences
+        }
       });
 
-      if (!generatedMealPlan) {
+      console.log('Resposta da Edge Function:', response);
+
+      if (!response.data || !response.data.mealPlan) {
+        console.error('Resposta inválida da Edge Function:', response);
         throw new Error('Plano alimentar não foi gerado corretamente');
       }
 
-      console.log('[MealPlanManager] Plano gerado:', generatedMealPlan);
+      const generatedPlan = response.data.mealPlan;
       
-      setMealPlan(generatedMealPlan);
-      return true;
+      console.log('Estrutura do plano gerado:', {
+        temPlanoSemanal: !!generatedPlan.weeklyPlan,
+        diasDisponiveis: generatedPlan.weeklyPlan ? Object.keys(generatedPlan.weeklyPlan) : [],
+        temRecomendacoes: !!generatedPlan.recommendations,
+        temTotaisSemanais: !!generatedPlan.weeklyTotals
+      });
+
+      setMealPlan(generatedPlan);
+
+      try {
+        await saveMealPlanData(userData.user.id, generatedPlan, calorieNeeds, preferences);
+        console.log('Plano salvo com sucesso no banco de dados');
+      } catch (dbError) {
+        console.error('Erro ao salvar plano:', dbError);
+        // Continuar mesmo com erro no salvamento
+      }
+
+      try {
+        await addTransaction({
+          amount: REWARDS.MEAL_PLAN,
+          type: 'meal_plan',
+          description: 'Geração de plano alimentar personalizado'
+        });
+        console.log('Recompensa adicionada com sucesso');
+      } catch (rewardError) {
+        console.error('Erro ao adicionar recompensa:', rewardError);
+      }
+
+      toast.success(`Cardápio personalizado gerado com sucesso! +${REWARDS.MEAL_PLAN} FITs`);
+      return generatedPlan;
     } catch (error) {
-      console.error('[MealPlanManager] Erro completo:', error);
-      toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
-      return false;
+      console.error('Erro crítico na geração do plano:', error);
+      toast.error("Não foi possível gerar o plano alimentar personalizado");
+      return null;
     } finally {
       setLoading(false);
     }
