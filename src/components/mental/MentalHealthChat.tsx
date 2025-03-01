@@ -1,8 +1,9 @@
+
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowUp, Loader2, AlertTriangle, BrainCircuit, RefreshCw, WifiOff, Network } from "lucide-react";
+import { ArrowUp, Loader2, AlertTriangle, BrainCircuit, RefreshCw, WifiOff, Network, ArrowBigDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -26,6 +27,7 @@ export const MentalHealthChat = () => {
   const [networkError, setNetworkError] = useState(false);
   const [apiUrlChecked, setApiUrlChecked] = useState(false);
   const [useGroqFallback, setUseGroqFallback] = useState(false);
+  const [apiKey, setApiKey] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -82,10 +84,12 @@ export const MentalHealthChat = () => {
     setIsLoading(true);
 
     try {
+      console.log("Enviando mensagem para processamento...");
       const historyLimit = Math.max(3, 6 - retryCount);
       const historyToSend = messages.slice(-historyLimit);
       
       const endpoint = useGroqFallback ? "groq-chat" : "mental-health-chat-llama";
+      console.log(`Usando endpoint: ${endpoint}`);
       
       const { data, error } = await supabase.functions.invoke(endpoint, {
         body: { 
@@ -94,6 +98,8 @@ export const MentalHealthChat = () => {
         },
       });
 
+      console.log("Resposta recebida:", data);
+      
       if (error) {
         console.error("Função retornou erro:", error);
         if (error.message?.includes("network") || 
@@ -121,6 +127,13 @@ export const MentalHealthChat = () => {
               duration: 8000,
             });
           }
+        } else if (data.errorType === "configuration") {
+          toast({
+            title: "Problema de configuração",
+            description: "O serviço de IA não está configurado corretamente. Um administrador precisa verificar as chaves de API.",
+            variant: "destructive",
+            duration: 10000,
+          });
         }
         
         if (data.fallbackResponse) {
@@ -355,6 +368,19 @@ export const MentalHealthChat = () => {
             )}
           </Button>
         </form>
+        {messages.length > 5 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mt-2 text-xs w-full text-gray-500 hover:text-gray-700 flex items-center justify-center"
+            onClick={() => {
+              messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+            }}
+          >
+            <ArrowBigDown className="h-3 w-3 mr-1" />
+            Rolar para o final
+          </Button>
+        )}
       </div>
     </div>
   );
