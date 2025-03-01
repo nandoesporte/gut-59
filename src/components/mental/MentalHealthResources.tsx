@@ -5,9 +5,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useWallet } from "@/hooks/useWallet";
-import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
-import "react-circular-progressbar/dist/styles.css";
-import { Info, Timer, ArrowUp, ArrowDown } from "lucide-react";
+import { Info, Timer } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Progress } from "@/components/ui/progress";
 
@@ -32,15 +30,6 @@ const BREATHING_CYCLE = {
   exhale: 8
 };
 
-// New interface for tracking breathing steps
-interface BreathStep {
-  phase: "inhale" | "hold" | "exhale";
-  icon: React.ReactNode;
-  color: string;
-  label: string;
-  seconds: number;
-}
-
 export const MentalHealthResources = () => {
   const [exercise, setExercise] = useState<BreathingExercise>({
     phase: "inhale",
@@ -57,31 +46,6 @@ export const MentalHealthResources = () => {
   const [isStarting, setIsStarting] = useState(false);
   const wallet = useWallet();
   const isMobile = useIsMobile();
-
-  // Define the breathing steps
-  const breathingSteps: BreathStep[] = [
-    { 
-      phase: "inhale", 
-      icon: <ArrowDown className="w-5 h-5" />, 
-      color: "#4CAF50", 
-      label: "Inspire", 
-      seconds: BREATHING_CYCLE.inhale 
-    },
-    { 
-      phase: "hold", 
-      icon: <div className="w-5 h-1 bg-amber-500 rounded-full"></div>, 
-      color: "#FF9800", 
-      label: "Segure", 
-      seconds: BREATHING_CYCLE.hold 
-    },
-    { 
-      phase: "exhale", 
-      icon: <ArrowUp className="w-5 h-5" />, 
-      color: "#2196F3", 
-      label: "Expire", 
-      seconds: BREATHING_CYCLE.exhale 
-    },
-  ];
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -243,15 +207,6 @@ export const MentalHealthResources = () => {
     }
   };
 
-  const getPhaseIcon = () => {
-    switch (exercise.phase) {
-      case "inhale": return <ArrowDown className="w-6 h-6 animate-bounce text-green-500" />;
-      case "hold": return <div className="w-6 h-1 bg-amber-500 rounded-full animate-pulse"></div>;
-      case "exhale": return <ArrowUp className="w-6 h-6 animate-bounce text-blue-500" />;
-      default: return null;
-    }
-  };
-
   if (isLoading) {
     return <div>Carregando...</div>;
   }
@@ -288,53 +243,9 @@ export const MentalHealthResources = () => {
               </p>
             )}
             
-            {/* Circular steps visualization - shown when not active */}
-            {exercise.count === 0 && !exercise.isComplete && !isStarting && (
-              <div className="flex flex-col items-center justify-center py-4">
-                <div className="relative flex items-center justify-center mb-4">
-                  {/* Preview of breathing cycle */}
-                  <div className="w-40 h-40 rounded-full bg-gray-50 border-2 border-dotted border-gray-200 flex items-center justify-center">
-                    <div className="w-32 h-32 rounded-full bg-white shadow-sm flex flex-col items-center justify-center">
-                      <Timer className="w-6 h-6 text-primary/70 mb-1" />
-                      <span className="text-sm font-medium">1:00</span>
-                      <span className="text-xs text-gray-500 mt-1">3 ciclos</span>
-                    </div>
-                  </div>
-                  
-                  {/* Step indicators */}
-                  {breathingSteps.map((step, index) => {
-                    const angle = (index * (360 / breathingSteps.length)) * (Math.PI / 180);
-                    const x = Math.cos(angle) * 70;  // 70 is the radius
-                    const y = Math.sin(angle) * 70;
-                    
-                    return (
-                      <div 
-                        key={step.phase}
-                        className="absolute w-12 h-12 rounded-full bg-white shadow-md flex items-center justify-center"
-                        style={{ 
-                          transform: `translate(${x}px, ${y}px)`,
-                          border: `2px solid ${step.color}`
-                        }}
-                      >
-                        <div className="flex flex-col items-center">
-                          {step.icon}
-                          <span className="text-xs font-medium mt-0.5" style={{ color: step.color }}>
-                            {step.seconds}s
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <p className="text-xs text-center text-muted-foreground">
-                  Clique para começar o exercício de respiração
-                </p>
-              </div>
-            )}
-            
             {exercise.count > 0 && !exercise.isComplete ? (
               <div className="flex flex-col items-center space-y-4 sm:space-y-6">
-                {/* Improved Progress bar for overall exercise */}
+                {/* Progress bar for overall exercise */}
                 <div className="w-full relative mt-2">
                   <Progress 
                     value={progressPercentage} 
@@ -350,79 +261,79 @@ export const MentalHealthResources = () => {
                   </div>
                 </div>
                 
-                {/* Enhanced breathing visualization with steps */}
-                <div className="relative w-52 h-52 sm:w-64 sm:h-64">
-                  {/* Main circle with countdown */}
-                  <div className="absolute inset-2 z-10">
-                    <CircularProgressbar
-                      value={(exercise.secondsLeft / 
-                        (exercise.phase === "inhale" ? BREATHING_CYCLE.inhale : 
-                         exercise.phase === "hold" ? BREATHING_CYCLE.hold : 
-                         BREATHING_CYCLE.exhale)) * 100}
-                      text={`${exercise.secondsLeft}s`}
-                      styles={buildStyles({
-                        pathColor: getPhaseColor(),
-                        textColor: getPhaseColor(),
-                        trailColor: '#e6e6e6',
-                        textSize: '24px',
-                        pathTransition: 'stroke-dashoffset 0.5s ease 0s',
-                        strokeLinecap: 'round',
-                      })}
-                    />
-                  </div>
-                  
-                  {/* Step indicators around the main circle */}
-                  {breathingSteps.map((step, index) => {
-                    const angle = (index * (360 / breathingSteps.length)) * (Math.PI / 180);
-                    const radius = 112; // Distance from center
-                    const x = Math.cos(angle) * radius;
-                    const y = Math.sin(angle) * radius;
-                    
-                    const isActive = exercise.phase === step.phase;
-                    
-                    return (
-                      <div 
-                        key={step.phase}
-                        className={`absolute w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
-                          isActive ? 'bg-white shadow-md scale-110' : 'bg-gray-50'
-                        }`}
-                        style={{ 
-                          transform: `translate(${x + 104}px, ${y + 104}px)`, // Adjusted for center position
-                          border: `2px solid ${isActive ? step.color : '#e0e0e0'}`
-                        }}
-                      >
-                        <div className="flex items-center justify-center" style={{ color: isActive ? step.color : '#9e9e9e' }}>
-                          {step.icon}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  
-                  {/* Visual indicators */}
-                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex items-center justify-center z-20">
-                    <div className="bg-white/80 rounded-full p-4 shadow-sm">
-                      {getPhaseIcon()}
+                {/* Simplified breathing circle with timer */}
+                <div 
+                  className="relative flex items-center justify-center w-60 h-60 sm:w-72 sm:h-72 rounded-full transition-all duration-300"
+                  style={{ 
+                    border: `8px solid ${getPhaseColor()}`,
+                    boxShadow: `0 0 15px ${getPhaseColor()}40` 
+                  }}
+                >
+                  {/* Current phase indicator */}
+                  <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-center">
+                    <div 
+                      className="text-lg font-bold" 
+                      style={{ color: getPhaseColor() }}
+                    >
+                      {getPhaseText()}
                     </div>
                   </div>
                   
-                  <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 text-center">
-                    <span className="text-xs sm:text-sm font-medium text-muted-foreground">
+                  {/* Central timer */}
+                  <div className="flex flex-col items-center justify-center">
+                    <div 
+                      className="text-5xl sm:text-6xl font-bold mb-2"
+                      style={{ color: getPhaseColor() }}
+                    >
+                      {exercise.secondsLeft}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
                       Ciclo {exercise.count + 1} de {exercise.totalBreaths}
-                    </span>
+                    </div>
                   </div>
                 </div>
                 
-                <div className="text-center">
-                  <div className="text-xl sm:text-2xl font-medium mb-1 sm:mb-2" style={{ color: getPhaseColor() }}>
-                    {getPhaseText()}
-                  </div>
-                  <div className="text-sm sm:text-base text-muted-foreground">
-                    {getInstructionText()}
-                  </div>
+                <div className="text-center text-sm sm:text-base text-muted-foreground">
+                  {getInstructionText()}
                 </div>
               </div>
             ) : (
               <div className="space-y-4">
+                {/* Circle representation for initial state */}
+                {!exercise.isComplete && !isStarting && (
+                  <div className="flex flex-col items-center justify-center py-4">
+                    <div className="relative flex flex-col items-center justify-center w-60 h-60 sm:w-72 sm:h-72 rounded-full border-4 border-gray-200 mb-4">
+                      <div className="absolute inset-0 rounded-full border-4 border-green-500 border-opacity-30"></div>
+                      <div className="absolute inset-0 rounded-full border-4 border-amber-500 border-opacity-30" style={{ clipPath: 'polygon(50% 0, 100% 0, 100% 100%, 50% 100%)' }}></div>
+                      <div className="absolute inset-0 rounded-full border-4 border-blue-500 border-opacity-30" style={{ clipPath: 'polygon(0 0, 50% 0, 50% 100%, 0 100%)' }}></div>
+                      
+                      <Timer className="h-8 w-8 text-primary mb-2" />
+                      <div className="text-lg font-medium">1:00</div>
+                      <div className="text-sm text-muted-foreground mt-1">3 ciclos completos</div>
+                      
+                      <div className="mt-6 flex flex-col items-center">
+                        <div className="flex space-x-8 mb-2">
+                          <div className="flex flex-col items-center">
+                            <div className="w-3 h-3 rounded-full bg-green-500 mb-1"></div>
+                            <span className="text-xs text-green-600">Inspire</span>
+                            <span className="text-xs text-green-600">4s</span>
+                          </div>
+                          <div className="flex flex-col items-center">
+                            <div className="w-3 h-3 rounded-full bg-amber-500 mb-1"></div>
+                            <span className="text-xs text-amber-600">Segure</span>
+                            <span className="text-xs text-amber-600">7s</span>
+                          </div>
+                          <div className="flex flex-col items-center">
+                            <div className="w-3 h-3 rounded-full bg-blue-500 mb-1"></div>
+                            <span className="text-xs text-blue-600">Expire</span>
+                            <span className="text-xs text-blue-600">8s</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 <Button 
                   onClick={startBreathing}
                   disabled={dailyExercisesCount >= dailyLimit || isStarting}
