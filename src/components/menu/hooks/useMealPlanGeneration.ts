@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { DietaryPreferences, ProtocolFood } from "../types";
@@ -112,9 +113,9 @@ export const generateMealPlan = async ({
       }
     });
 
-    toastId = toast.loading("Gerando seu plano alimentar personalizado...");
+    toastId = toast.loading("Gerando seu plano alimentar personalizado com Llama 3.2 1B...");
 
-    console.log('[MEAL PLAN] Iniciando chamada para a Edge Function Groq');
+    console.log('[MEAL PLAN] Iniciando chamada para a Edge Function com modelo Llama 3.2 1B');
     
     // Mapear o objetivo para o formato esperado pela API
     const goalMapping = {
@@ -174,12 +175,16 @@ export const generateMealPlan = async ({
         allergies: (preferences.allergies || []).slice(0, 3), // Limitar alergias
         dietaryRestrictions: (preferences.dietaryRestrictions || []).slice(0, 3), // Limitar restrições
         trainingTime: preferences.trainingTime
+      },
+      modelConfig: {
+        model: "llama-3.2-1b-chat-8k", // Especifica o modelo Llama 3.2 1B 8k
+        provider: "groq"
       }
     };
     
-    console.log('[MEAL PLAN] Enviando payload para Groq:', JSON.stringify(enhancedPayload, null, 2));
+    console.log('[MEAL PLAN] Enviando payload para Llama 3.2 1B via Groq:', JSON.stringify(enhancedPayload, null, 2));
     
-    // Definir timeout para capturar falhas por timeout (60 segundos para o modelo Groq processar)
+    // Definir timeout para capturar falhas por timeout (60 segundos para o modelo processar)
     const edgeFunctionTimeout = 60000; 
     
     // Implementar timeout manual com Promise.race
@@ -187,25 +192,25 @@ export const generateMealPlan = async ({
     try {
       // Criar uma promessa que rejeita após o timeout
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("Timeout na chamada à Edge Function Groq")), edgeFunctionTimeout);
+        setTimeout(() => reject(new Error("Timeout na chamada à Edge Function Llama")), edgeFunctionTimeout);
       });
       
-      // Chamar a edge function Groq
+      // Chamar a edge function com o modelo Llama 3.2 1B
       const result = await Promise.race([
-        supabase.functions.invoke('generate-meal-plan-groq', { body: enhancedPayload }),
+        supabase.functions.invoke('generate-meal-plan-llama', { body: enhancedPayload }),
         timeoutPromise
       ]);
       
       // Verificar se temos resultado e se ele contém um plano válido
       if (result && 'data' in result && result.data && typeof result.data === 'object' && 'mealPlan' in result.data) {
-        console.log('[MEAL PLAN] Chamada à Edge Function Groq bem-sucedida!');
+        console.log('[MEAL PLAN] Chamada à Edge Function Llama bem-sucedida!');
         resultData = result.data as EdgeFunctionResponse;
       } else {
-        console.error('[MEAL PLAN] Resposta da Edge Function Groq sem dados válidos:', result);
-        throw new Error("Resposta da Edge Function Groq inválida");
+        console.error('[MEAL PLAN] Resposta da Edge Function Llama sem dados válidos:', result);
+        throw new Error("Resposta da Edge Function Llama inválida");
       }
     } catch (edgeFunctionError) {
-      console.error('[MEAL PLAN] Erro na chamada à Edge Function Groq:', edgeFunctionError);
+      console.error('[MEAL PLAN] Erro na chamada à Edge Function Llama:', edgeFunctionError);
       
       if (edgeFunctionError instanceof Error) {
         console.error('[MEAL PLAN] Detalhes do erro:', edgeFunctionError.message);
@@ -214,9 +219,23 @@ export const generateMealPlan = async ({
         }
       }
       
-      // Usar plano padrão quando edge function falha
-      console.log('[MEAL PLAN] Usando plano padrão devido a falha na Edge Function');
-      return createDefaultMealPlan(userData, selectedFoodsDetails, foodsByMealTypeFormatted);
+      // Tentar usar a edge function Groq existente como fallback
+      console.log('[MEAL PLAN] Tentando usar Groq como fallback após falha no Llama');
+      try {
+        const result = await supabase.functions.invoke('generate-meal-plan-groq', { body: enhancedPayload });
+        
+        if (result && 'data' in result && result.data && typeof result.data === 'object' && 'mealPlan' in result.data) {
+          console.log('[MEAL PLAN] Chamada de fallback à Edge Function Groq bem-sucedida!');
+          resultData = result.data as EdgeFunctionResponse;
+        } else {
+          throw new Error("Resposta da Edge Function Groq inválida no fallback");
+        }
+      } catch (fallbackError) {
+        console.error('[MEAL PLAN] Erro no fallback com Groq:', fallbackError);
+        // Usar plano padrão quando todas as edge functions falham
+        console.log('[MEAL PLAN] Usando plano padrão devido a falhas em todos os modelos');
+        return createDefaultMealPlan(userData, selectedFoodsDetails, foodsByMealTypeFormatted);
+      }
     }
 
     // Verificar se o plano tem a estrutura completa esperada
@@ -292,7 +311,7 @@ export const generateMealPlan = async ({
       await addTransaction({
         amount: REWARDS.MEAL_PLAN,
         type: 'meal_plan',
-        description: 'Geração de plano alimentar personalizado com Groq'
+        description: 'Geração de plano alimentar personalizado com Llama 3.2 1B'
       });
       console.log('[MEAL PLAN] Transação de recompensa adicionada');
     } catch (transactionError) {
@@ -310,7 +329,7 @@ export const generateMealPlan = async ({
     }
 
     toast.dismiss(toastId);
-    toast.success(`Cardápio personalizado gerado com Groq com sucesso! +${REWARDS.MEAL_PLAN} FITs`);
+    toast.success(`Cardápio personalizado gerado com Llama 3.2 1B com sucesso! +${REWARDS.MEAL_PLAN} FITs`);
 
     return resultData.mealPlan;
   } catch (error) {

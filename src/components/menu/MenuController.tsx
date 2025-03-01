@@ -352,6 +352,8 @@ export const useMenuController = () => {
         console.error('Erro ao salvar preferências dietéticas:', prefsError);
       }
       
+      toast.loading("Gerando plano alimentar personalizado com Llama 3.2 1B...");
+      
       const generatedMealPlan = await generateMealPlan({
         userData: {
           id: userData.user.id,
