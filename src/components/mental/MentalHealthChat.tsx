@@ -3,9 +3,10 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowUp, Loader2 } from "lucide-react";
+import { ArrowUp, Loader2, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface Message {
   role: "user" | "assistant";
@@ -74,6 +75,13 @@ export const MentalHealthChat = () => {
 
   return (
     <div className="flex flex-col h-full">
+      <Alert variant="default" className="mb-4 bg-yellow-50 border-yellow-200">
+        <AlertTriangle className="h-4 w-4 text-yellow-600" />
+        <AlertDescription className="text-yellow-800">
+          Aviso: Essa conversa será excluída permanentemente após fechar este chat.
+        </AlertDescription>
+      </Alert>
+      
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((message, index) => (
           <div
