@@ -25,6 +25,22 @@ interface MentalHealthSettings {
   breathing_exercise_daily_limit: number;
 }
 
+// Define breathing cycle durations in seconds
+const BREATHING_CYCLE = {
+  inhale: 4,
+  hold: 7,
+  exhale: 8
+};
+
+// New interface for tracking breathing steps
+interface BreathStep {
+  phase: "inhale" | "hold" | "exhale";
+  icon: React.ReactNode;
+  color: string;
+  label: string;
+  seconds: number;
+}
+
 export const MentalHealthResources = () => {
   const [exercise, setExercise] = useState<BreathingExercise>({
     phase: "inhale",
@@ -41,6 +57,31 @@ export const MentalHealthResources = () => {
   const [isStarting, setIsStarting] = useState(false);
   const wallet = useWallet();
   const isMobile = useIsMobile();
+
+  // Define the breathing steps
+  const breathingSteps: BreathStep[] = [
+    { 
+      phase: "inhale", 
+      icon: <ArrowDown className="w-5 h-5" />, 
+      color: "#4CAF50", 
+      label: "Inspire", 
+      seconds: BREATHING_CYCLE.inhale 
+    },
+    { 
+      phase: "hold", 
+      icon: <div className="w-5 h-1 bg-amber-500 rounded-full"></div>, 
+      color: "#FF9800", 
+      label: "Segure", 
+      seconds: BREATHING_CYCLE.hold 
+    },
+    { 
+      phase: "exhale", 
+      icon: <ArrowUp className="w-5 h-5" />, 
+      color: "#2196F3", 
+      label: "Expire", 
+      seconds: BREATHING_CYCLE.exhale 
+    },
+  ];
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -104,11 +145,11 @@ export const MentalHealthResources = () => {
         count: 0,
         totalBreaths: 3, // Reduced to fit in 1 minute
         isComplete: false,
-        secondsLeft: 4,
+        secondsLeft: BREATHING_CYCLE.inhale,
         elapsedTime: 0,
       });
       
-      breathe("inhale", 4, 0);
+      breathe("inhale", BREATHING_CYCLE.inhale, 0);
       setIsStarting(false);
     }, 0);
   };
@@ -132,9 +173,9 @@ export const MentalHealthResources = () => {
         
         // Transition to next phase based on current phase
         if (phase === "inhale") {
-          breathe("hold", 7, newElapsedTime); // Hold breath for 7 seconds
+          breathe("hold", BREATHING_CYCLE.hold, newElapsedTime); // Hold breath
         } else if (phase === "hold") {
-          breathe("exhale", 8, newElapsedTime); // Exhale for 8 seconds
+          breathe("exhale", BREATHING_CYCLE.exhale, newElapsedTime); // Exhale
         } else if (phase === "exhale") {
           setExercise(prev => {
             const newCount = prev.count + 1;
@@ -143,7 +184,7 @@ export const MentalHealthResources = () => {
               return { ...prev, count: newCount, isComplete: true, elapsedTime: newElapsedTime };
             } else {
               // Start new breath cycle
-              breathe("inhale", 4, newElapsedTime);
+              breathe("inhale", BREATHING_CYCLE.inhale, newElapsedTime);
               return { ...prev, count: newCount, elapsedTime: newElapsedTime };
             }
           });
@@ -247,17 +288,45 @@ export const MentalHealthResources = () => {
               </p>
             )}
             
-            {/* Dynamic Breathing Preview for Quick Start - Always visible */}
+            {/* Circular steps visualization - shown when not active */}
             {exercise.count === 0 && !exercise.isComplete && !isStarting && (
-              <div className="flex flex-col items-center justify-center mb-2 py-2">
-                <div className="flex items-center gap-2 bg-primary-50 px-6 py-3 rounded-full shadow-sm">
-                  <div className="relative w-10 h-10 flex items-center justify-center">
-                    <div className="absolute inset-0 bg-primary/10 rounded-full animate-ping opacity-50" style={{ animationDuration: '3s' }}></div>
-                    <div className="absolute inset-1 bg-primary/20 rounded-full animate-ping opacity-50" style={{ animationDuration: '2.5s' }}></div>
-                    <span className="relative font-medium text-primary">1:00</span>
+              <div className="flex flex-col items-center justify-center py-4">
+                <div className="relative flex items-center justify-center mb-4">
+                  {/* Preview of breathing cycle */}
+                  <div className="w-40 h-40 rounded-full bg-gray-50 border-2 border-dotted border-gray-200 flex items-center justify-center">
+                    <div className="w-32 h-32 rounded-full bg-white shadow-sm flex flex-col items-center justify-center">
+                      <Timer className="w-6 h-6 text-primary/70 mb-1" />
+                      <span className="text-sm font-medium">1:00</span>
+                      <span className="text-xs text-gray-500 mt-1">3 ciclos</span>
+                    </div>
                   </div>
+                  
+                  {/* Step indicators */}
+                  {breathingSteps.map((step, index) => {
+                    const angle = (index * (360 / breathingSteps.length)) * (Math.PI / 180);
+                    const x = Math.cos(angle) * 70;  // 70 is the radius
+                    const y = Math.sin(angle) * 70;
+                    
+                    return (
+                      <div 
+                        key={step.phase}
+                        className="absolute w-12 h-12 rounded-full bg-white shadow-md flex items-center justify-center"
+                        style={{ 
+                          transform: `translate(${x}px, ${y}px)`,
+                          border: `2px solid ${step.color}`
+                        }}
+                      >
+                        <div className="flex flex-col items-center">
+                          {step.icon}
+                          <span className="text-xs font-medium mt-0.5" style={{ color: step.color }}>
+                            {step.seconds}s
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <p className="text-xs text-center text-muted-foreground mt-2">
+                <p className="text-xs text-center text-muted-foreground">
                   Clique para começar o exercício de respiração
                 </p>
               </div>
@@ -281,28 +350,62 @@ export const MentalHealthResources = () => {
                   </div>
                 </div>
                 
-                <div className={`w-48 h-48 sm:w-64 sm:h-64 relative ${isMobile ? 'mt-2' : 'mt-4'}`}>
-                  <CircularProgressbar
-                    value={(exercise.secondsLeft / (exercise.phase === "inhale" ? 4 : exercise.phase === "hold" ? 7 : 8)) * 100}
-                    text={`${exercise.secondsLeft}s`}
-                    styles={buildStyles({
-                      pathColor: getPhaseColor(),
-                      textColor: getPhaseColor(),
-                      trailColor: '#e6e6e6',
-                      textSize: '24px',
-                      pathTransition: 'stroke-dashoffset 0.5s ease 0s',
-                      strokeLinecap: 'round',
-                    })}
-                  />
+                {/* Enhanced breathing visualization with steps */}
+                <div className="relative w-52 h-52 sm:w-64 sm:h-64">
+                  {/* Main circle with countdown */}
+                  <div className="absolute inset-2 z-10">
+                    <CircularProgressbar
+                      value={(exercise.secondsLeft / 
+                        (exercise.phase === "inhale" ? BREATHING_CYCLE.inhale : 
+                         exercise.phase === "hold" ? BREATHING_CYCLE.hold : 
+                         BREATHING_CYCLE.exhale)) * 100}
+                      text={`${exercise.secondsLeft}s`}
+                      styles={buildStyles({
+                        pathColor: getPhaseColor(),
+                        textColor: getPhaseColor(),
+                        trailColor: '#e6e6e6',
+                        textSize: '24px',
+                        pathTransition: 'stroke-dashoffset 0.5s ease 0s',
+                        strokeLinecap: 'round',
+                      })}
+                    />
+                  </div>
                   
-                  {/* Dynamic visual indicator */}
-                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
-                    <div className="bg-white/80 rounded-full p-6 shadow-sm">
+                  {/* Step indicators around the main circle */}
+                  {breathingSteps.map((step, index) => {
+                    const angle = (index * (360 / breathingSteps.length)) * (Math.PI / 180);
+                    const radius = 112; // Distance from center
+                    const x = Math.cos(angle) * radius;
+                    const y = Math.sin(angle) * radius;
+                    
+                    const isActive = exercise.phase === step.phase;
+                    
+                    return (
+                      <div 
+                        key={step.phase}
+                        className={`absolute w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                          isActive ? 'bg-white shadow-md scale-110' : 'bg-gray-50'
+                        }`}
+                        style={{ 
+                          transform: `translate(${x + 104}px, ${y + 104}px)`, // Adjusted for center position
+                          border: `2px solid ${isActive ? step.color : '#e0e0e0'}`
+                        }}
+                      >
+                        <div className="flex items-center justify-center" style={{ color: isActive ? step.color : '#9e9e9e' }}>
+                          {step.icon}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  
+                  {/* Visual indicators */}
+                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex items-center justify-center z-20">
+                    <div className="bg-white/80 rounded-full p-4 shadow-sm">
                       {getPhaseIcon()}
                     </div>
                   </div>
                   
-                  <div className="absolute top-3/4 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
+                  <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 text-center">
                     <span className="text-xs sm:text-sm font-medium text-muted-foreground">
                       Ciclo {exercise.count + 1} de {exercise.totalBreaths}
                     </span>
