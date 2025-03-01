@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -164,7 +163,15 @@ export const useMealPlanManager = () => {
           },
           selectedFoods: selectedFoodsData,
           foodsByMealType: sanitizedFoodsByMealType,
-          preferences: sanitizedPreferences
+          preferences: sanitizedPreferences,
+          options: {
+            agentVersion: "nutri+", // Explicitly specify the "nutri+" agent
+            includeRecipes: true,
+            followNutritionalGuidelines: true,
+            optimizeForMacros: true,
+            enhanceNutritionalVariety: true,
+            useSimplifiedTerms: false
+          }
         }
       });
 
