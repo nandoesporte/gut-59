@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowUp, Loader2, AlertTriangle, BrainCircuit, RefreshCw, WifiOff } from "lucide-react";
+import { ArrowUp, Loader2, AlertTriangle, BrainCircuit, RefreshCw, WifiOff, Network } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -91,6 +91,13 @@ export const MentalHealthChat = () => {
             ...prev,
             { role: "assistant", content: data.fallbackResponse },
           ]);
+          
+          // Also show a toast about connectivity issues
+          toast({
+            title: "Problemas de conexão detectados",
+            description: "Estamos enfrentando dificuldades para acessar nossos servidores de IA. Fornecemos uma resposta alternativa.",
+            variant: "destructive",
+          });
         } else {
           throw new Error(data.error);
         }
@@ -119,7 +126,9 @@ export const MentalHealthChat = () => {
         errorMsg.includes("network") || 
         errorMsg.includes("failed to fetch") || 
         errorMsg.includes("sending request") ||
-        errorMsg.includes("connectivity");
+        errorMsg.includes("connectivity") ||
+        errorMsg.includes("unreachable") || 
+        errorMsg.includes("timeout");
       
       if (isNetworkError) {
         setNetworkError(true);
@@ -238,7 +247,7 @@ export const MentalHealthChat = () => {
         {errorMessage && (
           <Alert variant="destructive" className="mt-4">
             {networkError ? (
-              <WifiOff className="h-4 w-4" />
+              <Network className="h-4 w-4" />
             ) : (
               <AlertTriangle className="h-4 w-4" />
             )}
