@@ -18,12 +18,14 @@ const saveMealPlanData = async (
   try {
     console.log('Salvando plano alimentar no banco de dados para usuário:', userId);
     
-    const { error } = await supabase.from('meal_plans').insert({
-      user_id: userId,
-      plan_data: mealPlan,
-      calories: calorieNeeds,
-      dietary_preferences: preferences
-    });
+    const { error } = await supabase
+      .from('meal_plans')
+      .insert({
+        user_id: userId,
+        plan_data: mealPlan,
+        calories: calorieNeeds,
+        dietary_preferences: preferences
+      });
     
     if (error) {
       console.error('Erro ao salvar plano alimentar:', error);
@@ -160,7 +162,7 @@ export const useMealPlanManager = () => {
       setMealPlan(generatedPlan);
 
       try {
-        await saveMealPlanData(userData.user.id, generatedPlan, calorieNeeds, preferences);
+        await saveMealPlanData(userData.user.id, generatedPlan, calorieNeeds, sanitizedPreferences);
         console.log('Plano salvo com sucesso no banco de dados');
       } catch (dbError) {
         console.error('Erro ao salvar plano:', dbError);
