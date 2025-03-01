@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowUp, Loader2, AlertTriangle } from "lucide-react";
+import { ArrowUp, Loader2, AlertTriangle, BrainCircuit } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -17,7 +17,7 @@ export const MentalHealthChat = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "Olá! Eu sou sua assistente de saúde mental. Como posso ajudar você hoje?",
+      content: "Olá! Eu sou sua assistente de saúde mental, agora com tecnologia Llama 3.2. Como posso ajudar você hoje?",
     },
   ]);
   const [input, setInput] = useState("");
@@ -44,7 +44,7 @@ export const MentalHealthChat = () => {
     setIsLoading(true);
 
     try {
-      // Using the new groq-chat edge function instead of mental-health-chat
+      // Using the groq-chat edge function with Llama 3.2 model
       const { data, error } = await supabase.functions.invoke("groq-chat", {
         body: { 
           message: input,
@@ -66,7 +66,7 @@ export const MentalHealthChat = () => {
       console.error("Erro ao enviar mensagem:", error);
       toast({
         title: "Erro na comunicação",
-        description: "Não foi possível obter resposta. Tente novamente mais tarde.",
+        description: "Não foi possível obter resposta do modelo Llama 3.2. Tente novamente mais tarde.",
         variant: "destructive",
       });
     } finally {
@@ -76,10 +76,10 @@ export const MentalHealthChat = () => {
 
   return (
     <div className="flex flex-col h-full">
-      <Alert variant="default" className="mb-4 bg-yellow-50 border-yellow-200">
-        <AlertTriangle className="h-4 w-4 text-yellow-600" />
-        <AlertDescription className="text-yellow-800">
-          Aviso: Essa conversa será excluída permanentemente após fechar este chat.
+      <Alert variant="default" className="mb-4 bg-blue-50 border-blue-200">
+        <BrainCircuit className="h-4 w-4 text-blue-600" />
+        <AlertDescription className="text-blue-800">
+          Conselheira virtual agora com o modelo de IA Llama 3.2 para respostas mais precisas e humanas.
         </AlertDescription>
       </Alert>
       
