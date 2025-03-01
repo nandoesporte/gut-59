@@ -8,6 +8,8 @@ import { useWallet } from "@/hooks/useWallet";
 import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
 import "react-circular-progressbar/dist/styles.css";
 import { Info } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Progress } from "@/components/ui/progress";
 
 interface BreathingExercise {
   phase: "inhale" | "hold" | "exhale";
@@ -15,6 +17,7 @@ interface BreathingExercise {
   totalBreaths: number;
   isComplete: boolean;
   secondsLeft: number;
+  elapsedTime: number;
 }
 
 interface MentalHealthSettings {
@@ -26,15 +29,17 @@ export const MentalHealthResources = () => {
   const [exercise, setExercise] = useState<BreathingExercise>({
     phase: "inhale",
     count: 0,
-    totalBreaths: 5,
+    totalBreaths: 3, // Reduced total breaths to fit in 1 minute
     isComplete: false,
     secondsLeft: 4,
+    elapsedTime: 0,
   });
   const [dailyExercisesCount, setDailyExercisesCount] = useState(0);
   const [dailyLimit, setDailyLimit] = useState(5);
   const [isLoading, setIsLoading] = useState(true);
   const [timer, setTimer] = useState<NodeJS.Timeout | null>(null);
   const wallet = useWallet();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -86,50 +91,54 @@ export const MentalHealthResources = () => {
     setExercise({
       phase: "inhale",
       count: 0,
-      totalBreaths: 5,
+      totalBreaths: 3, // Reduced to fit in 1 minute
       isComplete: false,
       secondsLeft: 4,
+      elapsedTime: 0,
     });
-    breathe("inhale", 4);
+    breathe("inhale", 4, 0);
   };
 
-  const breathe = (phase: "inhale" | "hold" | "exhale", duration: number) => {
+  const breathe = (phase: "inhale" | "hold" | "exhale", duration: number, elapsedTime: number) => {
     setExercise(prev => ({
       ...prev,
       phase,
-      secondsLeft: duration
+      secondsLeft: duration,
+      elapsedTime
     }));
 
     let secondsRemaining = duration;
     
     const newTimer = setInterval(() => {
       secondsRemaining -= 1;
+      const newElapsedTime = elapsedTime + 1;
       
       if (secondsRemaining <= 0) {
         clearInterval(newTimer);
         
         // Transition to next phase based on current phase
         if (phase === "inhale") {
-          breathe("hold", 7); // Hold breath for 7 seconds
+          breathe("hold", 7, newElapsedTime); // Hold breath for 7 seconds
         } else if (phase === "hold") {
-          breathe("exhale", 8); // Exhale for 8 seconds
+          breathe("exhale", 8, newElapsedTime); // Exhale for 8 seconds
         } else if (phase === "exhale") {
           setExercise(prev => {
             const newCount = prev.count + 1;
-            if (newCount >= prev.totalBreaths) {
+            if (newCount >= prev.totalBreaths || newElapsedTime >= 60) { // Stop at 1 minute (60 seconds)
               completeExercise();
-              return { ...prev, count: newCount, isComplete: true };
+              return { ...prev, count: newCount, isComplete: true, elapsedTime: newElapsedTime };
             } else {
               // Start new breath cycle
-              breathe("inhale", 4);
-              return { ...prev, count: newCount };
+              breathe("inhale", 4, newElapsedTime);
+              return { ...prev, count: newCount, elapsedTime: newElapsedTime };
             }
           });
         }
       } else {
         setExercise(prev => ({
           ...prev,
-          secondsLeft: secondsRemaining
+          secondsLeft: secondsRemaining,
+          elapsedTime: newElapsedTime
         }));
       }
     }, 1000);
@@ -170,15 +179,29 @@ export const MentalHealthResources = () => {
     }
   };
 
+  const getInstructionText = () => {
+    switch (exercise.phase) {
+      case "inhale": return "Inspire lentamente pelo nariz";
+      case "hold": return "Segure o ar nos pulmões";
+      case "exhale": return "Expire completamente pela boca";
+      default: return "";
+    }
+  };
+
   if (isLoading) {
     return <div>Carregando...</div>;
   }
 
+  const totalExerciseTime = 60; // 1 minute in seconds
+  const progressPercentage = exercise.count > 0 && !exercise.isComplete 
+    ? (exercise.elapsedTime / totalExerciseTime) * 100 
+    : 0;
+
   return (
     <div className="space-y-6">
       <Card className="overflow-hidden">
-        <CardContent className="p-6">
-          <div className="space-y-6">
+        <CardContent className="p-4 sm:p-6">
+          <div className="space-y-4 sm:space-y-6">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-medium text-primary">Técnica de Respiração 4-7-8</h3>
               <span className="text-sm text-muted-foreground">
@@ -186,17 +209,32 @@ export const MentalHealthResources = () => {
               </span>
             </div>
             
-            <div className="bg-primary-50 p-4 rounded-lg flex items-center gap-3 mb-4">
-              <Info className="h-5 w-5 text-primary-600 flex-shrink-0" />
-              <p className="text-sm text-primary-800">
+            <div className="bg-primary-50 p-3 sm:p-4 rounded-lg flex items-start sm:items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+              <Info className="h-5 w-5 text-primary-600 flex-shrink-0 mt-0.5 sm:mt-0" />
+              <p className={`text-xs sm:text-sm text-primary-800 ${isMobile ? 'leading-tight' : ''}`}>
                 A técnica 4-7-8 ajuda a reduzir ansiedade e melhorar o foco: <strong>inspire por 4 segundos</strong>, 
                 <strong> segure por 7 segundos</strong> e <strong>expire por 8 segundos</strong>.
+                {!isMobile && ' Complete o exercício de 1 minuto para ganhar 1 FIT.'}
               </p>
             </div>
             
+            {isMobile && (
+              <p className="text-xs text-center text-muted-foreground -mt-2 mb-2">
+                Complete o exercício de 1 minuto para ganhar 1 FIT.
+              </p>
+            )}
+            
             {exercise.count > 0 && !exercise.isComplete ? (
-              <div className="flex flex-col items-center space-y-6">
-                <div className="w-64 h-64 relative">
+              <div className="flex flex-col items-center space-y-4 sm:space-y-6">
+                {/* Progress bar for overall exercise */}
+                <div className="w-full">
+                  <Progress value={progressPercentage} className="h-2" />
+                  <p className="text-xs text-center mt-1 text-muted-foreground">
+                    {Math.floor(exercise.elapsedTime)}s / {totalExerciseTime}s
+                  </p>
+                </div>
+                
+                <div className={`w-48 h-48 sm:w-64 sm:h-64 relative ${isMobile ? 'mt-2' : 'mt-4'}`}>
                   <CircularProgressbar
                     value={(exercise.secondsLeft / (exercise.phase === "inhale" ? 4 : exercise.phase === "hold" ? 7 : 8)) * 100}
                     text={`${exercise.secondsLeft}s`}
@@ -209,19 +247,18 @@ export const MentalHealthResources = () => {
                     })}
                   />
                   <div className="absolute top-3/4 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
-                    <span className="text-sm font-medium text-muted-foreground">
+                    <span className="text-xs sm:text-sm font-medium text-muted-foreground">
                       Ciclo {exercise.count + 1} de {exercise.totalBreaths}
                     </span>
                   </div>
                 </div>
+                
                 <div className="text-center">
-                  <div className="text-2xl font-medium mb-2" style={{ color: getPhaseColor() }}>
+                  <div className="text-xl sm:text-2xl font-medium mb-1 sm:mb-2" style={{ color: getPhaseColor() }}>
                     {getPhaseText()}
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    {exercise.phase === "inhale" ? "Inspire pelo nariz" : 
-                     exercise.phase === "hold" ? "Segure o ar" : 
-                     "Expire pela boca lentamente"}
+                  <div className="text-xs sm:text-sm text-muted-foreground">
+                    {getInstructionText()}
                   </div>
                 </div>
               </div>
@@ -230,7 +267,7 @@ export const MentalHealthResources = () => {
                 <Button 
                   onClick={startBreathing}
                   disabled={dailyExercisesCount >= dailyLimit}
-                  className="w-full py-6 text-lg"
+                  className="w-full py-4 sm:py-6 text-base sm:text-lg"
                   size="lg"
                 >
                   {dailyExercisesCount >= dailyLimit 
@@ -241,7 +278,7 @@ export const MentalHealthResources = () => {
                 {exercise.isComplete && (
                   <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-center">
                     <p className="text-green-800 font-medium">Exercício completado com sucesso!</p>
-                    <p className="text-sm text-green-700 mt-1">Você ganhou 1 FIT como recompensa</p>
+                    <p className="text-xs sm:text-sm text-green-700 mt-1">Você ganhou 1 FIT como recompensa</p>
                   </div>
                 )}
               </div>
