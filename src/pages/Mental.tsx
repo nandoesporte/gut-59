@@ -1,21 +1,25 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Brain, Clock, Headphones, BookOpen, MessageCircle, Smile, SmilePlus, Frown, Meh, Angry } from "lucide-react";
+import { Brain, Clock, Headphones, BookOpen, MessageCircle, Smile, SmilePlus, Frown, Meh, Angry, Loader2 } from "lucide-react";
 import { MentalHealthResources } from '@/components/mental/MentalHealthResources';
 import { MentalModules } from '@/components/mental/MentalModules';
 import { MentalHealthChat } from '@/components/mental/MentalHealthChat';
+import { supabase } from "@/integrations/supabase/client";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const Mental = () => {
   const [date] = useState<Date>(new Date());
   const [mood, setMood] = useState('');
   const [selectedEmotion, setSelectedEmotion] = useState('');
   const [activeTab, setActiveTab] = useState('breathing');
+  const [emotionGuidance, setEmotionGuidance] = useState('');
+  const [isLoadingGuidance, setIsLoadingGuidance] = useState(false);
 
   const menuItems = [
     { id: 'breathing', icon: <Clock className="w-6 h-6" />, label: 'Respiração', color: 'bg-[#D3E4FD]' },
@@ -32,6 +36,45 @@ const Mental = () => {
     { id: 'sad', icon: <Frown className="w-6 h-6 md:w-8 md:h-8" />, label: 'Triste', color: 'bg-[#FFDEE2]' },
     { id: 'angry', icon: <Angry className="w-6 h-6 md:w-8 md:h-8" />, label: 'Irritado', color: 'bg-[#FEC6A1]' },
   ];
+
+  const getEmotionGuidance = async (emotion: string) => {
+    setIsLoadingGuidance(true);
+    setEmotionGuidance('');
+    
+    try {
+      const emotionLabel = emotions.find(e => e.id === emotion)?.label || '';
+      
+      const { data, error } = await supabase.functions.invoke("mental-health-chat", {
+        body: { 
+          message: `Dê um breve conselho ou orientação para alguém que está se sentindo ${emotionLabel.toLowerCase()} hoje. Não mais que 2 parágrafos.`,
+          history: [
+            {
+              role: "assistant",
+              content: "Olá! Estou aqui para te ajudar com orientações sobre suas emoções."
+            }
+          ]
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.response) {
+        setEmotionGuidance(data.response);
+      } else {
+        throw new Error("Resposta não recebida");
+      }
+    } catch (error) {
+      console.error("Erro ao obter orientação:", error);
+      setEmotionGuidance("Não foi possível carregar uma orientação para essa emoção. Tente novamente mais tarde.");
+    } finally {
+      setIsLoadingGuidance(false);
+    }
+  };
+
+  const handleEmotionSelect = (emotion: string) => {
+    setSelectedEmotion(emotion);
+    getEmotionGuidance(emotion);
+  };
 
   return (
     <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 space-y-4 sm:space-y-8 animate-fadeIn pb-20">
@@ -96,7 +139,7 @@ const Mental = () => {
                 {emotions.map((emotion) => (
                   <button
                     key={emotion.id}
-                    onClick={() => setSelectedEmotion(emotion.id)}
+                    onClick={() => handleEmotionSelect(emotion.id)}
                     className={`p-3 sm:p-4 rounded-xl transition-all transform hover:scale-105 ${emotion.color} 
                       ${selectedEmotion === emotion.id ? 'ring-2 ring-primary shadow-lg' : 'hover:shadow-md'}`}
                   >
@@ -107,6 +150,21 @@ const Mental = () => {
                   </button>
                 ))}
               </div>
+
+              {selectedEmotion && (
+                <Alert className={`${emotions.find(e => e.id === selectedEmotion)?.color} border-none`}>
+                  <AlertDescription className="py-2">
+                    {isLoadingGuidance ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                        <span>Carregando orientação...</span>
+                      </div>
+                    ) : (
+                      <div className="text-sm whitespace-pre-wrap">{emotionGuidance}</div>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
 
               <div className="bg-card rounded-lg p-4 shadow-sm">
                 <div className="w-full max-w-md mx-auto">
