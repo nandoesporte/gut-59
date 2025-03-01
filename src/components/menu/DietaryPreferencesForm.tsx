@@ -18,6 +18,7 @@ export const DietaryPreferencesForm = ({ onSubmit, onBack }: DietaryPreferencesF
     dietaryRestrictions: [],
     trainingTime: null,
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleAllergiesChange = (checked: boolean) => {
     setPreferences(prev => ({
@@ -48,9 +49,22 @@ export const DietaryPreferencesForm = ({ onSubmit, onBack }: DietaryPreferencesF
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(preferences);
+    
+    if (isSubmitting) {
+      return;
+    }
+    
+    try {
+      setIsSubmitting(true);
+      console.log("Enviando preferências dietéticas:", preferences);
+      await onSubmit(preferences);
+    } catch (error) {
+      console.error("Erro ao enviar preferências:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -120,8 +134,12 @@ export const DietaryPreferencesForm = ({ onSubmit, onBack }: DietaryPreferencesF
         <Button type="button" variant="outline" onClick={onBack} className="w-full sm:w-auto">
           Voltar
         </Button>
-        <Button type="submit" className="w-full sm:w-auto bg-green-500 hover:bg-green-600">
-          Continuar
+        <Button 
+          type="submit" 
+          className="w-full sm:w-auto bg-green-500 hover:bg-green-600"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? "Processando..." : "Continuar"}
         </Button>
       </div>
     </form>

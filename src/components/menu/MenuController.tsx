@@ -133,7 +133,6 @@ export const useMenuController = () => {
         console.warn("Error checking authentication, proceeding to next step anyway:", authError);
       }
       
-      // Always proceed to next step after successful calorie calculation
       console.log("Advancing to step 2 (food selection)");
       setCurrentStep(2);
       return true;
@@ -332,11 +331,10 @@ export const useMenuController = () => {
   };
 
   const handleDietaryPreferences = async (preferences: DietaryPreferences) => {    
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) {
-      toast.error("Usuário não autenticado");
-      return false;
-    }
+    console.log('Preferências alimentares recebidas:', preferences);
+    console.log('Alimentos selecionados:', selectedFoods);
+
+    setDietaryPreferences(preferences);
 
     if (!calorieNeeds || calorieNeeds <= 0) {
       toast.error("Necessidade calórica inválida");
@@ -353,65 +351,95 @@ export const useMenuController = () => {
       return false;
     }
 
-    console.log('Preferências alimentares recebidas:', preferences);
-    console.log('Alimentos selecionados:', selectedFoods);
-
-    setLoading(true);
-
     try {
-      const selectedFoodsData = protocolFoods.filter(food => selectedFoods.includes(food.id));
-      console.log('Dados dos alimentos selecionados:', selectedFoodsData);
+      const { data: userData } = await supabase.auth.getUser();
+      
+      if (userData.user) {
+        const { error: prefsError } = await supabase
+          .from('dietary_preferences')
+          .upsert({
+            user_id: userData.user.id,
+            has_allergies: preferences.hasAllergies,
+            allergies: preferences.allergies,
+            dietary_restrictions: preferences.dietaryRestrictions,
+            training_time: preferences.trainingTime
+          }, { onConflict: 'user_id' });
+              
+        if (prefsError) {
+          console.error('Erro ao salvar preferências dietéticas:', prefsError);
+        }
+        
+        toast.loading("Gerando plano alimentar personalizado com Llama 3.2 1B...");
+        
+        try {
+          const generatedMealPlan = await generateMealPlan({
+            userData: {
+              id: userData.user.id,
+              weight: Number(formData.weight),
+              height: Number(formData.height),
+              age: Number(formData.age),
+              gender: formData.gender,
+              activityLevel: formData.activityLevel,
+              goal: formData.goal,
+              dailyCalories: calorieNeeds
+            },
+            selectedFoods: protocolFoods.filter(food => selectedFoods.includes(food.id)),
+            foodsByMealType,
+            preferences,
+            addTransaction: addTransactionAsync
+          });
 
-      const { error: prefsError } = await supabase
-        .from('dietary_preferences')
-        .upsert({
-          user_id: userData.user.id,
-          has_allergies: preferences.hasAllergies,
-          allergies: preferences.allergies,
-          dietary_restrictions: preferences.dietaryRestrictions,
-          training_time: preferences.trainingTime
-        }, { onConflict: 'user_id' });
-          
-      if (prefsError) {
-        console.error('Erro ao salvar preferências dietéticas:', prefsError);
+          if (generatedMealPlan) {
+            setMealPlan(generatedMealPlan);
+            console.log('Plano gerado:', generatedMealPlan);
+          } else {
+            console.error('Plano alimentar não foi gerado corretamente');
+            toast.error("Falha ao gerar plano alimentar. Tente novamente.");
+          }
+        } catch (error) {
+          console.error('Erro ao gerar plano alimentar:', error);
+          toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        console.log("Usuário não autenticado. Criando plano básico.");
+        
+        const basicMealPlan: MealPlan = {
+          userCalories: calorieNeeds,
+          weeklyPlan: {
+            "Segunda": {
+              "Café da Manhã": [
+                { name: "Escolha um dos alimentos selecionados", portion: "1 porção", calories: 0 }
+              ],
+              "Almoço": [
+                { name: "Escolha um dos alimentos selecionados", portion: "1 porção", calories: 0 }
+              ],
+              "Lanche": [
+                { name: "Escolha um dos alimentos selecionados", portion: "1 porção", calories: 0 }
+              ],
+              "Jantar": [
+                { name: "Escolha um dos alimentos selecionados", portion: "1 porção", calories: 0 }
+              ]
+            }
+          },
+          recommendations: [
+            "Para um plano personalizado completo, faça login na plataforma.",
+            "Mantenha uma alimentação balanceada com proteínas, carboidratos e gorduras boas.",
+            "Beba pelo menos 2 litros de água por dia."
+          ]
+        };
+        
+        setMealPlan(basicMealPlan);
+        toast.success("Plano básico criado! Para um plano personalizado completo, faça login.");
       }
-      
-      toast.loading("Gerando plano alimentar personalizado com Llama 3.2 1B...");
-      
-      const generatedMealPlan = await generateMealPlan({
-        userData: {
-          id: userData.user.id,
-          weight: Number(formData.weight),
-          height: Number(formData.height),
-          age: Number(formData.age),
-          gender: formData.gender,
-          activityLevel: formData.activityLevel,
-          goal: formData.goal,
-          dailyCalories: calorieNeeds
-        },
-        selectedFoods: selectedFoodsData,
-        foodsByMealType,
-        preferences,
-        addTransaction: addTransactionAsync
-      });
-
-      if (!generatedMealPlan) {
-        throw new Error('Plano alimentar não foi gerado corretamente');
-      }
-
-      console.log('Plano gerado:', generatedMealPlan);
-      
-      setMealPlan(generatedMealPlan);
-      
-      setDietaryPreferences(preferences);
       
       console.log("Avançando para a etapa 4 (exibição do plano alimentar)");
       setCurrentStep(4);
-      
       return true;
     } catch (error) {
       console.error('Erro completo:', error);
-      toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
+      toast.error("Erro ao processar suas preferências. Tente novamente.");
       return false;
     } finally {
       setLoading(false);
