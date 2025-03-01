@@ -142,8 +142,7 @@ const Mental = () => {
           .from('emotion_logs')
           .insert({
             emotion: emotion,
-            user_id: user.id,
-            created_at: new Date().toISOString()
+            user_id: user.id
           });
           
         if (error) throw error;
