@@ -44,8 +44,8 @@ export const MentalHealthChat = () => {
     setIsLoading(true);
 
     try {
-      // Using the groq-chat edge function with Mixtral model
-      const { data, error } = await supabase.functions.invoke("groq-chat", {
+      // Using the LlamaAPI with Nous-Hermes-2-Mixtral-8x7B-DPO model
+      const { data, error } = await supabase.functions.invoke("mental-health-chat-llama", {
         body: { 
           message: input,
           history: messages
@@ -66,7 +66,7 @@ export const MentalHealthChat = () => {
       console.error("Erro ao enviar mensagem:", error);
       toast({
         title: "Erro na comunicação",
-        description: "Não foi possível obter resposta do modelo Mixtral. Tente novamente mais tarde.",
+        description: "Não foi possível obter resposta do modelo Nous-Hermes-2-Mixtral-8x7B-DPO. Tente novamente mais tarde.",
         variant: "destructive",
       });
     } finally {
