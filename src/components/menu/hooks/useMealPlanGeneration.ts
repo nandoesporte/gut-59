@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { DietaryPreferences, ProtocolFood } from "../types";
@@ -233,8 +232,7 @@ export const generateMealPlan = async ({
         
         const result = await Promise.race([
           supabase.functions.invoke('generate-meal-plan-llama', { 
-            body: enhancedPayload,
-            options: { deadlineMs: 100000 } // Aumentar deadline para Supabase function
+            body: enhancedPayload
           }),
           new Promise<never>((_, reject) => setTimeout(() => 
             reject(new Error("Timeout na chamada à Edge Function Llama")), 90000))
