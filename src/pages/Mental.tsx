@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,6 +9,7 @@ import { ptBR } from 'date-fns/locale';
 import { Brain, Clock, Headphones, BookOpen, MessageCircle, Smile, SmilePlus, Frown, Meh, Angry } from "lucide-react";
 import { MentalHealthResources } from '@/components/mental/MentalHealthResources';
 import { MentalModules } from '@/components/mental/MentalModules';
+import { MentalHealthChat } from '@/components/mental/MentalHealthChat';
 
 const Mental = () => {
   const [date] = useState<Date>(new Date());
@@ -143,17 +145,10 @@ const Mental = () => {
             <CardHeader className="pb-2">
               <CardTitle className="text-lg sm:text-xl text-primary">IA Conselheira</CardTitle>
             </CardHeader>
-            <CardContent className="p-4 space-y-4">
-              <div className="rounded-lg bg-[#F6F9FE] p-4 shadow-sm">
-                <p className="text-sm text-muted-foreground">
-                  Olá! Sou sua assistente de bem-estar mental. Como posso ajudar você hoje?
-                </p>
+            <CardContent className="p-4">
+              <div className="h-[500px]">
+                <MentalHealthChat />
               </div>
-              <Textarea
-                placeholder="Digite sua mensagem..."
-                className="min-h-[100px] resize-none"
-              />
-              <Button className="w-full shadow-md">Enviar</Button>
             </CardContent>
           </Card>
         </TabsContent>
