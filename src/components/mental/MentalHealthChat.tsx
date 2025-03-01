@@ -1,94 +1,148 @@
 
-import React, { useState } from "react";
-import { useChatActions } from "./chat/useChatActions";
-import { ChatMessage } from "./chat/ChatMessage";
-import { ChatInput } from "./chat/ChatInput";
-import { ErrorDisplay } from "./chat/ErrorDisplay";
-import { ChatHeader } from "./chat/ChatHeader";
-import { ScrollToBottomButton } from "./chat/ScrollToBottomButton";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { ActivitySquare } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ArrowUp, Loader2, AlertTriangle, BrainCircuit } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
-export const MentalHealthChat: React.FC = () => {
-  const [isTesting, setIsTesting] = useState(false);
-  
-  const {
-    messages,
-    input,
-    setInput,
-    isLoading,
-    errorMessage,
-    networkError,
-    useGroqFallback,
-    messagesEndRef,
-    handleSubmit,
-    handleRetry,
-    switchToGroq,
-    scrollToBottom,
-    testApiConnection
-  } = useChatActions();
+interface Message {
+  role: "user" | "assistant";
+  content: string;
+}
 
-  const handleTestApi = async () => {
-    setIsTesting(true);
-    await testApiConnection();
-    setTimeout(() => setIsTesting(false), 3000);
+export const MentalHealthChat = () => {
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      role: "assistant",
+      content: "Olá! Eu sou sua assistente de saúde mental. Como posso ajudar você hoje?",
+    },
+  ]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    
+    if (!input.trim()) return;
+
+    const userMessage = { role: "user" as const, content: input };
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
+    setIsLoading(true);
+
+    try {
+      // Using the groq-chat edge function with Mixtral model
+      const { data, error } = await supabase.functions.invoke("groq-chat", {
+        body: { 
+          message: input,
+          history: messages
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.response) {
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: data.response },
+        ]);
+      } else {
+        throw new Error("Resposta não recebida");
+      }
+    } catch (error) {
+      console.error("Erro ao enviar mensagem:", error);
+      toast({
+        title: "Erro na comunicação",
+        description: "Não foi possível obter resposta do modelo Mixtral. Tente novamente mais tarde.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <div className="flex flex-col h-full bg-white rounded-lg shadow-sm">
-      <div className="p-4">
-        <ChatHeader />
-        <div className="mt-2 flex justify-end">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="text-xs flex items-center gap-1"
-            onClick={handleTestApi}
-            disabled={isTesting || isLoading}
-          >
-            {isTesting ? (
-              <>
-                <ActivitySquare className="h-3 w-3 animate-pulse" />
-                Testando...
-              </>
-            ) : (
-              <>
-                <ActivitySquare className="h-3 w-3" />
-                Testar API
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
+    <div className="flex flex-col h-full">
+      <Alert variant="default" className="mb-4 bg-blue-50 border-blue-200">
+        <BrainCircuit className="h-4 w-4 text-blue-600" />
+        <AlertDescription className="text-blue-800">
+          Essa mensagem será excluída imediatamente após fechar este chat. Não armazenamos suas mensagens!
+        </AlertDescription>
+      </Alert>
       
-      <div className="flex-1 px-4 overflow-y-auto mb-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((message, index) => (
-          <ChatMessage key={index} message={message} index={index} />
+          <div
+            key={index}
+            className={`flex items-start gap-3 ${
+              message.role === "user" ? "justify-end" : "justify-start"
+            }`}
+          >
+            {message.role === "assistant" && (
+              <Avatar className="h-8 w-8 bg-primary-50">
+                <AvatarImage src="/lovable-uploads/9456a3bf-9bc8-45d6-9105-dd939e3362f5.png" alt="IA" />
+                <AvatarFallback>IA</AvatarFallback>
+              </Avatar>
+            )}
+            <div
+              className={`rounded-lg p-4 max-w-[80%] ${
+                message.role === "user"
+                  ? "bg-primary-500 text-white"
+                  : "bg-muted"
+              }`}
+            >
+              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+            </div>
+            {message.role === "user" && (
+              <Avatar className="h-8 w-8">
+                <AvatarFallback>EU</AvatarFallback>
+              </Avatar>
+            )}
+          </div>
         ))}
-        
         <div ref={messagesEndRef} />
       </div>
-      
-      <ScrollToBottomButton 
-        messageLength={messages.length} 
-        scrollToBottom={scrollToBottom} 
-      />
-      
-      <ErrorDisplay 
-        errorMessage={errorMessage}
-        networkError={networkError}
-        useGroqFallback={useGroqFallback}
-        handleRetry={handleRetry}
-        switchToGroq={switchToGroq}
-      />
-      
-      <div className="p-4 bg-gray-50 border-t">
-        <ChatInput
-          input={input}
-          setInput={setInput}
-          handleSubmit={handleSubmit}
-          isLoading={isLoading}
-        />
+
+      <div className="border-t p-4">
+        <form onSubmit={handleSubmit} className="flex gap-2">
+          <Textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Digite sua mensagem..."
+            className="resize-none min-h-[80px]"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit();
+              }
+            }}
+          />
+          <Button 
+            type="submit" 
+            size="icon" 
+            className="h-10 w-10 shrink-0 self-end"
+            disabled={isLoading || !input.trim()}
+          >
+            {isLoading ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <ArrowUp className="h-5 w-5" />
+            )}
+          </Button>
+        </form>
       </div>
     </div>
   );

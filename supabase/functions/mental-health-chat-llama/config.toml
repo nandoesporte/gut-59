@@ -1,5 +1,0 @@
-
-project_id = "sxjafhzikftdenqnkcri"
-[functions.mental-health-chat-llama]
-verify_jwt = false
-timeout_seconds = 60

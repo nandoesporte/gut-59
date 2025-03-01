@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { DietaryPreferences, ProtocolFood } from "../types";
@@ -114,7 +115,7 @@ export const generateMealPlan = async ({
 
     toastId = toast.loading("Gerando seu plano alimentar personalizado com Nous-Hermes-2-Mixtral-8x7B-DPO...");
 
-    console.log('[MEAL PLAN] Iniciando chamada para a Edge Function com modelo Nous-Hermes-2-Mixtral-8x7B-DPO via LlamaAPI');
+    console.log('[MEAL PLAN] Iniciando chamada para a Edge Function com modelo Nous-Hermes-2-Mixtral-8x7B-DPO');
     
     // Mapear o objetivo para o formato esperado pela API
     const goalMapping = {
@@ -155,8 +156,8 @@ export const generateMealPlan = async ({
     
     console.log('[MEAL PLAN] Alimentos formatados por refeição:', foodsByMealTypeFormatted);
     
-    // Preparar payload para a edge function
-    const llamaApiPayload = {
+    // Melhorar a solicitação enviada à edge function com alimentos organizados por refeição
+    const enhancedPayload = {
       userData: {
         weight: Math.round(userData.weight),
         height: Math.round(userData.height),
@@ -168,17 +169,20 @@ export const generateMealPlan = async ({
         dailyCalories: Math.round(userData.dailyCalories)
       },
       selectedFoods: selectedFoodsDetails,
-      foodsByMealType: foodsByMealTypeFormatted,
+      foodsByMealType: foodsByMealTypeFormatted, // Enviando alimentos organizados por refeição
       dietaryPreferences: {
         hasAllergies: preferences.hasAllergies || false,
         allergies: (preferences.allergies || []).slice(0, 3), // Limitar alergias
         dietaryRestrictions: (preferences.dietaryRestrictions || []).slice(0, 3), // Limitar restrições
         trainingTime: preferences.trainingTime
+      },
+      modelConfig: {
+        model: "nous-hermes-2-mixtral-8x7b-dpo", // Especifica o modelo Nous-Hermes-2-Mixtral-8x7B-DPO
+        provider: "groq"
       }
     };
     
-    console.log('[MEAL PLAN] Enviando payload para Nous-Hermes-2-Mixtral-8x7B-DPO via LlamaAPI:', 
-      JSON.stringify(llamaApiPayload, null, 2).substring(0, 500) + "...");
+    console.log('[MEAL PLAN] Enviando payload para Nous-Hermes-2-Mixtral-8x7B-DPO via Groq:', JSON.stringify(enhancedPayload, null, 2));
     
     // Definir timeout para capturar falhas por timeout (60 segundos para o modelo processar)
     const edgeFunctionTimeout = 60000; 
@@ -188,25 +192,25 @@ export const generateMealPlan = async ({
     try {
       // Criar uma promessa que rejeita após o timeout
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("Timeout na chamada à Edge Function LlamaAPI")), edgeFunctionTimeout);
+        setTimeout(() => reject(new Error("Timeout na chamada à Edge Function Llama")), edgeFunctionTimeout);
       });
       
-      // Chamar a edge function com o modelo Nous-Hermes-2-Mixtral-8x7B-DPO via LlamaAPI
+      // Chamar a edge function com o modelo Nous-Hermes-2-Mixtral-8x7B-DPO
       const result = await Promise.race([
-        supabase.functions.invoke('generate-meal-plan-llama', { body: llamaApiPayload }),
+        supabase.functions.invoke('generate-meal-plan-llama', { body: enhancedPayload }),
         timeoutPromise
       ]);
       
       // Verificar se temos resultado e se ele contém um plano válido
       if (result && 'data' in result && result.data && typeof result.data === 'object' && 'mealPlan' in result.data) {
-        console.log('[MEAL PLAN] Chamada à Edge Function LlamaAPI bem-sucedida!');
+        console.log('[MEAL PLAN] Chamada à Edge Function Llama bem-sucedida!');
         resultData = result.data as EdgeFunctionResponse;
       } else {
-        console.error('[MEAL PLAN] Resposta da Edge Function LlamaAPI sem dados válidos:', result);
-        throw new Error("Resposta da Edge Function LlamaAPI inválida");
+        console.error('[MEAL PLAN] Resposta da Edge Function Llama sem dados válidos:', result);
+        throw new Error("Resposta da Edge Function Llama inválida");
       }
     } catch (edgeFunctionError) {
-      console.error('[MEAL PLAN] Erro na chamada à Edge Function LlamaAPI:', edgeFunctionError);
+      console.error('[MEAL PLAN] Erro na chamada à Edge Function Llama:', edgeFunctionError);
       
       if (edgeFunctionError instanceof Error) {
         console.error('[MEAL PLAN] Detalhes do erro:', edgeFunctionError.message);
@@ -216,11 +220,22 @@ export const generateMealPlan = async ({
       }
       
       // Tentar usar a edge function Groq existente como fallback
-      console.log('[MEAL PLAN] Tentando usar um plano padrão após falha no LlamaAPI');
-      
-      // Usar plano padrão quando todas as edge functions falham
-      console.log('[MEAL PLAN] Usando plano padrão devido a falhas em todos os modelos');
-      return createDefaultMealPlan(userData, selectedFoodsDetails, foodsByMealTypeFormatted);
+      console.log('[MEAL PLAN] Tentando usar Groq como fallback após falha no Llama');
+      try {
+        const result = await supabase.functions.invoke('generate-meal-plan-groq', { body: enhancedPayload });
+        
+        if (result && 'data' in result && result.data && typeof result.data === 'object' && 'mealPlan' in result.data) {
+          console.log('[MEAL PLAN] Chamada de fallback à Edge Function Groq bem-sucedida!');
+          resultData = result.data as EdgeFunctionResponse;
+        } else {
+          throw new Error("Resposta da Edge Function Groq inválida no fallback");
+        }
+      } catch (fallbackError) {
+        console.error('[MEAL PLAN] Erro no fallback com Groq:', fallbackError);
+        // Usar plano padrão quando todas as edge functions falham
+        console.log('[MEAL PLAN] Usando plano padrão devido a falhas em todos os modelos');
+        return createDefaultMealPlan(userData, selectedFoodsDetails, foodsByMealTypeFormatted);
+      }
     }
 
     // Verificar se o plano tem a estrutura completa esperada
@@ -296,7 +311,7 @@ export const generateMealPlan = async ({
       await addTransaction({
         amount: REWARDS.MEAL_PLAN,
         type: 'meal_plan',
-        description: 'Geração de plano alimentar personalizado com Nous-Hermes-2-Mixtral-8x7B-DPO via LlamaAPI'
+        description: 'Geração de plano alimentar personalizado com Nous-Hermes-2-Mixtral-8x7B-DPO'
       });
       console.log('[MEAL PLAN] Transação de recompensa adicionada');
     } catch (transactionError) {
@@ -314,7 +329,7 @@ export const generateMealPlan = async ({
     }
 
     toast.dismiss(toastId);
-    toast.success(`Cardápio personalizado gerado com Nous-Hermes-2-Mixtral-8x7B-DPO via LlamaAPI com sucesso! +${REWARDS.MEAL_PLAN} FITs`);
+    toast.success(`Cardápio personalizado gerado com Nous-Hermes-2-Mixtral-8x7B-DPO com sucesso! +${REWARDS.MEAL_PLAN} FITs`);
 
     return resultData.mealPlan;
   } catch (error) {

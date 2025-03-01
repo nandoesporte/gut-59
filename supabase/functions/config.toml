@@ -21,9 +21,3 @@ verify_jwt = false
 
 [functions.generate-meal-plan-llama]
 verify_jwt = false
-timeout_seconds = 60
-
-[functions.mental-health-chat-llama]
-verify_jwt = false
-timeout_seconds = 60
-
