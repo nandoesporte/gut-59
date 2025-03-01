@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,14 +18,15 @@ const saveMealPlanData = async (
   try {
     console.log('Salvando plano alimentar no banco de dados para usuário:', userId);
     
+    // When inserting a single row, we format it as an array with one object inside
     const { error } = await supabase
       .from('meal_plans')
-      .insert({
+      .insert([{
         user_id: userId,
         plan_data: mealPlan,
         calories: calorieNeeds,
         dietary_preferences: preferences
-      });
+      }]);
     
     if (error) {
       console.error('Erro ao salvar plano alimentar:', error);
