@@ -17,7 +17,7 @@ export const MentalHealthChat = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "Olá! Eu sou sua assistente de saúde mental, com tecnologia Mixtral. Como posso ajudar você hoje?",
+      content: "Olá! Eu sou sua assistente de saúde mental. Como posso ajudar você hoje?",
     },
   ]);
   const [input, setInput] = useState("");
