@@ -67,7 +67,7 @@ export const generateMealPlanPDF = async (mealPlan: MealPlan) => {
         if (meal.description) {
           doc.setFontSize(10);
           doc.setTextColor(100, 100, 100);
-          doc.text(`${meal.description.replace(/carboidrato/gi, "carbo")}`, 20, yPos);
+          doc.text(`${meal.description}`, 20, yPos);
           yPos += lineHeight;
         }
 
@@ -94,7 +94,7 @@ export const generateMealPlanPDF = async (mealPlan: MealPlan) => {
             // Adicionar detalhes se houver
             if (food.details) {
               doc.setTextColor(100, 100, 100);
-              doc.text(`  ${food.details.replace(/carboidrato/gi, "carbo")}`, 23, yPos);
+              doc.text(`  ${food.details}`, 23, yPos);
               doc.setTextColor(0, 0, 0);
               yPos += lineHeight;
             }

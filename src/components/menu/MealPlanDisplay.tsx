@@ -9,6 +9,8 @@ import { Recommendations } from "./components/Recommendations";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { MealPlan } from "./types";
 import { useRef, useState } from "react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface MealPlanDisplayProps {
   mealPlan: MealPlan;
@@ -50,6 +52,9 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
       <div className="space-y-6">
         <div className="p-4 bg-muted rounded-md mb-6">
           <h2 className="text-xl font-bold">📅 {dayNameMap[dayKey]} – Plano Alimentar</h2>
+          <p className="text-gray-500 text-sm mt-1">
+            {format(new Date(), "d 'de' MMMM 'de' yyyy", { locale: ptBR })}
+          </p>
         </div>
 
         {dayPlan.meals.breakfast && (

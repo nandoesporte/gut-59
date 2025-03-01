@@ -1,9 +1,6 @@
-import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
 import { MacroDistributionBar } from "./MacroDistributionBar";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
-import type { Meal, MealFood } from "../types";
+import type { Meal } from "../types";
 
 interface MealSectionProps {
   title: string;
@@ -38,7 +35,7 @@ export const MealSection = ({
 
       <div className="mb-4">
         <p className="text-gray-600 italic">
-          {safeFood.description?.replace(/carboidrato/gi, "carbo")}
+          {safeFood.description}
         </p>
       </div>
 
@@ -50,11 +47,11 @@ export const MealSection = ({
                 <div className="flex items-baseline gap-1">
                   <span className="font-medium">{food.portion} {food.unit}</span>
                   <span className="text-gray-600">de</span>
-                  <span>{food.name.replace(/carboidrato/gi, "carbo")}</span>
+                  <span>{food.name}</span>
                 </div>
                 {food.details && (
                   <span className="text-gray-500 text-sm block mt-1 ml-4">
-                    {food.details.replace(/carboidrato/gi, "carbo")}
+                    {food.details}
                   </span>
                 )}
               </div>
