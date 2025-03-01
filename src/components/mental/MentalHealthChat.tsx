@@ -22,6 +22,7 @@ export const MentalHealthChat = () => {
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -38,6 +39,7 @@ export const MentalHealthChat = () => {
     
     if (!input.trim()) return;
 
+    setErrorMessage(null);
     const userMessage = { role: "user" as const, content: input };
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
@@ -52,7 +54,15 @@ export const MentalHealthChat = () => {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Função retornou erro:", error);
+        throw new Error(error.message || "Erro ao chamar a função mental-health-chat-llama");
+      }
+
+      if (data?.error) {
+        console.error("Erro na resposta da função:", data.error);
+        throw new Error(data.error);
+      }
 
       if (data?.response) {
         setMessages((prev) => [
@@ -64,6 +74,8 @@ export const MentalHealthChat = () => {
       }
     } catch (error) {
       console.error("Erro ao enviar mensagem:", error);
+      setErrorMessage("Não foi possível obter resposta. A API pode estar temporariamente indisponível.");
+      
       toast({
         title: "Erro na comunicação",
         description: "Não foi possível obter resposta do modelo Nous-Hermes-2-Mixtral-8x7B-DPO. Tente novamente mais tarde.",
@@ -113,6 +125,12 @@ export const MentalHealthChat = () => {
             )}
           </div>
         ))}
+        {errorMessage && (
+          <Alert variant="destructive" className="mt-4">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>{errorMessage}</AlertDescription>
+          </Alert>
+        )}
         <div ref={messagesEndRef} />
       </div>
 
