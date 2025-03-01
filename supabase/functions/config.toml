@@ -21,3 +21,4 @@ verify_jwt = false
 
 [functions.generate-meal-plan-llama]
 verify_jwt = false
+timeout_seconds = 60
