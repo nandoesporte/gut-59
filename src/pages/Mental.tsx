@@ -11,10 +11,13 @@ import { MentalModules } from '@/components/mental/MentalModules';
 import { MentalHealthChat } from '@/components/mental/MentalHealthChat';
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { toast } from "sonner";
 
 interface EmotionLog {
+  id?: string;
   date: Date;
   emotion: string;
+  user_id?: string;
 }
 
 const Mental = () => {
@@ -23,6 +26,12 @@ const Mental = () => {
   const [emotionGuidance, setEmotionGuidance] = useState('');
   const [isLoadingGuidance, setIsLoadingGuidance] = useState(false);
   const [emotionHistory, setEmotionHistory] = useState<EmotionLog[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+
+  // Inicializa o componente e busca o histórico de emoções
+  useEffect(() => {
+    fetchEmotionHistory();
+  }, []);
 
   const menuItems = [
     { id: 'breathing', icon: <Clock className="w-6 h-6" />, label: 'Respiração', color: 'bg-[#D3E4FD]' },
@@ -39,6 +48,45 @@ const Mental = () => {
     { id: 'sad', icon: <Frown className="w-6 h-6 md:w-8 md:h-8" />, label: 'Triste', color: 'bg-[#FFDEE2]' },
     { id: 'angry', icon: <Angry className="w-6 h-6 md:w-8 md:h-8" />, label: 'Irritado', color: 'bg-[#FEC6A1]' },
   ];
+
+  // Busca o histórico de emoções do usuário no Supabase
+  const fetchEmotionHistory = async () => {
+    setIsLoadingHistory(true);
+    try {
+      // Verifica se o usuário está autenticado
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        // Busca as emoções registradas pelo usuário
+        const { data, error } = await supabase
+          .from('emotion_logs')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(10);
+          
+        if (error) throw error;
+        
+        // Formata os dados para o formato esperado pelo componente
+        const formattedData: EmotionLog[] = data?.map(item => ({
+          id: item.id,
+          date: new Date(item.created_at),
+          emotion: item.emotion,
+          user_id: item.user_id
+        })) || [];
+        
+        setEmotionHistory(formattedData);
+      } else {
+        // Para usuários não autenticados, mantém os dados na memória temporariamente
+        console.log("Usuário não autenticado, histórico será armazenado apenas na sessão");
+      }
+    } catch (error) {
+      console.error("Erro ao buscar histórico de emoções:", error);
+      toast.error("Não foi possível carregar seu histórico de emoções");
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
 
   const getEmotionGuidance = async (emotion: string) => {
     setIsLoadingGuidance(true);
@@ -74,17 +122,45 @@ const Mental = () => {
     }
   };
 
-  const handleEmotionSelect = (emotion: string) => {
+  const handleEmotionSelect = async (emotion: string) => {
     setSelectedEmotion(emotion);
     getEmotionGuidance(emotion);
     
-    // Add current emotion to history
+    // Cria o registro da emoção
     const newEntry: EmotionLog = {
       date: new Date(),
       emotion: emotion
     };
     
-    setEmotionHistory(prev => [newEntry, ...prev].slice(0, 10)); // Keep last 10 entries
+    try {
+      // Verifica se o usuário está autenticado para salvar no Supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        // Salva a emoção no Supabase
+        const { error } = await supabase
+          .from('emotion_logs')
+          .insert({
+            emotion: emotion,
+            user_id: user.id,
+            created_at: new Date().toISOString()
+          });
+          
+        if (error) throw error;
+        
+        // Atualiza o histórico local com os dados do banco
+        fetchEmotionHistory();
+      } else {
+        // Para usuários não autenticados, mantém os dados na memória temporariamente
+        setEmotionHistory(prev => [newEntry, ...prev].slice(0, 10));
+      }
+    } catch (error) {
+      console.error("Erro ao salvar emoção:", error);
+      toast.error("Não foi possível salvar sua emoção. Tente novamente mais tarde.");
+      
+      // Atualiza o histórico local mesmo em caso de erro para melhor experiência do usuário
+      setEmotionHistory(prev => [newEntry, ...prev].slice(0, 10));
+    }
   };
 
   const getEmotionLabel = (emotionId: string) => {
@@ -190,25 +266,33 @@ const Mental = () => {
                   <CalendarIcon className="h-4 w-4" /> 
                   Histórico de Emoções
                 </h3>
-                <div className="space-y-3">
-                  {emotionHistory.length > 0 ? (
-                    emotionHistory.map((entry, index) => (
-                      <div key={index} className={`flex justify-between items-center p-3 rounded-lg ${getEmotionColor(entry.emotion)}`}>
-                        <div className="flex items-center gap-2">
-                          {emotions.find(e => e.id === entry.emotion)?.icon}
-                          <span className="font-medium">{getEmotionLabel(entry.emotion)}</span>
+                
+                {isLoadingHistory ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                    <span>Carregando histórico...</span>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {emotionHistory.length > 0 ? (
+                      emotionHistory.map((entry, index) => (
+                        <div key={index} className={`flex justify-between items-center p-3 rounded-lg ${getEmotionColor(entry.emotion)}`}>
+                          <div className="flex items-center gap-2">
+                            {emotions.find(e => e.id === entry.emotion)?.icon}
+                            <span className="font-medium">{getEmotionLabel(entry.emotion)}</span>
+                          </div>
+                          <span className="text-sm text-muted-foreground">
+                            {format(entry.date, "dd 'de' MMMM", { locale: ptBR })}
+                          </span>
                         </div>
-                        <span className="text-sm text-muted-foreground">
-                          {format(entry.date, "dd 'de' MMMM", { locale: ptBR })}
-                        </span>
+                      ))
+                    ) : (
+                      <div className="text-center text-muted-foreground py-4">
+                        Seu histórico de emoções aparecerá aqui. Selecione uma emoção acima para registrar como você se sente hoje.
                       </div>
-                    ))
-                  ) : (
-                    <div className="text-center text-muted-foreground py-4">
-                      Seu histórico de emoções aparecerá aqui. Selecione uma emoção acima para registrar como você se sente hoje.
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
