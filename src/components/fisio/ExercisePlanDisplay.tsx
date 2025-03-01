@@ -31,7 +31,7 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
         return;
       }
 
-      // Use Groq API via Edge Function for rehab plan generation
+      // Use only Groq API via Edge Function for rehab plan generation
       const { data: response, error } = await supabase.functions.invoke('generate-rehab-plan-groq', {
         body: { 
           preferences, 

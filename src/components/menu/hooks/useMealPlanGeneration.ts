@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { DietaryPreferences, ProtocolFood } from "../types";
@@ -180,8 +179,8 @@ export const generateMealPlan = async ({
     
     console.log('[MEAL PLAN] Enviando payload para Groq:', JSON.stringify(enhancedPayload, null, 2));
     
-    // Definir timeout para capturar falhas por timeout (30 segundos - aumentado para dar mais tempo ao processamento)
-    const edgeFunctionTimeout = 60000; // 60 segundos para o modelo Groq processar
+    // Definir timeout para capturar falhas por timeout (60 segundos para o modelo Groq processar)
+    const edgeFunctionTimeout = 60000; 
     
     // Implementar timeout manual com Promise.race
     let resultData: EdgeFunctionResponse | null = null;
@@ -191,8 +190,7 @@ export const generateMealPlan = async ({
         setTimeout(() => reject(new Error("Timeout na chamada à Edge Function Groq")), edgeFunctionTimeout);
       });
       
-      // ALTERAÇÃO PRINCIPAL: Chamar a edge function Groq em vez da OpenAI
-      // Corrida entre o timeout e a chamada à Edge Function
+      // Chamar a edge function Groq
       const result = await Promise.race([
         supabase.functions.invoke('generate-meal-plan-groq', { body: enhancedPayload }),
         timeoutPromise
@@ -216,27 +214,9 @@ export const generateMealPlan = async ({
         }
       }
       
-      // Tentar utilizar a função anterior para casos de falha
-      console.log('[MEAL PLAN] Tentando com sistema alternativo...');
-      try {
-        const fallbackResult = await supabase.functions.invoke('generate-meal-plan', { 
-          body: enhancedPayload 
-        });
-        
-        if (fallbackResult && fallbackResult.data && fallbackResult.data.mealPlan) {
-          console.log('[MEAL PLAN] Sistema alternativo bem-sucedido!');
-          resultData = fallbackResult.data as EdgeFunctionResponse;
-        } else {
-          console.error('[MEAL PLAN] Sistema alternativo falhou:', fallbackResult);
-          throw new Error("Não foi possível gerar o plano alimentar");
-        }
-      } catch (fallbackError) {
-        console.error('[MEAL PLAN] Erro no sistema alternativo:', fallbackError);
-        
-        // Usar plano padrão quando edge function falha
-        console.log('[MEAL PLAN] Usando plano padrão devido a falha na Edge Function');
-        return createDefaultMealPlan(userData, selectedFoodsDetails, foodsByMealTypeFormatted);
-      }
+      // Usar plano padrão quando edge function falha
+      console.log('[MEAL PLAN] Usando plano padrão devido a falha na Edge Function');
+      return createDefaultMealPlan(userData, selectedFoodsDetails, foodsByMealTypeFormatted);
     }
 
     // Verificar se o plano tem a estrutura completa esperada
