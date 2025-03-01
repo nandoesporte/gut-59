@@ -25,6 +25,7 @@ export const MentalHealthChat = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [networkError, setNetworkError] = useState(false);
+  const [apiUrlChecked, setApiUrlChecked] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -64,7 +65,9 @@ export const MentalHealthChat = () => {
 
       if (error) {
         console.error("Função retornou erro:", error);
-        if (error.message?.includes("network") || error.message?.includes("failed to fetch")) {
+        if (error.message?.includes("network") || 
+            error.message?.includes("failed to fetch") || 
+            error.message?.includes("sending request")) {
           setNetworkError(true);
         }
         throw new Error(error.message || "Erro ao chamar a função mental-health-chat-llama");
@@ -76,6 +79,12 @@ export const MentalHealthChat = () => {
 
       if (data?.error) {
         console.error("Erro na resposta da função:", data.error);
+        
+        // Check if this is a network-related error
+        if (data.errorType === "network") {
+          setNetworkError(true);
+        }
+        
         if (data.fallbackResponse) {
           // If we have a fallback response from the edge function, use it
           setMessages((prev) => [
@@ -109,7 +118,8 @@ export const MentalHealthChat = () => {
       const isNetworkError = 
         errorMsg.includes("network") || 
         errorMsg.includes("failed to fetch") || 
-        errorMsg.includes("sending request");
+        errorMsg.includes("sending request") ||
+        errorMsg.includes("connectivity");
       
       if (isNetworkError) {
         setNetworkError(true);
@@ -159,6 +169,32 @@ export const MentalHealthChat = () => {
       setInput("");
     }
   };
+
+  // Check if API key is set
+  const checkApiConfiguration = async () => {
+    if (apiUrlChecked) return;
+    
+    try {
+      const { data, error } = await supabase.functions.invoke("mental-health-chat-llama", {
+        body: { checkConfiguration: true }
+      });
+      
+      if (error || (data && data.error)) {
+        if (data && data.missingApiKey) {
+          setErrorMessage("API não configurada corretamente. Entre em contato com o administrador.");
+        }
+      }
+    } catch (e) {
+      console.error("Erro ao verificar configuração da API:", e);
+    } finally {
+      setApiUrlChecked(true);
+    }
+  };
+
+  // Check API configuration on component mount
+  useEffect(() => {
+    checkApiConfiguration();
+  }, []);
 
   return (
     <div className="flex flex-col h-full">

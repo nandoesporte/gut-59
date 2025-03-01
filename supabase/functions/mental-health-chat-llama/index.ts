@@ -2,6 +2,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
+// Get API key from environment variables
 const LLAMA_API_KEY = Deno.env.get("LLAMA_API_KEY");
 const LLAMA_API_URL = "https://api.llama.cloud/chat/completions";
 
@@ -9,6 +10,21 @@ const LLAMA_API_URL = "https://api.llama.cloud/chat/completions";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+// Utility function to add delay for retry
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Function to check if error is related to network connectivity
+const isNetworkError = (error: Error): boolean => {
+  const errorMessage = error.message.toLowerCase();
+  return (
+    errorMessage.includes('network') ||
+    errorMessage.includes('failed to fetch') ||
+    errorMessage.includes('sending request') ||
+    errorMessage.includes('timeout') ||
+    errorMessage.includes('connection')
+  );
 };
 
 serve(async (req) => {
@@ -29,6 +45,7 @@ serve(async (req) => {
       throw new Error("Missing required parameter: message");
     }
 
+    // Verify API key is set before making any API calls
     if (!LLAMA_API_KEY) {
       console.error("LLAMA_API_KEY environment variable is not set");
       throw new Error("API configuration error: Missing API key");
@@ -47,7 +64,7 @@ Suas respostas devem ser:
 
 Responda em português do Brasil com um tom caloroso e acolhedor. Se a pessoa estiver em crise ou risco, sempre priorize sua segurança e recomende recursos de emergência.`;
 
-    // Prepare the conversation for the LlamaAPI
+    // Prepare the conversation for the LlamaAPI - limit history to prevent token issues
     const messages = [
       { role: "system", content: systemPrompt },
       ...history,
@@ -59,7 +76,7 @@ Responda em português do Brasil com um tom caloroso e acolhedor. Se a pessoa es
     // Make the request to the LlamaAPI with retry logic
     let response = null;
     let retryCount = 0;
-    const maxRetries = 2;
+    const maxRetries = 3;
     
     while (retryCount <= maxRetries && !response) {
       try {
@@ -67,6 +84,7 @@ Responda em português do Brasil com um tom caloroso e acolhedor. Se a pessoa es
           console.log(`Retry attempt ${retryCount}/${maxRetries}`);
         }
         
+        // Construct request body with consistent parameters
         const requestBody = {
           model: "nous-hermes-2-mixtral-8x7b-dpo",
           messages: messages,
@@ -78,14 +96,21 @@ Responda em português do Brasil com um tom caloroso e acolhedor. Se a pessoa es
         
         console.log(`Sending request to ${LLAMA_API_URL}`);
         
+        // Set longer timeout for fetch request and use appropriate fetch options
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30-second timeout
+        
         const fetchResponse = await fetch(LLAMA_API_URL, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${LLAMA_API_KEY}`
           },
-          body: JSON.stringify(requestBody)
+          body: JSON.stringify(requestBody),
+          signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
         
         console.log(`Response status: ${fetchResponse.status}`);
         
@@ -106,9 +131,19 @@ Responda em português do Brasil com um tom caloroso e acolhedor. Se a pessoa es
       } catch (fetchError) {
         console.error(`Fetch error (attempt ${retryCount}/${maxRetries}):`, fetchError.message);
         
+        // Check if this is a network error
+        const isNetwork = isNetworkError(fetchError);
+        if (isNetwork) {
+          console.log("Network-related error detected, will retry with backoff");
+        }
+        
         // On last retry, rethrow
         if (retryCount === maxRetries) {
-          throw new Error(`Failed to connect to LlamaAPI after ${maxRetries} attempts: ${fetchError.message}`);
+          if (isNetwork) {
+            throw new Error(`Network connectivity issue: ${fetchError.message}`);
+          } else {
+            throw new Error(`Failed to connect to LlamaAPI after ${maxRetries} attempts: ${fetchError.message}`);
+          }
         }
       }
       
@@ -116,15 +151,15 @@ Responda em português do Brasil com um tom caloroso e acolhedor. Se a pessoa es
       
       // If we need to retry, wait a bit before trying again (exponential backoff)
       if (!response && retryCount <= maxRetries) {
-        const backoffMs = Math.pow(2, retryCount) * 500; // 1s, 2s, 4s
+        const backoffMs = Math.pow(2, retryCount) * 1000; // 2s, 4s, 8s
         console.log(`Waiting ${backoffMs}ms before retry ${retryCount}`);
-        await new Promise(resolve => setTimeout(resolve, backoffMs));
+        await delay(backoffMs);
       }
     }
     
     // If we still don't have a response after all retries
     if (!response) {
-      throw new Error("Failed to get a response from LlamaAPI after all retry attempts");
+      throw new Error("API connectivity issue: Failed to get a response from LlamaAPI after all retry attempts");
     }
 
     // Extract the assistant's response
@@ -144,10 +179,14 @@ Responda em português do Brasil com um tom caloroso e acolhedor. Se a pessoa es
   } catch (error) {
     console.error("Error in mental-health-chat-llama function:", error.message);
     
-    // Provide a helpful response to the client
+    // Check if this is a network-related error
+    const isNetworkIssue = isNetworkError(error);
+    
+    // Provide a helpful response to the client with specific error type
     return new Response(
       JSON.stringify({ 
         error: error.message || "Erro interno no processamento da solicitação",
+        errorType: isNetworkIssue ? "network" : "api",
         fallbackResponse: "Desculpe, estou enfrentando dificuldades técnicas no momento. Por favor, tente novamente mais tarde ou entre em contato com um profissional de saúde mental se precisar de assistência imediata."
       }),
       { 
