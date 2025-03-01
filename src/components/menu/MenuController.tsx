@@ -42,7 +42,7 @@ export const useMenuController = () => {
 
   const protocolFoods = useProtocolFoods();
   const { calorieNeeds, calculateCalories } = useCalorieCalculator();
-  const { selectedFoods, totalCalories, handleFoodSelection, calculateTotalCalories } = useFoodSelection();
+  const { selectedFoods, foodsByMealType, totalCalories, handleFoodSelection, calculateTotalCalories, categorizeFoodsByMealType } = useFoodSelection();
   const wallet = useWallet();
 
   // Create a Promise-wrapped version of addTransaction
@@ -59,7 +59,7 @@ export const useMenuController = () => {
 
   useEffect(() => {
     calculateTotalCalories(protocolFoods);
-  }, [selectedFoods, protocolFoods]);
+  }, [selectedFoods, protocolFoods, calculateTotalCalories]);
 
   // Carregar preferências de alimentos salvos anteriormente
   useEffect(() => {
@@ -70,7 +70,7 @@ export const useMenuController = () => {
 
         const { data: nutritionPrefs, error } = await supabase
           .from('nutrition_preferences')
-          .select('selected_foods')
+          .select('selected_foods, food_by_meal_type')
           .eq('user_id', user.id)
           .maybeSingle();
 
@@ -87,13 +87,25 @@ export const useMenuController = () => {
             }
           });
         }
+        
+        // Se temos alimentos categorizados por refeição, usamos essa estrutura
+        if (nutritionPrefs?.food_by_meal_type && typeof nutritionPrefs.food_by_meal_type === 'object') {
+          console.log('Carregando preferências de alimentos categorizadas por refeição:', nutritionPrefs.food_by_meal_type);
+        } else {
+          // Se não temos, categorizamos os alimentos existentes
+          if (nutritionPrefs?.selected_foods && nutritionPrefs.selected_foods.length > 0) {
+            categorizeFoodsByMealType(protocolFoods);
+          }
+        }
       } catch (err) {
         console.error('Erro ao carregar preferências:', err);
       }
     };
 
-    loadSavedPreferences();
-  }, []);
+    if (protocolFoods.length > 0) {
+      loadSavedPreferences();
+    }
+  }, [protocolFoods, selectedFoods, handleFoodSelection, categorizeFoodsByMealType]);
 
   const handleCalculateCalories = async () => {
     const selectedLevel = activityLevels.find(level => level.value === formData.activityLevel);
@@ -143,7 +155,8 @@ export const useMenuController = () => {
                 activity_level: activityLevel,
                 goal: goal,
                 calories_needed: calories,
-                selected_foods: selectedFoods
+                selected_foods: selectedFoods,
+                food_by_meal_type: foodsByMealType
               })
               .eq('id', existingRecord.id);
             
@@ -166,7 +179,8 @@ export const useMenuController = () => {
                 activity_level: activityLevel,
                 goal: goal,
                 calories_needed: calories,
-                selected_foods: selectedFoods
+                selected_foods: selectedFoods,
+                food_by_meal_type: foodsByMealType
               });
             
             if (error) {
@@ -210,6 +224,7 @@ export const useMenuController = () => {
 
       console.log("Confirmando seleção de alimentos para usuário:", user.id);
       console.log("Alimentos selecionados:", selectedFoods);
+      console.log("Alimentos por tipo de refeição:", foodsByMealType);
 
       // CORREÇÃO: Usar order e limit para garantir que obtemos apenas o registro mais recente
       // Esta abordagem evita o erro de múltiplas linhas quando há registros duplicados
@@ -234,7 +249,10 @@ export const useMenuController = () => {
         // Atualizar o registro existente
         const { error: updateError } = await supabase
           .from('nutrition_preferences')
-          .update({ selected_foods: selectedFoods })
+          .update({ 
+            selected_foods: selectedFoods,
+            food_by_meal_type: foodsByMealType
+          })
           .eq('id', recentPrefs.id);
 
         if (updateError) {
@@ -274,6 +292,7 @@ export const useMenuController = () => {
           .insert({
             user_id: user.id,
             selected_foods: selectedFoods,
+            food_by_meal_type: foodsByMealType,
             weight: Number(formData.weight) || 70, // Usar valor do formulário se disponível
             height: Number(formData.height) || 170,
             age: Number(formData.age) || 30,
@@ -373,6 +392,7 @@ export const useMenuController = () => {
           dailyCalories: calorieNeeds
         },
         selectedFoods: selectedFoodsData,
+        foodsByMealType, // Passando alimentos categorizados por refeição
         preferences,
         addTransaction: addTransactionAsync
       });
@@ -417,6 +437,7 @@ export const useMenuController = () => {
     setCurrentStep,
     calorieNeeds,
     selectedFoods,
+    foodsByMealType,
     protocolFoods,
     totalCalories,
     mealPlan,
