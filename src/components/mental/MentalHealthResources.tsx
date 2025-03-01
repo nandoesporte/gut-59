@@ -7,7 +7,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useWallet } from "@/hooks/useWallet";
 import { Info, Timer } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Progress } from "@/components/ui/progress";
 
 interface BreathingExercise {
   phase: "inhale" | "hold" | "exhale";
@@ -28,6 +27,13 @@ const BREATHING_CYCLE = {
   inhale: 4,
   hold: 7,
   exhale: 8
+};
+
+// Colors for each breathing phase
+const PHASE_COLORS = {
+  inhale: "#48A1A1", // Teal color like in the image
+  hold: "#9b87f5",   // Purple
+  exhale: "#7E69AB"  // Darker purple
 };
 
 export const MentalHealthResources = () => {
@@ -180,25 +186,20 @@ export const MentalHealthResources = () => {
     }
   };
 
-  const getPhaseColor = () => {
-    switch (exercise.phase) {
-      case "inhale": return "#4CAF50"; // Green for inhale
-      case "hold": return "#FF9800";   // Orange for hold
-      case "exhale": return "#2196F3";  // Blue for exhale
-      default: return "#4CAF50";
-    }
-  };
-
   const getPhaseText = () => {
     switch (exercise.phase) {
-      case "inhale": return "Inspire...";
-      case "hold": return "Segure...";
-      case "exhale": return "Expire...";
-      default: return "Prepare-se...";
+      case "inhale": return "Inspire";
+      case "hold": return "Segure";
+      case "exhale": return "Expire";
+      default: return "Prepare-se";
     }
   };
 
-  const getInstructionText = () => {
+  const getPhaseColor = () => {
+    return PHASE_COLORS[exercise.phase];
+  };
+
+  const getPhaseInstruction = () => {
     switch (exercise.phase) {
       case "inhale": return "Inspire lentamente pelo nariz";
       case "hold": return "Segure o ar nos pulmões";
@@ -212,9 +213,6 @@ export const MentalHealthResources = () => {
   }
 
   const totalExerciseTime = 60; // 1 minute in seconds
-  const progressPercentage = exercise.count > 0 && !exercise.isComplete 
-    ? (exercise.elapsedTime / totalExerciseTime) * 100 
-    : 0;
 
   return (
     <div className="space-y-6">
@@ -244,91 +242,93 @@ export const MentalHealthResources = () => {
             )}
             
             {exercise.count > 0 && !exercise.isComplete ? (
-              <div className="flex flex-col items-center space-y-4 sm:space-y-6">
-                {/* Progress bar for overall exercise */}
-                <div className="w-full relative mt-2">
-                  <Progress 
-                    value={progressPercentage} 
-                    className="h-3 sm:h-4 bg-gray-100"
-                  />
-                  <div className="flex justify-between mt-1">
-                    <p className="text-xs text-muted-foreground">
-                      {Math.floor(exercise.elapsedTime)}s
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {totalExerciseTime}s
-                    </p>
-                  </div>
+              <div className="flex flex-col items-center space-y-6">
+                {/* Progress information */}
+                <div className="w-full text-center">
+                  <p className="text-sm text-muted-foreground">
+                    Ciclo {exercise.count + 1} de {exercise.totalBreaths} • 
+                    <span className="ml-1">{Math.floor(exercise.elapsedTime)}s/{totalExerciseTime}s</span>
+                  </p>
                 </div>
                 
-                {/* Simplified breathing circle with timer */}
-                <div 
-                  className="relative flex items-center justify-center w-60 h-60 sm:w-72 sm:h-72 rounded-full transition-all duration-300"
-                  style={{ 
-                    border: `8px solid ${getPhaseColor()}`,
-                    boxShadow: `0 0 15px ${getPhaseColor()}40` 
-                  }}
-                >
-                  {/* Current phase indicator */}
-                  <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-center">
-                    <div 
-                      className="text-lg font-bold" 
-                      style={{ color: getPhaseColor() }}
-                    >
-                      {getPhaseText()}
-                    </div>
-                  </div>
+                {/* Main breathing circle - simplified to match the image */}
+                <div className="relative flex items-center justify-center">
+                  {/* Outer circle with pulsing border */}
+                  <div 
+                    className="absolute w-64 h-64 sm:w-72 sm:h-72 rounded-full transition-all duration-300"
+                    style={{ 
+                      border: `2px solid ${getPhaseColor()}80`, 
+                      boxShadow: `0 0 15px ${getPhaseColor()}50`
+                    }}
+                  ></div>
                   
-                  {/* Central timer */}
-                  <div className="flex flex-col items-center justify-center">
-                    <div 
-                      className="text-5xl sm:text-6xl font-bold mb-2"
-                      style={{ color: getPhaseColor() }}
-                    >
-                      {exercise.secondsLeft}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Ciclo {exercise.count + 1} de {exercise.totalBreaths}
+                  {/* Colored circle for breathing visualization */}
+                  <div 
+                    className="relative flex items-center justify-center w-60 h-60 sm:w-68 sm:h-68 rounded-full transition-all duration-500 mx-auto"
+                    style={{ 
+                      backgroundColor: getPhaseColor(),
+                      transform: exercise.phase === "inhale" 
+                        ? "scale(1.0)" 
+                        : exercise.phase === "hold" 
+                          ? "scale(1.0)" 
+                          : "scale(0.85)"
+                    }}
+                  >
+                    {/* Central text showing phase */}
+                    <div className="text-center">
+                      <div className="text-white text-lg font-medium mb-1">
+                        {getPhaseText()}
+                      </div>
+                      
+                      {/* Small counter in the center */}
+                      <div className="text-white text-3xl font-bold">
+                        {exercise.secondsLeft}
+                      </div>
                     </div>
                   </div>
                 </div>
                 
-                <div className="text-center text-sm sm:text-base text-muted-foreground">
-                  {getInstructionText()}
+                {/* Instructions below the circle */}
+                <div className="text-center text-sm text-muted-foreground mt-2">
+                  {getPhaseInstruction()}
                 </div>
               </div>
             ) : (
               <div className="space-y-4">
-                {/* Circle representation for initial state */}
+                {/* Initial state circle representation */}
                 {!exercise.isComplete && !isStarting && (
                   <div className="flex flex-col items-center justify-center py-4">
-                    <div className="relative flex flex-col items-center justify-center w-60 h-60 sm:w-72 sm:h-72 rounded-full border-4 border-gray-200 mb-4">
-                      <div className="absolute inset-0 rounded-full border-4 border-green-500 border-opacity-30"></div>
-                      <div className="absolute inset-0 rounded-full border-4 border-amber-500 border-opacity-30" style={{ clipPath: 'polygon(50% 0, 100% 0, 100% 100%, 50% 100%)' }}></div>
-                      <div className="absolute inset-0 rounded-full border-4 border-blue-500 border-opacity-30" style={{ clipPath: 'polygon(0 0, 50% 0, 50% 100%, 0 100%)' }}></div>
-                      
-                      <Timer className="h-8 w-8 text-primary mb-2" />
-                      <div className="text-lg font-medium">1:00</div>
-                      <div className="text-sm text-muted-foreground mt-1">3 ciclos completos</div>
-                      
-                      <div className="mt-6 flex flex-col items-center">
-                        <div className="flex space-x-8 mb-2">
-                          <div className="flex flex-col items-center">
-                            <div className="w-3 h-3 rounded-full bg-green-500 mb-1"></div>
-                            <span className="text-xs text-green-600">Inspire</span>
-                            <span className="text-xs text-green-600">4s</span>
-                          </div>
-                          <div className="flex flex-col items-center">
-                            <div className="w-3 h-3 rounded-full bg-amber-500 mb-1"></div>
-                            <span className="text-xs text-amber-600">Segure</span>
-                            <span className="text-xs text-amber-600">7s</span>
-                          </div>
-                          <div className="flex flex-col items-center">
-                            <div className="w-3 h-3 rounded-full bg-blue-500 mb-1"></div>
-                            <span className="text-xs text-blue-600">Expire</span>
-                            <span className="text-xs text-blue-600">8s</span>
-                          </div>
+                    <div 
+                      className="relative flex flex-col items-center justify-center w-60 h-60 sm:w-68 sm:h-68 rounded-full border-2 border-gray-300 mb-4"
+                      style={{
+                        backgroundColor: "#48A1A1", // Teal color like in the image
+                        boxShadow: "0 0 15px rgba(72, 161, 161, 0.3)"
+                      }}
+                    >
+                      <div className="text-center">
+                        <div className="text-white text-lg font-medium mb-1">
+                          Segura
                         </div>
+                        
+                        {/* Static demo counter */}
+                        <div className="text-white text-3xl font-bold">
+                          7
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-wrap justify-center gap-4 text-sm mt-2 mb-4">
+                      <div className="flex flex-col items-center">
+                        <div className="w-3 h-3 rounded-full" style={{backgroundColor: PHASE_COLORS.inhale}}></div>
+                        <span className="text-xs mt-1">Inspire: 4s</span>
+                      </div>
+                      <div className="flex flex-col items-center">
+                        <div className="w-3 h-3 rounded-full" style={{backgroundColor: PHASE_COLORS.hold}}></div>
+                        <span className="text-xs mt-1">Segure: 7s</span>
+                      </div>
+                      <div className="flex flex-col items-center">
+                        <div className="w-3 h-3 rounded-full" style={{backgroundColor: PHASE_COLORS.exhale}}></div>
+                        <span className="text-xs mt-1">Expire: 8s</span>
                       </div>
                     </div>
                   </div>
