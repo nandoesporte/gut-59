@@ -81,6 +81,7 @@ export interface DietaryPreferences {
 }
 
 export interface MealPlan {
+  userCalories?: number; // Added this property to fix the TypeScript error
   weeklyPlan: {
     monday: DailyPlan;
     tuesday: DailyPlan;
