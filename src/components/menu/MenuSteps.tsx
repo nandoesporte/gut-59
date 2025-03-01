@@ -20,7 +20,7 @@ interface MenuStepsProps {
   formData: CalorieCalculatorForm;
   handleCalculateCalories: () => Promise<boolean | null> | boolean;
   handleFoodSelection: (foodId: string, food?: ProtocolFood) => void;
-  handleConfirmFoodSelection: () => Promise<boolean> | boolean; // Updated type here to match implementation
+  handleConfirmFoodSelection: () => void | Promise<boolean>;  // Fixed type signature here
   handleDietaryPreferences: (preferences: any) => Promise<boolean>;
   setFormData: (formData: CalorieCalculatorForm | ((prev: CalorieCalculatorForm) => CalorieCalculatorForm)) => void;
   regenerateMealPlan: () => Promise<void>;
