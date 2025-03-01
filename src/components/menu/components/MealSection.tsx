@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { MacroDistributionBar } from "./MacroDistributionBar";
@@ -23,7 +22,7 @@ export const MealSection = ({
     description: meal?.description || "",
     foods: meal?.foods || [],
     macros: {
-      protein: meal?.macros?.protein || a0,
+      protein: meal?.macros?.protein || 0,
       carbs: meal?.macros?.carbs || 0,
       fats: meal?.macros?.fats || 0,
       fiber: meal?.macros?.fiber || 0

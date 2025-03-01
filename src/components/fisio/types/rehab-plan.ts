@@ -25,4 +25,9 @@ export interface RehabPlan {
   start_date: string;
   end_date: string;
   rehab_sessions: RehabSession[];
+  
+  // Adding the missing properties that are being used in ExercisePlanDisplay.tsx
+  days?: Record<string, any>;
+  overview?: string;
+  recommendations?: string[] | string;
 }
