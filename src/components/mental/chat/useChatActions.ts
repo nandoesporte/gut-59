@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
@@ -29,8 +28,53 @@ export const useChatActions = () => {
     "Não estou conseguindo me conectar aos servidores. Durante esta pausa, você poderia experimentar técnicas de auto-cuidado como tomar um copo de água, fazer uma caminhada curta ou praticar respiração profunda."
   ];
 
+  const testApiConnection = async () => {
+    console.log("Testando conexão com a API Llama...");
+    try {
+      const { data, error } = await supabase.functions.invoke("mental-health-chat-llama", {
+        body: { 
+          testConnection: true,
+          message: "Olá, isso é um teste de conexão."
+        },
+      });
+
+      if (error) {
+        console.error("Erro ao testar API:", error);
+        toast({
+          title: "Erro no teste da API",
+          description: `Não foi possível se conectar: ${error.message}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log("Resposta do teste da API:", data);
+      
+      if (data?.success) {
+        toast({
+          title: "API Conectada",
+          description: "A API Llama está respondendo corretamente.",
+        });
+      } else if (data?.error) {
+        toast({
+          title: "API com erro",
+          description: `Erro na API: ${data.error}`,
+          variant: "destructive",
+        });
+      }
+    } catch (e) {
+      console.error("Exceção ao testar API:", e);
+      toast({
+        title: "Erro no teste",
+        description: `Exceção ao testar API: ${e instanceof Error ? e.message : String(e)}`,
+        variant: "destructive",
+      });
+    }
+  };
+
   useEffect(() => {
     scrollToBottom();
+    testApiConnection();
   }, [messages]);
 
   const scrollToBottom = () => {
@@ -269,6 +313,7 @@ export const useChatActions = () => {
     handleSubmit,
     handleRetry,
     switchToGroq,
-    scrollToBottom
+    scrollToBottom,
+    testApiConnection
   };
 };

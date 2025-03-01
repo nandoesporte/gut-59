@@ -16,9 +16,55 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { message, history = [], checkConfiguration = false } = await req.json();
+    const { message, history = [], checkConfiguration = false, testConnection = false } = await req.json();
     
-    console.log("Requisição recebida:", { message, historyLength: history.length, checkConfiguration });
+    console.log("Requisição recebida:", { message, historyLength: history.length, checkConfiguration, testConnection });
+    
+    // Verificação simples de conexão
+    if (testConnection) {
+      console.log("Testando conexão com a API Llama...");
+      
+      try {
+        // Tenta uma requisição simplificada para a API
+        const response = await fetch(LLAMA_API_URL, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${LLAMA_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "llama3-8b-8192",
+            messages: [{ role: "user", content: "Olá, isso é um teste de conexão." }],
+            max_tokens: 10,
+            temperature: 0.7
+          }),
+        });
+        
+        const statusCode = response.status;
+        const responseData = await response.json();
+        
+        console.log("Teste de API - Status:", statusCode);
+        console.log("Teste de API - Resposta:", responseData);
+        
+        return new Response(
+          JSON.stringify({ 
+            success: statusCode >= 200 && statusCode < 300, 
+            statusCode,
+            apiResponse: responseData
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      } catch (testError) {
+        console.error("Erro no teste de conexão:", testError);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: testError instanceof Error ? testError.message : String(testError)
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        );
+      }
+    }
     
     // Verificar configuração apenas se solicitado
     if (checkConfiguration) {
