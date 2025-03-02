@@ -1,3 +1,4 @@
 
 project_id = "sxjafhzikftdenqnkcri"
 name = "generate-workout-plan-llama"
+verify_jwt = true
