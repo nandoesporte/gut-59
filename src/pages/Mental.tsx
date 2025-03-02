@@ -36,7 +36,7 @@ const Mental = () => {
     { id: 'breathing', icon: <ArrowUpDown className="w-6 h-6" />, label: 'Respiração', color: 'bg-[#D3E4FD]' },
     { id: 'meditation', icon: <Headphones className="w-6 h-6" />, label: 'Meditação', color: 'bg-[#F2FCE2]' },
     { id: 'diary', icon: <Brain className="w-6 h-6" />, label: 'Diário', color: 'bg-[#FEF7CD]' },
-    { id: 'ai', icon: <MessageCircle className="w-6 h-6" />, label: 'IA', color: 'bg-[#FFDEE2]' },
+    { id: 'ai', icon: <MessageCircle className="w-6 h-6" />, label: 'IA Conselheira', color: 'bg-[#FFDEE2]' },
     { id: 'resources', icon: <BookOpen className="w-6 h-6" />, label: 'Recursos', color: 'bg-[#FEC6A1]' },
   ];
 
