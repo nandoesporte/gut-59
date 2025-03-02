@@ -134,8 +134,38 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       planData.user_id = user.id;
       setWorkoutPlan(planData);
       
-      // Update profile generation count
-      await supabase.rpc('increment_workout_generation_count', { p_user_id: user.id });
+      // Update profile generation count - fixed approach to avoid type error
+      // Instead of using rpc, we'll use a direct table update
+      const { data: countData, error: countError } = await supabase
+        .from('plan_generation_counts')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+        
+      if (countError && countError.code !== 'PGRST116') {
+        console.error("Error checking plan generation count:", countError);
+      }
+      
+      if (countData) {
+        // Update existing record
+        await supabase
+          .from('plan_generation_counts')
+          .update({ 
+            workout_count: (countData.workout_count || 0) + 1,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', user.id);
+      } else {
+        // Insert new record
+        await supabase
+          .from('plan_generation_counts')
+          .insert({
+            user_id: user.id,
+            workout_count: 1,
+            nutrition_count: 0,
+            rehabilitation_count: 0
+          });
+      }
       
       toast.success("Plano de treino gerado com sucesso!");
     } catch (err: any) {
