@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -29,14 +28,12 @@ export const MultipleGifsUploadForm = ({
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  // Make sure exerciseType only uses valid values from the updated type
   const [exerciseType, setExerciseType] = useState<ExerciseType>("strength");
-  // Make sure difficulty only uses valid values from the updated type
   const [difficulty, setDifficulty] = useState<Difficulty>("beginner");
   const [muscleGroup, setMuscleGroup] = useState("chest");
   const [trainingLocation, setTrainingLocation] = useState("gym");
-  const [goal, setGoal] = useState<string>("weight_loss"); // New state for goals
-  const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+  const [goal, setGoal] = useState<string>("weight_loss");
+  const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
   const muscleGroupOptions = [
     { value: "chest", label: "Peitoral" },
@@ -56,17 +53,13 @@ export const MultipleGifsUploadForm = ({
     { value: "anywhere", label: "Qualquer Lugar" },
   ];
   
-  // Update the difficulty options but ensure they map to valid Difficulty values
   const difficultyOptions = [
     { value: "beginner", label: "Sedentário - Pouco ou nenhum exercício" },
     { value: "intermediate", label: "Leve - 1-3 dias por semana" },
     { value: "advanced", label: "Moderado - 3-5 dias por semana" },
-    // We can't use "expert" anymore since it's not in the Difficulty type
-    // So we'll map the "Intenso" label to "advanced" value
-    { value: "advanced", label: "Intenso - 6-7 dias por semana" },
+    { value: "expert", label: "Intenso - 6-7 dias por semana" },
   ];
 
-  // New options for goals
   const goalOptions = [
     { value: "weight_loss", label: "Perder Peso - Foco em queima de gordura" },
     { value: "maintenance", label: "Manter Peso - Melhorar condicionamento" },
@@ -112,36 +105,38 @@ export const MultipleGifsUploadForm = ({
       let completedFiles = 0;
 
       for (const file of selectedFiles) {
-        // Extract exercise name from filename (removing extension)
         const exerciseName = file.name.replace(".gif", "").replace(/_/g, " ");
 
-        // Upload the GIF file
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from("exercise-gifs")
           .upload(`batch/${crypto.randomUUID()}.gif`, file);
 
         if (uploadError) throw uploadError;
 
-        // Get the public URL
         const { data: { publicUrl } } = supabase.storage
           .from("exercise-gifs")
           .getPublicUrl(uploadData.path);
 
-        // Create the exercise record with required fields
-        // Ensure all required fields are explicitly set with types that match the database
+        const validExerciseType = exerciseType === "strength" || 
+                                 exerciseType === "cardio" || 
+                                 exerciseType === "mobility" 
+                                 ? exerciseType 
+                                 : "mobility";
+        
+        const validDifficulty = difficulty === "expert" ? "advanced" : difficulty;
+
         const exerciseData = {
           name: exerciseName,
           description: `Exercício de ${muscleGroupOptions.find(m => m.value === muscleGroup)?.label}`,
           gif_url: publicUrl,
-          exercise_type: exerciseType,
-          difficulty: difficulty,
+          exercise_type: validExerciseType,
+          difficulty: validDifficulty,
           muscle_group: muscleGroup as any,
           primary_muscles_worked: [muscleGroup],
-          goals: [goal], // Use the selected goal
+          goals: [goal],
           equipment_needed: [],
           is_compound_movement: false,
           training_location: trainingLocation,
-          // Default required fields for the exercises table
           max_reps: 12,
           min_reps: 8, 
           max_sets: 5,
@@ -191,7 +186,6 @@ export const MultipleGifsUploadForm = ({
                   <SelectItem value="strength">Força</SelectItem>
                   <SelectItem value="cardio">Cardio</SelectItem>
                   <SelectItem value="mobility">Mobilidade</SelectItem>
-                  {/* Removing flexibility since it's not in the updated ExerciseType */}
                 </SelectContent>
               </Select>
             </div>
@@ -254,7 +248,6 @@ export const MultipleGifsUploadForm = ({
             </div>
           </div>
           
-          {/* Goal selection */}
           <div>
             <Label>Objetivo</Label>
             <Select
