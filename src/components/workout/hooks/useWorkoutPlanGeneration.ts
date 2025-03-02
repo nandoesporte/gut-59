@@ -50,12 +50,22 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
         throw new Error("AI model settings not found");
       }
       
+      // Ensure preferences arrays are defined before passing to the edge function
+      const safePreferences = {
+        ...preferences,
+        preferred_exercise_types: preferences.preferred_exercise_types || [],
+        available_equipment: preferences.available_equipment || [],
+        health_conditions: preferences.health_conditions || []
+      };
+      
+      console.log("Calling edge function with preferences:", safePreferences);
+      
       // Call the edge function to generate the workout plan
       const { data, error: functionError } = await supabase.functions.invoke(
         "generate-workout-plan-llama",
         {
           body: { 
-            preferences, 
+            preferences: safePreferences, 
             userId: user.id,
             settings: aiSettings
           },
@@ -204,8 +214,8 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
                   name: ex.exercise.name,
                   description: ex.exercise.description || '',
                   gif_url: ex.exercise.gif_url || '',
-                  muscle_group: ex.exercise.muscle_group,
-                  exercise_type: ex.exercise.exercise_type
+                  muscle_group: ex.exercise.muscle_group || '',
+                  exercise_type: ex.exercise.exercise_type || ''
                 } : null
               }))
               .filter(ex => ex.exercise !== null) // Double-check filter for null exercises
