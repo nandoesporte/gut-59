@@ -2,15 +2,15 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import type { ProtocolFood, DietaryPreferences, MealPlan } from "../types";
+import type { ProtocolFood, DietaryPreferences, MealPlan } from "./types";
 import { useMutation } from "@tanstack/react-query";
 import type { TransactionType } from "@/types/wallet";
 import { generateMealPlan } from "./hooks/useMealPlanGeneration";
 import { searchFood } from "./utils/food-api";
 
-interface FormData {
-  weight: number;
-  height: number;
+export interface CalorieCalculatorForm {
+  weight: string;
+  height: string;
   age: number;
   gender: string;
   activityLevel: string;
@@ -20,9 +20,9 @@ interface FormData {
 export const useMenuController = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [currentStep, setCurrentStep] = useState(1);
-  const [formData, setFormData] = useState<FormData>({
-    weight: 70,
-    height: 175,
+  const [formData, setFormData] = useState<CalorieCalculatorForm>({
+    weight: "70",
+    height: "175",
     age: 30,
     gender: "male",
     activityLevel: "moderate",
@@ -38,7 +38,6 @@ export const useMenuController = () => {
   const [useNutriPlus, setUseNutriPlus] = useState(false);
   const [user, setUser] = useState<any>(null);
 
-  // Mutation to add a transaction
   const addTransactionMutation = useMutation({
     mutationFn: async ({
       amount,
@@ -53,7 +52,7 @@ export const useMenuController = () => {
       recipientId?: string;
       qrCodeId?: string;
     }) => {
-      const { data, error } = await supabase.from("transactions").insert([
+      const { data, error } = await supabase.from("fit_transactions").insert([
         {
           amount,
           type,
@@ -113,9 +112,9 @@ export const useMenuController = () => {
     let bmr: number;
 
     if (gender === "male") {
-      bmr = 10 * weight + 6.25 * height - 5 * age + 5;
+      bmr = 10 * parseFloat(weight) + 6.25 * parseFloat(height) - 5 * age + 5;
     } else {
-      bmr = 10 * weight + 6.25 * height - 5 * age - 161;
+      bmr = 10 * parseFloat(weight) + 6.25 * parseFloat(height) - 5 * age - 161;
     }
 
     let activityFactor: number;
@@ -175,7 +174,7 @@ export const useMenuController = () => {
     updateSearchParams(3);
   };
 
-  const handleDietaryPreferences = async (preferences: DietaryPreferences) => {
+  const handleDietaryPreferences = async (preferences: DietaryPreferences): Promise<boolean> => {
     setLoading(true);
     setLoadingMessage("Gerando seu plano alimentar personalizado...");
 
@@ -188,29 +187,29 @@ export const useMenuController = () => {
         console.log("Acesso negado:", message);
         toast.error(message);
         setLoading(false);
-        return;
+        return false;
       }
 
       if (!calorieNeeds) {
         toast.error("Por favor, calcule suas necessidades calóricas primeiro.");
-        return;
+        return false;
       }
 
       if (selectedFoods.length === 0) {
         toast.error("Por favor, selecione alguns alimentos.");
-        return;
+        return false;
       }
 
       if (!user) {
         toast.error("Usuário não autenticado. Por favor, faça login novamente.");
-        return;
+        return false;
       }
 
       const mealPlanData = await generateMealPlan({
         userData: {
           id: user.id,
-          weight: formData.weight,
-          height: formData.height,
+          weight: parseFloat(formData.weight),
+          height: parseFloat(formData.height),
           age: formData.age,
           gender: formData.gender,
           activityLevel: formData.activityLevel,
@@ -224,18 +223,19 @@ export const useMenuController = () => {
 
       setMealPlan(mealPlanData);
       updateSearchParams(4);
+      return true;
     } catch (error: any) {
       console.error("Erro ao gerar plano alimentar:", error);
       toast.error(
         error.message || "Erro ao gerar plano alimentar. Tente novamente."
       );
+      return false;
     } finally {
       setLoading(false);
       setLoadingMessage(null);
     }
   };
 
-  // Fix the plan access verification to use proper plan type
   const verifyPlanAccess = async () => {
     if (!user) {
       console.error("Erro: Usuário não autenticado em verifyPlanAccess");
@@ -245,12 +245,11 @@ export const useMenuController = () => {
 
     console.log("Verificando acesso ao plano alimentar");
     try {
-      // First, check if user has premium access
       const { data: premiumAccess } = await supabase
         .from("plan_access")
         .select("*")
         .eq("user_id", user.id)
-        .eq("plan_type", "nutrition") // Changed from "premium" to "nutrition"
+        .eq("plan_type", "nutrition")
         .eq("is_active", true)
         .maybeSingle();
 
@@ -259,20 +258,18 @@ export const useMenuController = () => {
         return { hasAccess: true };
       }
 
-      // Check payment settings
       const { data: settings } = await supabase
         .from("payment_settings")
         .select("is_active, price")
         .eq("plan_type", "nutrition")
         .maybeSingle();
 
-      // Verify with the edge function
       const { data: grantData, error } = await supabase.functions.invoke(
         "grant-plan-access",
         {
           body: {
             userId: user.id,
-            planType: "nutrition", // Changed from "premium" to "nutrition"
+            planType: "nutrition",
             incrementCount: true,
           },
         }

@@ -121,7 +121,9 @@ const Menu = () => {
               {currentStep === 1 && (
                 <CalorieCalculatorStep
                   formData={formData}
-                  onInputChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
+                  onInputChange={(field, value) => {
+                    setFormData(prev => ({ ...prev, [field]: value }))
+                  }}
                   onCalculate={handleCalculateCalories}
                   calorieNeeds={calorieNeeds}
                 />
