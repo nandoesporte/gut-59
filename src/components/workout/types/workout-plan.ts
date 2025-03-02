@@ -4,6 +4,8 @@ interface Exercise {
   name: string;
   gif_url?: string;
   description?: string;
+  muscle_group?: string;
+  exercise_type?: string;
 }
 
 interface SessionExercise {
