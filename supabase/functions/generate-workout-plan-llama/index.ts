@@ -1,78 +1,56 @@
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { corsHeaders } from "../_shared/cors.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4"
+// Define CORS headers for browser compatibility
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || '';
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+// Create a Supabase client for database operations
+const supabaseClient = createClient(
+  Deno.env.get('SUPABASE_URL') ?? '',
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+);
 
-console.log("Workout Plan Generator Function Started");
-
+// Main function to handle HTTP requests
 serve(async (req) => {
-  // Handle CORS
+  console.log("Workout plan generation function called");
+  
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Parse request
-    let requestData;
-    try {
-      requestData = await req.json();
-      console.log("Request received with data structure:", Object.keys(requestData));
-    } catch (parseError) {
-      console.error("Failed to parse request body:", parseError);
-      return new Response(
-        JSON.stringify({ error: "Invalid request body format" }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400 
-        }
-      );
-    }
-    
-    const { preferences, userId, settings } = requestData;
-    
-    // Detailed logging of request
-    console.log(`Request received for user ${userId || 'unknown'}`);
-    console.log("AI Model Settings:", settings ? JSON.stringify(settings) : "undefined");
-    
-    // Input validation with detailed error reporting
-    if (!userId) {
-      console.error("Missing required parameter: userId");
-      return new Response(
-        JSON.stringify({ error: "User ID is required" }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400 
-        }
-      );
-    }
-    
+    // Parse the request body
+    const { preferences, userId, settings } = await req.json();
+    console.log("Request received:", { 
+      userId, 
+      preferences: {
+        ...preferences,
+        // Avoid logging full arrays in console
+        preferred_exercise_types: Array.isArray(preferences.preferred_exercise_types) ? 
+          `${preferences.preferred_exercise_types.length} items` : 'undefined',
+        available_equipment: Array.isArray(preferences.available_equipment) ? 
+          `${preferences.available_equipment.length} items` : 'undefined',
+        health_conditions: Array.isArray(preferences.health_conditions) ? 
+          `${preferences.health_conditions.length} items` : 'undefined'
+      }
+    });
+
+    // Validate request
     if (!preferences) {
-      console.error("Missing required parameter: preferences");
-      return new Response(
-        JSON.stringify({ error: "Workout preferences are required" }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400 
-        }
-      );
+      throw new Error("No workout preferences provided");
+    }
+    if (!userId) {
+      throw new Error("No user ID provided");
+    }
+    if (!settings || !settings.groq_api_key) {
+      throw new Error("No Groq API key found in settings");
     }
 
-    if (!settings) {
-      console.error("Missing required parameter: settings");
-      return new Response(
-        JSON.stringify({ error: "AI model settings are required" }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400 
-        }
-      );
-    }
-    
-    // Safeguard preferences arrays with detailed logging
+    // Ensure preferences arrays are defined
     const safePreferences = {
       ...preferences,
       preferred_exercise_types: Array.isArray(preferences.preferred_exercise_types) 
@@ -85,119 +63,143 @@ serve(async (req) => {
         ? preferences.health_conditions 
         : []
     };
+
+    console.log("Calling Groq API to generate workout plan");
+
+    // Create the prompt for the AI
+    const prompt = createWorkoutPrompt(safePreferences);
     
-    console.log("Processed preferences:", JSON.stringify({
-      age: safePreferences.age,
-      gender: safePreferences.gender,
-      goal: safePreferences.goal,
-      activity_level: safePreferences.activity_level,
-      preferred_exercise_types: safePreferences.preferred_exercise_types,
-      available_equipment: safePreferences.available_equipment
-    }));
+    // Call Groq API to generate the workout plan
+    const llmResponse = await callGroqLlama(prompt, settings.groq_api_key);
+    console.log("Received response from Groq");
+    
+    // Process and parse the LLM response
+    const workoutPlan = processLlmResponse(llmResponse);
+    console.log("Successfully parsed workout plan");
+    
+    // Resolve exercise IDs for the workout plan
+    const resolvedPlan = await resolveExerciseIds(workoutPlan);
+    console.log("Successfully resolved exercise IDs");
 
-    // Create a Supabase client with the service role key for full access
-    const adminSupabase = createClient(
-      SUPABASE_URL,
-      SUPABASE_SERVICE_ROLE_KEY
-    );
-
-    // Using the anon key for user-level access
-    const supabase = createClient(
-      SUPABASE_URL,
-      SUPABASE_ANON_KEY
-    );
-
-    // Fetch available exercises from the database with better error handling
-    let exercises;
-    try {
-      const { data, error } = await adminSupabase
-        .from('exercises')
-        .select('*');
-
-      if (error) {
-        console.error("Error fetching exercises:", error);
-        throw new Error(`Failed to fetch exercises: ${error.message}`);
+    // Return the workout plan
+    return new Response(
+      JSON.stringify({ workoutPlan: resolvedPlan }),
+      { 
+        headers: { 
+          ...corsHeaders,
+          'Content-Type': 'application/json' 
+        },
+        status: 200 
       }
-
-      if (!data || data.length === 0) {
-        console.error("No exercises found in the database");
-        throw new Error("No exercises found in the database");
+    );
+  } catch (error) {
+    console.error("Error generating workout plan:", error);
+    
+    return new Response(
+      JSON.stringify({ 
+        error: error.message || "Failed to generate workout plan" 
+      }),
+      { 
+        headers: { 
+          ...corsHeaders,
+          'Content-Type': 'application/json' 
+        },
+        status: 400 
       }
-      
-      exercises = data;
-      console.log(`Fetched ${exercises.length} exercises from the database`);
-    } catch (dbError) {
-      console.error("Database operation failed:", dbError);
-      return new Response(
-        JSON.stringify({ error: dbError.message || "Failed to fetch exercises from the database" }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500 
-        }
-      );
+    );
+  }
+});
+
+// Call the Groq API with Llama 3 8B model
+async function callGroqLlama(prompt: string, apiKey: string): Promise<string> {
+  const url = "https://api.groq.com/openai/v1/chat/completions";
+  
+  try {
+    console.log("Making request to Groq API");
+    
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: "llama3-8b-8192",
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert personal trainer specializing in creating personalized workout plans. Your plans are evidence-based, safe, and tailored to individual needs and preferences."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 4000
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Groq API error:", errorText);
+      throw new Error(`Groq API error: ${response.status} ${errorText}`);
     }
 
-    // Create exercise lookup map by muscle group for quick access
-    const exercisesByMuscleGroup = exercises.reduce((acc, exercise) => {
-      const muscleGroup = exercise.muscle_group || 'other';
-      if (!acc[muscleGroup]) {
-        acc[muscleGroup] = [];
-      }
-      acc[muscleGroup].push(exercise);
-      return acc;
-    }, {});
+    const data = await response.json();
+    
+    if (!data.choices || !data.choices[0] || !data.choices[0].message || !data.choices[0].message.content) {
+      throw new Error("Invalid response from Groq API");
+    }
+    
+    return data.choices[0].message.content;
+  } catch (error) {
+    console.error("Error calling Groq API:", error);
+    throw new Error(`Failed to generate workout plan: ${error.message}`);
+  }
+}
 
-    // Create name-to-exercise mapping for fallback search
-    const exercisesByName = exercises.reduce((acc, exercise) => {
-      acc[exercise.name.toLowerCase()] = exercise;
-      return acc;
-    }, {});
+// Create a detailed prompt for the workout plan
+function createWorkoutPrompt(preferences: any): string {
+  return `
+Create a detailed 7-day personalized workout plan based on the following preferences:
 
-    // Prepare system prompt with fallback handling
-    const systemPrompt = settings.use_custom_prompt && settings.system_prompt
-      ? settings.system_prompt 
-      : `You are TRENE2025, an AI specialized in creating personalized workout plans based on user preferences, physical condition, and goals. Generate a complete 7-day workout plan with detailed exercises, sets, and reps.`;
+BASIC INFO:
+- Age: ${preferences.age || 'Not specified'}
+- Gender: ${preferences.gender || 'Not specified'}
+- Weight: ${preferences.weight || 'Not specified'} kg
+- Height: ${preferences.height || 'Not specified'} cm
+- Experience Level: ${preferences.experience_level || 'Intermediate'}
 
-    // Prepare the workout request prompt with better formatting
-    const userPrompt = `
-Create a detailed 7-day workout plan for a user with the following information:
-- Age: ${safePreferences.age || 'Not specified'}
-- Gender: ${safePreferences.gender || 'Not specified'}
-- Height: ${safePreferences.height || 'Not specified'} cm
-- Weight: ${safePreferences.weight || 'Not specified'} kg
-- Goal: ${safePreferences.goal || 'Not specified'}
-- Activity Level: ${safePreferences.activity_level || 'Not specified'}
-- Training Location: ${safePreferences.training_location || 'Not specified'}
-- Available Equipment: ${safePreferences.available_equipment.join(', ') || 'Not specified'}
-- Preferred Exercise Types: ${safePreferences.preferred_exercise_types.join(', ') || 'Not specified'}
-- Health Conditions: ${safePreferences.health_conditions.join(', ') || 'None'}
-- Days Per Week: ${safePreferences.days_per_week || 7}
+GOAL: ${preferences.goal || 'General fitness'}
 
-Include the following for each day:
-1. Warmup description
-2. Main exercises with sets, reps, and rest times
-3. Cooldown description
+ACTIVITY LEVEL: ${preferences.activity_level || 'Moderate'}
 
-IMPORTANT FORMAT GUIDELINES:
-1. Return a valid JSON object with the structure defined below.
-2. For each exercise, use ONLY exercises from this list: ${exercises.slice(0, 20).map(e => e.name).join(', ')}... (and other exercises in the database)
-3. The workout_sessions array should contain 7 objects, one for each day of the week.
-4. Each session_exercises array should contain 4-6 exercises, with proper sets, reps and rest times.
-5. Include a "goal" field summarizing the workout plan's objective.
+PREFERRED EXERCISE TYPES: ${preferences.preferred_exercise_types?.join(', ') || 'Any'}
 
-REQUIRED JSON RESPONSE FORMAT:
+AVAILABLE EQUIPMENT: ${preferences.available_equipment?.join(', ') || 'Minimal equipment'}
+
+HEALTH CONDITIONS: ${preferences.health_conditions?.join(', ') || 'None'}
+
+TRAINING LOCATION: ${preferences.training_location || 'Home'}
+
+FORMAT THE RESPONSE IN JSON OBJECT like this:
 {
-  "goal": "Brief summary of the workout plan objective",
+  "goal": "Main goal of the workout plan",
+  "start_date": "Current date",
+  "end_date": "End date (7 days later)",
   "workout_sessions": [
     {
       "day_number": 1,
-      "warmup_description": "5-10 minute detailed warmup routine",
-      "cooldown_description": "5-10 minute detailed cooldown routine",
+      "warmup_description": "Detailed warmup instructions",
+      "cooldown_description": "Detailed cooldown instructions",
       "session_exercises": [
         {
           "exercise": {
-            "id": "Existing exercise ID from database",
-            "name": "Exact exercise name from the database"
+            "name": "Exercise name",
+            "description": "Brief description of how to perform it",
+            "muscle_group": "Primary muscle targeted (chest, back, legs, shoulders, arms, core)",
+            "exercise_type": "strength, cardio, flexibility, etc."
           },
           "sets": 3,
           "reps": "8-12",
@@ -207,337 +209,188 @@ REQUIRED JSON RESPONSE FORMAT:
     }
   ]
 }
+
+IMPORTANT GUIDELINES:
+1. Include proper warmup and cooldown sections
+2. Plan should be realistic and achievable
+3. Ensure proper rest days or lighter workout days
+4. Consider the user's experience level and health conditions
+5. Include 4-6 exercises per session
+6. Structure each day to target different muscle groups
+7. Provide specific sets, reps, and rest times
+8. Include detailed form descriptions for each exercise
+
+Respond ONLY with the JSON object, no introduction or explanation.
 `;
+}
 
-    console.log("Invoking AI model to generate workout plan");
-
-    // Call the LLM model with better error handling
-    let llmResponse;
-    try {
-      // Test if the llama-completion endpoint exists first
-      console.log("Checking if llama-completion endpoint is available");
-      const testResponse = await fetch(`${SUPABASE_URL}/functions/v1/llama-completion`, {
-        method: "HEAD",
-        headers: {
-          "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
-        }
-      });
-      
-      if (!testResponse.ok) {
-        console.error(`LLM endpoint check failed with status: ${testResponse.status}`);
-        throw new Error(`LLM endpoint not available (status ${testResponse.status})`);
-      }
-      
-      console.log("LLM endpoint is available, making completion request");
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/llama-completion`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
-        },
-        body: JSON.stringify({
-          system: systemPrompt,
-          user: userPrompt,
-          temperature: 0.7,
-          max_tokens: 4000
-        })
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("LLM API Error:", errorText);
-        throw new Error(`LLM API returned ${response.status}: ${errorText}`);
-      }
-      
-      llmResponse = await response.json();
-      console.log("LLM Response received, first 200 chars:", 
-        llmResponse.completion ? llmResponse.completion.substring(0, 200) + "..." : "No completion property in response");
-    } catch (error) {
-      console.error("Error calling LLM API:", error);
-      return new Response(
-        JSON.stringify({ error: `Failed to generate workout plan: ${error.message}` }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500 
-        }
-      );
+// Process the LLM response and extract the JSON workout plan
+function processLlmResponse(llmResponse: string): any {
+  try {
+    // Try to find JSON in the response (it might be wrapped in markdown code blocks or text)
+    let jsonMatch = llmResponse.match(/```json\s*(\{[\s\S]*?\})\s*```/);
+    if (jsonMatch && jsonMatch[1]) {
+      // Found JSON inside markdown code blocks
+      return JSON.parse(jsonMatch[1]);
     }
+    
+    // Try to find JSON without markdown formatting
+    jsonMatch = llmResponse.match(/\{[\s\S]*?\}/);
+    if (jsonMatch && jsonMatch[0]) {
+      return JSON.parse(jsonMatch[0]);
+    }
+    
+    // If still no JSON found, try to parse the whole response
+    return JSON.parse(llmResponse);
+  } catch (error) {
+    console.error("Error parsing LLM response:", error);
+    console.log("Raw LLM response:", llmResponse);
+    throw new Error("Failed to parse workout plan from AI response");
+  }
+}
 
-    // Extract and parse JSON from the completion with better error handling
-    let workoutPlan;
-    try {
-      if (!llmResponse.completion) {
-        throw new Error("No completion in LLM response");
+// Resolve exercise IDs by matching exercise names to the exercises table
+async function resolveExerciseIds(workoutPlan: any): Promise<any> {
+  // Create a deep copy to avoid modifying the original
+  const resolvedPlan = JSON.parse(JSON.stringify(workoutPlan));
+  
+  // Process each workout session
+  for (const session of resolvedPlan.workout_sessions || []) {
+    if (!Array.isArray(session.session_exercises)) {
+      console.warn(`Session ${session.day_number} has no exercises or invalid format`);
+      session.session_exercises = [];
+      continue;
+    }
+    
+    // Process each exercise in the session
+    for (const exerciseItem of session.session_exercises) {
+      if (!exerciseItem.exercise || !exerciseItem.exercise.name) {
+        console.warn("Invalid exercise item or missing name:", exerciseItem);
+        continue;
       }
-      
-      // Look for JSON structure in the completion
-      const jsonMatch = llmResponse.completion.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        console.error("No JSON structure found in the response");
-        throw new Error("Could not find valid JSON in the LLM response");
-      }
-      
-      const jsonString = jsonMatch[0];
-      console.log("Extracted JSON string, attempting to parse");
       
       try {
-        workoutPlan = JSON.parse(jsonString);
-        console.log("Successfully parsed workout plan JSON");
-      } catch (innerParseError) {
-        console.error("JSON parsing error:", innerParseError);
-        
-        // Try to fix common JSON issues and retry parsing
-        const fixedJson = jsonString
-          .replace(/,\s*}/g, '}')  // Remove trailing commas in objects
-          .replace(/,\s*]/g, ']')  // Remove trailing commas in arrays
-          .replace(/(['"])?([a-zA-Z0-9_]+)(['"])?\s*:/g, '"$2":')  // Ensure property names are quoted
-          .replace(/:\s*'([^']*)'/g, ':"$1"'); // Convert single quotes to double quotes
-          
-        console.log("Attempting to parse fixed JSON");
-        workoutPlan = JSON.parse(fixedJson);
-      }
-    } catch (parseError) {
-      console.error("JSON parsing error:", parseError);
-      console.error("Raw response:", llmResponse.completion ? llmResponse.completion.substring(0, 500) : "undefined");
-      return new Response(
-        JSON.stringify({ 
-          error: `Failed to parse workout plan: ${parseError.message}`, 
-          rawResponse: llmResponse.completion ? llmResponse.completion.substring(0, 200) + "..." : "undefined"
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 422
-        }
-      );
-    }
-
-    // Process and validate the workout plan with better error handling
-    if (!workoutPlan) {
-      console.error("Workout plan is undefined after parsing");
-      return new Response(
-        JSON.stringify({ error: "Failed to generate a valid workout plan" }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 422 
-        }
-      );
-    }
-    
-    if (!workoutPlan.workout_sessions || !Array.isArray(workoutPlan.workout_sessions)) {
-      console.error("Invalid workout plan structure:", JSON.stringify(workoutPlan));
-      
-      // Try to adapt the response if it doesn't have the expected structure
-      if (workoutPlan.days && Array.isArray(workoutPlan.days)) {
-        console.log("Found alternative 'days' array, adapting structure");
-        workoutPlan.workout_sessions = workoutPlan.days.map((day, index) => ({
-          day_number: index + 1,
-          warmup_description: day.warmup || "Standard warm-up: 5 minutes of light cardio followed by dynamic stretching.",
-          cooldown_description: day.cooldown || "Standard cool-down: 5 minutes of static stretching.",
-          session_exercises: Array.isArray(day.exercises) ? day.exercises.map(ex => ({
-            exercise: { name: ex.name },
-            sets: ex.sets || 3,
-            reps: ex.reps || "8-12",
-            rest_time_seconds: ex.rest || 60
-          })) : []
-        }));
-      } else {
-        return new Response(
-          JSON.stringify({ 
-            error: "Invalid workout plan structure: missing workout_sessions array",
-            generatedPlan: workoutPlan 
-          }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 422 
-          }
-        );
-      }
-    }
-
-    // Process each exercise to ensure it has a valid exercise ID
-    let missingExerciseCount = 0;
-    let replacedExerciseCount = 0;
-
-    workoutPlan.workout_sessions.forEach(session => {
-      // Ensure session number is valid
-      if (!session.day_number || typeof session.day_number !== 'number') {
-        session.day_number = workoutPlan.workout_sessions.indexOf(session) + 1;
-      }
-      
-      // Ensure warmup and cooldown descriptions exist
-      if (!session.warmup_description) {
-        session.warmup_description = "5 minutes of light cardio followed by dynamic stretching.";
-      }
-      
-      if (!session.cooldown_description) {
-        session.cooldown_description = "5 minutes of static stretching focusing on worked muscle groups.";
-      }
-      
-      // Process exercises if they exist
-      if (!session.session_exercises) {
-        console.warn(`Missing session_exercises array for day ${session.day_number}`);
-        session.session_exercises = [];
-        return;
-      }
-      
-      if (!Array.isArray(session.session_exercises)) {
-        console.warn(`session_exercises is not an array for day ${session.day_number}`);
-        session.session_exercises = [];
-        return;
-      }
-      
-      session.session_exercises.forEach((exerciseItem, index) => {
-        // Skip if we don't have an exercise object
-        if (!exerciseItem.exercise) {
-          console.warn(`Missing exercise object at day ${session.day_number}, exercise ${index + 1}`);
-          missingExerciseCount++;
-          
-          // Create a placeholder exercise object
-          exerciseItem.exercise = { name: "Generic Exercise" };
-        }
-
-        // Ensure sets, reps and rest_time_seconds have valid values
-        if (!exerciseItem.sets || typeof exerciseItem.sets !== 'number') {
-          exerciseItem.sets = 3;
-        }
-        
-        if (!exerciseItem.reps) {
-          exerciseItem.reps = "8-12";
-        }
-        
-        if (!exerciseItem.rest_time_seconds || typeof exerciseItem.rest_time_seconds !== 'number') {
-          exerciseItem.rest_time_seconds = 60;
-        }
-
+        // Get the exercise name for searching
         const exerciseName = exerciseItem.exercise.name;
-        if (!exerciseName) {
-          console.warn(`Missing exercise name at day ${session.day_number}, exercise ${index + 1}`);
+        const muscleGroup = exerciseItem.exercise.muscle_group || '';
+        
+        console.log(`Resolving exercise: ${exerciseName}, muscle group: ${muscleGroup}`);
+        
+        // Try to find an exact match first
+        let { data: exactMatches, error: exactError } = await supabaseClient
+          .from('exercises')
+          .select('*')
+          .ilike('name', exerciseName)
+          .limit(1);
           
-          // Generate a generic name based on index
-          exerciseItem.exercise.name = `Exercise ${index + 1}`;
+        if (exactError) {
+          console.error("Error querying exercises (exact match):", exactError);
         }
         
-        // Try multiple strategies to resolve exercise ID
-        let matchedExercise = null;
-        
-        // 1. Direct lookup by ID if it exists
-        if (exerciseItem.exercise.id) {
-          const idMatch = exercises.find(e => e.id === exerciseItem.exercise.id);
-          if (idMatch) {
-            matchedExercise = idMatch;
-            console.log(`Found exact ID match for "${exerciseName}": "${idMatch.name}" (ID: ${idMatch.id})`);
-          }
-        }
-        
-        // 2. Exact name match
-        if (!matchedExercise && exerciseName) {
-          const exactMatch = exercises.find(
-            e => e.name.toLowerCase() === exerciseName.toLowerCase()
-          );
-          if (exactMatch) {
-            matchedExercise = exactMatch;
-            console.log(`Found exact name match for "${exerciseName}" (ID: ${exactMatch.id})`);
-          }
-        }
-        
-        // 3. Name lookup from map
-        if (!matchedExercise && exerciseName) {
-          matchedExercise = exercisesByName[exerciseName.toLowerCase()];
-          if (matchedExercise) {
-            console.log(`Found name map match for "${exerciseName}" (ID: ${matchedExercise.id})`);
-          }
-        }
-        
-        // 4. Partial name match
-        if (!matchedExercise && exerciseName) {
-          const partialMatch = exercises.find(
-            e => e.name.toLowerCase().includes(exerciseName.toLowerCase()) || 
-                 exerciseName.toLowerCase().includes(e.name.toLowerCase())
-          );
-          if (partialMatch) {
-            matchedExercise = partialMatch;
-            console.log(`Found partial match for "${exerciseName}": "${partialMatch.name}" (ID: ${partialMatch.id})`);
-          }
-        }
-        
-        // 5. Fallback: use an exercise from the same muscle group if mentioned in name
-        if (!matchedExercise && exerciseName) {
-          // Extract potential muscle group from the exercise name
-          const muscleGroups = [
-            'chest', 'back', 'legs', 'shoulders', 'arms', 
-            'biceps', 'triceps', 'core', 'abs', 'glutes'
-          ];
+        // If no exact match, try fuzzy search or muscle group match
+        if (!exactMatches || exactMatches.length === 0) {
+          console.log(`No exact match found for ${exerciseName}, trying fuzzy search...`);
           
-          const potentialMuscleGroup = muscleGroups.find(
-            group => exerciseName.toLowerCase().includes(group)
-          );
+          // Try to find by muscle group if specified
+          if (muscleGroup) {
+            const { data: muscleMatches, error: muscleError } = await supabaseClient
+              .from('exercises')
+              .select('*')
+              .ilike('muscle_group', muscleGroup)
+              .limit(3);
+              
+            if (muscleError) {
+              console.error("Error querying exercises by muscle group:", muscleError);
+            }
+            
+            if (muscleMatches && muscleMatches.length > 0) {
+              console.log(`Found ${muscleMatches.length} matches by muscle group ${muscleGroup}`);
+              exactMatches = [muscleMatches[0]]; // Use the first match
+            }
+          }
           
-          if (potentialMuscleGroup && exercisesByMuscleGroup[potentialMuscleGroup]) {
-            const randomIndex = Math.floor(
-              Math.random() * exercisesByMuscleGroup[potentialMuscleGroup].length
-            );
-            matchedExercise = exercisesByMuscleGroup[potentialMuscleGroup][randomIndex];
-            console.log(`Using muscle group fallback for "${exerciseName}": "${matchedExercise.name}" (ID: ${matchedExercise.id})`);
+          // If still no match, try partial name match
+          if (!exactMatches || exactMatches.length === 0) {
+            const nameParts = exerciseName.split(' ');
+            if (nameParts.length > 1) {
+              // Try matching with part of the name (first two words or first word if only two)
+              const searchTerm = nameParts.slice(0, Math.min(2, nameParts.length)).join(' ');
+              
+              const { data: partialMatches, error: partialError } = await supabaseClient
+                .from('exercises')
+                .select('*')
+                .ilike('name', `%${searchTerm}%`)
+                .limit(1);
+                
+              if (partialError) {
+                console.error("Error querying exercises (partial match):", partialError);
+              }
+              
+              if (partialMatches && partialMatches.length > 0) {
+                console.log(`Found match with partial term: ${searchTerm}`);
+                exactMatches = partialMatches;
+              }
+            }
+          }
+          
+          // If still no match, use a default exercise based on muscle group
+          if (!exactMatches || exactMatches.length === 0) {
+            console.log(`No matches found, using default exercise for ${muscleGroup || 'general'}`);
+            
+            const defaultMuscleGroup = muscleGroup || 'chest'; // Default to chest if no muscle group
+            
+            const { data: defaultExercise, error: defaultError } = await supabaseClient
+              .from('exercises')
+              .select('*')
+              .ilike('muscle_group', defaultMuscleGroup)
+              .limit(1);
+              
+            if (defaultError) {
+              console.error("Error querying default exercise:", defaultError);
+            }
+            
+            if (defaultExercise && defaultExercise.length > 0) {
+              exactMatches = defaultExercise;
+            } else {
+              // If still nothing, get any exercise as last resort
+              const { data: anyExercise, error: anyError } = await supabaseClient
+                .from('exercises')
+                .select('*')
+                .limit(1);
+                
+              if (anyError) {
+                console.error("Error querying any exercise:", anyError);
+              }
+              
+              exactMatches = anyExercise || [];
+            }
           }
         }
         
-        // 6. Last resort: random exercise replacement
-        if (!matchedExercise) {
-          const randomIndex = Math.floor(Math.random() * exercises.length);
-          matchedExercise = exercises[randomIndex];
-          console.log(`Using random replacement for "${exerciseName}": "${matchedExercise.name}" (ID: ${matchedExercise.id})`);
-        }
-        
-        // Update the exercise information
-        if (matchedExercise) {
+        // If we found a match, update the exercise with the database values
+        if (exactMatches && exactMatches.length > 0) {
+          const matchedExercise = exactMatches[0];
+          console.log(`✅ Resolved exercise: ${exerciseName} → ${matchedExercise.name} (ID: ${matchedExercise.id})`);
+          
+          // Update with the matched exercise while preserving the original name from AI
+          const originalName = exerciseItem.exercise.name;
           exerciseItem.exercise = {
             id: matchedExercise.id,
-            name: matchedExercise.name,
-            description: matchedExercise.description || '',
+            name: originalName, // Keep the original name from the AI
+            description: matchedExercise.description || exerciseItem.exercise.description || '',
             gif_url: matchedExercise.gif_url || '',
-            muscle_group: matchedExercise.muscle_group || '',
-            exercise_type: matchedExercise.exercise_type || ''
+            muscle_group: matchedExercise.muscle_group || exerciseItem.exercise.muscle_group || '',
+            exercise_type: matchedExercise.exercise_type || exerciseItem.exercise.exercise_type || ''
           };
-          
-          if (!exerciseItem.exercise.id) {
-            replacedExerciseCount++;
-          }
+        } else {
+          console.warn(`❌ Could not find any exercise match for: ${exerciseName}`);
+          // Keep the exercise without an ID
         }
-      });
-    });
-
-    console.log(`Processed workout plan: ${missingExerciseCount} missing exercises, ${replacedExerciseCount} replaced exercises`);
-    console.log(`Final workout plan has ${workoutPlan.workout_sessions.length} days and goal: "${workoutPlan.goal}"`);
-
-    // Return the final workout plan
-    return new Response(
-      JSON.stringify({ 
-        workoutPlan,
-        message: "Workout plan generated successfully"
-      }),
-      { 
-        headers: { 
-          ...corsHeaders,
-          'Content-Type': 'application/json' 
-        },
-        status: 200
+      } catch (error) {
+        console.error(`Error processing exercise ${exerciseItem.exercise?.name}:`, error);
       }
-    );
-
-  } catch (error) {
-    console.error("Error in workout plan generation:", error);
-    
-    return new Response(
-      JSON.stringify({ 
-        error: error.message || "An unexpected error occurred" 
-      }),
-      { 
-        headers: { 
-          ...corsHeaders,
-          'Content-Type': 'application/json' 
-        },
-        status: 500
-      }
-    );
+    }
   }
-});
+  
+  return resolvedPlan;
+}
