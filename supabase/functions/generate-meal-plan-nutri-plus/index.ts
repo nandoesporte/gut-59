@@ -1,271 +1,152 @@
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-// Definindo os tipos para o payload
-interface UserData {
-  weight: number;
-  height: number;
-  age: number;
-  gender: string;
-  activityLevel: string;
-  goal: string;
-  userId: string;
-  dailyCalories: number;
-}
+const LLAMA_API_KEY = Deno.env.get("LLAMA_API_KEY");
+const LLAMA_API_URL = "https://api.llama-api.com";
 
-interface FoodData {
-  id: string;
-  name: string;
-  calories: number;
-  protein: number;
-  carbs: number;
-  fats: number;
-  fiber: number;
-  portion: number;
-  portionUnit: string;
-  food_group_id: number;
-  nutritionix_data?: any;
-}
-
-interface DietaryPreferences {
-  hasAllergies: boolean;
-  allergies: string[];
-  dietaryRestrictions: string[];
-  trainingTime: string | null;
-}
-
-interface RequestPayload {
-  userData: UserData;
-  selectedFoods: FoodData[];
-  foodsByMealType: Record<string, FoodData[]>;
-  dietaryPreferences: DietaryPreferences;
-  modelConfig: {
-    model: string;
-    provider: string;
-  };
-}
-
-interface NutriPlusConfig {
-  useAdvancedNutrition: boolean;
-  includeMealTimings: boolean;
-  generateGroceryList: boolean;
-  includeNutritionalAnalysis: boolean;
-  optimizeForPerformance: boolean;
-}
-
-const LLAMA_API_KEY = Deno.env.get("LLAMA_API_KEY") || "";
-const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY") || "";
-
-console.log("Starting generate-meal-plan-nutri-plus edge function");
-
-serve(async (req: Request) => {
-  // Handle CORS
-  if (req.method === "OPTIONS") {
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const payload: RequestPayload = await req.json();
-    const { userData, selectedFoods, foodsByMealType, dietaryPreferences } = payload;
+    const requestData = await req.json();
+    const { userData, selectedFoods, dietaryPreferences, foodsByMealType } = requestData;
     
-    console.log(`Processando requisição Nutri+ para usuário: ${userData.userId}`);
-    console.log(`Calorias diárias: ${userData.dailyCalories}, Objetivo: ${userData.goal}`);
-    console.log(`Alimentos selecionados: ${selectedFoods.length}`);
+    console.log("Generate Meal Plan Nutri+ Function - Request received");
+    console.log("Using model: nous-hermes-2-mixtral-8x7b for advanced nutrition plan");
     
-    const nutriPlusConfig: NutriPlusConfig = {
-      useAdvancedNutrition: true,
-      includeMealTimings: true,
-      generateGroceryList: true,
-      includeNutritionalAnalysis: true,
-      optimizeForPerformance: dietaryPreferences.trainingTime !== null
-    };
-    
-    console.log("Configuração Nutri+:", nutriPlusConfig);
+    // Create a detailed system prompt for the advanced nutrition plan
+    const systemPrompt = `You are NutriPlus, an advanced nutritionist AI specialized in creating comprehensive, personalized meal plans.
+You have expertise in nutrition science, dietary requirements, food combinations, and meal timing optimization.
+Create a detailed, nutritionally balanced 7-day meal plan with optimal macronutrient distribution.
 
-    // Decidindo qual modelo usar com base na complexidade
-    const useGroq = selectedFoods.length > 15 || 
-                    dietaryPreferences.allergies.length > 3 || 
-                    dietaryPreferences.dietaryRestrictions.length > 2;
-    
-    const modelEndpoint = useGroq 
-      ? "https://api.groq.com/openai/v1/chat/completions"
-      : "https://api.llama-api.com/chat/completions";
-    
-    const modelApiKey = useGroq ? GROQ_API_KEY : LLAMA_API_KEY;
-    const modelName = useGroq ? "mixtral-8x7b-32768" : "llama3:8b";
-    
-    console.log(`Usando modelo ${modelName} via ${useGroq ? 'Groq' : 'Llama API'}`);
+Your response must be valid JSON in the exact format specified below without any additional text:
 
-    // Construir o prompt para o agente Nutri+
-    const systemPrompt = `Você é o Nutri+, um assistente especializado em nutrição que cria planos alimentares completos e detalhados. 
-Seu papel é utilizar informações sobre necessidades calóricas, alimentos disponíveis, restrições alimentares e objetivos do usuário para criar um plano alimentar abrangente.
-
-INSTRUÇÕES CRÍTICAS PARA O PLANO ALIMENTAR:
-1. Crie um plano alimentar semanal completo (7 dias) baseado em informações fornecidas.
-2. Distribua ${userData.dailyCalories} calorias diárias entre cinco refeições: café da manhã, lanche da manhã, almoço, lanche da tarde e jantar.
-3. Use APENAS os alimentos listados em "selectedFoods".
-4. Siga a categorização de alimentos por refeição em "foodsByMealType" quando disponível.
-5. Atenda às restrições dietéticas e alergias informadas em "dietaryPreferences".
-6. Equilibre macronutrientes para o objetivo de "${userData.goal}" adaptado a uma pessoa de ${userData.gender}, ${userData.age} anos com nível de atividade "${userData.activityLevel}".
-7. As refeições devem ser variadas e não repetitivas ao longo da semana.
-8. Especifique porções precisas para cada alimento.
-9. Calcule nutrientes totais para cada refeição e dia.
-10. Forneça recomendações personalizadas para otimizar resultados.
-
-Todas as estatísticas nutricionais DEVEM ser precisamente calculadas com base nas informações dos alimentos fornecidos.
-
-Retorne APENAS um objeto JSON seguindo exatamente este formato:
 {
-  "userCalories": número,
-  "weeklyPlan": {
-    "monday": {
-      "dayName": "Segunda",
-      "meals": {
-        "breakfast": {
-          "description": "Café da Manhã",
-          "foods": [{"name": "string", "portion": número, "unit": "string", "details": "string"}],
-          "calories": número,
-          "macros": {"protein": número, "carbs": número, "fats": número, "fiber": número}
+  "mealPlan": {
+    "userCalories": number,
+    "weeklyPlan": {
+      "monday": { 
+        "dayName": "Monday", 
+        "meals": {
+          "breakfast": { "description": string, "foods": [{"name": string, "portion": number, "unit": string, "details": string}], "calories": number, "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number} },
+          "morningSnack": { "description": string, "foods": [{"name": string, "portion": number, "unit": string, "details": string}], "calories": number, "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number} },
+          "lunch": { "description": string, "foods": [{"name": string, "portion": number, "unit": string, "details": string}], "calories": number, "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number} },
+          "afternoonSnack": { "description": string, "foods": [{"name": string, "portion": number, "unit": string, "details": string}], "calories": number, "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number} },
+          "dinner": { "description": string, "foods": [{"name": string, "portion": number, "unit": string, "details": string}], "calories": number, "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number} }
         },
-        "morningSnack": { ... },
-        "lunch": { ... },
-        "afternoonSnack": { ... },
-        "dinner": { ... }
+        "dailyTotals": { "calories": number, "protein": number, "carbs": number, "fats": number, "fiber": number }
       },
-      "dailyTotals": {"calories": número, "protein": número, "carbs": número, "fats": número, "fiber": número}
+      // Similar structure for tuesday, wednesday, thursday, friday, saturday, sunday
     },
-    "tuesday": { ... },
-    "wednesday": { ... },
-    "thursday": { ... },
-    "friday": { ... },
-    "saturday": { ... },
-    "sunday": { ... }
-  },
-  "weeklyTotals": {
-    "averageCalories": número,
-    "averageProtein": número,
-    "averageCarbs": número,
-    "averageFats": número,
-    "averageFiber": número
-  },
-  "recommendations": {
-    "general": "string",
-    "preworkout": "string",
-    "postworkout": "string",
-    "timing": ["string", "string", ...]
+    "weeklyTotals": {
+      "averageCalories": number,
+      "averageProtein": number,
+      "averageCarbs": number,
+      "averageFats": number,
+      "averageFiber": number
+    },
+    "recommendations": {
+      "general": string,
+      "preworkout": string,
+      "postworkout": string,
+      "timing": [string]
+    }
   }
 }`;
 
-    // Criar a requisição para o modelo LLM
-    const llmRequest = {
-      model: modelName,
-      messages: [
-        {
-          role: "system",
-          content: systemPrompt
-        },
-        {
-          role: "user",
-          content: JSON.stringify({
-            userData,
-            selectedFoods,
-            foodsByMealType,
-            dietaryPreferences,
-            nutriPlusConfig
-          })
-        }
-      ],
-      temperature: 0.2,
-      max_tokens: 4000
-    };
-
-    console.log("Enviando requisição para o modelo LLM...");
+    // Create a comprehensive user prompt with all nutrition details
+    let userPrompt = `Create an advanced, personalized meal plan for a ${userData.age} year old ${userData.gender}, weighing ${userData.weight}kg, height ${userData.height}cm, with ${userData.activityLevel} activity level. The daily calorie target is ${userData.dailyCalories} calories with a goal to ${userData.goal}.`;
     
-    // Definir timeout para a requisição
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 150000); // 2.5 minutos de timeout
-    
-    try {
-      const llmResponse = await fetch(modelEndpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${modelApiKey}`
-        },
-        body: JSON.stringify(llmRequest),
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!llmResponse.ok) {
-        const errorText = await llmResponse.text();
-        console.error(`Erro na API do modelo: ${llmResponse.status} - ${errorText}`);
-        throw new Error(`Erro na API do modelo: ${llmResponse.status}`);
-      }
-
-      const llmData = await llmResponse.json();
-      
-      if (!llmData.choices || llmData.choices.length === 0) {
-        console.error("Resposta inválida do modelo:", llmData);
-        throw new Error("Resposta inválida do modelo");
-      }
-
-      // Extrair o conteúdo JSON da resposta do modelo
-      let mealPlanJson;
-      try {
-        const content = llmData.choices[0].message.content;
-        // Remover marcadores de código se presentes
-        const jsonContent = content.replace(/```json|```/g, '').trim();
-        mealPlanJson = JSON.parse(jsonContent);
-        
-        console.log("Plano alimentar gerado com sucesso!");
-      } catch (parseError) {
-        console.error("Erro ao processar resposta JSON:", parseError);
-        console.log("Conteúdo recebido:", llmData.choices[0].message.content);
-        throw new Error("Falha ao processar resposta do modelo");
-      }
-
-      // Validação básica do plano gerado
-      const requiredDays = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
-      const missingDays = requiredDays.filter(day => !mealPlanJson.weeklyPlan[day]);
-      
-      if (missingDays.length > 0) {
-        console.warn(`Dias ausentes no plano: ${missingDays.join(', ')}`);
-        throw new Error("Plano incompleto gerado pelo modelo");
-      }
-
-      return new Response(
-        JSON.stringify({ mealPlan: mealPlanJson }),
-        {
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json"
-          },
-          status: 200
-        }
-      );
-    } catch (fetchError) {
-      clearTimeout(timeoutId);
-      console.error("Erro na chamada do modelo:", fetchError);
-      throw fetchError;
+    // Add detailed dietary restrictions
+    if (dietaryPreferences.hasAllergies && dietaryPreferences.allergies.length > 0) {
+      userPrompt += ` The person has allergies to: ${dietaryPreferences.allergies.join(", ")}.`;
     }
-  } catch (error) {
-    console.error(`Erro na Edge Function Nutri+: ${error.message}`);
     
-    return new Response(
-      JSON.stringify({ 
-        error: error.message,
-        detail: "Falha ao gerar plano alimentar Nutri+"
-      }),
-      {
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json"
-        },
-        status: 500
+    if (dietaryPreferences.dietaryRestrictions && dietaryPreferences.dietaryRestrictions.length > 0) {
+      userPrompt += ` The person follows these dietary restrictions: ${dietaryPreferences.dietaryRestrictions.join(", ")}.`;
+    }
+    
+    if (dietaryPreferences.trainingTime) {
+      userPrompt += ` The person typically trains at: ${dietaryPreferences.trainingTime}.`;
+    }
+    
+    // Add detailed food preferences with nutritional information
+    userPrompt += ` Here are the foods the person likes to eat with their nutritional information:`;
+    selectedFoods.forEach(food => {
+      userPrompt += ` ${food.name} (${food.calories} calories, ${food.protein}g protein, ${food.carbs}g carbs, ${food.fats}g fats, ${food.fiber || 0}g fiber)`;
+    });
+    
+    // Add food by meal type preferences if available
+    if (foodsByMealType) {
+      userPrompt += " The person prefers specific foods by meal type:";
+      
+      for (const [mealType, foods] of Object.entries(foodsByMealType)) {
+        if (Array.isArray(foods) && foods.length > 0) {
+          userPrompt += ` For ${mealType}: ${foods.map(f => f.name).join(", ")}.`;
+        }
       }
-    );
+    }
+    
+    userPrompt += ` Create a comprehensive, optimized 7-day meal plan with 5 meals per day that precisely meets the calorie target and offers optimal macronutrient distribution for the person's goal. Include exact portion sizes in grams and complete nutritional information for each meal. Provide specific recommendations for meal timing, especially around workout times, and include advanced nutritional guidance.`;
+    
+    console.log("Sending request to Llama API for NutriPlus plan");
+    
+    // Call the Llama API with the Nous-Hermes model
+    const llamaResponse = await fetch(`${LLAMA_API_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${LLAMA_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: "nous-hermes-2-mixtral-8x7b",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 4000,
+        response_format: { type: "json_object" }
+      }),
+    });
+
+    if (!llamaResponse.ok) {
+      const errorText = await llamaResponse.text();
+      console.error("Llama API error:", errorText);
+      throw new Error(`Llama API error: ${llamaResponse.status} - ${errorText}`);
+    }
+
+    const llamaData = await llamaResponse.json();
+    console.log("Llama API response received for NutriPlus plan");
+    
+    // Extract the content from the response
+    let mealPlanJson;
+    try {
+      const content = llamaData.choices[0].message.content;
+      mealPlanJson = JSON.parse(content);
+      console.log("Successfully parsed NutriPlus meal plan JSON");
+    } catch (parseError) {
+      console.error("Error parsing JSON from Llama response:", parseError);
+      throw new Error("Invalid meal plan format in Llama response");
+    }
+    
+    // Add user calories to the meal plan if not present
+    if (mealPlanJson.mealPlan && !mealPlanJson.mealPlan.userCalories) {
+      mealPlanJson.mealPlan.userCalories = userData.dailyCalories;
+    }
+    
+    return new Response(JSON.stringify(mealPlanJson), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    console.error("Error in generate-meal-plan-nutri-plus function:", error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });

@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { DietaryPreferences, ProtocolFood } from "../types";
@@ -130,7 +129,7 @@ export const generateMealPlan = async ({
           .from('plan_access')
           .select('*')
           .eq('user_id', user.id)
-          .eq('plan_type', 'premium')
+          .eq('plan_type', 'nutrition')  // Changed from "premium" to "nutrition"
           .eq('is_active', true)
           .maybeSingle();
           
@@ -292,7 +291,7 @@ export const generateMealPlan = async ({
             console.log('[MEAL PLAN] Tentando usar Llama como segundo fallback');
             
             enhancedPayload.modelConfig = {
-              model: "llama3:8b",
+              model: "nous-hermes-2-mixtral-8x7b", // Using the requested Nous-Hermes model
               provider: "llama"
             };
             
@@ -324,7 +323,7 @@ export const generateMealPlan = async ({
         
         try {
           enhancedPayload.modelConfig = {
-            model: "llama3:8b",
+            model: "nous-hermes-2-mixtral-8x7b", // Using the requested Nous-Hermes model
             provider: "llama"
           };
           
@@ -665,251 +664,4 @@ const getDefaultRecommendations = (goal: string) => {
   if (goal === "lose" || goal === "lose_weight") {
     generalRecs.push("Crie um déficit calórico moderado, priorizando a redução de alimentos processados e açúcares.");
     generalRecs.push("Aumente a ingestão de alimentos ricos em fibras para promover saciedade.");
-    timingRecs.push("Considere uma janela de alimentação restrita de 10-12 horas para potencializar a perda de peso.");
-  } else if (goal === "gain" || goal === "gain_weight") {
-    generalRecs.push("Aumente gradualmente a ingestão calórica, priorizando proteínas de alta qualidade.");
-    generalRecs.push("Distribua bem as refeições ao longo do dia, evitando ficar longos períodos sem se alimentar.");
-    timingRecs.push("Considere uma refeição adicional antes de dormir rica em proteínas de absorção lenta como caseína.");
-  } else {
-    generalRecs.push("Mantenha o equilíbrio energético, ajustando a ingestão calórica conforme seu nível de atividade diária.");
-    generalRecs.push("Priorize a variedade alimentar para garantir a ingestão adequada de todos os nutrientes.");
-  }
-  
-  return {
-    general: generalRecs.join(" "),
-    preworkout: preworkoutRecs,
-    postworkout: postworkoutRecs,
-    timing: timingRecs
-  };
-};
-
-// Função para criar um plano de refeição padrão de fallback
-const createDefaultMealPlan = (
-  userData: MealPlanGenerationProps['userData'], 
-  selectedFoods: any[],
-  foodsByMealType?: Record<string, any[]>
-) => {
-  console.log('[MEAL PLAN] Criando plano padrão de fallback com', userData.dailyCalories, 'calorias/dia');
-  
-  const dailyCalories = userData.dailyCalories || 2000;
-  
-  // Cálculo básico de macronutrientes
-  const protein = Math.round(dailyCalories * 0.3 / 4); // 30% proteína (4 cal/g)
-  const carbs = Math.round(dailyCalories * 0.45 / 4);  // 45% carboidratos (4 cal/g)
-  const fats = Math.round(dailyCalories * 0.25 / 9);   // 25% gorduras (9 cal/g)
-  
-  // Distribuição por refeição
-  const breakfastCals = Math.round(dailyCalories * 0.25);
-  const lunchCals = Math.round(dailyCalories * 0.35);
-  const dinnerCals = Math.round(dailyCalories * 0.25);
-  const snackCals = Math.round(dailyCalories * 0.15);
-  
-  // Criar um plano semanal padrão
-  const weeklyPlan: any = {};
-  
-  const dayNames = {
-    monday: "Segunda-feira",
-    tuesday: "Terça-feira",
-    wednesday: "Quarta-feira",
-    thursday: "Quinta-feira",
-    friday: "Sexta-feira",
-    saturday: "Sábado",
-    sunday: "Domingo"
-  };
-  
-  // Inicializar comida por tipo de refeição
-  const foodsForBreakfast = foodsByMealType?.breakfast || 
-    selectedFoods.filter(food => food.food_group_id === 1);
-  const foodsForLunch = foodsByMealType?.lunch || 
-    selectedFoods.filter(food => food.food_group_id === 2);
-  const foodsForSnack = foodsByMealType?.snack || 
-    selectedFoods.filter(food => food.food_group_id === 3);
-  const foodsForDinner = foodsByMealType?.dinner || 
-    selectedFoods.filter(food => food.food_group_id === 4);
-    
-  // Usar alimentos categorizados por refeição quando disponíveis
-  console.log('[MEAL PLAN] Usando alimentos categorizados para o plano padrão:', {
-    breakfast: foodsForBreakfast.length,
-    lunch: foodsForLunch.length, 
-    snack: foodsForSnack.length,
-    dinner: foodsForDinner.length
-  });
-  
-  // Seleção de alimentos para o plano padrão por refeição
-  const getRandomFood = (foods: any[], count: number = 1) => {
-    if (!foods || foods.length === 0) return [{ name: "Opção variada", portion: 100, unit: "g", details: "Consulte um nutricionista" }];
-    // Embaralhar o array e retornar N itens
-    const shuffled = [...foods].sort(() => 0.5 - Math.random());
-    const selected = shuffled.slice(0, Math.min(count, foods.length));
-    // Mapear para o formato esperado
-    return selected.map(food => ({
-      name: food.name,
-      portion: food.portion || 100,
-      unit: food.portionUnit || "g",
-      details: getFoodDetail(food)
-    }));
-  };
-  
-  // Gerar descrição para o alimento
-  const getFoodDetail = (food: any) => {
-    if (food.food_group_id === 1) return "Fonte de carboidratos para o café da manhã";
-    if (food.food_group_id === 2) return "Alimento recomendado para o almoço";
-    if (food.food_group_id === 3) return "Opção saudável para lanches";
-    if (food.food_group_id === 4) return "Alimento recomendado para o jantar";
-    return "Alimento personalizado baseado em suas preferências";
-  };
-  
-  // Criar cada dia da semana usando os alimentos preferidos do usuário
-  Object.entries(dayNames).forEach(([day, dayName]) => {
-    weeklyPlan[day] = {
-      dayName,
-      meals: {
-        breakfast: {
-          foods: getRandomFood(foodsForBreakfast, 3),
-          calories: breakfastCals,
-          macros: {
-            protein: Math.round(protein * 0.25),
-            carbs: Math.round(carbs * 0.3),
-            fats: Math.round(fats * 0.2),
-            fiber: 5
-          },
-          description: `Café da manhã balanceado com aproximadamente ${breakfastCals} calorias.`
-        },
-        morningSnack: {
-          foods: getRandomFood(foodsForSnack, 2),
-          calories: Math.round(snackCals / 2),
-          macros: {
-            protein: Math.round(protein * 0.1),
-            carbs: Math.round(carbs * 0.1),
-            fats: Math.round(fats * 0.05),
-            fiber: 3
-          },
-          description: `Lanche da manhã leve com aproximadamente ${Math.round(snackCals/2)} calorias.`
-        },
-        lunch: {
-          foods: getRandomFood(foodsForLunch, 4),
-          calories: lunchCals,
-          macros: {
-            protein: Math.round(protein * 0.4),
-            carbs: Math.round(carbs * 0.35),
-            fats: Math.round(fats * 0.25),
-            fiber: 8
-          },
-          description: `Almoço nutritivo e balanceado com aproximadamente ${lunchCals} calorias.`
-        },
-        afternoonSnack: {
-          foods: getRandomFood(foodsForSnack, 2),
-          calories: Math.round(snackCals / 2),
-          macros: {
-            protein: Math.round(protein * 0.05),
-            carbs: Math.round(carbs * 0.1),
-            fats: Math.round(fats * 0.2),
-            fiber: 3
-          },
-          description: `Lanche da tarde com aproximadamente ${Math.round(snackCals/2)} calorias.`
-        },
-        dinner: {
-          foods: getRandomFood(foodsForDinner, 3),
-          calories: dinnerCals,
-          macros: {
-            protein: Math.round(protein * 0.2),
-            carbs: Math.round(carbs * 0.15),
-            fats: Math.round(fats * 0.3),
-            fiber: 6
-          },
-          description: `Jantar leve e nutritivo com aproximadamente ${dinnerCals} calorias.`
-        }
-      },
-      dailyTotals: {
-        calories: dailyCalories,
-        protein,
-        carbs,
-        fats,
-        fiber: 25
-      }
-    };
-  });
-
-  // Criar médias semanais
-  const weeklyTotals = {
-    averageCalories: dailyCalories,
-    averageProtein: protein,
-    averageCarbs: carbs, 
-    averageFats: fats,
-    averageFiber: 25
-  };
-
-  // Obter recomendações baseadas no objetivo do usuário
-  const recommendations = getDefaultRecommendations(userData.goal);
-
-  // Montar o plano alimentar completo
-  return {
-    userCalories: dailyCalories,
-    weeklyPlan,
-    weeklyTotals,
-    recommendations,
-    isDefaultPlan: true
-  };
-};
-
-const saveMealPlanData = async (userId: string, mealPlan: any, calories: number, preferences: DietaryPreferences) => {
-  try {
-    console.log('[MEAL PLAN/DB] Iniciando salvamento das preferências dietéticas');
-    
-    // Salvar preferências dietéticas
-    const { error: dietaryError } = await supabase
-      .from('dietary_preferences')
-      .upsert({
-        user_id: userId,
-        has_allergies: preferences.hasAllergies || false,
-        allergies: preferences.allergies || [],
-        dietary_restrictions: preferences.dietaryRestrictions || [],
-        training_time: preferences.trainingTime || null
-      });
-
-    if (dietaryError) {
-      console.error('[MEAL PLAN/DB] Erro ao salvar preferências:', dietaryError);
-      console.error('[MEAL PLAN/DB] Código:', dietaryError.code);
-      console.error('[MEAL PLAN/DB] Detalhes:', dietaryError.details);
-      console.error('[MEAL PLAN/DB] Mensagem:', dietaryError.message);
-      throw dietaryError;
-    }
-
-    console.log('[MEAL PLAN/DB] Preferências dietéticas salvas com sucesso');
-
-    // Salvar plano alimentar
-    const { error: saveError } = await supabase
-      .from('meal_plans')
-      .insert({
-        user_id: userId,
-        plan_data: mealPlan,
-        calories: calories,
-        dietary_preferences: {
-          hasAllergies: preferences.hasAllergies || false,
-          allergies: preferences.allergies || [],
-          dietaryRestrictions: preferences.dietaryRestrictions || [],
-          training_time: preferences.trainingTime || null
-        }
-      });
-
-    if (saveError) {
-      console.error('[MEAL PLAN/DB] Erro ao salvar cardápio:', saveError);
-      console.error('[MEAL PLAN/DB] Código:', saveError.code);
-      console.error('[MEAL PLAN/DB] Detalhes:', saveError.details);
-      console.error('[MEAL PLAN/DB] Mensagem:', saveError.message);
-      throw saveError;
-    }
-
-    console.log('[MEAL PLAN/DB] Plano alimentar salvo com sucesso');
-  } catch (error) {
-    console.error('[MEAL PLAN/DB] Erro ao salvar dados do plano:');
-    if (error instanceof Error) {
-      console.error('[MEAL PLAN/DB] Nome do erro:', error.name);
-      console.error('[MEAL PLAN/DB] Mensagem:', error.message);
-      console.error('[MEAL PLAN/DB] Stack trace:', error.stack);
-    } else {
-      console.error('[MEAL PLAN/DB] Erro não padronizado:', JSON.stringify(error, null, 2));
-    }
-    throw error;
-  }
-};
+    timingRecs
