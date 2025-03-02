@@ -13,8 +13,8 @@ export type MuscleGroup =
   | "cardio"
   | "mobility";
 
-export type ExerciseType = "strength" | "cardio" | "mobility";
-export type Difficulty = "beginner" | "intermediate" | "advanced";
+export type ExerciseType = "strength" | "cardio" | "mobility" | "flexibility" | "balance";
+export type Difficulty = "beginner" | "intermediate" | "advanced" | "expert";
 
 export interface Exercise {
   id: string;

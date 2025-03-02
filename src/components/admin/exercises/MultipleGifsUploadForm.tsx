@@ -52,6 +52,13 @@ export const MultipleGifsUploadForm = ({
     { value: "outdoor", label: "Ar Livre" },
     { value: "anywhere", label: "Qualquer Lugar" },
   ];
+  
+  const difficultyOptions = [
+    { value: "beginner", label: "Sedentário - Pouco ou nenhum exercício" },
+    { value: "intermediate", label: "Leve - 1-3 dias por semana" },
+    { value: "advanced", label: "Moderado - 3-5 dias por semana" },
+    { value: "expert", label: "Intenso - 6-7 dias por semana" },
+  ];
 
   const validateFile = (file: File): boolean => {
     if (!file.type.includes("gif")) {
@@ -187,9 +194,11 @@ export const MultipleGifsUploadForm = ({
                   <SelectValue placeholder="Selecione a dificuldade" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="beginner">Iniciante</SelectItem>
-                  <SelectItem value="intermediate">Intermediário</SelectItem>
-                  <SelectItem value="advanced">Avançado</SelectItem>
+                  {difficultyOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value as Difficulty}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
