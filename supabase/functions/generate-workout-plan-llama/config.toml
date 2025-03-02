@@ -1,5 +1,5 @@
 
 project_id = "sxjafhzikftdenqnkcri"
 app_version = "v1"
-timeout_ms = 60000 # Increased to 60s as model responses may take time
+timeout_seconds = 60
 import_map = "../import_map.json"

@@ -32,7 +32,10 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
   }
 
   if (error || !workoutPlan) {
-    return <WorkoutError onReset={onReset} errorMessage={error || "Não foi possível gerar seu plano. Por favor, tente novamente."} />;
+    return <WorkoutError 
+      onReset={onReset} 
+      errorMessage={error || "Não foi possível gerar seu plano. Por favor, tente novamente com diferentes preferências ou mais tarde."} 
+    />;
   }
 
   return (

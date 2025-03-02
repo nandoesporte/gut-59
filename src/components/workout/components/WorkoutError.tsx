@@ -28,8 +28,9 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
         <p className="font-semibold mb-2">Possíveis soluções:</p>
         <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
           <li>Verifique sua conexão com a internet e tente novamente</li>
-          <li>Tente mudar algumas preferências de treino</li>
-          <li>Aguarde alguns minutos e tente novamente</li>
+          <li>O servidor pode estar sobrecarregado. Aguarde alguns minutos e tente novamente</li>
+          <li>O modelo Llama 3 pode estar temporariamente indisponível na API Groq</li>
+          <li>Tente mudar algumas preferências de treino para simplificar a solicitação</li>
           <li>Entre em contato com o suporte se o problema persistir</li>
         </ul>
       </div>
