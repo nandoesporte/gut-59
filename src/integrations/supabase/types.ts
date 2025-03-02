@@ -45,6 +45,36 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_model_settings: {
+        Row: {
+          active_model: string
+          created_at: string | null
+          id: string
+          name: string
+          system_prompt: string
+          updated_at: string | null
+          use_custom_prompt: boolean
+        }
+        Insert: {
+          active_model?: string
+          created_at?: string | null
+          id?: string
+          name: string
+          system_prompt: string
+          updated_at?: string | null
+          use_custom_prompt?: boolean
+        }
+        Update: {
+          active_model?: string
+          created_at?: string | null
+          id?: string
+          name?: string
+          system_prompt?: string
+          updated_at?: string | null
+          use_custom_prompt?: boolean
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           created_at: string

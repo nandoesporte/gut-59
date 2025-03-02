@@ -16,7 +16,7 @@ interface WorkoutPlanDisplayProps {
 }
 
 export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayProps) => {
-  const { loading, workoutPlan, progressData } = useWorkoutPlanGeneration(preferences);
+  const { loading, workoutPlan, progressData, error } = useWorkoutPlanGeneration(preferences);
 
   const handleExportPDF = async () => {
     if (!workoutPlan) return;
@@ -28,7 +28,7 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
   }
 
   if (!workoutPlan) {
-    return <WorkoutError onReset={onReset} />;
+    return <WorkoutError onReset={onReset} errorMessage={error || undefined} />;
   }
 
   return (

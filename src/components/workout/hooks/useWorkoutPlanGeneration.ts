@@ -172,15 +172,22 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       }
 
       console.log("Acesso permitido, gerando plano com Llama 3...");
-      // Usamos a nova função generate-workout-plan-llama
+      
+      // Usamos a nova função generate-workout-plan-llama com log detalhado
+      console.log("Chamando edge function com preferências:", preferences);
       const { data: response, error: planError } = await supabase.functions.invoke('generate-workout-plan-llama', {
-        body: { preferences, userId: user.id }
+        body: { 
+          preferences, 
+          userId: user.id 
+        }
       });
 
       if (planError) {
         console.error("Erro ao gerar plano com Llama 3:", planError);
         throw new Error(planError.message || "Erro ao gerar plano de treino com Llama 3");
       }
+
+      console.log("Resposta da edge function:", response);
 
       if (!response) {
         console.error("Nenhum plano foi retornado da edge function Llama 3");
