@@ -191,9 +191,15 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
         setWorkoutPlan(typedWorkoutPlan);
       } else {
         // Fallback: use the original data but add the saved plan ID
-        planData.id = savedPlan.id;
-        planData.user_id = user.id;
-        setWorkoutPlan(planData as WorkoutPlan);
+        const fallbackPlan: WorkoutPlan = {
+          id: savedPlan.id,
+          user_id: user.id,
+          goal: planData.goal,
+          start_date: savedPlan.start_date,
+          end_date: savedPlan.end_date,
+          workout_sessions: planData.workout_sessions
+        };
+        setWorkoutPlan(fallbackPlan);
       }
       
       // Update profile generation count - fixed approach to avoid type error
