@@ -51,6 +51,12 @@ const Workout = () => {
     fetchWorkoutHistory();
   }, []);
 
+  // Log when preferences are set
+  const handlePreferencesSubmit = (prefs: WorkoutPreferences) => {
+    console.log('Preferências submetidas no componente Workout:', prefs);
+    setPreferences(prefs);
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       <div className="container mx-auto px-4 py-8 space-y-8">
@@ -69,7 +75,7 @@ const Workout = () => {
         <div className="max-w-4xl mx-auto space-y-8">
           {!preferences ? (
             <div className="transform transition-all duration-500 hover:scale-[1.01]">
-              <PreferencesForm onSubmit={setPreferences} />
+              <PreferencesForm onSubmit={handlePreferencesSubmit} />
             </div>
           ) : (
             <WorkoutPlanDisplay 

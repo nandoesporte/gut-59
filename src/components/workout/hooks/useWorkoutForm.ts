@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -76,6 +75,8 @@ export const useWorkoutForm = (onSubmit: (data: WorkoutPreferences) => void) => 
       
       if (!user) return;
 
+      console.log('Buscando preferências para usuário:', user.id);
+
       const { data, error } = await supabase
         .from('user_workout_preferences')
         .select('*')
@@ -88,6 +89,8 @@ export const useWorkoutForm = (onSubmit: (data: WorkoutPreferences) => void) => 
       }
 
       if (data) {
+        console.log('Preferências encontradas:', data);
+        
         // Validate and cast the data to ensure it matches the expected enums
         const gender = isValidGender(data.gender) ? data.gender : "male";
         const goal = isValidGoal(data.goal) ? data.goal : "maintain";
@@ -119,6 +122,8 @@ export const useWorkoutForm = (onSubmit: (data: WorkoutPreferences) => void) => 
             ? "outdoors"
             : "no_equipment"
         });
+      } else {
+        console.log('Nenhuma preferência encontrada para este usuário');
       }
     } catch (error) {
       console.error('Erro ao carregar preferências:', error);
@@ -151,6 +156,9 @@ export const useWorkoutForm = (onSubmit: (data: WorkoutPreferences) => void) => 
         return;
       }
 
+      console.log('Salvando preferências para usuário:', user.id);
+      console.log('Dados a serem salvos:', data);
+
       const availableEquipment = data.training_location === "gym" 
         ? ["all"] 
         : data.training_location === "home"
@@ -159,25 +167,33 @@ export const useWorkoutForm = (onSubmit: (data: WorkoutPreferences) => void) => 
         ? ["bodyweight", "resistance-bands"]
         : ["bodyweight"];
 
-      const { error } = await supabase
+      console.log('Equipamentos mapeados:', availableEquipment);
+
+      const preferenceData = {
+        user_id: user.id,
+        age: data.age,
+        weight: data.weight,
+        height: data.height,
+        gender: data.gender,
+        goal: data.goal,
+        activity_level: data.activity_level,
+        preferred_exercise_types: data.preferred_exercise_types,
+        available_equipment: availableEquipment,
+        health_conditions: [],
+      };
+
+      console.log('Objeto completo para upsert:', preferenceData);
+
+      const { error, data: savedData } = await supabase
         .from('user_workout_preferences')
-        .upsert({
-          user_id: user.id,
-          age: data.age,
-          weight: data.weight,
-          height: data.height,
-          gender: data.gender,
-          goal: data.goal,
-          activity_level: data.activity_level,
-          preferred_exercise_types: data.preferred_exercise_types,
-          available_equipment: availableEquipment,
-          health_conditions: [],
-        });
+        .upsert(preferenceData)
+        .select();
 
       if (error) {
         console.error('Erro ao salvar preferências:', error);
         toast.error("Erro ao salvar suas preferências");
       } else {
+        console.log('Preferências salvas com sucesso:', savedData);
         toast.success("Preferências salvas com sucesso");
       }
     } catch (error) {
