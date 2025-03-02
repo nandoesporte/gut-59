@@ -1,8 +1,11 @@
 
 import { WorkoutPlan } from '../types/workout-plan';
 import { jsPDF } from 'jspdf';
-import { format } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { toast } from 'sonner';
+
+// Timezone configuration
+const BRAZIL_TIMEZONE = "America/Sao_Paulo";
 
 export const generateWorkoutPDF = async (plan: WorkoutPlan) => {
   try {
@@ -20,7 +23,7 @@ export const generateWorkoutPDF = async (plan: WorkoutPlan) => {
     doc.setFontSize(12);
     doc.text(`Objetivo: ${translateGoal(plan.goal)}`, 20, yPos);
     yPos += lineHeight;
-    doc.text(`Período: ${format(new Date(plan.start_date), 'dd/MM/yyyy')} - ${format(new Date(plan.end_date), 'dd/MM/yyyy')}`, 20, yPos);
+    doc.text(`Período: ${formatInTimeZone(new Date(plan.start_date), BRAZIL_TIMEZONE, 'dd/MM/yyyy')} - ${formatInTimeZone(new Date(plan.end_date), BRAZIL_TIMEZONE, 'dd/MM/yyyy')}`, 20, yPos);
     yPos += lineHeight * 2;
 
     // Para cada sessão de treino
@@ -88,7 +91,7 @@ export const generateWorkoutPDF = async (plan: WorkoutPlan) => {
     }
 
     // Salvar o PDF
-    const fileName = `plano_treino_${format(new Date(), 'dd_MM_yyyy')}.pdf`;
+    const fileName = `plano_treino_${formatInTimeZone(new Date(), BRAZIL_TIMEZONE, 'dd_MM_yyyy')}.pdf`;
     doc.save(fileName);
     toast.success('PDF gerado com sucesso!');
 

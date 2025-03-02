@@ -4,6 +4,8 @@ import { WorkoutPreferences } from "../types";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { WorkoutPlan } from "../types/workout-plan";
+import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 
 // Mock progress data for now
 const mockProgressData = [
@@ -15,6 +17,9 @@ const mockProgressData = [
   { day: 6, completion: 0 },
   { day: 7, completion: 0 },
 ];
+
+// Timezone configuration
+const BRAZIL_TIMEZONE = "America/Sao_Paulo";
 
 export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
   const [loading, setLoading] = useState(false);
@@ -70,14 +75,22 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       const planData = data.workoutPlan;
       console.log("Received workout plan data:", planData);
       
+      // Get current date in Brasilia timezone
+      const now = new Date();
+      const nowBrasilia = formatInTimeZone(now, BRAZIL_TIMEZONE, "yyyy-MM-dd");
+      
+      // Calculate end date (current date + 7 days) in Brasilia timezone
+      const endDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const endDateBrasilia = formatInTimeZone(endDate, BRAZIL_TIMEZONE, "yyyy-MM-dd");
+      
       // First, save the main workout plan (without the sessions)
       const { data: savedPlan, error: planError } = await supabase
         .from('workout_plans')
         .insert({
           user_id: user.id,
           goal: planData.goal,
-          start_date: planData.start_date || new Date().toISOString().split('T')[0],
-          end_date: planData.end_date || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          start_date: planData.start_date || nowBrasilia,
+          end_date: planData.end_date || endDateBrasilia,
           // Removed workout_sessions as it's not a column in the table
         })
         .select()
@@ -220,7 +233,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
           .from('plan_generation_counts')
           .update({ 
             workout_count: (countData.workout_count || 0) + 1,
-            updated_at: new Date().toISOString()
+            updated_at: formatInTimeZone(new Date(), BRAZIL_TIMEZONE, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx")
           })
           .eq('user_id', user.id);
       } else {

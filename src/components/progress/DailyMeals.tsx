@@ -1,5 +1,5 @@
 
-import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { Utensils, ChevronDown, ChevronUp } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Calendar } from "@/components/ui/calendar";
@@ -8,6 +8,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+
+// Timezone configuration
+const BRAZIL_TIMEZONE = "America/Sao_Paulo";
 
 interface SavedMeal {
   id: string;
@@ -36,7 +39,7 @@ const DailyMeals = ({ date, onDateChange }: DailyMealsProps) => {
       const { data, error } = await supabase
         .from('meals')
         .select('*')
-        .eq('meal_date', format(date, 'yyyy-MM-dd'))
+        .eq('meal_date', formatInTimeZone(date, BRAZIL_TIMEZONE, 'yyyy-MM-dd'))
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -77,7 +80,7 @@ const DailyMeals = ({ date, onDateChange }: DailyMealsProps) => {
                   className="justify-start text-left font-normal"
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {format(date, "dd/MM/yyyy")}
+                  {formatInTimeZone(date, BRAZIL_TIMEZONE, "dd/MM/yyyy")}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="end">
@@ -124,7 +127,7 @@ const DailyMeals = ({ date, onDateChange }: DailyMealsProps) => {
                           )}
                         </div>
                         <span className="text-sm text-gray-500">
-                          {meal.created_at && format(new Date(meal.created_at), 'HH:mm')}
+                          {meal.created_at && formatInTimeZone(new Date(meal.created_at), BRAZIL_TIMEZONE, 'HH:mm')}
                         </span>
                       </div>
                       {meal.photo_url && (

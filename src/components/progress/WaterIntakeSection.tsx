@@ -1,11 +1,14 @@
 
-import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { Droplets, ChevronDown, ChevronUp } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
+// Timezone configuration
+const BRAZIL_TIMEZONE = "America/Sao_Paulo";
 
 interface WaterIntake {
   id: string;
@@ -92,7 +95,7 @@ const WaterIntakeSection = ({ date }: WaterIntakeSectionProps) => {
                   <CardContent className="p-4">
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-500">
-                        {water.created_at && format(new Date(water.created_at), 'HH:mm')}
+                        {water.created_at && formatInTimeZone(new Date(water.created_at), BRAZIL_TIMEZONE, 'HH:mm')}
                       </span>
                       <div className="flex items-center gap-2">
                         <Droplets className="w-4 h-4 text-primary-500" />

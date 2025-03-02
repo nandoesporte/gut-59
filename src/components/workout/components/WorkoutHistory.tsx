@@ -8,6 +8,10 @@ import { generateWorkoutPDF } from '../utils/pdf-generator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { formatInTimeZone } from 'date-fns-tz';
+
+// Timezone configuration
+const BRAZIL_TIMEZONE = "America/Sao_Paulo";
 
 interface WorkoutHistoryProps {
   plans: WorkoutPlan[];
@@ -59,8 +63,8 @@ const WorkoutHistory: React.FC<WorkoutHistoryProps> = ({ plans }) => {
                     <div className="flex items-center gap-2 mt-2 text-gray-600">
                       <Calendar className="w-4 h-4" />
                       <span className="text-sm">
-                        {new Date(plan.start_date).toLocaleDateString('pt-BR')} até{" "}
-                        {new Date(plan.end_date).toLocaleDateString('pt-BR')}
+                        {formatInTimeZone(new Date(plan.start_date), BRAZIL_TIMEZONE, 'dd/MM/yyyy')} até{" "}
+                        {formatInTimeZone(new Date(plan.end_date), BRAZIL_TIMEZONE, 'dd/MM/yyyy')}
                       </span>
                     </div>
                   </div>
