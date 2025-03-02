@@ -87,12 +87,12 @@ const Menu = () => {
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
         <div className="text-center px-4">
           <h3 className="text-lg font-semibold text-gray-900">
-            Gerando seu plano alimentar personalizado com Nutri+...
+            Gerando seu plano alimentar personalizado...
           </h3>
           <p className="text-sm text-gray-500 mt-1">
-            Este processo pode levar de 1 a 3 minutos.
+            Este processo pode levar de 1 a 2 minutos.
             <br />
-            Por favor, aguarde enquanto o agente Nutri+ prepara seu cardápio de alta qualidade.
+            Por favor, aguarde enquanto preparamos seu cardápio.
           </p>
         </div>
       </div>
@@ -105,9 +105,7 @@ const Menu = () => {
         <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8">
           <div className="text-center mb-6 sm:mb-8">
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Monte sua Dieta Personalizada</h1>
-            <p className="text-gray-600 text-sm sm:text-base">
-              Agora com o agente Nutri+ para planos alimentares mais completos e personalizados!
-            </p>
+            <p className="text-gray-600 text-sm sm:text-base">Siga as etapas abaixo para criar seu plano alimentar</p>
           </div>
 
           <div className="space-y-6 sm:space-y-8">
