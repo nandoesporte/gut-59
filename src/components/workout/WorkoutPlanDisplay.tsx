@@ -16,19 +16,23 @@ interface WorkoutPlanDisplayProps {
 }
 
 export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayProps) => {
-  const { loading, workoutPlan, progressData, error } = useWorkoutPlanGeneration(preferences);
+  const { loading, workoutPlan, progressData, error, generatePlan } = useWorkoutPlanGeneration(preferences);
 
   const handleExportPDF = async () => {
     if (!workoutPlan) return;
     await generateWorkoutPDF(workoutPlan);
   };
 
+  const handleRetry = () => {
+    generatePlan();
+  };
+
   if (loading) {
     return <WorkoutLoadingState message="Gerando seu plano de treino personalizado com Llama 3" />;
   }
 
-  if (!workoutPlan) {
-    return <WorkoutError onReset={onReset} errorMessage={error || undefined} />;
+  if (error || !workoutPlan) {
+    return <WorkoutError onReset={onReset} errorMessage={error || "Não foi possível gerar seu plano. Por favor, tente novamente."} />;
   }
 
   return (
@@ -43,10 +47,16 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
             </Badge>
           </div>
         </div>
-        <Button onClick={handleExportPDF} variant="outline">
-          <FileDown className="w-4 h-4 mr-2" />
-          Exportar PDF
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={handleRetry} variant="outline" size="sm">
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Gerar Novo
+          </Button>
+          <Button onClick={handleExportPDF} variant="outline">
+            <FileDown className="w-4 h-4 mr-2" />
+            Exportar PDF
+          </Button>
+        </div>
       </div>
 
       <CurrentWorkoutPlan plan={workoutPlan} />

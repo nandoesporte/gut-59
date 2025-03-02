@@ -13,6 +13,8 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
   const [workoutPlan, setWorkoutPlan] = useState<WorkoutPlan | null>(null);
   const [progressData, setProgressData] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [retries, setRetries] = useState(0);
+  const MAX_RETRIES = 2;
 
   const fetchProgressData = async () => {
     try {
@@ -173,25 +175,52 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
 
       console.log("Acesso permitido, gerando plano com Llama 3...");
       
-      // Usamos a nova função generate-workout-plan-llama com log detalhado
+      // Recuperar configurações do modelo AI antes de chamar a edge function
+      const { data: aiSettings, error: aiSettingsError } = await supabase
+        .from('ai_model_settings')
+        .select('*')
+        .eq('name', 'trene2025')
+        .maybeSingle();
+        
+      if (aiSettingsError) {
+        console.error("Erro ao buscar configurações de IA:", aiSettingsError);
+        // Continuar com configurações padrão se houver erro
+      }
+      
+      console.log("Configurações de IA recuperadas:", aiSettings);
+      
+      // Usamos a edge function generate-workout-plan-llama com log detalhado
       console.log("Chamando edge function com preferências:", preferences);
       const { data: response, error: planError } = await supabase.functions.invoke('generate-workout-plan-llama', {
         body: { 
           preferences, 
-          userId: user.id 
+          userId: user.id,
+          settings: aiSettings || {
+            active_model: 'llama3',
+            system_prompt: null,
+            use_custom_prompt: false
+          }
         }
       });
 
       if (planError) {
         console.error("Erro ao gerar plano com Llama 3:", planError);
-        throw new Error(planError.message || "Erro ao gerar plano de treino com Llama 3");
+        // Tentar novamente se não exceder o número máximo de tentativas
+        if (retries < MAX_RETRIES) {
+          console.log(`Tentativa ${retries + 1} de ${MAX_RETRIES} para gerar plano`);
+          setRetries(retries + 1);
+          setLoading(false);
+          setTimeout(generatePlan, 2000); // Aguardar 2 segundos antes de tentar novamente
+          return;
+        }
+        throw new Error("Erro ao comunicar com o serviço de IA. Por favor, tente novamente mais tarde.");
       }
 
       console.log("Resposta da edge function:", response);
 
       if (!response) {
         console.error("Nenhum plano foi retornado da edge function Llama 3");
-        throw new Error("Nenhum plano foi gerado");
+        throw new Error("Nenhum plano foi gerado. Por favor, tente novamente.");
       }
 
       console.log("Plano gerado com sucesso usando Llama 3");
