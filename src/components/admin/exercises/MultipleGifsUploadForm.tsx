@@ -33,6 +33,7 @@ export const MultipleGifsUploadForm = ({
   const [difficulty, setDifficulty] = useState<Difficulty>("beginner");
   const [muscleGroup, setMuscleGroup] = useState("chest");
   const [trainingLocation, setTrainingLocation] = useState("gym");
+  const [goal, setGoal] = useState<string>("weight_loss"); // New state for goals
   const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
   const muscleGroupOptions = [
@@ -58,6 +59,13 @@ export const MultipleGifsUploadForm = ({
     { value: "intermediate", label: "Leve - 1-3 dias por semana" },
     { value: "advanced", label: "Moderado - 3-5 dias por semana" },
     { value: "expert", label: "Intenso - 6-7 dias por semana" },
+  ];
+
+  // New options for goals
+  const goalOptions = [
+    { value: "weight_loss", label: "Perder Peso - Foco em queima de gordura" },
+    { value: "maintenance", label: "Manter Peso - Melhorar condicionamento" },
+    { value: "muscle_gain", label: "Ganhar Massa - Foco em hipertrofia" },
   ];
 
   const validateFile = (file: File): boolean => {
@@ -124,10 +132,10 @@ export const MultipleGifsUploadForm = ({
           difficulty: difficulty,
           muscle_group: muscleGroup as any,
           primary_muscles_worked: [muscleGroup],
-          goals: ["fitness"],
+          goals: [goal], // Use the selected goal
           equipment_needed: [],
           is_compound_movement: false,
-          training_location: trainingLocation, // Add training location field
+          training_location: trainingLocation,
           // Default required fields for the exercises table
           max_reps: 12,
           min_reps: 8, 
@@ -240,6 +248,26 @@ export const MultipleGifsUploadForm = ({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          
+          {/* New Goals selection */}
+          <div>
+            <Label>Objetivo</Label>
+            <Select
+              value={goal}
+              onValueChange={setGoal}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o objetivo" />
+              </SelectTrigger>
+              <SelectContent>
+                {goalOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
