@@ -66,7 +66,8 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       
       console.log("Calling edge function with preferences:", safePreferences);
       
-      // Call the edge function to generate the workout plan with auth headers
+      // Call the edge function to generate the workout plan without auth headers
+      // since we've disabled JWT verification in the Edge Function
       const { data, error: functionError } = await supabase.functions.invoke(
         "generate-workout-plan-llama",
         {
