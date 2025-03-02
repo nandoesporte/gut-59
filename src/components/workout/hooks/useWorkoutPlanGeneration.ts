@@ -66,10 +66,11 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
         throw new Error("Invalid response from workout plan generator");
       }
       
-      // Save the workout plan to the database
+      // Extract the complete plan data
       const planData = data.workoutPlan;
+      console.log("Received workout plan data:", planData);
       
-      // First, save the main workout plan
+      // First, save the main workout plan (without the sessions)
       const { data: savedPlan, error: planError } = await supabase
         .from('workout_plans')
         .insert({
@@ -77,6 +78,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
           goal: planData.goal,
           start_date: planData.start_date || new Date().toISOString().split('T')[0],
           end_date: planData.end_date || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          // Do NOT include workout_sessions here as it's not a column in the table
         })
         .select()
         .single();
@@ -86,7 +88,9 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
         throw new Error(`Error saving workout plan: ${planError.message}`);
       }
       
-      // Then save each workout session
+      console.log("Saved main workout plan:", savedPlan);
+      
+      // Then save each workout session as a separate record
       if (planData.workout_sessions && Array.isArray(planData.workout_sessions)) {
         for (const session of planData.workout_sessions) {
           // Insert the session
@@ -105,6 +109,8 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
             console.error("Error saving workout session:", sessionError);
             continue; // Skip to the next session if there's an error
           }
+          
+          console.log("Saved workout session:", savedSession);
           
           // Then save each exercise in the session
           if (session.session_exercises && Array.isArray(session.session_exercises)) {
@@ -129,10 +135,39 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
         }
       }
       
-      // Set the workout plan
-      planData.id = savedPlan.id;
-      planData.user_id = user.id;
-      setWorkoutPlan(planData);
+      // Now fetch the complete workout plan with all its sessions and exercises
+      // to make sure we have the most up-to-date data
+      const { data: completePlan, error: fetchError } = await supabase
+        .from('workout_plans')
+        .select(`
+          id, user_id, goal, start_date, end_date,
+          workout_sessions (
+            id, day_number, warmup_description, cooldown_description,
+            session_exercises (
+              id, sets, reps, rest_time_seconds, order_in_session,
+              exercise:exercise_id (
+                id, name, description, gif_url, video_url
+              )
+            )
+          )
+        `)
+        .eq('id', savedPlan.id)
+        .single();
+        
+      if (fetchError) {
+        console.error("Error fetching complete workout plan:", fetchError);
+        // Still continue as we at least saved the basic plan
+      }
+      
+      // Set the workout plan with the fetched data or fall back to original data with ID
+      if (completePlan) {
+        setWorkoutPlan(completePlan as WorkoutPlan);
+      } else {
+        // Fallback: use the original data but add the saved plan ID
+        planData.id = savedPlan.id;
+        planData.user_id = user.id;
+        setWorkoutPlan(planData);
+      }
       
       // Update profile generation count - fixed approach to avoid type error
       // Instead of using rpc, we'll use a direct table update
