@@ -128,12 +128,14 @@ Você deve fornecer um plano completo, com exercícios, séries, repetições e 
             id="system-prompt"
             value={aiSettings.systemPrompt}
             onChange={(e) => setAiSettings({...aiSettings, systemPrompt: e.target.value})}
-            disabled={loading || !aiSettings.useCustomPrompt}
+            disabled={loading}
             className="min-h-[200px]"
             placeholder="Insira o prompt do sistema para o modelo de IA"
           />
           <p className="text-sm text-muted-foreground">
-            Este prompt define o comportamento e as instruções para o modelo de IA
+            {aiSettings.useCustomPrompt 
+              ? "Este prompt personalizado será usado para instruir o modelo de IA" 
+              : "Visualize o prompt padrão (você pode ativar a edição com a opção acima)"}
           </p>
         </div>
 
