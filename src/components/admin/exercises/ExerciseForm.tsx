@@ -52,15 +52,28 @@ export const ExerciseForm = ({ onSuccess, onCancel, exercise }: ExerciseFormProp
 
   const onSubmit = async (data: any) => {
     try {
+      // Ensure exercise_type is one of the allowed values
+      const validExerciseType = data.exercise_type === "strength" || 
+                                data.exercise_type === "cardio" || 
+                                data.exercise_type === "mobility" 
+                                ? data.exercise_type 
+                                : "mobility";
+      
+      const safeData = {
+        ...data,
+        exercise_type: validExerciseType,
+        difficulty: data.difficulty || "beginner"
+      };
+      
       if (exercise?.id) {
         await supabase
           .from('exercises')
-          .update(data)
+          .update(safeData)
           .eq('id', exercise.id);
       } else {
         await supabase
           .from('exercises')
-          .insert([data]);
+          .insert([safeData]);
       }
       onSuccess();
     } catch (error) {

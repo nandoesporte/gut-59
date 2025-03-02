@@ -1,4 +1,3 @@
-
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ExerciseForm } from "./exercises/ExerciseForm";
 import { BatchUploadForm } from "./exercises/BatchUploadForm";
@@ -43,8 +42,12 @@ export const ExerciseGifsTab = () => {
         .getPublicUrl(uploadData.path);
 
       // Ensure the exercise type is valid according to the database constraints
-      // Specifically limit it to "strength", "cardio", or "mobility"
-      const validExerciseType = exerciseData.exercise_type === "flexibility" ? "mobility" : exerciseData.exercise_type;
+      // Map "flexibility" to "mobility" if it's present in the data
+      const validExerciseType = exerciseData.exercise_type === "strength" || 
+                                exerciseData.exercise_type === "cardio" || 
+                                exerciseData.exercise_type === "mobility" 
+                                ? exerciseData.exercise_type 
+                                : "mobility";
       
       // Create the exercise record with all the additional fields
       // Explicitly cast difficulty to "beginner" | "intermediate" | "advanced" for the database
@@ -118,7 +121,11 @@ export const ExerciseGifsTab = () => {
         .getPublicUrl(uploadData.path);
 
       // Ensure the exercise type is valid according to the database constraints
-      const validExerciseType = exerciseData.exercise_type === "flexibility" ? "mobility" : exerciseData.exercise_type;
+      const validExerciseType = exerciseData.exercise_type === "strength" || 
+                                exerciseData.exercise_type === "cardio" || 
+                                exerciseData.exercise_type === "mobility" 
+                                ? exerciseData.exercise_type 
+                                : "mobility";
 
       // Cast the difficulty type for database compatibility
       const safeData = {

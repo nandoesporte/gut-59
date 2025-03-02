@@ -1,3 +1,4 @@
+
 export type MuscleGroup = 
   | "weight_training"
   | "stretching"
@@ -14,7 +15,7 @@ export type MuscleGroup =
   | "mobility";
 
 export type ExerciseType = "strength" | "cardio" | "mobility";
-export type Difficulty = "beginner" | "intermediate" | "advanced";
+export type Difficulty = "beginner" | "intermediate" | "advanced" | "expert";
 
 export interface Exercise {
   id: string;
