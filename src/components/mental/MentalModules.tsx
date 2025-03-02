@@ -89,8 +89,6 @@ export const MentalModules = () => {
 
   return (
     <div className="space-y-8">
-      <h2 className="text-2xl font-bold text-center text-primary mb-4">Vídeos de Instrução</h2>
-      
       {isLoading ? (
         <div className="flex justify-center items-center h-40">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -103,7 +101,7 @@ export const MentalModules = () => {
                 onClick={handleCloseVideo} 
                 className="text-primary hover:underline flex items-center gap-2"
               >
-                ← Voltar para todos os vídeos
+                ← Voltar para categorias
               </button>
               
               <Card>
@@ -127,96 +125,51 @@ export const MentalModules = () => {
               </Card>
             </div>
           ) : (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {videos.map((video) => {
-                const thumbnailUrl = getThumbnailUrl(video.url);
-                return (
-                  <Card 
-                    key={video.id} 
-                    className="overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer"
-                    onClick={() => handleVideoSelect(video)}
-                  >
-                    <div className="relative">
-                      <div className="aspect-video bg-gray-100 relative overflow-hidden">
-                        {thumbnailUrl ? (
-                          <img 
-                            src={thumbnailUrl} 
-                            alt={video.title} 
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-sky-100 flex items-center justify-center">
-                            <Info className="h-10 w-10 text-sky-400" />
+            <div className="space-y-6">
+              <h3 className="text-xl font-semibold border-b pb-2">Categorias</h3>
+              {modules.map((module) => (
+                <Card key={module.id} className="overflow-hidden">
+                  <CardHeader className="bg-primary/5 pb-3">
+                    <CardTitle className="text-lg">{module.name}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4">
+                    {module.description && (
+                      <p className="text-sm text-muted-foreground mb-4">{module.description}</p>
+                    )}
+                    <div className="grid gap-4">
+                      {videos
+                        .filter(video => video.module_id === module.id)
+                        .slice(0, 3) // Show only first 3 videos per module
+                        .map(video => (
+                          <div 
+                            key={video.id} 
+                            className="flex items-center gap-3 p-2 hover:bg-muted/50 rounded-md cursor-pointer transition-colors"
+                            onClick={() => handleVideoSelect(video)}
+                          >
+                            <div className="w-12 h-12 bg-sky-100 rounded-md flex items-center justify-center flex-shrink-0">
+                              <Play className="h-6 w-6 text-primary" />
+                            </div>
+                            <div>
+                              <h4 className="font-medium line-clamp-1">{video.title}</h4>
+                              {video.description && (
+                                <p className="text-xs text-muted-foreground line-clamp-1">{video.description}</p>
+                              )}
+                            </div>
                           </div>
-                        )}
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/40 transition-all">
-                          <div className="rounded-full bg-primary/90 p-4 shadow-lg">
-                            <Play className="h-8 w-8 text-white" />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <CardContent className="p-4">
-                      <h3 className="font-semibold text-lg leading-tight line-clamp-2 mb-2">{video.title}</h3>
-                      {!isMobile && video.description && (
-                        <p className="text-muted-foreground text-sm line-clamp-2">{video.description}</p>
+                        ))}
+                      
+                      {videos.filter(video => video.module_id === module.id).length > 3 && (
+                        <button className="text-sm text-primary hover:underline self-start mt-2">
+                          Ver mais vídeos desta categoria
+                        </button>
                       )}
-                      <div className="mt-2 text-xs text-muted-foreground">
-                        {modules.find(m => m.id === video.module_id)?.name || 'Saúde Mental'}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           )}
         </>
-      )}
-
-      {!selectedVideo && modules.length > 0 && (
-        <div className="space-y-6 mt-8">
-          <h3 className="text-xl font-semibold border-b pb-2">Categorias</h3>
-          {modules.map((module) => (
-            <Card key={module.id} className="overflow-hidden">
-              <CardHeader className="bg-primary/5 pb-3">
-                <CardTitle className="text-lg">{module.name}</CardTitle>
-              </CardHeader>
-              <CardContent className="p-4">
-                {module.description && (
-                  <p className="text-sm text-muted-foreground mb-4">{module.description}</p>
-                )}
-                <div className="grid gap-4">
-                  {videos
-                    .filter(video => video.module_id === module.id)
-                    .slice(0, 3) // Show only first 3 videos per module
-                    .map(video => (
-                      <div 
-                        key={video.id} 
-                        className="flex items-center gap-3 p-2 hover:bg-muted/50 rounded-md cursor-pointer transition-colors"
-                        onClick={() => handleVideoSelect(video)}
-                      >
-                        <div className="w-12 h-12 bg-sky-100 rounded-md flex items-center justify-center flex-shrink-0">
-                          <Play className="h-6 w-6 text-primary" />
-                        </div>
-                        <div>
-                          <h4 className="font-medium line-clamp-1">{video.title}</h4>
-                          {video.description && (
-                            <p className="text-xs text-muted-foreground line-clamp-1">{video.description}</p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  
-                  {videos.filter(video => video.module_id === module.id).length > 3 && (
-                    <button className="text-sm text-primary hover:underline self-start mt-2">
-                      Ver mais vídeos desta categoria
-                    </button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
       )}
     </div>
   );
