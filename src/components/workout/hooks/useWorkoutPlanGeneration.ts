@@ -128,10 +128,10 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
           // Then save each exercise in the session
           if (session.session_exercises && Array.isArray(session.session_exercises)) {
             for (const exerciseItem of session.session_exercises) {
-              // Verificar se temos um objeto de exercício válido com ID
+              // Check if we have a valid exercise object with ID
               if (!exerciseItem.exercise || !exerciseItem.exercise.id) {
                 console.warn("Invalid exercise item or missing ID:", exerciseItem);
-                continue; // Pular para o próximo exercício se não tiver ID
+                continue; // Skip to the next exercise if there's no valid ID
               }
               
               // Insert the session exercise
@@ -165,7 +165,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
             session_exercises (
               id, sets, reps, rest_time_seconds, order_in_session,
               exercise:exercise_id (
-                id, name, description, gif_url
+                id, name, description, gif_url, muscle_group, exercise_type
               )
             )
           )
@@ -192,18 +192,23 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
             day_number: session.day_number,
             warmup_description: session.warmup_description,
             cooldown_description: session.cooldown_description,
-            session_exercises: session.session_exercises.map(ex => ({
-              id: ex.id,
-              sets: ex.sets,
-              reps: ex.reps,
-              rest_time_seconds: ex.rest_time_seconds,
-              exercise: ex.exercise ? {
-                id: ex.exercise.id,
-                name: ex.exercise.name,
-                description: ex.exercise.description || '',
-                gif_url: ex.exercise.gif_url || ''
-              } : null
-            })).filter(ex => ex.exercise !== null) // Filtrar exercícios nulos
+            session_exercises: session.session_exercises
+              .filter(ex => ex.exercise !== null) // Filter out null exercises
+              .map(ex => ({
+                id: ex.id,
+                sets: ex.sets,
+                reps: ex.reps,
+                rest_time_seconds: ex.rest_time_seconds,
+                exercise: ex.exercise ? {
+                  id: ex.exercise.id,
+                  name: ex.exercise.name,
+                  description: ex.exercise.description || '',
+                  gif_url: ex.exercise.gif_url || '',
+                  muscle_group: ex.exercise.muscle_group,
+                  exercise_type: ex.exercise.exercise_type
+                } : null
+              }))
+              .filter(ex => ex.exercise !== null) // Double-check filter for null exercises
           }))
         };
         

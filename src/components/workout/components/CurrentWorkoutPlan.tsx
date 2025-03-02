@@ -17,6 +17,26 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
     return null;
   }
 
+  // Group exercises by muscle group for better visualization
+  const getMuscleGroupBadges = (session: any) => {
+    if (!session.session_exercises) return null;
+    
+    // Extract unique muscle groups from this session
+    const muscleGroups = new Set<string>();
+    session.session_exercises.forEach((ex: any) => {
+      if (ex.exercise?.muscle_group) {
+        muscleGroups.add(ex.exercise.muscle_group);
+      }
+    });
+    
+    // Convert to array and sort
+    return Array.from(muscleGroups).sort().map(group => (
+      <Badge key={group} variant="outline" className="bg-gray-50 text-gray-700 border-gray-200 mr-1">
+        {group.replace('_', ' ')}
+      </Badge>
+    ));
+  };
+
   return (
     <div className="space-y-6">
       <Card className="bg-white shadow-lg">
@@ -44,10 +64,15 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
       {plan.workout_sessions.map((session) => (
         <Card key={session.id} className="overflow-hidden bg-white shadow-lg transition-all hover:shadow-xl">
           <CardHeader className="p-6 bg-gradient-to-r from-primary-500 to-primary-600">
-            <h4 className="text-xl font-semibold text-white flex items-center gap-2">
-              <Dumbbell className="w-5 h-5" />
-              Dia {session.day_number}
-            </h4>
+            <div className="flex justify-between items-center">
+              <h4 className="text-xl font-semibold text-white flex items-center gap-2">
+                <Dumbbell className="w-5 h-5" />
+                Dia {session.day_number}
+              </h4>
+              <div className="flex flex-wrap gap-1">
+                {getMuscleGroupBadges(session)}
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="p-6">
             <div className="space-y-6">
@@ -74,9 +99,16 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
                         </div>
                       )}
                       <div className="flex-grow">
-                        <h6 className="text-lg font-medium text-gray-900 mb-4">
-                          {exerciseSession.exercise?.name}
-                        </h6>
+                        <div className="flex justify-between items-start mb-4">
+                          <h6 className="text-lg font-medium text-gray-900">
+                            {exerciseSession.exercise?.name}
+                          </h6>
+                          {exerciseSession.exercise?.muscle_group && (
+                            <Badge className="bg-primary-100 text-primary-700 border-none">
+                              {exerciseSession.exercise.muscle_group.replace('_', ' ')}
+                            </Badge>
+                          )}
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div className="bg-white p-4 rounded-lg shadow-sm">
                             <span className="text-sm text-gray-500 block mb-1">Séries</span>
