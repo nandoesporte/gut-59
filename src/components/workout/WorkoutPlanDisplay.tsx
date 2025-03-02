@@ -5,7 +5,8 @@ import { CurrentWorkoutPlan } from "./components/CurrentWorkoutPlan";
 import { WorkoutLoadingState } from "./components/WorkoutLoadingState";
 import { WorkoutProgressChart } from "./components/WorkoutProgressChart";
 import { WorkoutError } from "./components/WorkoutError";
-import { FileDown, RotateCcw } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { FileDown, RotateCcw, Bot } from "lucide-react";
 import { generateWorkoutPDF } from "./utils/pdf-generator";
 import { useWorkoutPlanGeneration } from "./hooks/useWorkoutPlanGeneration";
 
@@ -23,7 +24,7 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
   };
 
   if (loading) {
-    return <WorkoutLoadingState message="Gerando seu plano de treino personalizado" />;
+    return <WorkoutLoadingState message="Gerando seu plano de treino personalizado com Llama 3" />;
   }
 
   if (!workoutPlan) {
@@ -33,7 +34,15 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-semibold">Seu Plano de Treino</h2>
+        <div>
+          <h2 className="text-2xl font-semibold">Seu Plano de Treino</h2>
+          <div className="flex items-center mt-2 gap-2">
+            <Badge variant="outline" className="flex items-center gap-1 bg-primary/5">
+              <Bot className="w-3 h-3" />
+              Gerado por TRENE2025 (Llama 3)
+            </Badge>
+          </div>
+        </div>
         <Button onClick={handleExportPDF} variant="outline">
           <FileDown className="w-4 h-4 mr-2" />
           Exportar PDF

@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ModuleForm } from "./training/ModuleForm";
 import { VideoForm } from "./training/VideoForm";
 import { ExerciseGifsTab } from "./ExerciseGifsTab";
+import { AIModelSettings } from "./training/AIModelSettings";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -42,6 +43,7 @@ export const TrainingTab = () => {
         <TabsTrigger value="modules">Módulos</TabsTrigger>
         <TabsTrigger value="videos">Vídeos</TabsTrigger>
         <TabsTrigger value="exercise-gifs">GIFs de Exercícios</TabsTrigger>
+        <TabsTrigger value="ai-models">Modelos de IA</TabsTrigger>
       </TabsList>
       <TabsContent value="modules">
         <ModuleForm onModuleChange={fetchModules} />
@@ -51,6 +53,9 @@ export const TrainingTab = () => {
       </TabsContent>
       <TabsContent value="exercise-gifs">
         <ExerciseGifsTab />
+      </TabsContent>
+      <TabsContent value="ai-models">
+        <AIModelSettings />
       </TabsContent>
     </Tabs>
   );

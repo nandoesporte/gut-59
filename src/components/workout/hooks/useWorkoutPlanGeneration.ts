@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { WorkoutPreferences } from "../types";
 import { WorkoutPlan } from "../types/workout-plan";
@@ -139,7 +140,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
 
   const generatePlan = async () => {
     try {
-      console.log("Iniciando geração do plano de treino");
+      console.log("Iniciando geração do plano de treino com Llama 3");
       setLoading(true);
       setError(null);
 
@@ -170,30 +171,31 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
         return;
       }
 
-      console.log("Acesso permitido, gerando plano...");
-      const { data: response, error: planError } = await supabase.functions.invoke('generate-workout-plan', {
+      console.log("Acesso permitido, gerando plano com Llama 3...");
+      // Usamos a nova função generate-workout-plan-llama
+      const { data: response, error: planError } = await supabase.functions.invoke('generate-workout-plan-llama', {
         body: { preferences, userId: user.id }
       });
 
       if (planError) {
-        console.error("Erro ao gerar plano:", planError);
-        throw new Error(planError.message || "Erro ao gerar plano de treino");
+        console.error("Erro ao gerar plano com Llama 3:", planError);
+        throw new Error(planError.message || "Erro ao gerar plano de treino com Llama 3");
       }
 
       if (!response) {
-        console.error("Nenhum plano foi retornado da edge function");
+        console.error("Nenhum plano foi retornado da edge function Llama 3");
         throw new Error("Nenhum plano foi gerado");
       }
 
-      console.log("Plano gerado com sucesso");
+      console.log("Plano gerado com sucesso usando Llama 3");
       await addTransaction({
         amount: REWARDS.WORKOUT_PLAN,
         type: 'workout_plan',
-        description: 'Geração de plano de treino'
+        description: 'Geração de plano de treino com Llama 3'
       });
       
       setWorkoutPlan(response);
-      toast.success(`Plano de treino gerado com sucesso! +${REWARDS.WORKOUT_PLAN} FITs`);
+      toast.success(`Plano de treino personalizado gerado com Llama 3! +${REWARDS.WORKOUT_PLAN} FITs`);
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : "Erro ao gerar plano de treino";
       console.error("Erro no processo de geração do plano:", error);
