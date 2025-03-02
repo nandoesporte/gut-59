@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export const AIModelSettings = () => {
   const [loading, setLoading] = useState(false);
@@ -18,6 +20,7 @@ export const AIModelSettings = () => {
     useCustomPrompt: false,
     groqApiKey: ''
   });
+  const [showMissingKeyAlert, setShowMissingKeyAlert] = useState(false);
 
   useEffect(() => {
     fetchSettings();
@@ -35,12 +38,16 @@ export const AIModelSettings = () => {
       if (error) throw error;
       
       if (data) {
+        const useGroq = data.active_model === 'groq' || data.active_model === 'llama3';
+        const hasGroqKey = data.groq_api_key && data.groq_api_key.trim() !== '';
+        
+        setShowMissingKeyAlert(useGroq && !hasGroqKey);
+        
         setAiSettings({
           activeModel: data.active_model || 'llama3',
           systemPrompt: data.system_prompt || getDefaultPrompt(),
           useCustomPrompt: data.use_custom_prompt || false,
-          // Use type assertion to access the groq_api_key property
-          groqApiKey: (data as any).groq_api_key || ''
+          groqApiKey: data.groq_api_key || ''
         });
       }
     } catch (error) {
@@ -104,6 +111,11 @@ Você deve fornecer um plano completo, com exercícios, séries, repetições e 
 
       if (saveError) throw saveError;
       
+      // Check if we need to show the missing key alert
+      const useGroq = aiSettings.activeModel === 'groq' || aiSettings.activeModel === 'llama3';
+      const hasGroqKey = aiSettings.groqApiKey && aiSettings.groqApiKey.trim() !== '';
+      setShowMissingKeyAlert(useGroq && !hasGroqKey);
+      
       toast.success('Configurações salvas com sucesso');
     } catch (error) {
       console.error('Erro ao salvar configurações:', error);
@@ -119,6 +131,16 @@ Você deve fornecer um plano completo, com exercícios, séries, repetições e 
       systemPrompt: getDefaultPrompt()
     });
   };
+  
+  const handleModelChange = (value: string) => {
+    const newSettings = {...aiSettings, activeModel: value};
+    setAiSettings(newSettings);
+    
+    // Check if we need to show the missing key alert
+    const useGroq = value === 'groq' || value === 'llama3';
+    const hasGroqKey = aiSettings.groqApiKey && aiSettings.groqApiKey.trim() !== '';
+    setShowMissingKeyAlert(useGroq && !hasGroqKey);
+  };
 
   return (
     <Card>
@@ -129,11 +151,20 @@ Você deve fornecer um plano completo, com exercícios, séries, repetições e 
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {showMissingKeyAlert && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              A chave da API Groq não está configurada. Os modelos Llama 3 e Groq não funcionarão sem ela.
+            </AlertDescription>
+          </Alert>
+        )}
+      
         <div className="space-y-2">
           <Label htmlFor="model-select">Modelo de IA Ativo</Label>
           <Select
             value={aiSettings.activeModel}
-            onValueChange={(value) => setAiSettings({...aiSettings, activeModel: value})}
+            onValueChange={handleModelChange}
             disabled={loading}
           >
             <SelectTrigger id="model-select">
@@ -156,10 +187,16 @@ Você deve fornecer um plano completo, com exercícios, séries, repetições e 
             onChange={(e) => setAiSettings({...aiSettings, groqApiKey: e.target.value})}
             disabled={loading}
             placeholder="Insira a chave da API Groq"
+            className={showMissingKeyAlert ? "border-red-500 focus:border-red-500" : ""}
           />
           <p className="text-sm text-muted-foreground">
             Necessária para utilizar o modelo Llama 3 via Groq
           </p>
+          {showMissingKeyAlert && (
+            <p className="text-sm text-red-500">
+              Obtenha uma chave API gratuita em <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" className="underline">console.groq.com/keys</a>
+            </p>
+          )}
         </div>
 
         <div className="flex items-center space-x-2">

@@ -40,14 +40,14 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       }
       
       // Get AI model settings
-      const { data: aiSettings } = await supabase
+      const { data: aiSettings, error: settingsError } = await supabase
         .from('ai_model_settings')
         .select('*')
         .eq('name', 'trene2025')
         .single();
       
-      if (!aiSettings) {
-        throw new Error("AI model settings not found");
+      if (settingsError) {
+        console.warn("AI model settings not found, will use defaults:", settingsError);
       }
       
       // Ensure preferences arrays are defined before passing to the edge function
@@ -67,14 +67,13 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       console.log("Calling edge function with preferences:", safePreferences);
       
       // Call the edge function to generate the workout plan without auth headers
-      // since we've disabled JWT verification in the Edge Function
       const { data, error: functionError } = await supabase.functions.invoke(
         "generate-workout-plan-llama",
         {
           body: { 
             preferences: safePreferences, 
             userId: user.id,
-            settings: aiSettings
+            settings: aiSettings || null
           },
         }
       );

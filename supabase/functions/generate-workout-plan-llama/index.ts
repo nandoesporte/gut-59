@@ -27,16 +27,31 @@ serve(async (req) => {
     // Get request payload
     const { preferences, userId, settings } = await req.json();
     
-    if (!preferences || !userId || !settings) {
-      throw new Error('Missing required parameters');
+    if (!preferences || !userId) {
+      throw new Error('Missing required parameters: preferences and userId are required');
     }
     
     console.log("Request received for user", userId);
     
-    // Check if Groq API key is available
-    if (!settings.groq_api_key) {
-      throw new Error('No Groq API key found in settings');
+    // Check if we have settings and if not, fetch default settings
+    let modelSettings = settings;
+    if (!modelSettings) {
+      const { data: fetchedSettings, error: settingsError } = await supabase
+        .from('ai_model_settings')
+        .select('*')
+        .eq('name', 'trene2025')
+        .single();
+        
+      if (settingsError) {
+        throw new Error(`Error fetching AI model settings: ${settingsError.message}`);
+      }
+      
+      modelSettings = fetchedSettings;
     }
+    
+    // Determine which model to use based on settings
+    const useGroq = modelSettings?.active_model === 'groq' || modelSettings?.active_model === 'llama3';
+    const groqApiKey = modelSettings?.groq_api_key;
     
     // Query to get available exercises
     const { data: availableExercises, error: exercisesError } = await supabase
@@ -116,42 +131,86 @@ Important guidelines:
 
 Return only the JSON object as described above.`;
 
-    // Make API call to Groq
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${settings.groq_api_key}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: "llama3-8b-8192",
-        messages: [
-          {
-            role: "system",
-            content: "You are an expert fitness coach that specializes in creating personalized workout plans. You always respond with valid JSON."
-          },
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        temperature: 0.3,
-        max_tokens: 4000,
-      }),
-    });
-
-    if (!response.ok) {
-      const responseText = await response.text();
-      throw new Error(`Groq API error: ${response.status} - ${responseText}`);
-    }
-
-    const groqData = await response.json();
+    let llmResponse;
     
-    if (!groqData.choices || groqData.choices.length === 0) {
-      throw new Error('No response from Groq API');
-    }
+    // If we have a Groq API key and should use Groq
+    if (useGroq && groqApiKey) {
+      console.log("Using Groq API for workout plan generation");
+      
+      // Make API call to Groq
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${groqApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: "llama3-8b-8192",
+          messages: [
+            {
+              role: "system",
+              content: "You are an expert fitness coach that specializes in creating personalized workout plans. You always respond with valid JSON."
+            },
+            {
+              role: "user",
+              content: prompt
+            }
+          ],
+          temperature: 0.3,
+          max_tokens: 4000,
+        }),
+      });
 
-    const llmResponse = groqData.choices[0].message.content;
+      if (!response.ok) {
+        const responseText = await response.text();
+        throw new Error(`Groq API error: ${response.status} - ${responseText}`);
+      }
+
+      const groqData = await response.json();
+      
+      if (!groqData.choices || groqData.choices.length === 0) {
+        throw new Error('No response from Groq API');
+      }
+
+      llmResponse = groqData.choices[0].message.content;
+    } 
+    // If we don't have a Groq API key or shouldn't use Groq
+    else {
+      // Check if we should use Groq but don't have an API key
+      if (useGroq) {
+        console.log("Groq API was selected but no API key found. Using fallback response.");
+        
+        // Create a simplified fallback workout plan
+        llmResponse = JSON.stringify({
+          goal: `${preferences.goal} workout plan (FALLBACK: Groq API key missing)`,
+          start_date: new Date().toISOString().split('T')[0],
+          end_date: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          workout_sessions: [
+            {
+              day_number: 1,
+              warmup_description: "5-10 minutes of light cardio followed by dynamic stretching",
+              cooldown_description: "5 minutes of static stretching, focusing on worked muscle groups",
+              session_exercises: availableExercises.slice(0, 4).map((ex, i) => ({
+                exercise: {
+                  id: ex.id,
+                  name: ex.name,
+                  description: ex.description || "",
+                  muscle_group: ex.muscle_group,
+                  exercise_type: ex.exercise_type,
+                  gif_url: ex.gif_url || ""
+                },
+                sets: 3,
+                reps: 10,
+                rest_time_seconds: 60
+              }))
+            }
+          ]
+        });
+      } else {
+        // In a real implementation, you would call another LLM service here
+        throw new Error('Alternative LLM service not implemented. Please configure Groq API key in settings.');
+      }
+    }
     
     try {
       // Extract the JSON object from the LLM response
