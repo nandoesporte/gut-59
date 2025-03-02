@@ -11,18 +11,18 @@ import { useWorkoutPayment } from "./useWorkoutPayment";
 export const useWorkoutForm = (onSubmit: (data: WorkoutPreferences) => void) => {
   const [formData, setFormData] = useState<FormSchema | null>(null);
   
-  // Create form with default values
+  // Create form with empty default values
   const form = useForm<FormSchema>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       age: 30,
       weight: 70,
       height: 170,
-      gender: "male",
-      goal: "maintain",
-      activity_level: "moderate",
-      preferred_exercise_types: ["strength"],
-      training_location: "gym",
+      gender: undefined,
+      goal: undefined,
+      activity_level: undefined,
+      preferred_exercise_types: [],
+      training_location: undefined,
     }
   });
 
