@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -151,13 +152,14 @@ export const MentalHealthResources = () => {
         } else if (phase === "hold") {
           breathe("exhale", BREATHING_CYCLE.exhale, newElapsedTime); // Exhale
         } else if (phase === "exhale") {
+          // Importante: Não resete o estado do exercise aqui, apenas atualize o contador
           setExercise(prev => {
             const newCount = prev.count + 1;
             if (newCount >= prev.totalBreaths || newElapsedTime >= 60) { // Stop at 1 minute (60 seconds)
               completeExercise();
               return { ...prev, count: newCount, isComplete: true, elapsedTime: newElapsedTime };
             } else {
-              // Start new breath cycle
+              // Iniciar novo ciclo de respiração sem redefinir o estado completamente
               breathe("inhale", BREATHING_CYCLE.inhale, newElapsedTime);
               return { ...prev, count: newCount, elapsedTime: newElapsedTime };
             }
@@ -247,7 +249,7 @@ export const MentalHealthResources = () => {
               </p>
             )}
             
-            {(exercise.count > 0 || exercise.phase === "prepare") && !exercise.isComplete ? (
+            {((exercise.count > 0 || exercise.phase === "prepare") && !exercise.isComplete) ? (
               <div className="flex flex-col items-center space-y-6">
                 {/* Progress information */}
                 <div className="w-full text-center">
