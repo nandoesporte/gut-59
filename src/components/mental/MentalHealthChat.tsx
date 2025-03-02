@@ -44,6 +44,8 @@ export const MentalHealthChat = () => {
     setIsLoading(true);
 
     try {
+      console.log("Enviando mensagem para o modelo Mistral Saba 24B via Groq...");
+      
       // Using the groq-chat edge function with Mistral Saba 24B model
       const { data, error } = await supabase.functions.invoke("groq-chat", {
         body: { 
@@ -53,7 +55,12 @@ export const MentalHealthChat = () => {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Erro na chamada da Edge Function groq-chat:", error);
+        throw error;
+      }
+
+      console.log("Resposta recebida da Edge Function groq-chat:", data);
 
       if (data?.response) {
         setMessages((prev) => [
@@ -61,6 +68,7 @@ export const MentalHealthChat = () => {
           { role: "assistant", content: data.response },
         ]);
       } else {
+        console.error("Resposta inválida da Edge Function:", data);
         throw new Error("Resposta não recebida");
       }
     } catch (error) {

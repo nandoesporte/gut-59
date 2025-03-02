@@ -6,6 +6,7 @@ verify_jwt = false
 
 [functions.groq-chat]
 verify_jwt = false
+timeout_seconds = 60
 
 [functions.generate-meal-plan-groq]
 verify_jwt = false

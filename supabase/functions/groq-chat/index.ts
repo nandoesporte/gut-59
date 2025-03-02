@@ -1,112 +1,166 @@
 
-// Follow this setup guide to integrate the Deno language server with your editor:
-// https://deno.land/manual/getting_started/setup_your_environment
-// This enables autocomplete, go to definition, etc.
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
-// Define CORS headers for browser requests
+// CORS headers for browser access
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+}
+
+interface Message {
+  role: "user" | "assistant";
+  content: string;
+}
 
 serve(async (req) => {
-  // Handle CORS preflight requests
+  // Handle CORS preflight request
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, {
+      headers: corsHeaders,
+    })
   }
 
   try {
-    const { message, history, model = "mistral-saba-24b" } = await req.json();
-    
+    // Get the request body
+    const reqBody = await req.json()
+    const { message, history = [], model = "mistral-saba-24b" } = reqBody
+
+    console.log(`Recebida solicitação para modelo: ${model}`)
+    console.log(`Mensagem: ${message.substring(0, 100)}${message.length > 100 ? '...' : ''}`)
+    console.log(`Histórico: ${history.length} mensagens`)
+
+    // Validate request
     if (!message) {
       return new Response(
-        JSON.stringify({ error: "Mensagem não fornecida" }),
-        { 
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400 
+        JSON.stringify({
+          error: 'Message is required in the request body',
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
-      );
+      )
     }
 
-    console.log(`Processando mensagem do usuário com o modelo ${model}`);
-    
-    // Formatar histórico de mensagens para o formato esperado pela API Groq
-    const formattedHistory = history?.map((msg: { role: string; content: string }) => ({
-      role: msg.role === "user" ? "user" : "assistant",
-      content: msg.content
-    })) || [];
-    
-    // Adicionar a nova mensagem do usuário ao histórico
-    formattedHistory.push({
-      role: "user",
-      content: message
-    });
-    
-    // Adicionar instruções de sistema
-    const systemPrompt = "Você é um assistente de saúde mental especializado em suporte emocional para pacientes brasileiros. Responda com empatia e em português brasileiro. Ofereça conselhos úteis, não-medicamentosos baseados em terapias cognitivo-comportamentais e práticas de bem-estar. Mantenha suas respostas concisas, com no máximo 3 parágrafos. Se o usuário apresentar sinais de crise ou emergência, sugira buscar ajuda profissional imediata.";
+    // Format the conversation history for Groq AI
+    let formattedMessages: any[] = []
 
-    const messages = [
-      {
-        role: "system",
-        content: systemPrompt
-      },
-      ...formattedHistory
-    ];
+    // First, add the system message to instruct the model
+    formattedMessages.push({
+      role: "system",
+      content: `Você é um assistente de saúde mental especializado. Responda com empatia, clareza e gentileza. 
+Suas respostas são para ajudar pessoas comuns a entender melhor suas questões emocionais e mentais. 
+Evite termos muito técnicos e sempre priorize o bem-estar. 
+Sua linguagem deve ser em Português do Brasil.
+Nunca recomende medicamentos específicos, mas pode falar sobre abordagens terapêuticas.
+Mantenha respostas concisas (máximo 3 parágrafos).
+Se perceber uma emergência de saúde mental, sempre sugira buscar ajuda profissional imediata.`,
+    })
 
-    // Chamar a API Groq
-    const apiKey = Deno.env.get("GROQ_API_KEY");
-    if (!apiKey) {
-      throw new Error("GROQ_API_KEY não está definida");
-    }
-    
-    console.log(`Enviando ${messages.length} mensagens para a API Groq`);
-    
-    const response = await fetch(`https://api.groq.com/openai/v1/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: model,
-        messages: messages,
-        temperature: 0.7,
-        max_tokens: 800,
+    // Then add the conversation history
+    if (history && Array.isArray(history)) {
+      history.forEach((msg: Message) => {
+        if (msg.role === "user" || msg.role === "assistant") {
+          formattedMessages.push({
+            role: msg.role,
+            content: msg.content,
+          })
+        }
       })
+    }
+
+    // Finally add the current message
+    formattedMessages.push({
+      role: "user",
+      content: message,
+    })
+    
+    // Prepare the API request options
+    const groqApiKey = Deno.env.get('GROQ_API_KEY')
+    if (!groqApiKey) {
+      console.error('GROQ_API_KEY não configurada nas variáveis de ambiente')
+      throw new Error('GROQ_API_KEY não configurada')
+    }
+
+    // Models available on Groq
+    const validModels = ["llama3-8b-8192", "llama3-70b-8192", "mixtral-8x7b-32768", "gemma-7b-it"];
+    
+    // If we need to support the Mistral model, we'll use it directly (it's one of the best models on Groq)
+    let modelToUse = model;
+    
+    // Default to the Mistral Saba model which is excellent for this task
+    if (!validModels.includes(model) && model !== "mistral-saba-24b") {
+      console.log(`Modelo solicitado '${model}' não é suportado. Usando mistral-saba-24b como fallback.`);
+      modelToUse = "mistral-saba-24b";
+    }
+
+    console.log(`Usando modelo: ${modelToUse}`);
+
+    // Prepare API call
+    const endpoint = `https://api.groq.com/openai/v1/chat/completions`;
+    const headers = {
+      'Authorization': `Bearer ${groqApiKey}`,
+      'Content-Type': 'application/json',
+    };
+    
+    const requestBody = {
+      model: modelToUse,
+      messages: formattedMessages,
+      temperature: 0.7,
+      max_tokens: 1500,
+    };
+    
+    console.log(`Enviando requisição para Groq API com ${formattedMessages.length} mensagens.`);
+    
+    // Make request to Groq API
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`Erro na API Groq: ${response.status}`, errorText);
-      throw new Error(`Erro na API Groq: ${response.status} - ${errorText}`);
+      console.error(`Erro na API do Groq: ${response.status} ${response.statusText}`);
+      console.error(`Detalhes: ${errorText}`);
+      throw new Error(`Erro na API do Groq: ${response.status} ${response.statusText}`);
     }
 
+    // Parse the response
     const data = await response.json();
-    console.log("Resposta da API Groq recebida com sucesso");
+    console.log(`Resposta da Groq API recebida com sucesso`);
     
-    // Extrair a resposta do assistente
-    const assistantResponse = data.choices[0]?.message?.content || "Desculpe, não consegui processar sua solicitação.";
-    
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      console.error('Resposta da API não contém mensagens:', data);
+      throw new Error('Formato de resposta inválido da API');
+    }
+
+    // Return the response content
+    const aiMessage = data.choices[0].message.content;
+    console.log(`Resposta da IA: ${aiMessage.substring(0, 100)}${aiMessage.length > 100 ? '...' : ''}`);
+
     return new Response(
-      JSON.stringify({ response: assistantResponse }),
-      { 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
-      }
-    );
-  } catch (error) {
-    console.error("Erro ao processar solicitação:", error);
-    
-    return new Response(
-      JSON.stringify({ 
-        error: "Erro ao processar a solicitação",
-        details: error.message 
+      JSON.stringify({
+        response: aiMessage,
       }),
-      { 
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500 
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
-    );
+    )
+  } catch (error) {
+    console.error('Erro:', error.message)
+    console.error('Stack trace:', error.stack)
+
+    return new Response(
+      JSON.stringify({
+        error: `Erro ao processar requisição: ${error.message}`,
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    )
   }
-});
+})
