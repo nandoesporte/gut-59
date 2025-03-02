@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -59,10 +60,10 @@ const StepCounter = () => {
   const initialSteps = loadStoredSteps();
   const initialLastStepTime = Number(localStorage.getItem(STORAGE_KEYS.LAST_STEP_TIME) || '0');
   const initialParameters = JSON.parse(localStorage.getItem(STORAGE_KEYS.PARAMETERS) || 'null') || {
-    magnitudeThreshold: 1.2,
-    averageThreshold: 0.8,
-    minStepInterval: 250,
-    peakThreshold: 1.0
+    magnitudeThreshold: 1.0, // Reduced from 1.2
+    averageThreshold: 0.6,   // Reduced from 0.8
+    minStepInterval: 200,    // Reduced from 250
+    peakThreshold: 0.8       // Reduced from 1.0
   };
 
   const [steps, setSteps] = useState(initialSteps);
@@ -78,6 +79,7 @@ const StepCounter = () => {
   const [calibrationTime, setCalibrationTime] = useState(0);
   const calibrationData = useRef<CalibrationData[]>([]);
   const [parameters, setParameters] = useState(initialParameters);
+  const [debugInfo, setDebugInfo] = useState<string>('');
 
   const movingAverageFilter = (buffer: number[], windowSize: number = ACCELEROMETER_CONFIG.windowSize): number => {
     if (buffer.length === 0) return 0;
@@ -87,8 +89,8 @@ const StepCounter = () => {
   };
 
   const calculateMagnitude = (acc: AccelerationData): number => {
-    const weightedY = acc.y * 1.5;
-    return Math.sqrt(acc.x * acc.x + weightedY * weightedY + acc.z * acc.z);
+    // Apply less weight to X and more to Y for better vertical movement detection
+    return Math.sqrt(acc.x * acc.x + acc.y * acc.y * 2 + acc.z * acc.z);
   };
 
   const analyzeCalibrationData = () => {
@@ -126,10 +128,10 @@ const StepCounter = () => {
       : 300;
 
     const newParameters = {
-      magnitudeThreshold: avgPeakMagnitude * 0.7,
-      averageThreshold: avgPeakAvgMagnitude * 0.6,
-      minStepInterval: Math.min(Math.max(avgInterval * 0.7, 200), 400),
-      peakThreshold: avgPeakMagnitude * 0.6
+      magnitudeThreshold: avgPeakMagnitude * 0.6, // Reduced from 0.7
+      averageThreshold: avgPeakAvgMagnitude * 0.5, // Reduced from 0.6
+      minStepInterval: Math.min(Math.max(avgInterval * 0.6, 180), 350),
+      peakThreshold: avgPeakMagnitude * 0.5 // Reduced from 0.6
     };
 
     setParameters(newParameters);
@@ -164,18 +166,23 @@ const StepCounter = () => {
 
     const avgMagnitude = movingAverageFilter(accelerationBuffer);
     
+    // Reduced dependence on vertical movement
     const verticalChange = Math.abs(acceleration.y - lastAcceleration.y);
     
     const timeSinceLastStep = now - lastStepTime;
 
+    // Track metrics for debugging
+    setDebugInfo(`Mag: ${magnitude.toFixed(2)}, Avg: ${avgMagnitude.toFixed(2)}, Vrt: ${verticalChange.toFixed(2)}, T: ${timeSinceLastStep}`);
+
+    // Check if we're above the threshold for registering a peak
     if (magnitude > parameters.peakThreshold && 
         !peakDetected && 
         timeSinceLastStep > parameters.minStepInterval) {
       setPeakDetected(true);
       
-      if (verticalChange > parameters.magnitudeThreshold && 
-          avgMagnitude > parameters.averageThreshold &&
-          Math.abs(acceleration.x) < Math.abs(acceleration.y) * 1.5) {
+      // More relaxed criteria for step detection
+      if ((verticalChange > parameters.magnitudeThreshold || magnitude > parameters.magnitudeThreshold * 1.5) && 
+          avgMagnitude > parameters.averageThreshold) {
         const newSteps = steps + 1;
         setSteps(newSteps);
         setLastStepTime(now);
@@ -190,7 +197,7 @@ const StepCounter = () => {
           parameters
         });
       }
-    } else if (magnitude < parameters.peakThreshold / 2) {
+    } else if (magnitude < parameters.peakThreshold / 1.5) { // Lowered to reset faster
       setPeakDetected(false);
     }
     
@@ -208,32 +215,76 @@ const StepCounter = () => {
       if (permission !== 'granted') return;
 
       try {
-        // @ts-ignore
-        sensor = new Accelerometer({ 
-          frequency: ACCELEROMETER_CONFIG.frequency
-        });
-        
-        let lastProcessTime = 0;
-        const processInterval = 1000 / ACCELEROMETER_CONFIG.frequency;
-
-        sensor.addEventListener('reading', () => {
-          const now = Date.now();
-          if (now - lastProcessTime >= processInterval) {
-            detectStep({
-              x: sensor.x,
-              y: sensor.y,
-              z: sensor.z,
-              timestamp: now
-            });
-            lastProcessTime = now;
+        if (typeof DeviceMotionEvent !== 'undefined' && 
+            typeof (DeviceMotionEvent as any).requestPermission === 'function') {
+          // iOS devices need special permission
+          const permissionResult = await (DeviceMotionEvent as any).requestPermission();
+          if (permissionResult !== 'granted') {
+            toast.error('Permissão de movimento negada');
+            return;
           }
-        });
+        }
 
-        sensor.start();
-        console.log('Acelerômetro iniciado');
+        // Try to use the standard DeviceMotionEvent if Accelerometer API is not available
+        if ('Accelerometer' in window) {
+          // @ts-ignore
+          sensor = new Accelerometer({ 
+            frequency: ACCELEROMETER_CONFIG.frequency
+          });
+          
+          let lastProcessTime = 0;
+          const processInterval = 1000 / ACCELEROMETER_CONFIG.frequency;
+
+          sensor.addEventListener('reading', () => {
+            const now = Date.now();
+            if (now - lastProcessTime >= processInterval) {
+              detectStep({
+                x: sensor.x,
+                y: sensor.y,
+                z: sensor.z,
+                timestamp: now
+              });
+              lastProcessTime = now;
+            }
+          });
+
+          sensor.start();
+          console.log('Acelerômetro iniciado');
+        } else {
+          // Fallback to DeviceMotion
+          window.addEventListener('devicemotion', (event) => {
+            if (event.accelerationIncludingGravity) {
+              detectStep({
+                x: event.accelerationIncludingGravity.x || 0,
+                y: event.accelerationIncludingGravity.y || 0,
+                z: event.accelerationIncludingGravity.z || 0,
+                timestamp: Date.now()
+              });
+            }
+          });
+          console.log('DeviceMotion iniciado como fallback');
+        }
       } catch (error) {
         console.error('Erro ao iniciar acelerômetro:', error);
-        toast.error('Erro ao iniciar o contador de passos');
+        toast.error('Erro ao iniciar o contador de passos. Tentando DeviceMotion como alternativa...');
+        
+        // Fallback to DeviceMotion if Accelerometer API fails
+        try {
+          window.addEventListener('devicemotion', (event) => {
+            if (event.accelerationIncludingGravity) {
+              detectStep({
+                x: event.accelerationIncludingGravity.x || 0,
+                y: event.accelerationIncludingGravity.y || 0,
+                z: event.accelerationIncludingGravity.z || 0,
+                timestamp: Date.now()
+              });
+            }
+          });
+          console.log('DeviceMotion iniciado como fallback após erro');
+        } catch (fallbackError) {
+          console.error('Erro ao iniciar DeviceMotion:', fallbackError);
+          toast.error('Não foi possível iniciar o contador de passos');
+        }
       }
     };
 
@@ -267,6 +318,9 @@ const StepCounter = () => {
       if (calibrationInterval) {
         clearInterval(calibrationInterval);
       }
+
+      // Remove devicemotion listener if it was used
+      window.removeEventListener('devicemotion', () => {});
     };
   }, [permission, isCalibrating]);
 
@@ -302,6 +356,33 @@ const StepCounter = () => {
     };
   }, [steps]);
 
+  // Fetch last reward date on component mount
+  useEffect(() => {
+    const checkLastReward = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        
+        const today = new Date().toISOString().split('T')[0];
+        
+        const { data } = await supabase
+          .from('step_rewards')
+          .select('reward_date')
+          .eq('user_id', user.id)
+          .eq('reward_date', today)
+          .single();
+          
+        if (data) {
+          setLastRewardDate(today);
+        }
+      } catch (error) {
+        console.error('Erro ao verificar última recompensa:', error);
+      }
+    };
+    
+    checkLastReward();
+  }, []);
+
   const startCalibration = () => {
     setIsCalibrating(true);
     toast.info('Calibração iniciada! Por favor, caminhe normalmente por 10 segundos.');
@@ -310,21 +391,55 @@ const StepCounter = () => {
   const requestPermission = async () => {
     try {
       console.log('Solicitando permissão para o acelerômetro');
-      const result = await (navigator.permissions as any).query({ 
-        name: 'accelerometer' 
-      });
-
-      console.log('Resultado da permissão:', result.state);
-      setPermission(result.state);
       
-      if (result.state === 'granted') {
-        toast.success('Permissão concedida!');
+      // Check if we need iOS specific permission
+      if (typeof DeviceMotionEvent !== 'undefined' && 
+          typeof (DeviceMotionEvent as any).requestPermission === 'function') {
+        const permissionResult = await (DeviceMotionEvent as any).requestPermission();
+        setPermission(permissionResult);
+        
+        if (permissionResult === 'granted') {
+          toast.success('Permissão concedida!');
+        } else {
+          toast.error('Permissão negada');
+        }
+        return;
+      }
+      
+      // Try the standard Permissions API
+      if (navigator.permissions) {
+        try {
+          const result = await (navigator.permissions as any).query({ 
+            name: 'accelerometer' 
+          });
+
+          console.log('Resultado da permissão:', result.state);
+          setPermission(result.state);
+          
+          if (result.state === 'granted') {
+            toast.success('Permissão concedida!');
+          } else {
+            toast.error('Permissão negada');
+          }
+        } catch (error) {
+          console.error('Erro ao solicitar permissão via Permissions API:', error);
+          // Fallback to assuming permission is granted for browsers that don't support the Permissions API
+          setPermission('granted');
+          toast.success('Permissão presumida concedida');
+        }
       } else {
-        toast.error('Permissão negada');
+        // Fallback for browsers without Permissions API support
+        console.log('Permissions API não suportada, presumindo permissão');
+        setPermission('granted');
+        toast.success('Permissão presumida concedida');
       }
     } catch (error) {
       console.error('Erro ao solicitar permissão:', error);
       toast.error('Erro ao solicitar permissão');
+      
+      // Last resort fallback
+      setPermission('granted');
+      toast.info('Tentando continuar sem permissão explícita');
     }
   };
 
@@ -372,6 +487,13 @@ const StepCounter = () => {
 
   const calories = Math.round(steps * 0.05);
   const distance = ((steps * 0.762) / 1000).toFixed(2);
+
+  // Manually add steps for testing (will be removed in production)
+  const addStepForTesting = () => {
+    const newSteps = steps + 1;
+    setSteps(newSteps);
+    localStorage.setItem(STORAGE_KEYS.STEPS, newSteps.toString());
+  };
 
   return (
     <Card className="bg-gradient-to-br from-primary-50 to-white border-none shadow-lg">
@@ -450,6 +572,20 @@ const StepCounter = () => {
                     </div>
                   </div>
                 </div>
+
+                {process.env.NODE_ENV === 'development' && (
+                  <div className="text-xs text-gray-500 mb-2 text-center">
+                    {debugInfo}
+                    <Button 
+                      onClick={addStepForTesting} 
+                      size="sm" 
+                      variant="outline" 
+                      className="ml-2 h-6 text-xs"
+                    >
+                      +1 (Test)
+                    </Button>
+                  </div>
+                )}
 
                 <Button
                   onClick={handleRewardSteps}
