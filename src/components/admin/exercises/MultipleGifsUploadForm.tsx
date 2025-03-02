@@ -36,14 +36,14 @@ export const MultipleGifsUploadForm = ({
   const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
   const muscleGroupOptions = [
-    { value: "chest", label: "Peitoral" },
-    { value: "back", label: "Costas" },
-    { value: "legs", label: "Pernas" },
-    { value: "shoulders", label: "Ombros" },
-    { value: "arms", label: "Braços" },
-    { value: "core", label: "Core" },
-    { value: "full_body", label: "Corpo Inteiro" },
-    { value: "cardio", label: "Cardio" },
+    { value: "chest" as MuscleGroup, label: "Peitoral" },
+    { value: "back" as MuscleGroup, label: "Costas" },
+    { value: "legs" as MuscleGroup, label: "Pernas" },
+    { value: "shoulders" as MuscleGroup, label: "Ombros" },
+    { value: "arms" as MuscleGroup, label: "Braços" },
+    { value: "core" as MuscleGroup, label: "Core" },
+    { value: "full_body" as MuscleGroup, label: "Corpo Inteiro" },
+    { value: "cardio" as MuscleGroup, label: "Cardio" },
   ];
   
   const locationOptions = [
@@ -131,7 +131,7 @@ export const MultipleGifsUploadForm = ({
           gif_url: publicUrl,
           exercise_type: validExerciseType,
           difficulty: validDifficulty,
-          muscle_group: muscleGroup as MuscleGroup,
+          muscle_group: muscleGroup,
           primary_muscles_worked: [muscleGroup],
           goals: [goal],
           equipment_needed: [],
@@ -219,7 +219,7 @@ export const MultipleGifsUploadForm = ({
                 </SelectTrigger>
                 <SelectContent>
                   {muscleGroupOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value as MuscleGroup}>
+                    <SelectItem key={option.value} value={option.value}>
                       {option.label}
                     </SelectItem>
                   ))}
