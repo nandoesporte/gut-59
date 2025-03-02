@@ -13,7 +13,7 @@ export interface CalorieCalculatorForm {
   weight: string;
   height: string;
   age: string;  // Changed from number to string for compatibility
-  gender: string;
+  gender: "male" | "female";  // Changed from string to union type to match CalorieCalculator
   activityLevel: string;
   goal: string;
 }
@@ -53,14 +53,32 @@ export const useMenuController = () => {
       recipientId?: string;
       qrCodeId?: string;
     }) => {
-      // Fixed: Using transaction_type instead of type, and not using array for single insert
+      // Get user's wallet ID first
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData?.user?.id) {
+        throw new Error("User not authenticated");
+      }
+      
+      // Get the wallet ID for this user
+      const { data: walletData, error: walletError } = await supabase
+        .from("wallets")
+        .select("id")
+        .eq("user_id", userData.user.id)
+        .single();
+        
+      if (walletError) {
+        console.error("Error fetching wallet:", walletError);
+        throw walletError;
+      }
+      
+      // Now insert the transaction with wallet_id instead of user_id
       const { data, error } = await supabase.from("fit_transactions").insert({
         amount,
         transaction_type: type,  // Changed from type to transaction_type
         description,
         recipient_id: recipientId,
         qr_code_id: qrCodeId,
-        user_id: user?.id,
+        wallet_id: walletData.id,  // Use wallet_id instead of user_id
       });
 
       if (error) {
