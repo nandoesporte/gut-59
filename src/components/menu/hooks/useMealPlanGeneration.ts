@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { DietaryPreferences, ProtocolFood } from "../types";
@@ -346,7 +345,13 @@ export const generateMealPlan = async ({
           console.error('[MEAL PLAN] Erro no fallback com Llama:', fallbackError);
           // Tentar usar o gerador local como último recurso
           console.log('[MEAL PLAN] Usando plano local devido a falhas em ambos modelos');
-          return createDefaultMealPlan(userData, selectedFoodsDetails, foodsByMealTypeFormatted);
+          return createDefaultMealPlan(userData, selectedFoods, foodsByMealType ? 
+            {
+              breakfast: selectedFoods.filter(food => foodsByMealType.breakfast?.includes(food.id) || false),
+              lunch: selectedFoods.filter(food => foodsByMealType.lunch?.includes(food.id) || false),
+              snack: selectedFoods.filter(food => foodsByMealType.snack?.includes(food.id) || false),
+              dinner: selectedFoods.filter(food => foodsByMealType.dinner?.includes(food.id) || false)
+            } : undefined);
         }
       }
     }
@@ -724,18 +729,16 @@ const createDefaultMealPlan = (userData: any, selectedFoods: any[], foodsByMealT
 // Função para salvar os dados do plano
 const saveMealPlanData = async (userId: string, mealPlan: any, dailyCalories: number, preferences: DietaryPreferences) => {
   try {
-    // Salvar o plano de refeições completo
+    // Fixed: Inserting single object instead of array and converting complex object to JSON
     const { data: planData, error: planError } = await supabase
       .from('meal_plans')
-      .insert([
-        {
-          user_id: userId,
-          plan_data: mealPlan,
-          daily_calories: dailyCalories,
-          dietary_preferences: preferences,
-          created_at: new Date().toISOString()
-        }
-      ]);
+      .insert({
+        user_id: userId,
+        plan_data: mealPlan,
+        daily_calories: dailyCalories,
+        dietary_preferences: JSON.stringify(preferences), // Convert to JSON string
+        created_at: new Date().toISOString()
+      });
       
     if (planError) {
       throw new Error(`Erro ao salvar plano: ${planError.message}`);

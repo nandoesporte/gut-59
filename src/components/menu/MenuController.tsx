@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,7 +12,7 @@ import { searchFood } from "./utils/food-api";
 export interface CalorieCalculatorForm {
   weight: string;
   height: string;
-  age: number;
+  age: string;  // Changed from number to string for compatibility
   gender: string;
   activityLevel: string;
   goal: string;
@@ -23,14 +24,14 @@ export const useMenuController = () => {
   const [formData, setFormData] = useState<CalorieCalculatorForm>({
     weight: "70",
     height: "175",
-    age: 30,
+    age: "30",  // Changed from number to string
     gender: "male",
     activityLevel: "moderate",
     goal: "maintain",
   });
   const [calorieNeeds, setCalorieNeeds] = useState<number | null>(null);
   const [protocolFoods, setProtocolFoods] = useState<ProtocolFood[]>([]);
-  const [selectedFoods, setSelectedFoods] = useState<ProtocolFood[]>([]);
+  const [selectedFoods, setSelectedFoods] = useState<string[]>([]);  // Changed to string[] to match expected type
   const [totalCalories, setTotalCalories] = useState(0);
   const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
   const [loading, setLoading] = useState(false);
@@ -52,16 +53,15 @@ export const useMenuController = () => {
       recipientId?: string;
       qrCodeId?: string;
     }) => {
-      const { data, error } = await supabase.from("fit_transactions").insert([
-        {
-          amount,
-          type,
-          description,
-          recipient_id: recipientId,
-          qr_code_id: qrCodeId,
-          user_id: user?.id,
-        },
-      ]);
+      // Fixed: Using transaction_type instead of type, and not using array for single insert
+      const { data, error } = await supabase.from("fit_transactions").insert({
+        amount,
+        transaction_type: type,  // Changed from type to transaction_type
+        description,
+        recipient_id: recipientId,
+        qr_code_id: qrCodeId,
+        user_id: user?.id,
+      });
 
       if (error) {
         console.error("Erro ao adicionar transação:", error);
@@ -111,10 +111,13 @@ export const useMenuController = () => {
     const { weight, height, age, gender, activityLevel, goal } = formData;
     let bmr: number;
 
+    // Parse age from string to number
+    const ageNum = parseInt(age, 10);
+
     if (gender === "male") {
-      bmr = 10 * parseFloat(weight) + 6.25 * parseFloat(height) - 5 * age + 5;
+      bmr = 10 * parseFloat(weight) + 6.25 * parseFloat(height) - 5 * ageNum + 5;
     } else {
-      bmr = 10 * parseFloat(weight) + 6.25 * parseFloat(height) - 5 * age - 161;
+      bmr = 10 * parseFloat(weight) + 6.25 * parseFloat(height) - 5 * ageNum - 161;
     }
 
     let activityFactor: number;
@@ -150,18 +153,24 @@ export const useMenuController = () => {
     updateSearchParams(2);
   };
 
-  const handleFoodSelection = (food: ProtocolFood) => {
-    const isSelected = selectedFoods.find((f) => f.id === food.id);
+  const handleFoodSelection = (foodId: string, food?: ProtocolFood) => {
+    const isSelected = selectedFoods.includes(foodId);
     let newSelection = [...selectedFoods];
 
     if (isSelected) {
-      newSelection = newSelection.filter((f) => f.id !== food.id);
+      newSelection = newSelection.filter((id) => id !== foodId);
     } else {
-      newSelection = [...newSelection, food];
+      newSelection = [...newSelection, foodId];
     }
 
     setSelectedFoods(newSelection);
-    const total = newSelection.reduce((acc, food) => acc + food.calories, 0);
+    
+    // Calculate total calories based on selected food IDs
+    const total = newSelection.reduce((acc, id) => {
+      const food = protocolFoods.find(f => f.id === id);
+      return acc + (food?.calories || 0);
+    }, 0);
+    
     setTotalCalories(total);
   };
 
@@ -205,18 +214,23 @@ export const useMenuController = () => {
         return false;
       }
 
+      // Get the actual food objects from the selected IDs
+      const selectedFoodObjects = protocolFoods.filter(food => 
+        selectedFoods.includes(food.id)
+      );
+
       const mealPlanData = await generateMealPlan({
         userData: {
           id: user.id,
           weight: parseFloat(formData.weight),
           height: parseFloat(formData.height),
-          age: formData.age,
+          age: parseInt(formData.age, 10),
           gender: formData.gender,
           activityLevel: formData.activityLevel,
           goal: formData.goal,
           dailyCalories: calorieNeeds,
         },
-        selectedFoods: selectedFoods,
+        selectedFoods: selectedFoodObjects,
         preferences: preferences,
         addTransaction: addTransactionMutation.mutate,
       });
