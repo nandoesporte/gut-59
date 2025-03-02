@@ -3,42 +3,47 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
+const LLAMA_API_KEY = Deno.env.get("LLAMA_API_KEY");
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 serve(async (req) => {
+  console.log("Workout Plan Generation Function - Request received");
+
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log("Generate Workout Plan Function - Request received");
-    
-    // Parse request body
-    const requestData = await req.json();
-    const { preferences, userId, settings } = requestData;
-    
-    if (!preferences) {
-      throw new Error("Workout preferences are required");
-    }
-    
-    if (!userId) {
-      throw new Error("User ID is required");
-    }
-    
-    // Initialize Supabase client with the provided service role key
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const { preferences, userId, settings } = await req.json();
     
     console.log("Fetching exercises from database...");
     
-    // Get exercises from the database
-    const { data: exercises, error: exercisesError } = await supabaseAdmin
+    // Validate input
+    if (!preferences) {
+      throw new Error("No workout preferences provided");
+    }
+    
+    if (!userId) {
+      throw new Error("No user ID provided");
+    }
+    
+    if (!LLAMA_API_KEY) {
+      console.error("LLAMA_API_KEY not found in environment variables");
+      throw new Error("LlamaAPI key not configured");
+    }
+    
+    // Create Supabase client
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    
+    // Fetch exercises from the database
+    const { data: exercises, error: exercisesError } = await supabase
       .from('exercises')
       .select('*');
       
@@ -48,229 +53,21 @@ serve(async (req) => {
     }
     
     if (!exercises || exercises.length === 0) {
-      console.warn("No exercises found in the database");
-    } else {
-      console.log(`Found ${exercises.length} exercises in the database`);
+      console.error("No exercises found in database");
+      throw new Error("No exercises found in database");
     }
     
-    // Match exercises to user preferences
-    const matchedExercises = matchExercisesToPreferences(exercises, preferences);
-    console.log(`Matched ${matchedExercises.length} exercises to user preferences`);
+    console.log(`Found ${exercises.length} exercises in database`);
     
-    // Call API to generate workout plan
-    console.log("Generating workout plan with Trene2025 agent");
-    const workoutPlan = await generateWorkoutPlan(preferences, matchedExercises, settings);
-    
-    // Return response
-    return new Response(
-      JSON.stringify({ 
-        workoutPlan,
-        message: "Workout plan generated successfully"
-      }),
-      { 
-        headers: { 
-          ...corsHeaders,
-          "Content-Type": "application/json"
-        }
-      }
-    );
-    
-  } catch (error) {
-    console.error("Error in workout plan generation:", error);
-    
-    return new Response(
-      JSON.stringify({
-        error: error.message || "Error generating workout plan",
-        success: false
-      }),
-      { 
-        status: 500,
-        headers: { 
-          ...corsHeaders,
-          "Content-Type": "application/json"
-        }
-      }
-    );
-  }
-});
+    // Build the prompt for workout plan generation
+    const systemPrompt = `You are an expert fitness coach specializing in creating custom workout plans for clients.
+Your task is to create a balanced 7-day workout plan based on the user's specific information and preferences.`;
 
-// Function to match exercises to user preferences
-function matchExercisesToPreferences(exercises, preferences) {
-  // If no exercises, return empty array
-  if (!exercises || exercises.length === 0) {
-    return [];
-  }
-
-  // Extract user preferences
-  const { 
-    age, 
-    gender, 
-    goal, 
-    activity_level, 
-    preferred_exercise_types, 
-    available_equipment,
-    health_conditions
-  } = preferences;
-
-  // Filter and score exercises based on preferences
-  const scoredExercises = exercises.map(exercise => {
-    let score = 0;
+    const userPrompt = buildWorkoutPrompt(preferences, exercises);
     
-    // Match exercise type
-    if (preferred_exercise_types && preferred_exercise_types.includes(exercise.exercise_type)) {
-      score += 5;
-    }
+    console.log("Sending request to LlamaAPI...");
     
-    // Match equipment
-    if (available_equipment && available_equipment.length > 0) {
-      const hasRequiredEquipment = !exercise.equipment_needed || 
-        exercise.equipment_needed.some(eq => available_equipment.includes(eq));
-      
-      if (hasRequiredEquipment) {
-        score += 3;
-      } else {
-        score -= 10; // Heavily penalize exercises requiring unavailable equipment
-      }
-    }
-    
-    // Match goals
-    if (exercise.goals && exercise.goals.length > 0) {
-      const goalMapping = {
-        'lose_weight': ['weight loss', 'fat burning', 'calorie burning', 'endurance'],
-        'gain_mass': ['muscle growth', 'strength', 'hypertrophy', 'power'],
-        'maintain': ['general fitness', 'functional', 'health', 'maintenance']
-      };
-      
-      const userGoalKeywords = goalMapping[goal] || [];
-      const matchingGoals = exercise.goals.filter(g => 
-        userGoalKeywords.some(keyword => g.toLowerCase().includes(keyword))
-      );
-      
-      score += matchingGoals.length * 2;
-    }
-    
-    // Consider health conditions
-    if (health_conditions && health_conditions.length > 0 && exercise.contraindicated_conditions) {
-      const hasContraindication = exercise.contraindicated_conditions.some(condition => 
-        health_conditions.some(hc => condition.toLowerCase().includes(hc.toLowerCase()))
-      );
-      
-      if (hasContraindication) {
-        score -= 20; // Heavily penalize exercises contraindicated for user's health conditions
-      }
-    }
-    
-    // Consider age-appropriate exercises
-    if (age && exercise.suitable_for_conditions) {
-      if ((age > 60 && exercise.suitable_for_conditions.some(c => c.toLowerCase().includes('senior'))) ||
-          (age < 18 && exercise.suitable_for_conditions.some(c => c.toLowerCase().includes('youth')))) {
-        score += 3;
-      }
-    }
-    
-    return { exercise, score };
-  });
-  
-  // Sort by score and take the top exercises
-  const sortedExercises = scoredExercises
-    .sort((a, b) => b.score - a.score)
-    .map(item => item.exercise);
-  
-  // Return at least some exercises even if scores are low
-  return sortedExercises.slice(0, Math.max(50, sortedExercises.length));
-}
-
-// Function to generate workout plan using the LLM
-async function generateWorkoutPlan(preferences, matchedExercises, settings) {
-  try {
-    // Extract AI API key
-    const LLAMA_API_KEY = Deno.env.get("LLAMA_API_KEY");
-    
-    if (!LLAMA_API_KEY) {
-      throw new Error("LLAMA_API_KEY is not configured in environment variables");
-    }
-    
-    // Prepare the system prompt
-    const systemPrompt = settings?.system_prompt || 
-      `You are TRENE2025, an AI fitness professional specializing in creating personalized workout plans based on user data.
-       Your task is to create a 7-day workout plan tailored to the user's specific needs, preferences, and goals.`;
-    
-    // Format the list of available exercises
-    const exerciseList = matchedExercises.map(ex => {
-      return `- ${ex.name} (Muscle Group: ${ex.muscle_group || 'Not specified'}, Type: ${ex.exercise_type || 'Not specified'}, Difficulty: ${ex.difficulty || 'Not specified'})`;
-    }).join('\n');
-    
-    // Create a detailed user prompt with preferences and available exercises
-    const userPrompt = `
-Create a personalized 7-day workout plan based on the following information:
-
-USER PROFILE:
-- Age: ${preferences.age} years
-- Gender: ${preferences.gender}
-- Weight: ${preferences.weight} ${preferences.weight_unit || 'kg'}
-- Height: ${preferences.height} ${preferences.height_unit || 'cm'}
-- Activity Level: ${preferences.activity_level}
-- Goal: ${preferences.goal.replace('_', ' ')}
-- Preferred Exercise Types: ${preferences.preferred_exercise_types?.join(', ') || 'Not specified'}
-- Available Equipment: ${preferences.available_equipment?.join(', ') || 'None'}
-${preferences.health_conditions?.length > 0 ? `- Health Conditions: ${preferences.health_conditions.join(', ')}` : ''}
-
-AVAILABLE EXERCISES (selected specifically for this user's profile):
-${exerciseList}
-
-INSTRUCTIONS:
-1. Create a structured 7-day workout plan with the following:
-   - A different focus for each day to ensure balanced muscle development and recovery
-   - For each day, include a warmup, 3-6 exercises, and a cooldown
-   - For each exercise, specify sets, reps, rest time between sets
-   - Make sure to use exercises from the list provided above
-   - Ensure exercises are appropriate for the user's goals and experience level
-
-2. The workout plan should follow a structure that ensures:
-   - Proper recovery between muscle groups
-   - Progressive overload
-   - Variation in exercise selection
-   - Appropriate intensity based on the user's activity level and goals
-   - Exercises are from different muscle groups to ensure balanced development
-
-Format your response as a valid JSON object with this structure:
-{
-  "goal": "string (overall goal of the plan)",
-  "start_date": "YYYY-MM-DD (current date)",
-  "end_date": "YYYY-MM-DD (7 days from start date)",
-  "workout_sessions": [
-    {
-      "day_number": 1,
-      "warmup_description": "string",
-      "cooldown_description": "string",
-      "session_exercises": [
-        {
-          "exercise": {
-            "id": "string (use the exercise ID if available)",
-            "name": "string (exercise name from the list)",
-            "description": "string (brief description of the exercise)",
-            "muscle_group": "string (primary muscle group targeted)", 
-            "gif_url": "string (if available)",
-            "exercise_type": "string (strength, cardio, or mobility)"
-          },
-          "sets": number,
-          "reps": number,
-          "rest_time_seconds": number
-        }
-      ]
-    }
-  ]
-}
-
-IMPORTANT: 
-- Each day should focus on different muscle groups to allow for recovery
-- Include a mix of exercise types (strength, cardio, mobility) based on the user's preferences
-- Make sure exercises recommended are available from the provided list
-- Balance the workout plan across different muscle groups for overall development
-`;
-    
-    // Make request to the LLM API
-    console.log("Sending request to LLM API...");
+    // Make request to LlamaAPI
     const response = await fetch("https://api.llama-api.com/chat/completions", {
       method: "POST",
       headers: {
@@ -278,7 +75,7 @@ IMPORTANT:
         "Authorization": `Bearer ${LLAMA_API_KEY}`
       },
       body: JSON.stringify({
-        model: "llama-3-8b-chat",
+        model: settings?.model_id || "nous-hermes-2-mixtral-8x7b-dpo", // Use settings if available, otherwise fallback
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
@@ -289,81 +86,193 @@ IMPORTANT:
       })
     });
     
-    // Check if response is OK
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`LLM API Error (${response.status}):`, errorText);
-      throw new Error(`LLM API request failed with status ${response.status}: ${errorText}`);
+      console.error(`LlamaAPI Error (${response.status}):`, errorText);
+      throw new Error(`LlamaAPI request failed with status ${response.status}`);
     }
     
-    // Parse response
     const result = await response.json();
-    console.log("LLM API response received");
+    console.log("LlamaAPI response received");
     
     if (!result.choices || result.choices.length === 0) {
-      console.error("LLM API returned empty choices array:", result);
-      throw new Error("No content generated by LLM API");
+      console.error("LlamaAPI returned empty choices array");
+      throw new Error("No content generated by LlamaAPI");
     }
     
-    // Extract the workout plan from the LLM response
     let workoutPlan;
     try {
+      // Extract and parse the workout plan JSON
       const content = result.choices[0].message.content;
-      console.log("LLM API content type:", typeof content);
-      
-      // Try to parse the response as JSON
       workoutPlan = typeof content === 'string' ? JSON.parse(content) : content;
       
-      // Validate the workout plan structure
-      if (!workoutPlan.workout_sessions || !Array.isArray(workoutPlan.workout_sessions)) {
-        console.error("Invalid workout plan structure:", workoutPlan);
-        throw new Error("Invalid workout plan structure returned by LLM API");
-      }
-      
-      // Ensure each exercise has a muscle_group property
-      workoutPlan.workout_sessions.forEach(session => {
-        if (session.session_exercises) {
-          session.session_exercises.forEach(sessionEx => {
-            if (sessionEx.exercise) {
-              // If muscle_group is missing, try to find it from our matched exercises
-              if (!sessionEx.exercise.muscle_group) {
-                const matchedExercise = matchedExercises.find(ex => 
-                  ex.name.toLowerCase() === sessionEx.exercise.name.toLowerCase()
-                );
-                
-                if (matchedExercise) {
-                  sessionEx.exercise.muscle_group = matchedExercise.muscle_group || 'Not specified';
-                  sessionEx.exercise.exercise_type = matchedExercise.exercise_type || 'Not specified';
-                  sessionEx.exercise.id = matchedExercise.id;
-                  
-                  // Add other properties if they exist
-                  if (matchedExercise.gif_url) {
-                    sessionEx.exercise.gif_url = matchedExercise.gif_url;
-                  }
-                  
-                  if (matchedExercise.description) {
-                    sessionEx.exercise.description = matchedExercise.description;
-                  }
-                } else {
-                  // Fallback if we can't find a match
-                  sessionEx.exercise.muscle_group = 'Not specified';
-                }
-              }
-            }
-          });
-        }
-      });
-      
+      // Process the workout plan to match exercises from our database
+      const processedPlan = processWorkoutPlan(workoutPlan, exercises);
       console.log("Workout plan processed successfully");
-      return workoutPlan;
       
+      return new Response(JSON.stringify({ workoutPlan: processedPlan }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
     } catch (parseError) {
-      console.error("Error parsing LLM API response:", parseError);
+      console.error("Error parsing LlamaAPI response:", parseError);
       console.error("Raw response:", result.choices[0].message.content);
-      throw new Error("Failed to parse workout plan from LLM API response");
+      throw new Error("Failed to parse workout plan from LlamaAPI response");
     }
   } catch (error) {
-    console.error("Error in generateWorkoutPlan:", error);
-    throw error;
+    console.error("Error in generate-workout-plan-llama:", error);
+    return new Response(
+      JSON.stringify({
+        error: error.message || "An error occurred while generating the workout plan",
+        success: false,
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      }
+    );
   }
+});
+
+function buildWorkoutPrompt(preferences, exercises) {
+  // Extract available exercise types for better recommendations
+  const exerciseTypes = [...new Set(exercises.map(e => e.exercise_type))].join(", ");
+  const muscleGroups = [...new Set(exercises.map(e => e.muscle_group))].join(", ");
+  
+  return `
+Please create a comprehensive 7-day workout plan based on the following user information:
+
+USER INFORMATION:
+- Age: ${preferences.age} years
+- Weight: ${preferences.weight} kg
+- Height: ${preferences.height} cm
+- Gender: ${preferences.gender}
+- Fitness Goal: ${preferences.goal.replace('_', ' ')}
+- Activity Level: ${preferences.activity_level}
+- Preferred Exercise Types: ${preferences.preferred_exercise_types.join(', ')}
+- Available Equipment: ${preferences.available_equipment.join(', ')}
+${preferences.health_conditions ? `- Health Conditions: ${preferences.health_conditions.join(', ')}` : '- No health conditions'}
+
+INSTRUCTIONS:
+1. Create a 7-day workout plan with one session per day.
+2. Each day should focus on different muscle groups for balanced training.
+3. Each session should include:
+   - A 5-minute warm-up description
+   - 3-6 exercises from our database
+   - A 5-minute cooldown description
+4. For each exercise specify:
+   - Number of sets (2-5)
+   - Number of reps (8-20, depending on exercise type)
+   - Rest time between sets in seconds (30-120)
+
+AVAILABLE EXERCISE TYPES: ${exerciseTypes}
+AVAILABLE MUSCLE GROUPS: ${muscleGroups}
+
+FORMAT YOUR RESPONSE AS A VALID JSON OBJECT with the following structure:
+{
+  "goal": "user's goal (lose_weight, maintain, or gain_mass)",
+  "workout_sessions": [
+    {
+      "day_number": 1,
+      "warmup_description": "detailed warmup instructions",
+      "cooldown_description": "detailed cooldown instructions",
+      "session_exercises": [
+        {
+          "exercise_name": "name of exercise from our database",
+          "muscle_group": "target muscle group",
+          "sets": number of sets (integer),
+          "reps": number of reps per set (integer),
+          "rest_time_seconds": rest time in seconds (integer)
+        },
+        ...more exercises
+      ]
+    },
+    ...more days
+  ]
+}
+
+IMPORTANT: Only include exercises from the available types and muscle groups mentioned above.
+Create a balanced workout plan that addresses all major muscle groups throughout the week.
+`;
+}
+
+function processWorkoutPlan(workoutPlan, exercises) {
+  // Make sure we have the expected format
+  if (!workoutPlan || !workoutPlan.workout_sessions) {
+    console.error("Invalid workout plan format", workoutPlan);
+    throw new Error("Invalid workout plan format");
+  }
+  
+  // Process each session
+  workoutPlan.workout_sessions = workoutPlan.workout_sessions.map(session => {
+    if (!session.session_exercises) {
+      session.session_exercises = [];
+      return session;
+    }
+    
+    // Process each exercise in the session
+    session.session_exercises = session.session_exercises.map(sessionExercise => {
+      // Find matching exercise in our database
+      const exerciseName = sessionExercise.exercise_name.toLowerCase();
+      const targetMuscleGroup = sessionExercise.muscle_group?.toLowerCase();
+      
+      // Try to match by name and muscle group if available
+      let matchedExercise = exercises.find(e => 
+        e.name.toLowerCase() === exerciseName && 
+        (!targetMuscleGroup || e.muscle_group?.toLowerCase() === targetMuscleGroup)
+      );
+      
+      // If no exact match, try to find by name only
+      if (!matchedExercise) {
+        matchedExercise = exercises.find(e => 
+          e.name.toLowerCase() === exerciseName
+        );
+      }
+      
+      // If still no match, try fuzzy matching by seeing if the name contains the exercise name
+      if (!matchedExercise) {
+        matchedExercise = exercises.find(e => 
+          e.name.toLowerCase().includes(exerciseName) || 
+          exerciseName.includes(e.name.toLowerCase())
+        );
+      }
+      
+      // If still no match, try to find an exercise with the same muscle group
+      if (!matchedExercise && targetMuscleGroup) {
+        const muscleGroupExercises = exercises.filter(e => 
+          e.muscle_group?.toLowerCase() === targetMuscleGroup
+        );
+        
+        if (muscleGroupExercises.length > 0) {
+          // Select a random exercise from this muscle group
+          matchedExercise = muscleGroupExercises[Math.floor(Math.random() * muscleGroupExercises.length)];
+          console.log(`No exact match for "${exerciseName}". Using alternative: "${matchedExercise.name}"`);
+        }
+      }
+      
+      // If we still don't have a match, just pick a random exercise
+      if (!matchedExercise) {
+        matchedExercise = exercises[Math.floor(Math.random() * exercises.length)];
+        console.log(`No match for "${exerciseName}". Using random exercise: "${matchedExercise.name}"`);
+      }
+      
+      // Map to the expected format
+      return {
+        sets: sessionExercise.sets || 3,
+        reps: sessionExercise.reps || 10,
+        rest_time_seconds: sessionExercise.rest_time_seconds || 60,
+        exercise: {
+          id: matchedExercise.id,
+          name: matchedExercise.name,
+          description: matchedExercise.description,
+          gif_url: matchedExercise.gif_url,
+          muscle_group: matchedExercise.muscle_group,
+          exercise_type: matchedExercise.exercise_type
+        }
+      };
+    });
+    
+    return session;
+  });
+  
+  return workoutPlan;
 }
