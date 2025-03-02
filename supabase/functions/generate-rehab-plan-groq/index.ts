@@ -1,16 +1,13 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { supabaseClient } from "../_shared/supabase-client.ts";
 
-// CORS headers for browser compatibility
+const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY');
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-// Groq API endpoint
-const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY');
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -19,160 +16,272 @@ serve(async (req) => {
   }
 
   try {
-    const { preferences, userId } = await req.json();
+    const { userData, preferences, exerciseOptions } = await req.json();
     
-    if (!GROQ_API_KEY) {
-      throw new Error("GROQ_API_KEY is not set. Please configure this environment variable.");
+    console.log("Gerando plano de reabilitação com llama3-8b-8192 via Groq");
+    console.log("Dados do usuário:", JSON.stringify(userData));
+    console.log("Preferências:", JSON.stringify(preferences));
+    
+    if (!userData || !preferences) {
+      throw new Error("Dados insuficientes para gerar o plano de reabilitação");
     }
 
-    console.log("Received request to generate rehab plan");
-    console.log("User ID:", userId);
-    console.log("Preferences:", JSON.stringify(preferences, null, 2));
+    // Format the user preferences and injury data for the prompt
+    const painLevel = preferences.painLevel ? `Nível de dor: ${preferences.painLevel}/10` : 'Nível de dor não informado';
+    const injuryDescription = preferences.injuryDescription ? 
+      `Descrição da lesão: ${preferences.injuryDescription}` : 
+      'Descrição da lesão não informada';
+    
+    const painLocation = preferences.painLocation ?
+      `Localização da dor: ${preferences.painLocation}` :
+      'Localização da dor não informada';
+      
+    const injuryDuration = preferences.injuryDuration ?
+      `Duração da lesão: ${preferences.injuryDuration}` :
+      'Duração da lesão não informada';
+      
+    const previousTreatments = preferences.previousTreatments ?
+      `Tratamentos anteriores: ${preferences.previousTreatments}` :
+      'Sem tratamentos anteriores informados';
+      
+    const exerciseExperience = preferences.exerciseExperience ?
+      `Experiência com exercícios: ${preferences.exerciseExperience}` :
+      'Experiência com exercícios não informada';
+      
+    const equipmentAvailable = preferences.equipmentAvailable && preferences.equipmentAvailable.length > 0 ?
+      `Equipamentos disponíveis: ${preferences.equipmentAvailable.join(', ')}` :
+      'Sem equipamentos disponíveis';
+    
+    // Prepare the full prompt for the LLM
+    const prompt = `
+# Instrução
+Crie um plano de reabilitação física personalizado de 4 semanas baseado nos seguintes dados:
 
-    // Create system prompt for Groq
-    const systemPrompt = `You are an expert physiotherapist and rehabilitation specialist. 
-Your task is to create a personalized rehabilitation plan based on the patient's symptoms, 
-conditions, and preferences. The plan should include exercises, treatments, and recommendations 
-that are tailored to their specific needs. Use evidence-based practices and be detailed in your explanations.`;
+## Informações do Usuário
+- Peso: ${userData.weight || 'Não informado'}kg
+- Altura: ${userData.height || 'Não informada'}cm
+- Idade: ${userData.age || 'Não informada'} anos
+- Gênero: ${userData.gender === 'male' ? 'Masculino' : userData.gender === 'female' ? 'Feminino' : 'Não informado'}
 
-    // Create user prompt based on provided preferences
-    const userPrompt = `Please create a detailed rehabilitation plan for me based on the following information:
+## Informações da Lesão
+- ${painLocation}
+- ${painLevel}
+- ${injuryDescription}
+- ${injuryDuration}
+- ${previousTreatments}
 
-Injury/Condition: ${preferences.condition}
-Pain Level (1-10): ${preferences.painLevel}
-Pain Areas: ${preferences.painAreas.join(", ")}
-Daily Activities: ${preferences.dailyActivities.join(", ")}
-Previous Treatments: ${preferences.previousTreatments?.join(", ") || "None"}
-Goals: ${preferences.goals.join(", ")}
-Frequency preference: ${preferences.frequency} times per week
-Exercise duration preference: ${preferences.duration} minutes
-Equipment available: ${preferences.equipment.join(", ")}
+## Experiência e Recursos
+- ${exerciseExperience}
+- ${equipmentAvailable}
 
-My plan should include:
-1. A clear breakdown of exercises with detailed instructions
-2. Frequency and duration recommendations
-3. Progression plan as my condition improves
-4. Any precautions or modifications I should consider
-5. Estimated timeline for recovery
-6. Complementary treatments or modalities that might help
+## Estrutura do Plano de Reabilitação
+Crie um plano de reabilitação física para 4 semanas, com:
+1. Exercícios diários para cada semana
+2. Progressão adequada de dificuldade
+3. Tempo de descanso recomendado
+4. Número de séries e repetições para cada exercício
+5. Descrições detalhadas de como realizar os exercícios com segurança
 
-Please format the response as a structured rehabilitation plan with clear sections.`;
+## Recomendações Adicionais
+Inclua:
+1. Recomendações gerais para recuperação
+2. Cuidados a serem tomados durante exercícios
+3. Sinais de alerta para interromper os exercícios
+4. Técnicas de gerenciamento de dor
 
-    // Call Groq API
-    const response = await fetch(GROQ_API_URL, {
+## Formato de Resposta
+Responda APENAS com um objeto JSON válido com a seguinte estrutura:
+{
+  "overview": {
+    "title": string,
+    "goals": [string],
+    "general_recommendations": [string],
+    "pain_management": [string],
+    "warning_signs": [string]
+  },
+  "plan": {
+    "week1": {
+      "title": string,
+      "description": string,
+      "days": {
+        "day1": {
+          "exercises": [
+            {
+              "name": string,
+              "description": string,
+              "sets": número,
+              "reps": string,
+              "rest": string,
+              "equipment": string,
+              "tips": [string]
+            }
+          ],
+          "notes": string
+        },
+        "day2": {},
+        "day3": {},
+        "day4": {},
+        "day5": {},
+        "day6": {},
+        "day7": {}
+      },
+      "weekNotes": string
+    },
+    "week2": {},
+    "week3": {},
+    "week4": {}
+  }
+}
+
+Certifique-se de que os números são números (e não strings). O JSON deve ser válido e todos os campos listados devem estar preenchidos.
+`;
+
+    console.log("Enviando prompt para o modelo llama3-8b-8192");
+
+    // Call Groq API to generate the rehabilitation plan
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${GROQ_API_KEY}`,
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${GROQ_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "llama3-8b-8192",  // Using Llama 3 8B model
+        model: "llama3-8b-8192",
         messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
+          { 
+            role: "system", 
+            content: "Você é um fisioterapeuta especializado em criar planos de reabilitação personalizados. Você sempre responde apenas com JSON válido, sem explicações ou texto adicional."
+          },
+          { role: "user", content: prompt }
         ],
-        temperature: 0.3,  // Lower temperature for more predictable results
-        max_tokens: 2000,  // Sufficient for detailed plan
-        top_p: 0.95,
+        max_tokens: 4096,
+        temperature: 0.2,
+        response_format: { type: "json_object" }
       }),
     });
 
     if (!response.ok) {
-      const errorData = await response.text();
-      console.error("Groq API error:", errorData);
-      throw new Error(`Groq API error: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.error(`Erro na chamada da API do Groq (${response.status}):`, errorText);
+      throw new Error(`Erro na API: ${response.status} ${errorText}`);
     }
 
-    const data = await response.json();
-    const generatedPlan = data.choices[0].message.content;
+    const groqResponse = await response.json();
+    console.log("Resposta recebida da API do Groq");
 
-    console.log("Successfully generated rehab plan with Groq");
+    if (!groqResponse.choices || !groqResponse.choices[0] || !groqResponse.choices[0].message) {
+      console.error("Formato de resposta inesperado:", groqResponse);
+      throw new Error("Formato de resposta inesperado");
+    }
 
-    // Process and structure the rehab plan
-    const structuredPlan = {
-      overview: "Plano de reabilitação personalizado gerado com o modelo Groq Llama 3",
-      condition: preferences.condition,
-      painLevel: preferences.painLevel,
-      painAreas: preferences.painAreas,
-      plan: generatedPlan,
-      exercises: [],
-      recommendations: [],
-      timeline: {},
-      precautions: []
-    };
+    let rehabPlanJson = groqResponse.choices[0].message.content;
+    console.log("Conteúdo da resposta:", rehabPlanJson);
 
-    // Extract sections from the generated text
-    const exercisesMatch = generatedPlan.match(/(?:Exercises:|EXERCISES:)([^#]*)/i);
-    if (exercisesMatch) {
-      // Simple extraction of exercises as an array
-      const exerciseText = exercisesMatch[1].trim();
-      const exerciseLines = exerciseText.split('\n').filter(line => line.trim().length > 0);
-      
-      // Try to extract each exercise with some basic structure
-      structuredPlan.exercises = exerciseLines.map(line => {
-        const exerciseParts = line.split(':');
-        if (exerciseParts.length > 1) {
-          return {
-            name: exerciseParts[0].trim().replace(/^\d+\.\s*/, ''),
-            instructions: exerciseParts[1].trim()
-          };
-        } else {
-          return {
-            name: line.trim().replace(/^\d+\.\s*/, ''),
-            instructions: ''
-          };
+    // Try to parse the JSON response
+    let rehabPlan;
+    try {
+      // First, check if the response is already a string or if it's an object
+      if (typeof rehabPlanJson === 'string') {
+        // Clean up the response if it contains markdown code blocks
+        if (rehabPlanJson.includes('```json')) {
+          rehabPlanJson = rehabPlanJson.replace(/```json\n|\n```/g, '');
         }
-      }).filter(ex => ex.name.length > 0);
+        
+        rehabPlan = JSON.parse(rehabPlanJson);
+      } else if (typeof rehabPlanJson === 'object') {
+        rehabPlan = rehabPlanJson;
+      } else {
+        throw new Error("Formato de resposta inválido");
+      }
+    } catch (parseError) {
+      console.error("Erro ao analisar JSON:", parseError);
+      console.error("Conteúdo JSON problemático:", rehabPlanJson);
+      throw new Error("Erro ao processar resposta: " + parseError.message);
     }
 
-    // Extract recommendations
-    const recommendationsMatch = generatedPlan.match(/(?:Recommendations:|RECOMMENDATIONS:)([^#]*)/i);
-    if (recommendationsMatch) {
-      const recommendationsText = recommendationsMatch[1].trim();
-      structuredPlan.recommendations = recommendationsText
-        .split('\n')
-        .filter(line => line.trim().length > 0)
-        .map(line => line.replace(/^\d+\.\s*/, '').trim());
-    }
-
-    // Extract precautions
-    const precautionsMatch = generatedPlan.match(/(?:Precautions:|PRECAUTIONS:)([^#]*)/i);
-    if (precautionsMatch) {
-      const precautionsText = precautionsMatch[1].trim();
-      structuredPlan.precautions = precautionsText
-        .split('\n')
-        .filter(line => line.trim().length > 0)
-        .map(line => line.replace(/^\d+\.\s*/, '').trim());
-    }
-
-    // Extract timeline
-    const timelineMatch = generatedPlan.match(/(?:Timeline:|TIMELINE:)([^#]*)/i);
-    if (timelineMatch) {
-      const timelineText = timelineMatch[1].trim();
-      const timelineLines = timelineText
-        .split('\n')
-        .filter(line => line.trim().length > 0);
+    // Save the rehabilitation plan to the database if user is authenticated
+    if (userData.id) {
+      const supabase = supabaseClient();
       
-      structuredPlan.timeline = {
-        description: timelineLines.join('\n'),
-        phases: timelineLines.map(line => {
-          const phaseMatch = line.match(/([^:]+):(.*)/);
-          return phaseMatch ? 
-            { name: phaseMatch[1].trim(), description: phaseMatch[2].trim() } : 
-            { name: line.trim(), description: '' };
-        })
-      };
+      // Save the rehab plan
+      const { error: insertError } = await supabase
+        .from('rehab_plans')
+        .insert({
+          user_id: userData.id,
+          plan_data: rehabPlan,
+          injury_info: {
+            pain_location: preferences.painLocation,
+            pain_level: preferences.painLevel,
+            injury_description: preferences.injuryDescription,
+            injury_duration: preferences.injuryDuration,
+            previous_treatments: preferences.previousTreatments
+          }
+        });
+
+      if (insertError) {
+        console.error("Erro ao salvar plano de reabilitação:", insertError);
+      } else {
+        console.log("Plano de reabilitação salvo com sucesso!");
+      
+        // Update the plan generation count
+        const now = new Date().toISOString();
+        const { data: planCount, error: countError } = await supabase
+          .from('plan_generation_counts')
+          .select('count, last_reset_date')
+          .eq('user_id', userData.id)
+          .eq('plan_type', 'rehab_plan')
+          .maybeSingle();
+          
+        if (countError) {
+          console.error("Erro ao verificar contagem de planos:", countError);
+        }
+        
+        if (planCount) {
+          await supabase
+            .from('plan_generation_counts')
+            .update({
+              count: planCount.count + 1,
+              last_generated_date: now
+            })
+            .eq('user_id', userData.id)
+            .eq('plan_type', 'rehab_plan');
+        } else {
+          await supabase
+            .from('plan_generation_counts')
+            .insert({
+              user_id: userData.id,
+              plan_type: 'rehab_plan',
+              count: 1,
+              last_generated_date: now,
+              last_reset_date: now
+            });
+        }
+      }
     }
 
-    return new Response(JSON.stringify(structuredPlan), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
+    return new Response(
+      JSON.stringify(rehabPlan),
+      {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+      }
+    );
   } catch (error) {
-    console.error("Error generating rehab plan:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
-    });
+    console.error("Erro completo:", error);
+    
+    return new Response(
+      JSON.stringify({
+        error: error.message || "Ocorreu um erro ao gerar o plano de reabilitação"
+      }),
+      {
+        status: 500,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+      }
+    );
   }
 });

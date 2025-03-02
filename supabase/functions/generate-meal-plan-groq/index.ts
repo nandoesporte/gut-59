@@ -1,313 +1,305 @@
 
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { supabaseClient } from "../_shared/supabase-client.ts";
 
-// CORS headers for browser access
+const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY');
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+};
 
 serve(async (req) => {
-  // Handle CORS preflight request
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      headers: corsHeaders,
-    })
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log("Iniciando função generate-meal-plan-groq com modelo Mistral Saba 24B");
-    const requestData = await req.json();
-    const { userData, selectedFoods = [], foodsByMealType = {}, dietaryPreferences = {}, model = "mistral-saba-24b" } = requestData;
+    const { 
+      userData, 
+      selectedFoods, 
+      foodsByMealType,
+      preferences
+    } = await req.json();
 
-    console.log(`Modelo solicitado: ${model}`);
-    console.log(`Calorias diárias do usuário: ${userData?.dailyCalories || 'não definido'}`);
-    console.log(`Número de alimentos selecionados: ${selectedFoods?.length || 0}`);
-    console.log(`Preferências dietéticas: ${JSON.stringify(dietaryPreferences).substring(0, 100)}...`);
-
-    if (!userData || !userData.dailyCalories) {
-      throw new Error('Dados do usuário ou calorias diárias não fornecidos');
+    console.log("Gerando plano alimentar com llama3-8b-8192 via Groq");
+    console.log("Dados do usuário:", JSON.stringify(userData));
+    console.log("Preferências:", JSON.stringify(preferences));
+    
+    // Validate required data
+    if (!userData || !selectedFoods || !preferences) {
+      throw new Error("Dados insuficientes para gerar o plano alimentar");
     }
 
-    if (!selectedFoods || selectedFoods.length === 0) {
-      throw new Error('Nenhum alimento selecionado');
-    }
+    // Prepare food information grouped by meal types
+    const formattedFoodsByMealType = Object.entries(foodsByMealType || {}).map(([mealType, foods]) => {
+      return `${mealType.charAt(0).toUpperCase() + mealType.slice(1)}: ${foods.join(', ')}`;
+    }).join('\n');
 
-    // Construct the system prompt
-    const systemPrompt = `Você é um nutricionista profissional especializado em criar planos alimentares personalizados. 
-Sua tarefa é criar um cardápio semanal detalhado para 7 dias com base nas preferências, necessidades calóricas e alimentos selecionados pelo usuário.
-O resultado deve ser em formato JSON estruturado conforme o exemplo fornecido.`;
+    // Build the list of all selected foods with their nutritional info
+    const selectedFoodsDetails = selectedFoods.map(food => {
+      return `- ${food.name}: ${food.calories} calorias, Proteínas: ${food.protein}g, Carboidratos: ${food.carbs}g, Gorduras: ${food.fats}g, Fibras: ${food.fiber || 0}g`;
+    }).join('\n');
 
-    // Create a detailed prompt with user data and food preferences
-    let userPrompt = `Crie um plano alimentar semanal personalizado com as seguintes características:
+    // Allergies and dietary restrictions
+    const allergies = preferences.hasAllergies ? 
+      `Alergias: ${preferences.allergies.join(', ')}` : 
+      'Sem alergias';
+      
+    const restrictions = preferences.dietaryRestrictions?.length > 0 ? 
+      `Restrições alimentares: ${preferences.dietaryRestrictions.join(', ')}` : 
+      'Sem restrições alimentares';
 
-PERFIL DO USUÁRIO:
+    // Training time
+    const trainingTime = preferences.trainingTime ? 
+      `Horário de treino: ${preferences.trainingTime}` : 
+      'Sem horário de treino específico';
+
+    // Format prompt for the meal plan generation
+    const prompt = `
+# Instrução
+Crie um plano alimentar personalizado de 7 dias baseado nos seguintes dados:
+
+## Informações do Usuário
 - Peso: ${userData.weight}kg
 - Altura: ${userData.height}cm
 - Idade: ${userData.age} anos
 - Gênero: ${userData.gender === 'male' ? 'Masculino' : 'Feminino'}
-- Nível de atividade: ${userData.activityLevel || 'moderado'}
-- Objetivo: ${userData.goal === 'lose_weight' ? 'Perda de peso' : userData.goal === 'gain_weight' ? 'Ganho de massa' : 'Manutenção'}
-- Necessidade calórica diária: ${userData.dailyCalories} kcal
+- Nível de Atividade: ${userData.activityLevel}
+- Objetivo: ${userData.goal}
+- Calorias Diárias Necessárias: ${userData.dailyCalories} kcal
 
-PREFERÊNCIAS ALIMENTARES:
-`;
+## Alimentos Preferidos por Refeição
+${formattedFoodsByMealType}
 
-    // Add selected foods
-    userPrompt += "ALIMENTOS SELECIONADOS PELO USUÁRIO:\n";
-    selectedFoods.forEach((food, index) => {
-      if (index < 40) { // Limit foods to avoid token limits
-        userPrompt += `- ${food.name} (${food.calories || 0}kcal por ${food.portion || 100}${food.portionUnit || 'g'})\n`;
-      }
-    });
+## Alimentos Selecionados e Informações Nutricionais
+${selectedFoodsDetails}
 
-    // Add dietary restrictions and allergies
-    userPrompt += "\nRESTRIÇÕES DIETÉTICAS E ALERGIAS:\n";
-    if (dietaryPreferences.hasAllergies && dietaryPreferences.allergies && dietaryPreferences.allergies.length > 0) {
-      userPrompt += `- Alergias: ${dietaryPreferences.allergies.join(', ')}\n`;
-    } else {
-      userPrompt += "- Sem alergias reportadas\n";
-    }
+## Restrições e Preferências
+- ${allergies}
+- ${restrictions}
+- ${trainingTime}
 
-    if (dietaryPreferences.dietaryRestrictions && dietaryPreferences.dietaryRestrictions.length > 0) {
-      userPrompt += `- Restrições: ${dietaryPreferences.dietaryRestrictions.join(', ')}\n`;
-    } else {
-      userPrompt += "- Sem restrições dietéticas específicas\n";
-    }
+## Estrutura do Plano Alimentar
+Crie um plano alimentar para 7 dias (segunda a domingo), com as seguintes refeições diárias:
+1. Café da manhã
+2. Lanche da manhã
+3. Almoço
+4. Lanche da tarde
+5. Jantar
 
-    // Add training time if available
-    if (dietaryPreferences.trainingTime) {
-      userPrompt += `\nHORÁRIO DE TREINO: ${dietaryPreferences.trainingTime}\n`;
-    }
+Para cada dia:
+- Especifique os alimentos para cada refeição
+- Detalhe as porções em gramas ou unidades
+- Calcule as calorias e macronutrientes (proteínas, carboidratos, gorduras, fibras) de cada refeição
+- Calcule o total diário de calorias e macronutrientes
+- O total diário deve estar próximo das calorias diárias necessárias (${userData.dailyCalories} kcal)
 
-    // Add custom food categorization by meal type if available
-    if (foodsByMealType && Object.keys(foodsByMealType).length > 0) {
-      userPrompt += "\nCATEGORIZAÇÃO DE ALIMENTOS POR REFEIÇÃO:\n";
-      
-      for (const [mealType, foods] of Object.entries(foodsByMealType)) {
-        if (Array.isArray(foods) && foods.length > 0) {
-          const mealTypeLabels = {
-            breakfast: "Café da Manhã",
-            lunch: "Almoço",
-            dinner: "Jantar",
-            snack: "Lanches"
-          };
-          
-          const mealLabel = mealTypeLabels[mealType as keyof typeof mealTypeLabels] || mealType;
-          
-          userPrompt += `- ${mealLabel}: `;
-          
-          // Get food names based on the food IDs in this meal type
-          const foodNames = foods.map(foodId => {
-            const food = selectedFoods.find(f => f.id === foodId || f.name === foodId);
-            return food ? food.name : foodId;
-          }).filter(name => name);
-          
-          userPrompt += foodNames.join(', ') + '\n';
-        }
-      }
-    }
+## Recomendações Adicionais
+Inclua:
+1. Recomendações gerais para o plano alimentar
+2. Sugestões específicas para refeições pré-treino
+3. Sugestões específicas para refeições pós-treino
+4. Dicas sobre timing alimentar
 
-    // Add expected output format
-    userPrompt += `
-RESULTADO ESPERADO:
-Crie um cardápio semanal completo com refeições para 7 dias (segunda a domingo) na estrutura JSON abaixo. 
-Use apenas os alimentos que o usuário selecionou.
-Distribua as calorias diárias conforme o objetivo do usuário.
-Inclua recomendações específicas para antes e após o treino.
-
-FORMATO JSON ESPERADO:
+## Formato de Resposta
+Responda APENAS com um objeto JSON válido com a seguinte estrutura:
 {
+  "userCalories": número,
   "weeklyPlan": {
     "monday": {
-      "dayName": "Segunda-feira",
+      "dayName": "Segunda",
       "meals": {
         "breakfast": {
-          "foods": [{"name": "Nome do alimento", "portion": 100, "unit": "g", "details": "Detalhes nutricionais"}],
-          "calories": 500,
-          "macros": {"protein": 30, "carbs": 60, "fats": 15, "fiber": 8},
-          "description": "Descrição da refeição"
+          "description": "Café da Manhã",
+          "foods": [{"name": string, "portion": número, "unit": string, "details": string}],
+          "calories": número,
+          "macros": {"protein": número, "carbs": número, "fats": número, "fiber": número}
         },
-        "morningSnack": { ... formato similar ao breakfast ... },
-        "lunch": { ... formato similar ao breakfast ... },
-        "afternoonSnack": { ... formato similar ao breakfast ... },
-        "dinner": { ... formato similar ao breakfast ... }
+        "morningSnack": {},
+        "lunch": {},
+        "afternoonSnack": {},
+        "dinner": {}
       },
-      "dailyTotals": {
-        "calories": 2000,
-        "protein": 150,
-        "carbs": 200,
-        "fats": 70,
-        "fiber": 30
-      }
+      "dailyTotals": {"calories": número, "protein": número, "carbs": número, "fats": número, "fiber": número}
     },
-    ... similar structure for tuesday through sunday ...
+    "tuesday": {},
+    "wednesday": {},
+    "thursday": {},
+    "friday": {},
+    "saturday": {},
+    "sunday": {}
   },
   "weeklyTotals": {
-    "averageCalories": 2000,
-    "averageProtein": 150,
-    "averageCarbs": 200,
-    "averageFats": 70,
-    "averageFiber": 30
+    "averageCalories": número,
+    "averageProtein": número,
+    "averageCarbs": número,
+    "averageFats": número,
+    "averageFiber": número
   },
   "recommendations": {
-    "general": "Recomendações gerais sobre alimentação",
-    "preworkout": "O que comer antes do treino",
-    "postworkout": "O que comer após o treino",
-    "timing": ["Dica 1 sobre tempo de alimentação", "Dica 2 sobre tempo de alimentação"]
+    "general": string,
+    "preworkout": string,
+    "postworkout": string,
+    "timing": [string]
   }
 }
 
-Importante: O resultado deve ser apenas o JSON válido, sem texto antes ou depois.`;
+Certifique-se de que os números são números (e não strings). O JSON deve ser válido e todos os campos listados devem estar preenchidos.
+`;
 
-    // Log the prompt (truncated for logs)
-    console.log(`Prompt de sistema: ${systemPrompt.substring(0, 100)}...`);
-    console.log(`Prompt do usuário: ${userPrompt.substring(0, 100)}...`);
+    console.log("Enviando prompt para o modelo llama3-8b-8192");
 
-    // Get Groq API key
-    const groqApiKey = Deno.env.get('GROQ_API_KEY');
-    if (!groqApiKey) {
-      throw new Error('GROQ_API_KEY não definida nas variáveis de ambiente');
-    }
-
-    // Set up messages array for Groq API
-    const messages = [
-      {
-        role: "system",
-        content: systemPrompt
-      },
-      {
-        role: "user",
-        content: userPrompt
-      }
-    ];
-
-    console.log(`Enviando requisição para Groq API usando modelo Mistral Saba 24B...`);
-    
-    // Call Groq API
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
+    // Call Groq API to generate the meal plan
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${groqApiKey}`,
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${GROQ_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "mistral-saba-24b", // Always use Mistral Saba 24B which is excellent for structured output
-        messages: messages,
-        response_format: { type: "json_object" }, // Ensure JSON response
-        temperature: 0.7,
-        max_tokens: 4000, // Need plenty of tokens for the full meal plan
+        model: "llama3-8b-8192",
+        messages: [
+          { 
+            role: "system", 
+            content: "Você é um nutricionista especializado em criar planos alimentares personalizados. Você sempre responde apenas com JSON válido, sem explicações ou texto adicional."
+          },
+          { role: "user", content: prompt }
+        ],
+        max_tokens: 4096,
+        temperature: 0.2,
+        response_format: { type: "json_object" }
       }),
     });
 
     if (!response.ok) {
-      const errorData = await response.text();
-      console.error(`Erro na resposta da Groq API: ${response.status} ${response.statusText}`);
-      console.error(`Detalhes do erro: ${errorData}`);
-      throw new Error(`Erro na resposta da Groq API: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.error(`Erro na chamada da API do Groq (${response.status}):`, errorText);
+      throw new Error(`Erro na API: ${response.status} ${errorText}`);
     }
 
-    // Parse Groq API response
     const groqResponse = await response.json();
-    console.log('Resposta recebida da Groq API');
-    
+    console.log("Resposta recebida da API do Groq");
+
     if (!groqResponse.choices || !groqResponse.choices[0] || !groqResponse.choices[0].message) {
-      console.error('Formato inválido de resposta da Groq API:', groqResponse);
-      throw new Error('Formato inválido de resposta da Groq API');
+      console.error("Formato de resposta inesperado:", groqResponse);
+      throw new Error("Formato de resposta inesperado");
     }
 
-    // Extract JSON content from Groq response
-    const aiResponseContent = groqResponse.choices[0].message.content;
-    console.log(`Resposta da IA (primeiros 100 caracteres): ${aiResponseContent.substring(0, 100)}...`);
+    let mealPlanJson = groqResponse.choices[0].message.content;
+    console.log("Conteúdo da resposta:", mealPlanJson);
 
-    // Parse the JSON from the AI response content
+    // Try to parse the JSON response
     let mealPlan;
     try {
-      // Extract JSON from the response - handle potential text before or after JSON
-      let jsonContent = aiResponseContent;
-      
-      // Find JSON opening brace and closing brace
-      const startIndex = jsonContent.indexOf('{');
-      const endIndex = jsonContent.lastIndexOf('}') + 1;
-      
-      if (startIndex !== -1 && endIndex !== -1 && startIndex < endIndex) {
-        jsonContent = jsonContent.substring(startIndex, endIndex);
-      }
-      
-      // Now try to parse it
-      mealPlan = JSON.parse(jsonContent);
-      console.log('JSON do plano alimentar extraído com sucesso');
-    } catch (error) {
-      console.error('Erro ao extrair JSON da resposta:', error);
-      console.error('Conteúdo que falhou ao analisar:', aiResponseContent);
-      throw new Error(`Erro ao analisar JSON da resposta: ${error.message}`);
-    }
-
-    // Add user calories to the meal plan for reference
-    mealPlan.userCalories = userData.dailyCalories;
-
-    // Save meal plan to database if userId is provided
-    if (userData.userId) {
-      try {
-        // Initialize Supabase client
-        const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-        const supabase = createClient(supabaseUrl, supabaseKey);
-        
-        console.log(`Salvando plano alimentar para usuário ${userData.userId}`);
-        
-        // Insert meal plan into database
-        const { error } = await supabase
-          .from('meal_plans')
-          .insert({
-            user_id: userData.userId,
-            plan_data: mealPlan,
-            calories: userData.dailyCalories,
-            dietary_preferences: dietaryPreferences
-          });
-          
-        if (error) {
-          console.error('Erro ao salvar plano alimentar no banco de dados:', error);
-          // Continue execution despite database error
-        } else {
-          console.log('Plano alimentar salvo com sucesso no banco de dados');
+      // First, check if the response is already a string or if it's an object
+      if (typeof mealPlanJson === 'string') {
+        // Clean up the response if it contains markdown code blocks
+        if (mealPlanJson.includes('```json')) {
+          mealPlanJson = mealPlanJson.replace(/```json\n|\n```/g, '');
         }
-      } catch (dbError) {
-        console.error('Erro no acesso ao banco de dados:', dbError);
-        // Continue execution despite database error
+        
+        mealPlan = JSON.parse(mealPlanJson);
+      } else if (typeof mealPlanJson === 'object') {
+        mealPlan = mealPlanJson;
+      } else {
+        throw new Error("Formato de resposta inválido");
+      }
+    } catch (parseError) {
+      console.error("Erro ao analisar JSON:", parseError);
+      console.error("Conteúdo JSON problemático:", mealPlanJson);
+      throw new Error("Erro ao processar resposta: " + parseError.message);
+    }
+
+    // Save the meal plan to the database if user is authenticated
+    if (userData.id) {
+      const supabase = supabaseClient();
+      
+      // Check if the user has reached the plan generation limit
+      const { data: planCount, error: countError } = await supabase
+        .from('plan_generation_counts')
+        .select('count, last_reset_date')
+        .eq('user_id', userData.id)
+        .eq('plan_type', 'meal_plan')
+        .maybeSingle();
+        
+      if (countError) {
+        console.error("Erro ao verificar contagem de planos:", countError);
+      }
+
+      // Save the meal plan
+      const { error: insertError } = await supabase
+        .from('meal_plans')
+        .insert({
+          user_id: userData.id,
+          plan_data: mealPlan,
+          calories: userData.dailyCalories,
+          preferences: {
+            weight: userData.weight,
+            height: userData.height,
+            age: userData.age,
+            gender: userData.gender,
+            activity_level: userData.activityLevel,
+            goal: userData.goal,
+            dietary_restrictions: preferences.dietaryRestrictions,
+            allergies: preferences.allergies,
+            selected_foods: selectedFoods.map(food => food.id)
+          }
+        });
+
+      if (insertError) {
+        console.error("Erro ao salvar plano alimentar:", insertError);
+      } else {
+        console.log("Plano alimentar salvo com sucesso!");
+      
+        // Update the plan generation count
+        const now = new Date().toISOString();
+        if (planCount) {
+          await supabase
+            .from('plan_generation_counts')
+            .update({
+              count: planCount.count + 1,
+              last_generated_date: now
+            })
+            .eq('user_id', userData.id)
+            .eq('plan_type', 'meal_plan');
+        } else {
+          await supabase
+            .from('plan_generation_counts')
+            .insert({
+              user_id: userData.id,
+              plan_type: 'meal_plan',
+              count: 1,
+              last_generated_date: now,
+              last_reset_date: now
+            });
+        }
       }
     }
 
-    // Return the response
-    console.log('Retornando resposta com o plano alimentar gerado');
     return new Response(
-      JSON.stringify({
-        mealPlan: mealPlan,
-        message: 'Plano alimentar gerado com sucesso usando Mistral Saba 24B',
-      }),
+      JSON.stringify(mealPlan),
       {
-        status: 200,
         headers: {
           ...corsHeaders,
-          'Content-Type': 'application/json',
-        }
+          "Content-Type": "application/json",
+        },
       }
     );
   } catch (error) {
-    console.error('Erro na função generate-meal-plan-groq:', error);
-    console.error('Stack trace:', error.stack);
+    console.error("Erro completo:", error);
     
     return new Response(
       JSON.stringify({
-        error: `Erro ao gerar plano alimentar: ${error.message}`,
+        error: error.message || "Ocorreu um erro ao gerar o plano alimentar"
       }),
       {
         status: 500,
         headers: {
           ...corsHeaders,
-          'Content-Type': 'application/json',
-        }
+          "Content-Type": "application/json",
+        },
       }
     );
   }

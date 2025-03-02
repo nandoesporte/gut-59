@@ -44,14 +44,14 @@ export const MentalHealthChat = () => {
     setIsLoading(true);
 
     try {
-      console.log("Enviando mensagem para o modelo Mistral Saba 24B via Groq...");
+      console.log("Enviando mensagem para o modelo llama3-8b-8192 via Groq...");
       
-      // Using the groq-chat edge function with Mistral Saba 24B model
+      // Using the groq-chat edge function with llama3-8b-8192 model
       const { data, error } = await supabase.functions.invoke("groq-chat", {
         body: { 
           message: input,
           history: messages,
-          model: "mistral-saba-24b" // Specify the Mistral Saba 24B model
+          model: "llama3-8b-8192" // Using llama3-8b-8192 model
         },
       });
 
@@ -75,7 +75,7 @@ export const MentalHealthChat = () => {
       console.error("Erro ao enviar mensagem:", error);
       toast({
         title: "Erro na comunicação",
-        description: "Não foi possível obter resposta do modelo Mistral Saba 24B. Tente novamente mais tarde.",
+        description: "Não foi possível obter resposta do modelo llama3-8b-8192. Tente novamente mais tarde.",
         variant: "destructive",
       });
     } finally {
