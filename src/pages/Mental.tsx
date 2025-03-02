@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -97,7 +98,7 @@ const Mental = () => {
               content: "Olá! Estou aqui para te ajudar com orientações sobre suas emoções."
             }
           ],
-          model: "llama3-70b-8192"
+          model: "llama3-8b-8192"
         },
       });
 
