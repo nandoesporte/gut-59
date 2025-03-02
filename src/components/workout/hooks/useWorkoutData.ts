@@ -47,9 +47,31 @@ export const useWorkoutData = () => {
         health_conditions: [],
       };
 
-      const { error } = await supabase
+      // Use update instead of upsert to avoid unique constraint errors
+      const { data: existingPrefs } = await supabase
         .from('user_workout_preferences')
-        .upsert(preferenceData);
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      let error;
+      
+      if (existingPrefs) {
+        // Update existing preferences
+        const { error: updateError } = await supabase
+          .from('user_workout_preferences')
+          .update(preferenceData)
+          .eq('user_id', user.id);
+          
+        error = updateError;
+      } else {
+        // Insert new preferences
+        const { error: insertError } = await supabase
+          .from('user_workout_preferences')
+          .insert(preferenceData);
+          
+        error = insertError;
+      }
 
       if (error) {
         console.error('Erro ao auto-salvar preferências:', error);
@@ -94,12 +116,44 @@ export const useWorkoutData = () => {
         health_conditions: [],
       };
 
-      console.log('Objeto completo para upsert:', preferenceData);
+      console.log('Objeto completo para salvar:', preferenceData);
 
-      const { error, data: savedData } = await supabase
+      // Check if record already exists
+      const { data: existingPrefs, error: checkError } = await supabase
         .from('user_workout_preferences')
-        .upsert(preferenceData)
-        .select();
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+        
+      if (checkError) {
+        console.error('Erro ao verificar preferências existentes:', checkError);
+        toast.error("Erro ao verificar preferências existentes");
+        throw new Error(checkError.message);
+      }
+      
+      let savedData;
+      let error;
+      
+      if (existingPrefs) {
+        // Update existing preferences
+        const { data: updateData, error: updateError } = await supabase
+          .from('user_workout_preferences')
+          .update(preferenceData)
+          .eq('user_id', user.id)
+          .select();
+          
+        savedData = updateData;
+        error = updateError;
+      } else {
+        // Insert new preferences
+        const { data: insertData, error: insertError } = await supabase
+          .from('user_workout_preferences')
+          .insert(preferenceData)
+          .select();
+          
+        savedData = insertData;
+        error = insertError;
+      }
 
       if (error) {
         console.error('Erro ao salvar preferências:', error);
