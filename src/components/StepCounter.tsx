@@ -222,7 +222,9 @@ const StepCounter = () => {
         // Check if Accelerometer API is available in a type-safe way
         if (typeof window !== 'undefined' && 'Accelerometer' in window) {
           try {
-            sensor = new (window as any).Accelerometer({ 
+            // Use type assertion to avoid TypeScript error
+            const AccelerometerClass = (window as any).Accelerometer;
+            sensor = new AccelerometerClass({ 
               frequency: ACCELEROMETER_CONFIG.frequency
             });
             
