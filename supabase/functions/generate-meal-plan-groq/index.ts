@@ -1,193 +1,197 @@
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
-import { corsHeaders } from '../_shared/cors.ts'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
-const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-const groqApiKey = Deno.env.get('GROQ_API_KEY') ?? ''
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
-const supabase = createClient(supabaseUrl, supabaseKey)
-
-Deno.serve(async (req) => {
-  // Handle CORS preflight request
+serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Get request body
-    const requestData = await req.json()
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const groqApiKey = Deno.env.get('GROQ_API_KEY');
     
-    // Validate required data - this prevents the "Insufficient data" error
-    if (!requestData.userData || !requestData.selectedFoods || requestData.selectedFoods.length === 0) {
-      console.error('Input validation failed:', {
-        hasUserData: !!requestData.userData,
-        selectedFoodsCount: requestData.selectedFoods?.length || 0
-      })
-      return new Response(
-        JSON.stringify({ 
-          error: 'Dados insuficientes para gerar o plano alimentar. Verifique se você selecionou alimentos e preencheu seus dados.' 
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400 
-        }
-      )
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Missing Supabase configuration');
     }
 
-    // Log data received (truncated to avoid huge logs)
-    console.log('Generating meal plan with Llama3-8b-8192 model via Groq')
-    console.log('User data:', JSON.stringify(requestData.userData))
-    console.log(`Selected foods count: ${requestData.selectedFoods.length}`)
-    
-    // Get the model to use - default to llama3-8b-8192
-    const model = "llama3-8b-8192"
-    console.log(`Using model: ${model}`)
+    if (!groqApiKey) {
+      throw new Error('Missing GROQ_API_KEY environment variable');
+    }
 
-    // Extract user data for better prompting
-    const { weight, height, age, gender, activityLevel, goal, dailyCalories } = requestData.userData
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
-    // Structure system prompt to guide Llama3 to generate valid JSON
-    const systemPrompt = `You are a professional nutrition expert specialized in creating personalized meal plans. 
-You will receive user data and food preferences, and you will create a detailed weekly meal plan.
-Your output MUST be valid JSON without any markdown formatting or additional text.
-The meal plan should include 7 days (Monday to Sunday) with 5 meals per day (breakfast, morningSnack, lunch, afternoonSnack, dinner).
-For each meal, include foods, calories, macros (protein, carbs, fats, fiber), and a description.
-Calculate daily totals and weekly averages accurately.
-Include practical recommendations for the user based on their goal (${goal}) and daily calorie needs (${dailyCalories} kcal).
+    // Parse request body
+    const { userInput, user_id } = await req.json();
+    
+    console.log(`Received meal plan generation request for user: ${user_id}`);
+    console.log(`User input: ${JSON.stringify(userInput)}`);
 
-This is the expected structure (example):
-{
-  "mealPlan": {
-    "weeklyPlan": {
-      "monday": {
-        "dayName": "Monday",
-        "meals": {
-          "breakfast": {
-            "foods": [
-              {"name": "Eggs", "portion": 100, "unit": "g", "details": "Good protein source"}
-            ],
-            "calories": 250,
-            "macros": {"protein": 20, "carbs": 15, "fats": 10, "fiber": 2},
-            "description": "Breakfast description"
-          },
-          "morningSnack": { ... similar structure ... },
-          "lunch": { ... similar structure ... },
-          "afternoonSnack": { ... similar structure ... },
-          "dinner": { ... similar structure ... }
+    // Prepare the prompt for Groq
+    const prompt = `
+    Create a detailed meal plan based on the following user preferences:
+    
+    ${JSON.stringify(userInput, null, 2)}
+    
+    The meal plan should:
+    - Include 5-6 meals per day (breakfast, morning snack, lunch, afternoon snack, dinner, and optional evening snack)
+    - Specify portion sizes and quantities
+    - Include nutritional information (calories, protein, carbs, fats)
+    - Consider any dietary restrictions mentioned
+    - Be realistic and practical for daily preparation
+    - Include a shopping list
+
+    Format your response as valid JSON with the following structure:
+    {
+      "meal_plan": {
+        "daily_calories": number,
+        "macro_distribution": {
+          "protein_percentage": number,
+          "carbs_percentage": number,
+          "fat_percentage": number
         },
-        "dailyTotals": {
-          "calories": 2000,
-          "protein": 120,
-          "carbs": 200,
-          "fats": 70,
-          "fiber": 30
-        }
+        "meals": [
+          {
+            "name": string,
+            "type": string,
+            "foods": [
+              {
+                "name": string,
+                "portion": string,
+                "calories": number,
+                "protein": number,
+                "carbs": number,
+                "fat": number
+              }
+            ],
+            "total_calories": number,
+            "total_protein": number,
+            "total_carbs": number,
+            "total_fat": number
+          }
+        ]
       },
-      "tuesday": { ... similar structure ... },
-      ... other days of the week ...
-    },
-    "weeklyTotals": {
-      "averageCalories": 2000,
-      "averageProtein": 120,
-      "averageCarbs": 200,
-      "averageFats": 70,
-      "averageFiber": 30
-    },
-    "recommendations": {
-      "general": "General nutrition recommendations text",
-      "preworkout": "Pre-workout meal recommendations",
-      "postworkout": "Post-workout meal recommendations",
-      "timing": ["Timing recommendation 1", "Timing recommendation 2"]
+      "shopping_list": {
+        "categories": [
+          {
+            "name": string,
+            "items": string[]
+          }
+        ]
+      },
+      "recommendations": string[]
     }
-  }
-}`
+    
+    Return only the JSON, nothing else.`;
 
-    // Create a concise user prompt with critical information
-    const userPrompt = `Create a personalized meal plan for a ${age} year old ${gender} who weighs ${weight}kg, is ${height}cm tall, has ${activityLevel} activity level, with a goal to ${goal}, requiring approximately ${dailyCalories} calories daily.
-
-Their food preferences and available foods are: ${requestData.selectedFoods.map(food => food.name).join(', ')}.
-
-${requestData.dietaryPreferences ? `
-Dietary restrictions: ${requestData.dietaryPreferences.dietaryRestrictions?.join(', ') || 'None'}
-Allergies: ${requestData.dietaryPreferences.hasAllergies ? requestData.dietaryPreferences.allergies?.join(', ') : 'None'}
-Training time: ${requestData.dietaryPreferences.trainingTime || 'Not specified'}
-` : 'No specific dietary restrictions or allergies.'}
-
-Return ONLY valid JSON without any markdown formatting, explanations, or additional text. Follow the exact structure provided in the system prompt.`
-
-    // Make the API call to Groq with Llama3
+    // Make request to Groq API
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${groqApiKey}`,
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: model,
+        model: 'llama3-70b-8192',
         messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
+          {
+            role: 'system',
+            content: 'You are a nutrition expert that creates personalized meal plans.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
         ],
         temperature: 0.7,
-        max_tokens: 4096,
-        response_format: { type: "json_object" } // Request specifically formatted JSON
-      }),
-    })
+        max_tokens: 4000
+      })
+    });
 
-    const result = await response.json()
-    
     if (!response.ok) {
-      console.error('Groq API error:', result)
-      throw new Error(`Groq API error: ${result.error?.message || 'Unknown error'}`)
+      const error = await response.text();
+      console.error('Error from Groq API:', error);
+      throw new Error(`Groq API error: ${response.status} ${response.statusText}`);
     }
 
-    if (!result.choices || result.choices.length === 0) {
-      console.error('No choices returned from Groq:', result)
-      throw new Error('No response content received from Groq API')
-    }
-
-    // Extract the model's response
-    const modelResponse = result.choices[0].message.content
-    console.log('Received raw response from model, parsing JSON...')
+    const groqData = await response.json();
+    const mealPlanContent = groqData.choices[0]?.message?.content;
     
-    try {
-      // Parse the JSON response from the model
-      const parsedResponse = JSON.parse(modelResponse)
-      
-      // Validate the parsed response
-      if (!parsedResponse.mealPlan || !parsedResponse.mealPlan.weeklyPlan) {
-        console.error('Invalid meal plan structure:', parsedResponse)
-        throw new Error('The generated meal plan is missing required structure')
-      }
-      
-      // Add user calories to the response
-      parsedResponse.mealPlan.userCalories = dailyCalories
-      
-      console.log('Meal plan successfully generated and validated')
-      
-      // Return the meal plan
-      return new Response(
-        JSON.stringify({ mealPlan: parsedResponse.mealPlan }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    } catch (parseError) {
-      console.error('Error parsing model response:', parseError)
-      console.error('Raw model response:', modelResponse)
-      throw new Error('Failed to parse the model response as JSON')
+    if (!mealPlanContent) {
+      throw new Error('No content returned from Groq API');
     }
+
+    console.log('Successfully received response from Groq');
+    
+    // Extract JSON from the response
+    let mealPlanJson;
+    try {
+      // Remove any markdown formatting if present
+      const jsonContent = mealPlanContent.replace(/```json|```/g, '').trim();
+      mealPlanJson = JSON.parse(jsonContent);
+    } catch (e) {
+      console.error('Failed to parse JSON:', e);
+      console.log('Raw content:', mealPlanContent);
+      throw new Error('Failed to parse meal plan JSON from Groq response');
+    }
+
+    // Store the generated meal plan in the database
+    const { data: insertData, error: insertError } = await supabase
+      .from('meal_plans')
+      .insert({
+        user_id: user_id,
+        plan_data: mealPlanJson,
+        calories: mealPlanJson.meal_plan.daily_calories,
+        generated_at: new Date().toISOString()
+      })
+      .select('id')
+      .single();
+
+    if (insertError) {
+      console.error('Error storing meal plan:', insertError);
+      throw new Error('Failed to store the generated meal plan');
+    }
+
+    // Increment the meal plan generation count for this user
+    await supabase.rpc('increment_nutrition_count', { user_id });
+
+    console.log(`Meal plan generated and stored with ID: ${insertData.id}`);
+
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        mealPlan: mealPlanJson,
+        id: insertData.id
+      }),
+      { 
+        headers: { 
+          ...corsHeaders,
+          'Content-Type': 'application/json' 
+        }
+      }
+    );
+
   } catch (error) {
-    console.error('Error in generate-meal-plan-groq:', error.message)
+    console.error('Error:', error);
     
     return new Response(
       JSON.stringify({ 
-        error: `Erro ao gerar plano alimentar: ${error.message}`,
-        message: 'Falha ao processar seu pedido. Por favor, tente novamente.'
+        error: error.message || 'An unexpected error occurred'
       }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500 
+        status: 500, 
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
       }
-    )
+    );
   }
-})
+});
