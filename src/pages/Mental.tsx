@@ -96,7 +96,8 @@ const Mental = () => {
               role: "assistant",
               content: "Olá! Estou aqui para te ajudar com orientações sobre suas emoções."
             }
-          ]
+          ],
+          model: "llama3-70b-8192"
         },
       });
 
