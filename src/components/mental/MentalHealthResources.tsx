@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,7 +41,7 @@ export const MentalHealthResources = () => {
   const [exercise, setExercise] = useState<BreathingExercise>({
     phase: "inhale",
     count: 0,
-    totalBreaths: 3, // Reduced total breaths to fit in 1 minute
+    totalBreaths: 5, // Increased total breaths to 5 cycles
     isComplete: false,
     secondsLeft: 4,
     elapsedTime: 0,
@@ -114,7 +113,7 @@ export const MentalHealthResources = () => {
       setExercise({
         phase: "prepare",
         count: 0,
-        totalBreaths: 3, // Reduced to fit in 1 minute
+        totalBreaths: 5, // Increased to 5 cycles
         isComplete: false,
         secondsLeft: BREATHING_CYCLE.prepare,
         elapsedTime: 0,
@@ -306,28 +305,9 @@ export const MentalHealthResources = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                {/* Initial state circle representation */}
+                {/* Removed the initial state circle representation with "Segure 7" */}
                 {!exercise.isComplete && !isStarting && (
                   <div className="flex flex-col items-center justify-center py-4">
-                    <div 
-                      className="relative flex flex-col items-center justify-center w-60 h-60 sm:w-68 sm:h-68 rounded-full border-2 border-gray-300 mb-4"
-                      style={{
-                        backgroundColor: "#48A1A1", // Teal color like in the image
-                        boxShadow: "0 0 15px rgba(72, 161, 161, 0.3)"
-                      }}
-                    >
-                      <div className="text-center">
-                        <div className="text-white text-lg font-medium mb-1">
-                          Segura
-                        </div>
-                        
-                        {/* Static demo counter */}
-                        <div className="text-white text-3xl font-bold">
-                          7
-                        </div>
-                      </div>
-                    </div>
-                    
                     <div className="flex flex-wrap justify-center gap-4 text-sm mt-2 mb-4">
                       <div className="flex flex-col items-center">
                         <div className="w-3 h-3 rounded-full" style={{backgroundColor: PHASE_COLORS.inhale}}></div>
