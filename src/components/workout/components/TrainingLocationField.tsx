@@ -18,7 +18,7 @@ export const TrainingLocationField = ({ form }: TrainingLocationFieldProps) => {
   return (
     <FormField
       control={form.control}
-      name="trainingLocation"
+      name="training_location"
       render={({ field }) => (
         <FormItem>
           <FormLabel>Local de Treino</FormLabel>

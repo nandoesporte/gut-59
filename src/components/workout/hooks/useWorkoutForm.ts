@@ -53,6 +53,7 @@ export const useWorkoutForm = (onSubmit: (data: WorkoutPreferences) => void) => 
     };
 
     checkPaymentSettings();
+    loadUserPreferences();
   }, []);
 
   const form = useForm<FormSchema>({
@@ -69,6 +70,90 @@ export const useWorkoutForm = (onSubmit: (data: WorkoutPreferences) => void) => 
     }
   });
 
+  const loadUserPreferences = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('user_workout_preferences')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Erro ao carregar preferências:', error);
+        return;
+      }
+
+      if (data) {
+        form.reset({
+          age: data.age,
+          weight: data.weight,
+          height: data.height,
+          gender: data.gender,
+          goal: data.goal,
+          activity_level: data.activity_level,
+          preferred_exercise_types: data.preferred_exercise_types || ["strength"],
+          training_location: data.available_equipment?.includes("all") 
+            ? "gym" 
+            : data.available_equipment?.includes("bodyweight") && data.available_equipment?.includes("dumbbells")
+            ? "home"
+            : data.available_equipment?.includes("bodyweight") && !data.available_equipment?.includes("dumbbells")
+            ? "outdoors"
+            : "no_equipment"
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao carregar preferências:', error);
+    }
+  };
+
+  const saveUserPreferences = async (data: FormSchema) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast.error("Usuário não autenticado");
+        return;
+      }
+
+      const availableEquipment = data.training_location === "gym" 
+        ? ["all"] 
+        : data.training_location === "home"
+        ? ["bodyweight", "resistance-bands", "dumbbells"]
+        : data.training_location === "outdoors"
+        ? ["bodyweight", "resistance-bands"]
+        : ["bodyweight"];
+
+      const { error } = await supabase
+        .from('user_workout_preferences')
+        .upsert({
+          user_id: user.id,
+          age: data.age,
+          weight: data.weight,
+          height: data.height,
+          gender: data.gender,
+          goal: data.goal,
+          activity_level: data.activity_level,
+          preferred_exercise_types: data.preferred_exercise_types,
+          available_equipment: availableEquipment,
+          health_conditions: [],
+        });
+
+      if (error) {
+        console.error('Erro ao salvar preferências:', error);
+        toast.error("Erro ao salvar suas preferências");
+      } else {
+        toast.success("Preferências salvas com sucesso");
+      }
+    } catch (error) {
+      console.error('Erro ao salvar preferências:', error);
+      toast.error("Erro ao salvar suas preferências");
+    }
+  };
+
   const handleSubmit = async (data: FormSchema) => {
     if (isPaymentEnabled && !hasPaid) {
       setFormData(data);
@@ -77,6 +162,9 @@ export const useWorkoutForm = (onSubmit: (data: WorkoutPreferences) => void) => 
     }
 
     try {
+      // Salvar as preferências do usuário no banco de dados
+      await saveUserPreferences(data);
+
       const workoutPreferences: WorkoutPreferences = {
         age: data.age,
         weight: data.weight,
