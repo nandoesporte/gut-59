@@ -135,7 +135,7 @@ Você deve fornecer um plano completo, com exercícios, séries, repetições e 
           <p className="text-sm text-muted-foreground">
             {aiSettings.useCustomPrompt 
               ? "Este prompt personalizado será usado para instruir o modelo de IA" 
-              : "Visualize o prompt padrão (você pode ativar a edição com a opção acima)"}
+              : "Este prompt será usado apenas se a opção 'Usar prompt personalizado' estiver ativada"}
           </p>
         </div>
 
