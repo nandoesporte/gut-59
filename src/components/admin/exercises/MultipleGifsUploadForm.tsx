@@ -100,7 +100,8 @@ export const MultipleGifsUploadForm = ({
           .getPublicUrl(uploadData.path);
 
         // Create the exercise record with required fields
-        const exerciseData: Partial<Exercise> = {
+        // Ensure all required fields are explicitly set (not optional)
+        const exerciseData = {
           name: exerciseName,
           description: `Exercício de ${muscleGroupOptions.find(m => m.value === muscleGroup)?.label}`,
           gif_url: publicUrl,
@@ -111,6 +112,12 @@ export const MultipleGifsUploadForm = ({
           goals: ["fitness"],
           equipment_needed: [],
           is_compound_movement: false,
+          // Default required fields for the exercises table
+          max_reps: 12,
+          min_reps: 8, 
+          max_sets: 5,
+          min_sets: 3,
+          rest_time_seconds: 60
         };
 
         const { error: insertError } = await supabase
