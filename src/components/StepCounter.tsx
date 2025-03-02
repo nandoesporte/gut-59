@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -89,7 +88,6 @@ const StepCounter = () => {
   };
 
   const calculateMagnitude = (acc: AccelerationData): number => {
-    // Apply less weight to X and more to Y for better vertical movement detection
     return Math.sqrt(acc.x * acc.x + acc.y * acc.y * 2 + acc.z * acc.z);
   };
 
@@ -166,21 +164,17 @@ const StepCounter = () => {
 
     const avgMagnitude = movingAverageFilter(accelerationBuffer);
     
-    // Reduced dependence on vertical movement
     const verticalChange = Math.abs(acceleration.y - lastAcceleration.y);
     
     const timeSinceLastStep = now - lastStepTime;
 
-    // Track metrics for debugging
     setDebugInfo(`Mag: ${magnitude.toFixed(2)}, Avg: ${avgMagnitude.toFixed(2)}, Vrt: ${verticalChange.toFixed(2)}, T: ${timeSinceLastStep}`);
 
-    // Check if we're above the threshold for registering a peak
     if (magnitude > parameters.peakThreshold && 
         !peakDetected && 
         timeSinceLastStep > parameters.minStepInterval) {
       setPeakDetected(true);
       
-      // More relaxed criteria for step detection
       if ((verticalChange > parameters.magnitudeThreshold || magnitude > parameters.magnitudeThreshold * 1.5) && 
           avgMagnitude > parameters.averageThreshold) {
         const newSteps = steps + 1;
@@ -197,7 +191,7 @@ const StepCounter = () => {
           parameters
         });
       }
-    } else if (magnitude < parameters.peakThreshold / 1.5) { // Lowered to reset faster
+    } else if (magnitude < parameters.peakThreshold / 1.5) {
       setPeakDetected(false);
     }
     
@@ -217,7 +211,6 @@ const StepCounter = () => {
       try {
         if (typeof DeviceMotionEvent !== 'undefined' && 
             typeof (DeviceMotionEvent as any).requestPermission === 'function') {
-          // iOS devices need special permission
           const permissionResult = await (DeviceMotionEvent as any).requestPermission();
           if (permissionResult !== 'granted') {
             toast.error('Permissão de movimento negada');
@@ -225,9 +218,7 @@ const StepCounter = () => {
           }
         }
 
-        // Try to use the standard DeviceMotionEvent if Accelerometer API is not available
         if ('Accelerometer' in window) {
-          // @ts-ignore
           sensor = new Accelerometer({ 
             frequency: ACCELEROMETER_CONFIG.frequency
           });
@@ -251,7 +242,6 @@ const StepCounter = () => {
           sensor.start();
           console.log('Acelerômetro iniciado');
         } else {
-          // Fallback to DeviceMotion
           window.addEventListener('devicemotion', (event) => {
             if (event.accelerationIncludingGravity) {
               detectStep({
@@ -268,7 +258,6 @@ const StepCounter = () => {
         console.error('Erro ao iniciar acelerômetro:', error);
         toast.error('Erro ao iniciar o contador de passos. Tentando DeviceMotion como alternativa...');
         
-        // Fallback to DeviceMotion if Accelerometer API fails
         try {
           window.addEventListener('devicemotion', (event) => {
             if (event.accelerationIncludingGravity) {
@@ -319,7 +308,6 @@ const StepCounter = () => {
         clearInterval(calibrationInterval);
       }
 
-      // Remove devicemotion listener if it was used
       window.removeEventListener('devicemotion', () => {});
     };
   }, [permission, isCalibrating]);
@@ -356,7 +344,6 @@ const StepCounter = () => {
     };
   }, [steps]);
 
-  // Fetch last reward date on component mount
   useEffect(() => {
     const checkLastReward = async () => {
       try {
@@ -392,7 +379,6 @@ const StepCounter = () => {
     try {
       console.log('Solicitando permissão para o acelerômetro');
       
-      // Check if we need iOS specific permission
       if (typeof DeviceMotionEvent !== 'undefined' && 
           typeof (DeviceMotionEvent as any).requestPermission === 'function') {
         const permissionResult = await (DeviceMotionEvent as any).requestPermission();
@@ -406,7 +392,6 @@ const StepCounter = () => {
         return;
       }
       
-      // Try the standard Permissions API
       if (navigator.permissions) {
         try {
           const result = await (navigator.permissions as any).query({ 
@@ -423,12 +408,10 @@ const StepCounter = () => {
           }
         } catch (error) {
           console.error('Erro ao solicitar permissão via Permissions API:', error);
-          // Fallback to assuming permission is granted for browsers that don't support the Permissions API
           setPermission('granted');
           toast.success('Permissão presumida concedida');
         }
       } else {
-        // Fallback for browsers without Permissions API support
         console.log('Permissions API não suportada, presumindo permissão');
         setPermission('granted');
         toast.success('Permissão presumida concedida');
@@ -437,7 +420,6 @@ const StepCounter = () => {
       console.error('Erro ao solicitar permissão:', error);
       toast.error('Erro ao solicitar permissão');
       
-      // Last resort fallback
       setPermission('granted');
       toast.info('Tentando continuar sem permissão explícita');
     }
@@ -488,7 +470,6 @@ const StepCounter = () => {
   const calories = Math.round(steps * 0.05);
   const distance = ((steps * 0.762) / 1000).toFixed(2);
 
-  // Manually add steps for testing (will be removed in production)
   const addStepForTesting = () => {
     const newSteps = steps + 1;
     setSteps(newSteps);
@@ -517,88 +498,90 @@ const StepCounter = () => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {permission !== 'granted' ? (
+        <div>
+          {isCalibrating ? (
+            <div className="text-center space-y-2">
+              <div className="text-lg font-semibold text-primary-600">
+                Calibrando... {calibrationTime}s
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Por favor, caminhe normalmente
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="text-center space-y-2">
+                <span className="text-6xl font-bold text-primary-600">
+                  {steps.toLocaleString()}
+                </span>
+                <div className="text-sm text-muted-foreground">
+                  / {goalSteps.toLocaleString()} passos
+                </div>
+              </div>
+              
+              <Progress 
+                value={progress} 
+                className="h-2 w-full bg-primary-100"
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-white p-4 rounded-xl shadow-sm">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                    <Activity className="w-4 h-4" />
+                    Calorias
+                  </div>
+                  <div className="text-lg font-semibold text-primary-600">
+                    {calories} kcal
+                  </div>
+                </div>
+                
+                <div className="bg-white p-4 rounded-xl shadow-sm">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                    <MapPin className="w-4 h-4" />
+                    Distância
+                  </div>
+                  <div className="text-lg font-semibold text-primary-600">
+                    {distance} km
+                  </div>
+                </div>
+              </div>
+
+              {process.env.NODE_ENV === 'development' && (
+                <div className="text-xs text-gray-500 mb-2 text-center">
+                  {debugInfo}
+                  <Button 
+                    onClick={addStepForTesting} 
+                    size="sm" 
+                    variant="outline" 
+                    className="ml-2 h-6 text-xs"
+                  >
+                    +1 (Test)
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {permission !== 'granted' && (
           <Button 
             onClick={requestPermission} 
             className="w-full bg-primary hover:bg-primary-600 text-white"
           >
             Permitir contagem de passos
           </Button>
-        ) : (
-          <>
-            {isCalibrating ? (
-              <div className="text-center space-y-2">
-                <div className="text-lg font-semibold text-primary-600">
-                  Calibrando... {calibrationTime}s
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  Por favor, caminhe normalmente
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="text-center space-y-2">
-                  <span className="text-6xl font-bold text-primary-600">
-                    {steps.toLocaleString()}
-                  </span>
-                  <div className="text-sm text-muted-foreground">
-                    / {goalSteps.toLocaleString()} passos
-                  </div>
-                </div>
-                
-                <Progress 
-                  value={progress} 
-                  className="h-2 w-full bg-primary-100"
-                />
+        )}
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-white p-4 rounded-xl shadow-sm">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                      <Activity className="w-4 h-4" />
-                      Calorias
-                    </div>
-                    <div className="text-lg font-semibold text-primary-600">
-                      {calories} kcal
-                    </div>
-                  </div>
-                  
-                  <div className="bg-white p-4 rounded-xl shadow-sm">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                      <MapPin className="w-4 h-4" />
-                      Distância
-                    </div>
-                    <div className="text-lg font-semibold text-primary-600">
-                      {distance} km
-                    </div>
-                  </div>
-                </div>
-
-                {process.env.NODE_ENV === 'development' && (
-                  <div className="text-xs text-gray-500 mb-2 text-center">
-                    {debugInfo}
-                    <Button 
-                      onClick={addStepForTesting} 
-                      size="sm" 
-                      variant="outline" 
-                      className="ml-2 h-6 text-xs"
-                    >
-                      +1 (Test)
-                    </Button>
-                  </div>
-                )}
-
-                <Button
-                  onClick={handleRewardSteps}
-                  disabled={!canReceiveReward}
-                  className="w-full bg-primary hover:bg-primary-600 text-white"
-                >
-                  {lastRewardDate === today
-                    ? 'Recompensa já recebida hoje'
-                    : `Resgatar ${REWARDS.STEPS} FITs`}
-                </Button>
-              </>
-            )}
-          </>
+        {permission === 'granted' && (
+          <Button
+            onClick={handleRewardSteps}
+            disabled={!canReceiveReward}
+            className="w-full bg-primary hover:bg-primary-600 text-white"
+          >
+            {lastRewardDate === today
+              ? 'Recompensa já recebida hoje'
+              : `Resgatar ${REWARDS.STEPS} FITs`}
+          </Button>
         )}
       </CardContent>
     </Card>
