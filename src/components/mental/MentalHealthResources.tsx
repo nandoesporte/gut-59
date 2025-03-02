@@ -41,7 +41,7 @@ export const MentalHealthResources = () => {
   const [exercise, setExercise] = useState<BreathingExercise>({
     phase: "inhale",
     count: 0,
-    totalBreaths: 5, // Increased total breaths to 5 cycles
+    totalBreaths: 5,
     isComplete: false,
     secondsLeft: 4,
     elapsedTime: 0,
@@ -113,7 +113,7 @@ export const MentalHealthResources = () => {
       setExercise({
         phase: "prepare",
         count: 0,
-        totalBreaths: 5, // Increased to 5 cycles
+        totalBreaths: 5,
         isComplete: false,
         secondsLeft: BREATHING_CYCLE.prepare,
         elapsedTime: 0,
@@ -144,7 +144,7 @@ export const MentalHealthResources = () => {
         
         // Transition to next phase based on current phase
         if (phase === "prepare") {
-          // After prepare phase, start the first inhale phase
+          // After prepare phase, go directly to inhale phase (skipping any hold)
           breathe("inhale", BREATHING_CYCLE.inhale, newElapsedTime);
         } else if (phase === "inhale") {
           breathe("hold", BREATHING_CYCLE.hold, newElapsedTime); // Hold breath
