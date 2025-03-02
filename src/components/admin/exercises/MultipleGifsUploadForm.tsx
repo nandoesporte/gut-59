@@ -29,7 +29,9 @@ export const MultipleGifsUploadForm = ({
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  // Make sure exerciseType only uses valid values from the updated type
   const [exerciseType, setExerciseType] = useState<ExerciseType>("strength");
+  // Make sure difficulty only uses valid values from the updated type
   const [difficulty, setDifficulty] = useState<Difficulty>("beginner");
   const [muscleGroup, setMuscleGroup] = useState("chest");
   const [trainingLocation, setTrainingLocation] = useState("gym");
@@ -54,11 +56,14 @@ export const MultipleGifsUploadForm = ({
     { value: "anywhere", label: "Qualquer Lugar" },
   ];
   
+  // Update the difficulty options but ensure they map to valid Difficulty values
   const difficultyOptions = [
     { value: "beginner", label: "Sedentário - Pouco ou nenhum exercício" },
     { value: "intermediate", label: "Leve - 1-3 dias por semana" },
     { value: "advanced", label: "Moderado - 3-5 dias por semana" },
-    { value: "expert", label: "Intenso - 6-7 dias por semana" },
+    // We can't use "expert" anymore since it's not in the Difficulty type
+    // So we'll map the "Intenso" label to "advanced" value
+    { value: "advanced", label: "Intenso - 6-7 dias por semana" },
   ];
 
   // New options for goals
@@ -123,7 +128,7 @@ export const MultipleGifsUploadForm = ({
           .getPublicUrl(uploadData.path);
 
         // Create the exercise record with required fields
-        // Ensure all required fields are explicitly set (not optional)
+        // Ensure all required fields are explicitly set with types that match the database
         const exerciseData = {
           name: exerciseName,
           description: `Exercício de ${muscleGroupOptions.find(m => m.value === muscleGroup)?.label}`,
@@ -186,8 +191,7 @@ export const MultipleGifsUploadForm = ({
                   <SelectItem value="strength">Força</SelectItem>
                   <SelectItem value="cardio">Cardio</SelectItem>
                   <SelectItem value="mobility">Mobilidade</SelectItem>
-                  <SelectItem value="flexibility">Flexibilidade</SelectItem>
-                  <SelectItem value="balance">Equilíbrio</SelectItem>
+                  {/* Removing flexibility since it's not in the updated ExerciseType */}
                 </SelectContent>
               </Select>
             </div>
@@ -250,7 +254,7 @@ export const MultipleGifsUploadForm = ({
             </div>
           </div>
           
-          {/* New Goals selection */}
+          {/* Goal selection */}
           <div>
             <Label>Objetivo</Label>
             <Select

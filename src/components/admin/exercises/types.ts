@@ -13,8 +13,8 @@ export type MuscleGroup =
   | "cardio"
   | "mobility";
 
-export type ExerciseType = "strength" | "cardio" | "mobility" | "flexibility" | "balance";
-export type Difficulty = "beginner" | "intermediate" | "advanced" | "expert";
+export type ExerciseType = "strength" | "cardio" | "mobility";
+export type Difficulty = "beginner" | "intermediate" | "advanced";
 
 export interface Exercise {
   id: string;
@@ -32,7 +32,6 @@ export interface Exercise {
   min_sets?: number;
   rest_time_seconds?: number;
   goals?: string[];
-  // Novos campos para análise de IA
   preparation_time_minutes?: number;
   is_compound_movement?: boolean;
   target_heart_rate_zone?: string[];
