@@ -1,306 +1,316 @@
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+
+const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+const llamaApiKey = Deno.env.get('LLAMA_API_KEY') ?? '';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Helper function to safely parse JSON
-function safeJsonParse(text: string) {
-  try {
-    return JSON.parse(text);
-  } catch (e) {
-    console.error("JSON parsing error:", e);
-    console.log("Text that failed to parse:", text);
-    return null;
-  }
-}
-
 serve(async (req) => {
-  // Handle CORS preflight request
+  console.log('Function called: generate-workout-plan-llama');
+  
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
-    const SUPABASE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-    const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY') || '';
-    
-    if (!SUPABASE_URL || !SUPABASE_KEY) {
-      throw new Error('Missing Supabase credentials');
-    }
-    
-    if (!GROQ_API_KEY) {
-      throw new Error('Missing Groq API key');
-    }
-
-    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+    const supabase = createClient(supabaseUrl, supabaseKey);
     const { preferences, userId, settings } = await req.json();
     
-    console.log("Preferences received:", JSON.stringify(preferences));
+    console.log(`Processing request for user: ${userId}`);
+    console.log(`Preferences received: ${JSON.stringify(preferences, null, 2)}`);
     
     if (!preferences) {
-      throw new Error('Preferences are required');
-    }
-    
-    if (!userId) {
-      throw new Error('User ID is required');
+      throw new Error("No preferences provided");
     }
 
-    // Ensure we have arrays for the preferences to avoid "join of undefined" errors
-    const safePreferences = {
-      ...preferences,
-      preferred_exercise_types: Array.isArray(preferences.preferred_exercise_types) 
-        ? preferences.preferred_exercise_types 
-        : [],
-      available_equipment: Array.isArray(preferences.available_equipment) 
-        ? preferences.available_equipment 
-        : [],
-      health_conditions: Array.isArray(preferences.health_conditions) 
-        ? preferences.health_conditions 
-        : []
-    };
+    if (!userId) {
+      throw new Error("No user ID provided");
+    }
+
+    if (!settings) {
+      throw new Error("No AI model settings provided");
+    }
+
+    // Make sure arrays are defined
+    const preferredExerciseTypes = preferences.preferred_exercise_types || [];
+    const availableEquipment = preferences.available_equipment || [];
+    const healthConditions = preferences.health_conditions || [];
+
+    console.log(`Building workout plan prompt...`);
     
-    // Query for all exercises in one go
-    const { data: allExercises, error: exercisesError } = await supabase
+    // Fetch available exercises based on preferences
+    const { data: exercises, error: exerciseError } = await supabase
       .from('exercises')
       .select('*');
-    
-    if (exercisesError) {
-      throw new Error(`Error fetching exercises: ${exercisesError.message}`);
-    }
-
-    if (!allExercises || allExercises.length === 0) {
-      throw new Error('No exercises found in the database');
-    }
-    
-    console.log(`Found ${allExercises.length} total exercises`);
-
-    // Filter exercises based on user preferences
-    const availableEquipment = safePreferences.available_equipment;
-    const isGymWorkout = availableEquipment.includes('all') || 
-                         availableEquipment.includes('gym') || 
-                         availableEquipment.includes('full_gym');
-    
-    let availableExercises = allExercises;
-    
-    // Filter by equipment if not in a gym
-    if (!isGymWorkout && availableEquipment.length > 0) {
-      availableExercises = allExercises.filter(exercise => {
-        if (!exercise.equipment_needed || !Array.isArray(exercise.equipment_needed)) {
-          return true; // Include exercises with no equipment
-        }
-        
-        // Check if any of the user's available equipment matches any of the exercise's required equipment
-        return exercise.equipment_needed.some(eq => 
-          availableEquipment.includes(eq) || eq === 'none' || eq === 'bodyweight'
-        );
-      });
       
-      console.log(`Filtered to ${availableExercises.length} exercises based on available equipment`);
+    if (exerciseError) {
+      console.error('Error fetching exercises:', exerciseError);
+      throw new Error(`Error fetching exercises: ${exerciseError.message}`);
     }
     
-    // If we have preferred exercise types, filter by those
-    if (safePreferences.preferred_exercise_types.length > 0) {
-      const preferredTypes = safePreferences.preferred_exercise_types;
-      availableExercises = availableExercises.filter(exercise => 
-        preferredTypes.includes(exercise.exercise_type)
+    console.log(`Fetched ${exercises?.length || 0} exercises`);
+
+    if (!exercises || exercises.length === 0) {
+      throw new Error("No exercises found in the database");
+    }
+
+    // Filter exercises based on available equipment and preferences if specified
+    let filteredExercises = exercises;
+    
+    if (availableEquipment && availableEquipment.length > 0) {
+      console.log(`Filtering by equipment: ${availableEquipment.join(', ')}`);
+      filteredExercises = exercises.filter(ex => 
+        !ex.equipment || 
+        ex.equipment === 'none' || 
+        availableEquipment.some(eq => ex.equipment && ex.equipment.includes(eq))
       );
-      
-      console.log(`Filtered to ${availableExercises.length} exercises based on preferred types`);
-    }
-
-    // Allow at least some exercises even if filtering is too restrictive
-    if (availableExercises.length < 10) {
-      console.log("Too few exercises after filtering, using all exercises");
-      availableExercises = allExercises;
     }
     
-    // Extract key data for the prompt
-    const exerciseData = availableExercises.map(ex => ({
-      id: ex.id,
-      name: ex.name,
-      muscle_group: ex.muscle_group,
-      exercise_type: ex.exercise_type,
-      equipment_needed: ex.equipment_needed
-    }));
+    if (preferredExerciseTypes && preferredExerciseTypes.length > 0) {
+      console.log(`Filtering by exercise types: ${preferredExerciseTypes.join(', ')}`);
+      filteredExercises = filteredExercises.filter(ex => 
+        preferredExerciseTypes.some(type => ex.exercise_type && ex.exercise_type.includes(type))
+      );
+    }
+    
+    // If filters were too restrictive, fall back to original set
+    if (filteredExercises.length < 10) {
+      console.log(`Too few exercises after filtering (${filteredExercises.length}), using complete exercise set`);
+      filteredExercises = exercises;
+    }
+    
+    console.log(`Using ${filteredExercises.length} exercises after filtering`);
 
-    // Create the workout plan generation prompt
-    const systemPrompt = settings?.system_prompt || 
-      "You are a professional personal trainer AI that creates workout plans based on user preferences.";
-    
-    const userPrompt = `
-    Create a 7-day workout plan for a person with the following details:
-    - Age: ${safePreferences.age}
-    - Weight: ${safePreferences.weight} kg
-    - Height: ${safePreferences.height} cm
-    - Gender: ${safePreferences.gender}
-    - Fitness goal: ${safePreferences.goal}
-    - Activity level: ${safePreferences.activity_level}
-    - Preferred exercise types: ${safePreferences.preferred_exercise_types.join(', ')}
-    ${safePreferences.health_conditions.length > 0 ? 
-      `- Health conditions to consider: ${safePreferences.health_conditions.join(', ')}` : ''}
-    
-    Select exercises from this list (include the ID in your response):
-    ${JSON.stringify(exerciseData)}
-    
-    For each day, include:
-    1. Day number
-    2. A brief warmup description
-    3. 4-6 exercises with:
-       - Sets (3-5)
-       - Repetitions (8-15)
-       - Rest time in seconds (30-120)
-    4. A brief cooldown routine
-    
-    Format your response as a JSON object without any additional text:
+    // Build the system prompt
+    const systemPrompt = `You are an advanced personal trainer AI that creates personalized workout plans. 
+You will receive user information and preferences, and your task is to create a detailed 7-day workout plan.
+The workout plan should be specifically tailored to the user's needs, goals, fitness level, and any health conditions.
+Your workout plan should be REALISTIC, EFFECTIVE, and EVIDENCE-BASED.
+The exercises you recommend MUST ONLY be from the list of exercises provided and include their exact IDs.
+
+Some guidelines:
+1. The workout plan should align with the user's goal: ${preferences.goal}
+2. Account for the user's fitness level: ${preferences.fitness_level}
+3. Consider any health conditions: ${healthConditions.join(', ') || 'None'}
+4. Consider their age (${preferences.age}) and gender (${preferences.gender})
+5. Structure each day with appropriate warm-up, main exercises, and cool-down
+6. Include sets, reps, and rest times for each exercise
+7. Balance the workout plan across the week for different muscle groups
+8. Include rest days as appropriate based on fitness level
+
+The response MUST be valid JSON that follows this exact structure:
+{
+  "goal": "Brief description of workout plan goal",
+  "start_date": "YYYY-MM-DD", // Current date
+  "end_date": "YYYY-MM-DD", // Current date + 7 days
+  "workout_sessions": [
     {
-      "goal": "A brief description of the workout plan goal",
-      "workout_sessions": [
+      "day_number": 1, // Number from 1-7 representing day of the week
+      "warmup_description": "Short description of warm-up routine",
+      "cooldown_description": "Short description of cool-down routine",
+      "session_exercises": [
         {
-          "day_number": 1,
-          "warmup_description": "5-minute warmup description",
-          "session_exercises": [
-            {
-              "exercise": {
-                "id": "exercise-uuid",
-                "name": "Exercise Name",
-                "muscle_group": "muscle group",
-                "exercise_type": "exercise type"
-              },
-              "sets": 3,
-              "reps": 10,
-              "rest_time_seconds": 60
-            }
-          ],
-          "cooldown_description": "5-minute cooldown description"
+          "exercise": {
+            "id": "uuid-of-exercise", // Must match EXACTLY one of the exercises provided
+            "name": "Name matching the exercise ID",
+            "muscle_group": "Primary muscle group",
+            "exercise_type": "Type of exercise"
+          },
+          "sets": 3, // Number of sets
+          "reps": 10, // Number of reps per set
+          "rest_time_seconds": 60 // Rest time between sets in seconds
         }
+        // More exercises...
       ]
     }
-    `;
+    // More days...
+  ]
+}`;
 
-    console.log("Sending request to Groq API");
+    const userPrompt = `Please create a personalized 7-day workout plan based on the following information:
+
+User Information:
+- Age: ${preferences.age}
+- Gender: ${preferences.gender}
+- Height: ${preferences.height} cm
+- Weight: ${preferences.weight} kg
+- Fitness Level: ${preferences.fitness_level}
+- Workout Goal: ${preferences.goal}
+- Preferred Exercise Types: ${preferredExerciseTypes.join(', ') || 'Any'}
+- Available Equipment: ${availableEquipment.join(', ') || 'Any'}
+- Health Conditions or Limitations: ${healthConditions.join(', ') || 'None'}
+- Workout Location: ${preferences.workout_location || 'Any'}
+- Days Per Week Available: ${preferences.days_per_week || 7}
+- Time Per Session: ${preferences.time_per_session || '60'} minutes
+
+Available Exercises (you MUST ONLY use these with their exact IDs):
+${filteredExercises.slice(0, 100).map(ex => `- ID: ${ex.id}, Name: ${ex.name}, Type: ${ex.exercise_type || 'General'}, Equipment: ${ex.equipment || 'None'}, Muscle Group: ${ex.muscle_group || 'Full body'}`).join('\n')}
+
+Remember to create a plan that matches their fitness level and addresses their specific needs and goals. The response must be valid JSON following the structure provided earlier.`;
+
+    console.log(`Calling Llama API with prompts ready`);
     
-    // Make request to Groq API
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const response = await fetch('https://api.llama.cloud/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${llamaApiKey}`,
       },
       body: JSON.stringify({
-        model: "llama3-8b-8192",
+        model: settings.model_name || "llama-3-70b-chat",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
         ],
-        temperature: 0.7,
-        max_tokens: 4096
-      })
+        temperature: settings.temperature || 0.7,
+        max_tokens: 4000
+      }),
     });
 
+    const responseData = await response.json();
+    console.log(`Received response from Llama API: ${JSON.stringify(responseData, null, 2).substring(0, 200)}...`);
+
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Groq API error:", errorText);
-      throw new Error(`Groq API error: ${response.status} ${errorText}`);
+      throw new Error(`Error from Llama API: ${responseData.error?.message || JSON.stringify(responseData)}`);
     }
 
-    const groqResponse = await response.json();
-    const llmResponse = groqResponse.choices[0].message.content.trim();
-    
-    console.log("Received LLM response");
-    
-    // Try to extract JSON from the response
-    let startIdx = llmResponse.indexOf('{');
-    let endIdx = llmResponse.lastIndexOf('}');
-    
-    if (startIdx === -1 || endIdx === -1) {
-      console.error("Could not find valid JSON in the response:", llmResponse);
-      throw new Error("Invalid JSON response from LLM");
+    if (!responseData.choices || responseData.choices.length === 0) {
+      throw new Error("No choices returned from Llama API");
     }
+
+    const aiContent = responseData.choices[0].message.content;
+    console.log(`Raw AI content received (first 200 chars): ${aiContent.substring(0, 200)}...`);
     
-    const jsonString = llmResponse.substring(startIdx, endIdx + 1);
-    const parsedWorkoutPlan = safeJsonParse(jsonString);
-    
-    if (!parsedWorkoutPlan) {
-      throw new Error("Failed to parse workout plan JSON");
-    }
-    
-    console.log("Successfully parsed workout plan");
-    
-    // Validate and ensure exercise IDs are correct
-    if (!parsedWorkoutPlan.workout_sessions || !Array.isArray(parsedWorkoutPlan.workout_sessions)) {
-      throw new Error("Invalid workout plan: missing workout_sessions array");
-    }
-    
-    for (const session of parsedWorkoutPlan.workout_sessions) {
-      if (!session.session_exercises || !Array.isArray(session.session_exercises)) {
-        continue;
+    // Extract JSON from the response
+    let workoutPlanData;
+    try {
+      // First look for JSON block wrapped in ```json and ``` markdown
+      const jsonMatch = aiContent.match(/```(?:json)?\n([\s\S]*?)\n```/);
+      if (jsonMatch) {
+        console.log("Found JSON inside markdown code block");
+        workoutPlanData = JSON.parse(jsonMatch[1]);
+      } else {
+        // If not found, try to parse the entire response as JSON
+        workoutPlanData = JSON.parse(aiContent);
       }
       
+      console.log(`Successfully parsed workout plan data`);
+    } catch (parseError) {
+      console.error("Error parsing workout plan JSON:", parseError);
+      console.log("Failed content:", aiContent);
+      throw new Error(`Failed to parse workout plan from AI response: ${parseError.message}`);
+    }
+
+    // Validate workout plan data structure
+    if (!workoutPlanData || !workoutPlanData.workout_sessions || !Array.isArray(workoutPlanData.workout_sessions)) {
+      console.error("Invalid workout plan structure:", workoutPlanData);
+      throw new Error("Invalid workout plan structure returned by AI");
+    }
+
+    // Validate exercise IDs and fix if necessary
+    let needsFallbackExercises = false;
+    const exerciseIdMap = {};
+    exercises.forEach(ex => {
+      exerciseIdMap[ex.id] = ex;
+    });
+
+    // Process each workout session to ensure valid exercise IDs
+    for (const session of workoutPlanData.workout_sessions) {
+      if (!session.session_exercises || !Array.isArray(session.session_exercises)) {
+        console.error(`Session missing exercises array:`, session);
+        session.session_exercises = [];
+        continue;
+      }
+
       for (let i = 0; i < session.session_exercises.length; i++) {
         const exerciseItem = session.session_exercises[i];
-        
         if (!exerciseItem.exercise || !exerciseItem.exercise.id) {
-          console.warn(`Exercise at day ${session.day_number}, position ${i} has no ID, attempting to find by name`);
+          console.error(`Exercise item missing ID at index ${i} in session ${session.day_number}:`, exerciseItem);
+          needsFallbackExercises = true;
+          continue;
+        }
+
+        // Check if exercise ID exists in our database
+        if (!exerciseIdMap[exerciseItem.exercise.id]) {
+          console.warn(`Exercise ID not found in database: ${exerciseItem.exercise.id}, name: ${exerciseItem.exercise.name}`);
           
-          if (exerciseItem.exercise?.name) {
-            // Try to find by name
-            const matchedExercise = allExercises.find(e => 
-              e.name.toLowerCase() === exerciseItem.exercise.name.toLowerCase()
-            );
-            
-            if (matchedExercise) {
-              console.log(`Found exercise by name: ${matchedExercise.name} (${matchedExercise.id})`);
-              exerciseItem.exercise.id = matchedExercise.id;
-              exerciseItem.exercise.muscle_group = matchedExercise.muscle_group;
-              exerciseItem.exercise.exercise_type = matchedExercise.exercise_type;
-            } else {
-              // Try partial name match
-              const partialMatch = allExercises.find(e => 
-                e.name.toLowerCase().includes(exerciseItem.exercise.name.toLowerCase()) ||
-                exerciseItem.exercise.name.toLowerCase().includes(e.name.toLowerCase())
-              );
-              
-              if (partialMatch) {
-                console.log(`Found exercise by partial name match: ${partialMatch.name} (${partialMatch.id})`);
-                exerciseItem.exercise.id = partialMatch.id;
-                exerciseItem.exercise.name = partialMatch.name;
-                exerciseItem.exercise.muscle_group = partialMatch.muscle_group;
-                exerciseItem.exercise.exercise_type = partialMatch.exercise_type;
-              } else {
-                // If all else fails, replace with a random valid exercise
-                const randomExercise = availableExercises[Math.floor(Math.random() * availableExercises.length)];
-                console.log(`Replacing unmatched exercise with: ${randomExercise.name} (${randomExercise.id})`);
-                exerciseItem.exercise = {
-                  id: randomExercise.id,
-                  name: randomExercise.name,
-                  muscle_group: randomExercise.muscle_group,
-                  exercise_type: randomExercise.exercise_type
-                };
-              }
-            }
+          // Try to find by name match
+          const matchByName = exercises.find(ex => ex.name && exerciseItem.exercise.name && 
+                                           ex.name.toLowerCase() === exerciseItem.exercise.name.toLowerCase());
+          if (matchByName) {
+            console.log(`Found match by exact name: ${matchByName.id}`);
+            exerciseItem.exercise.id = matchByName.id;
+            continue;
+          }
+          
+          // Try to find by partial name match
+          const partialMatches = exercises.filter(ex => ex.name && exerciseItem.exercise.name && 
+                                              ex.name.toLowerCase().includes(exerciseItem.exercise.name.toLowerCase()));
+          if (partialMatches.length > 0) {
+            console.log(`Found ${partialMatches.length} partial name matches, using first: ${partialMatches[0].id}`);
+            exerciseItem.exercise.id = partialMatches[0].id;
+            continue;
+          }
+          
+          // If no match found, use a fallback exercise from the same muscle group if possible
+          const muscleGroup = exerciseItem.exercise.muscle_group || 'general';
+          const muscleGroupMatches = exercises.filter(ex => 
+            ex.muscle_group && ex.muscle_group.toLowerCase() === muscleGroup.toLowerCase()
+          );
+          
+          if (muscleGroupMatches.length > 0) {
+            const replacement = muscleGroupMatches[Math.floor(Math.random() * muscleGroupMatches.length)];
+            console.log(`Using replacement exercise from same muscle group: ${replacement.id}`);
+            exerciseItem.exercise.id = replacement.id;
+            exerciseItem.exercise.name = replacement.name;
+          } else {
+            // Last resort, use any random exercise
+            const randomExercise = exercises[Math.floor(Math.random() * exercises.length)];
+            console.log(`Using random exercise as last resort: ${randomExercise.id}`);
+            exerciseItem.exercise.id = randomExercise.id;
+            exerciseItem.exercise.name = randomExercise.name;
           }
         }
       }
     }
-    
-    console.log("Workout plan processed and validated");
+
+    if (needsFallbackExercises) {
+      console.log("Some exercises needed fallbacks or fixes");
+    }
+
+    console.log(`Final workout plan ready to return`);
     
     return new Response(
-      JSON.stringify({ workoutPlan: parsedWorkoutPlan }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ workoutPlan: workoutPlanData }),
+      { 
+        headers: { 
+          ...corsHeaders,
+          'Content-Type': 'application/json' 
+        } 
+      }
     );
-    
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error in generate-workout-plan-llama function:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ 
+        error: error.message || "An error occurred while generating workout plan",
+        stack: error.stack
+      }),
+      { 
+        status: 500,
+        headers: { 
+          ...corsHeaders,
+          'Content-Type': 'application/json' 
+        } 
+      }
     );
   }
 });
