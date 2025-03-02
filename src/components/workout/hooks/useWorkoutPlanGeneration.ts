@@ -53,9 +53,15 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       // Ensure preferences arrays are defined before passing to the edge function
       const safePreferences = {
         ...preferences,
-        preferred_exercise_types: preferences.preferred_exercise_types || [],
-        available_equipment: preferences.available_equipment || [],
-        health_conditions: preferences.health_conditions || []
+        preferred_exercise_types: Array.isArray(preferences.preferred_exercise_types) 
+          ? preferences.preferred_exercise_types 
+          : [],
+        available_equipment: Array.isArray(preferences.available_equipment) 
+          ? preferences.available_equipment 
+          : [],
+        health_conditions: Array.isArray(preferences.health_conditions) 
+          ? preferences.health_conditions 
+          : []
       };
       
       console.log("Calling edge function with preferences:", safePreferences);
