@@ -92,7 +92,7 @@ const Menu = () => {
           <p className="text-sm text-gray-500 mt-1">
             Este processo pode levar de 1 a 2 minutos.
             <br />
-            Por favor, aguarde enquanto preparamos seu cardápio.
+            Por favor, aguarde enquanto o Nutri+ prepara seu cardápio.
           </p>
         </div>
       </div>
@@ -105,7 +105,7 @@ const Menu = () => {
         <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8">
           <div className="text-center mb-6 sm:mb-8">
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Monte sua Dieta Personalizada</h1>
-            <p className="text-gray-600 text-sm sm:text-base">Siga as etapas abaixo para criar seu plano alimentar</p>
+            <p className="text-gray-600 text-sm sm:text-base">Siga as etapas abaixo para criar seu plano alimentar com o Nutri+</p>
           </div>
 
           <div className="space-y-6 sm:space-y-8">
@@ -198,8 +198,12 @@ const Menu = () => {
                 <Card className="p-4 sm:p-6">
                   <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center">
                     <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">4</span>
-                    Seu Plano Alimentar
+                    Seu Plano Alimentar Personalizado
                   </h2>
+                  <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-700">
+                    <p className="font-medium">✨ Plano gerado por Nutri+ (powered by Llama 3)</p>
+                    <p className="mt-1">Este plano foi personalizado com base em suas preferências e necessidades nutricionais.</p>
+                  </div>
                   <MealPlanDisplay
                     mealPlan={mealPlan}
                     onRefresh={handleRefreshMealPlan}

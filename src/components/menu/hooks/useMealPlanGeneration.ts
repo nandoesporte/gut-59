@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { DietaryPreferences, ProtocolFood } from "../types";
@@ -112,10 +113,8 @@ export const generateMealPlan = async ({
       }
     });
 
-    toastId = toast.loading("Gerando seu plano alimentar personalizado com Mistral Saba 24B via Groq...");
+    toastId = toast.loading("Gerando plano alimentar personalizado com Nutri+ (powered by Llama 3)...");
 
-    console.log('[MEAL PLAN] Iniciando chamada para a Edge Function generate-meal-plan-groq com modelo Mistral Saba 24B');
-    
     // Mapear o objetivo para o formato esperado pela API
     const goalMapping = {
       "lose": "lose_weight",
@@ -155,8 +154,8 @@ export const generateMealPlan = async ({
     
     console.log('[MEAL PLAN] Alimentos formatados por refeição:', foodsByMealTypeFormatted);
     
-    // Preparar payload para a edge function
-    const groqPayload = {
+    // Preparar payload para a edge function Nutri+
+    const nutriPlusPayload = {
       userData: {
         weight: Math.round(userData.weight),
         height: Math.round(userData.height),
@@ -174,51 +173,72 @@ export const generateMealPlan = async ({
         allergies: (preferences.allergies || []).slice(0, 3), // Limitar alergias
         dietaryRestrictions: (preferences.dietaryRestrictions || []).slice(0, 3), // Limitar restrições
         trainingTime: preferences.trainingTime
-      },
-      model: "mistral-saba-24b" // Especificar uso do modelo Mistral Saba 24B
+      }
     };
     
-    console.log('[MEAL PLAN] Enviando payload para generate-meal-plan-groq:', 
-      JSON.stringify(groqPayload, null, 2).substring(0, 500) + "...");
-    
-    // Definir timeout para capturar falhas por timeout (120 segundos para o modelo processar)
-    const edgeFunctionTimeout = 120000; 
+    console.log('[MEAL PLAN] Enviando payload para Nutri+ agent:',
+      JSON.stringify(nutriPlusPayload, null, 2).substring(0, 500) + "...");
+
+    // Definir timeout para capturar falhas por timeout (180 segundos)
+    const edgeFunctionTimeout = 180000; 
     
     // Implementar timeout manual com Promise.race
     let resultData: EdgeFunctionResponse | null = null;
     try {
       // Criar uma promessa que rejeita após o timeout
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("Timeout na chamada à Edge Function Groq")), edgeFunctionTimeout);
+        setTimeout(() => reject(new Error("Timeout na chamada à Edge Function Nutri+")), edgeFunctionTimeout);
       });
       
-      // Chamar a edge function com o modelo Mistral Saba 24B via Groq
+      // Chamar a edge function Nutri+
       const result = await Promise.race([
-        supabase.functions.invoke('generate-meal-plan-groq', { body: groqPayload }),
+        supabase.functions.invoke('nutri-plus-agent', { body: nutriPlusPayload }),
         timeoutPromise
       ]);
       
       // Verificar se temos resultado e se ele contém um plano válido
       if (result && 'data' in result && result.data && typeof result.data === 'object' && 'mealPlan' in result.data) {
-        console.log('[MEAL PLAN] Chamada à Edge Function Groq bem-sucedida!');
+        console.log('[MEAL PLAN] Chamada à Edge Function Nutri+ bem-sucedida!');
         resultData = result.data as EdgeFunctionResponse;
       } else {
-        console.error('[MEAL PLAN] Resposta da Edge Function Groq sem dados válidos:', result);
-        throw new Error("Resposta da Edge Function Groq inválida");
+        console.error('[MEAL PLAN] Resposta do Nutri+ agent sem dados válidos:', result);
+        throw new Error("Resposta do Nutri+ agent inválida");
       }
-    } catch (edgeFunctionError) {
-      console.error('[MEAL PLAN] Erro na chamada à Edge Function Groq:', edgeFunctionError);
+    } catch (nutriPlusError) {
+      console.error('[MEAL PLAN] Erro na chamada ao Nutri+ agent:', nutriPlusError);
+      console.log('[MEAL PLAN] Tentando alternativa com generate-meal-plan-groq');
       
-      if (edgeFunctionError instanceof Error) {
-        console.error('[MEAL PLAN] Detalhes do erro:', edgeFunctionError.message);
-        if (edgeFunctionError.stack) {
-          console.error('[MEAL PLAN] Stack:', edgeFunctionError.stack);
+      // Fallback para generate-meal-plan-groq
+      try {
+        // Preparar payload para generate-meal-plan-groq (mesmo payload, adicionando model)
+        const groqPayload = {
+          ...nutriPlusPayload,
+          model: "mistral-saba-24b" // Especificar uso do modelo Mistral Saba 24B
+        };
+        
+        console.log('[MEAL PLAN] Enviando payload para generate-meal-plan-groq como fallback');
+        
+        const result = await Promise.race([
+          supabase.functions.invoke('generate-meal-plan-groq', { body: groqPayload }),
+          new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error("Timeout na chamada à Edge Function Groq")), edgeFunctionTimeout);
+          })
+        ]);
+        
+        if (result && 'data' in result && result.data && typeof result.data === 'object' && 'mealPlan' in result.data) {
+          console.log('[MEAL PLAN] Chamada fallback à generate-meal-plan-groq bem-sucedida!');
+          resultData = result.data as EdgeFunctionResponse;
+        } else {
+          console.error('[MEAL PLAN] Resposta da Edge Function Groq fallback sem dados válidos:', result);
+          throw new Error("Resposta da Edge Function Groq fallback inválida");
         }
+      } catch (fallbackError) {
+        console.error('[MEAL PLAN] Erro no fallback para generate-meal-plan-groq:', fallbackError);
+        
+        // Usar plano padrão como último recurso
+        console.log('[MEAL PLAN] Usando plano padrão após falhas em Nutri+ e generate-meal-plan-groq');
+        return createDefaultMealPlan(userData, selectedFoodsDetails, foodsByMealTypeFormatted);
       }
-      
-      // Usar plano padrão como fallback
-      console.log('[MEAL PLAN] Usando plano padrão após falha no Groq');
-      return createDefaultMealPlan(userData, selectedFoodsDetails, foodsByMealTypeFormatted);
     }
 
     // Verificar se o plano tem a estrutura completa esperada
@@ -294,7 +314,7 @@ export const generateMealPlan = async ({
       await addTransaction({
         amount: REWARDS.MEAL_PLAN,
         type: 'meal_plan',
-        description: 'Geração de plano alimentar personalizado com Mistral Saba 24B via Groq'
+        description: 'Geração de plano alimentar personalizado com Nutri+ (powered by Llama 3)'
       });
       console.log('[MEAL PLAN] Transação de recompensa adicionada');
     } catch (transactionError) {
@@ -312,7 +332,7 @@ export const generateMealPlan = async ({
     }
 
     toast.dismiss(toastId);
-    toast.success(`Cardápio personalizado gerado com Mistral Saba 24B via Groq com sucesso! +${REWARDS.MEAL_PLAN} FITs`);
+    toast.success(`Cardápio personalizado gerado com Nutri+ com sucesso! +${REWARDS.MEAL_PLAN} FITs`);
 
     return resultData.mealPlan;
   } catch (error) {
