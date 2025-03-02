@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ExerciseType, Difficulty, Exercise } from "./types";
+import { ExerciseType, Difficulty, Exercise, MuscleGroup } from "./types";
 import { Progress } from "@/components/ui/progress";
 
 interface MultipleGifsUploadFormProps {
@@ -30,7 +30,7 @@ export const MultipleGifsUploadForm = ({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [exerciseType, setExerciseType] = useState<ExerciseType>("strength");
   const [difficulty, setDifficulty] = useState<Difficulty>("beginner");
-  const [muscleGroup, setMuscleGroup] = useState("chest");
+  const [muscleGroup, setMuscleGroup] = useState<MuscleGroup>("chest");
   const [trainingLocation, setTrainingLocation] = useState("gym");
   const [goal, setGoal] = useState<string>("weight_loss");
   const MAX_FILE_SIZE = 20 * 1024 * 1024;
@@ -56,8 +56,8 @@ export const MultipleGifsUploadForm = ({
   const difficultyOptions = [
     { value: "beginner", label: "Sedentário - Pouco ou nenhum exercício" },
     { value: "intermediate", label: "Leve - 1-3 dias por semana" },
-    { value: "advanced", label: "Moderado - 3-5 dias por semana" },
-    { value: "expert", label: "Intenso - 6-7 dias por semana" },
+    { value: "moderate", label: "Moderado - 3-5 dias por semana" },
+    { value: "advanced", label: "Intenso - 6-7 dias por semana" },
   ];
 
   const goalOptions = [
@@ -131,7 +131,7 @@ export const MultipleGifsUploadForm = ({
           gif_url: publicUrl,
           exercise_type: validExerciseType,
           difficulty: validDifficulty,
-          muscle_group: muscleGroup,
+          muscle_group: muscleGroup as MuscleGroup,
           primary_muscles_worked: [muscleGroup],
           goals: [goal],
           equipment_needed: [],
@@ -212,14 +212,14 @@ export const MultipleGifsUploadForm = ({
               <Label>Grupo Muscular</Label>
               <Select
                 value={muscleGroup}
-                onValueChange={setMuscleGroup}
+                onValueChange={(value: MuscleGroup) => setMuscleGroup(value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o grupo muscular" />
                 </SelectTrigger>
                 <SelectContent>
                   {muscleGroupOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
+                    <SelectItem key={option.value} value={option.value as MuscleGroup}>
                       {option.label}
                     </SelectItem>
                   ))}
