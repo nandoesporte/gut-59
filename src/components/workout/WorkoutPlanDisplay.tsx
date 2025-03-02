@@ -43,7 +43,7 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
           <div className="flex items-center mt-2 gap-2">
             <Badge variant="outline" className="flex items-center gap-1 bg-primary/5">
               <Bot className="w-3 h-3" />
-              Gerado por TRENE2025 (Llama 3)
+              Gerado por TRENE2025 (Llama 3 8B via Groq)
             </Badge>
           </div>
         </div>

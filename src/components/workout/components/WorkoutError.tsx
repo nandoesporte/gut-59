@@ -23,6 +23,16 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
       <p className="text-muted-foreground">
         {errorMessage || "Não foi possível gerar seu plano. Por favor, tente novamente."}
       </p>
+
+      <div className="bg-red-100 dark:bg-red-900/10 p-4 rounded-lg text-left text-sm max-w-2xl mx-auto">
+        <p className="font-semibold mb-2">Possíveis soluções:</p>
+        <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
+          <li>Verifique sua conexão com a internet e tente novamente</li>
+          <li>Tente mudar algumas preferências de treino</li>
+          <li>Aguarde alguns minutos e tente novamente</li>
+          <li>Entre em contato com o suporte se o problema persistir</li>
+        </ul>
+      </div>
       
       <div className="pt-2">
         <Button onClick={onReset} variant="outline" size="lg" className="border-red-200 hover:bg-red-100 dark:hover:bg-red-900/20">
