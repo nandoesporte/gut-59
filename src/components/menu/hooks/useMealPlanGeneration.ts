@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { DietaryPreferences, ProtocolFood } from "../types";
@@ -664,4 +665,107 @@ const getDefaultRecommendations = (goal: string) => {
   if (goal === "lose" || goal === "lose_weight") {
     generalRecs.push("Crie um déficit calórico moderado, priorizando a redução de alimentos processados e açúcares.");
     generalRecs.push("Aumente a ingestão de alimentos ricos em fibras para promover saciedade.");
-    timingRecs
+    timingRecs.push("Considere um período de jejum de 12-16 horas entre o jantar e o café da manhã do dia seguinte.");
+  } else if (goal === "gain" || goal === "gain_weight") {
+    generalRecs.push("Crie um superávit calórico, consumindo mais calorias do que gasta.");
+    generalRecs.push("Aumente a frequência das refeições para 5-6 vezes ao dia.");
+    generalRecs.push("Priorize alimentos calóricos e nutritivos como abacate, nozes, azeite e carnes magras.");
+  }
+  
+  return [
+    ...generalRecs,
+    preworkoutRecs,
+    postworkoutRecs,
+    ...timingRecs
+  ];
+};
+
+// Função para criar um plano de refeições padrão
+const createDefaultMealPlan = (userData: any, selectedFoods: any[], foodsByMealType?: Record<string, any[]>) => {
+  console.log('[MEAL PLAN] Criando plano de refeições padrão');
+  
+  const weeklyPlan: Record<string, any> = {};
+  const days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+  
+  // Criar plano para cada dia da semana
+  days.forEach(day => {
+    const capitalized = day.charAt(0).toUpperCase() + day.slice(1);
+    const meals: Record<string, any> = {
+      breakfast: createDefaultMeal('breakfast', userData.dailyCalories),
+      morningSnack: createDefaultMeal('morningSnack', userData.dailyCalories),
+      lunch: createDefaultMeal('lunch', userData.dailyCalories),
+      afternoonSnack: createDefaultMeal('afternoonSnack', userData.dailyCalories),
+      dinner: createDefaultMeal('dinner', userData.dailyCalories)
+    };
+    
+    const dailyTotals = calculateDailyTotals(meals);
+    
+    weeklyPlan[day] = {
+      dayName: capitalized,
+      meals,
+      dailyTotals
+    };
+  });
+  
+  // Calcular médias semanais
+  const weeklyTotals = calculateWeeklyAverages(weeklyPlan);
+  
+  return {
+    userId: userData.id,
+    dailyCalories: userData.dailyCalories,
+    goal: userData.goal,
+    weeklyPlan,
+    weeklyTotals,
+    recommendations: getDefaultRecommendations(userData.goal),
+    generatedAt: new Date().toISOString()
+  };
+};
+
+// Função para salvar os dados do plano
+const saveMealPlanData = async (userId: string, mealPlan: any, dailyCalories: number, preferences: DietaryPreferences) => {
+  try {
+    // Salvar o plano de refeições completo
+    const { data: planData, error: planError } = await supabase
+      .from('meal_plans')
+      .insert([
+        {
+          user_id: userId,
+          plan_data: mealPlan,
+          daily_calories: dailyCalories,
+          dietary_preferences: preferences,
+          created_at: new Date().toISOString()
+        }
+      ]);
+      
+    if (planError) {
+      throw new Error(`Erro ao salvar plano: ${planError.message}`);
+    }
+    
+    // Atualizar as preferências dietéticas do usuário
+    try {
+      const { error: prefError } = await supabase.rpc(
+        'update_dietary_preferences',
+        {
+          p_user_id: userId,
+          p_has_allergies: preferences.hasAllergies || false,
+          p_allergies: preferences.allergies || [],
+          p_dietary_restrictions: preferences.dietaryRestrictions || [],
+          p_training_time: preferences.trainingTime || null
+        }
+      );
+      
+      if (prefError) {
+        console.error('Erro ao atualizar preferências dietéticas:', prefError);
+        // Continuar mesmo com erro
+      }
+    } catch (prefUpdateError) {
+      console.error('Erro durante atualização de preferências:', prefUpdateError);
+      // Continuar mesmo com erro
+    }
+    
+    return planData;
+  } catch (error) {
+    console.error('Erro no salvamento de dados do plano:', error);
+    throw error;
+  }
+};
