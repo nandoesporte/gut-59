@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { DietaryPreferences, ProtocolFood } from "../types";
@@ -664,4 +665,131 @@ const getDefaultRecommendations = (goal: string) => {
   if (goal === "lose" || goal === "lose_weight") {
     generalRecs.push("Crie um déficit calórico moderado, priorizando a redução de alimentos processados e açúcares.");
     generalRecs.push("Aumente a ingestão de alimentos ricos em fibras para promover saciedade.");
-    timingRecs
+    timingRecs.push("Considere um intervalo maior entre o jantar e o café da manhã (jejum intermitente de 12-14h) para potencializar a queima de gordura.");
+  } else if (goal === "gain" || goal === "gain_weight") {
+    generalRecs.push("Crie um superávit calórico, priorizando o aumento de alimentos densos em nutrientes.");
+    generalRecs.push("Aumente a frequência das refeições para 5-6 refeições diárias para facilitar o consumo calórico.");
+    timingRecs.push("Não deixe passar mais de 3 horas sem se alimentar durante o dia.");
+    timingRecs.push("Consuma uma refeição rica em proteínas antes de dormir para favorecer a recuperação durante o sono.");
+  }
+  
+  // Construir objeto de recomendações
+  return {
+    general: generalRecs,
+    timing: timingRecs,
+    preworkout: preworkoutRecs,
+    postworkout: postworkoutRecs
+  };
+};
+
+// Função para criar um plano alimentar padrão
+const createDefaultMealPlan = (userData: any, selectedFoods: ProtocolFood[], foodsByMealType?: Record<string, any[]>) => {
+  console.log('[MEAL PLAN] Criando plano alimentar padrão com dados do usuário');
+  
+  const weeklyPlan: Record<string, any> = {};
+  const dailyCalories = userData.dailyCalories || 2000;
+  
+  // Dias da semana
+  const days = [
+    { key: "monday", name: "Segunda-feira" },
+    { key: "tuesday", name: "Terça-feira" },
+    { key: "wednesday", name: "Quarta-feira" },
+    { key: "thursday", name: "Quinta-feira" },
+    { key: "friday", name: "Sexta-feira" },
+    { key: "saturday", name: "Sábado" },
+    { key: "sunday", name: "Domingo" }
+  ];
+  
+  // Criar um plano para cada dia
+  days.forEach(day => {
+    // Refeições do dia
+    const meals: Record<string, any> = {
+      breakfast: createDefaultMeal('breakfast', dailyCalories),
+      morningSnack: createDefaultMeal('morningSnack', dailyCalories),
+      lunch: createDefaultMeal('lunch', dailyCalories),
+      afternoonSnack: createDefaultMeal('afternoonSnack', dailyCalories),
+      dinner: createDefaultMeal('dinner', dailyCalories)
+    };
+    
+    // Substituir alimentos padrão pelos selecionados pelo usuário quando possível
+    if (foodsByMealType) {
+      Object.entries(foodsByMealType).forEach(([mealType, foods]) => {
+        if (foods.length > 0 && meals[mealType]) {
+          const foodsToInclude = foods.slice(0, 3); // Limitar a 3 alimentos por refeição
+          
+          meals[mealType].foods = foodsToInclude.map(food => ({
+            name: food.name,
+            portion: food.portion || 100,
+            unit: food.portionUnit || 'g',
+            details: `${food.calories} kcal, P:${food.protein}g, C:${food.carbs}g, G:${food.fats}g`
+          }));
+          
+          // Atualizar calorias e macros com base nos alimentos incluídos
+          const totalCals = foodsToInclude.reduce((sum, food) => sum + (food.calories || 0), 0);
+          
+          if (totalCals > 0) {
+            meals[mealType].calories = totalCals;
+            meals[mealType].macros = {
+              protein: foodsToInclude.reduce((sum, food) => sum + (food.protein || 0), 0),
+              carbs: foodsToInclude.reduce((sum, food) => sum + (food.carbs || 0), 0),
+              fats: foodsToInclude.reduce((sum, food) => sum + (food.fats || 0), 0),
+              fiber: foodsToInclude.reduce((sum, food) => sum + (food.fiber || 0), 0)
+            };
+          }
+        }
+      });
+    }
+    
+    // Calcular totais diários
+    const dailyTotals = calculateDailyTotals(meals);
+    
+    // Montar o dia completo
+    weeklyPlan[day.key] = {
+      dayName: day.name,
+      meals,
+      dailyTotals
+    };
+  });
+  
+  // Calcular médias semanais
+  const weeklyTotals = calculateWeeklyAverages(weeklyPlan);
+  
+  // Montar o plano completo
+  return {
+    userId: userData.id,
+    dailyCaloriesGoal: dailyCalories,
+    weeklyPlan,
+    weeklyTotals,
+    recommendations: getDefaultRecommendations(userData.goal),
+    createdAt: new Date().toISOString()
+  };
+};
+
+// Função para salvar o plano no banco de dados
+const saveMealPlanData = async (userId: string, mealPlan: any, dailyCalories: number, preferences: DietaryPreferences) => {
+  try {
+    // Salvar o plano alimentar
+    const { data: planData, error: planError } = await supabase
+      .from('meal_plans')
+      .insert([
+        {
+          user_id: userId,
+          plan_data: mealPlan,
+          daily_calories: dailyCalories,
+          has_allergies: preferences.hasAllergies,
+          allergies: preferences.allergies || [],
+          dietary_restrictions: preferences.dietaryRestrictions || []
+        }
+      ]);
+      
+    if (planError) {
+      console.error('[MEAL PLAN] Erro ao salvar plano:', planError);
+      throw planError;
+    }
+    
+    return planData;
+  } catch (error) {
+    console.error('[MEAL PLAN] Erro ao salvar dados:', error);
+    throw error;
+  }
+};
