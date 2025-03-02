@@ -3,7 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
-const GROQ_API_KEY = Deno.env.get("LLAMA_API_KEY");
+const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -19,6 +19,8 @@ serve(async (req) => {
   }
 
   try {
+    console.log("Starting to generate plan using Groq API with Llama 3");
+    
     const { preferences, userId, settings } = await req.json();
     
     if (!preferences) {
@@ -30,7 +32,7 @@ serve(async (req) => {
     }
 
     if (!GROQ_API_KEY) {
-      throw new Error("LLAMA_API_KEY environment variable is not set");
+      throw new Error("GROQ_API_KEY environment variable is not set");
     }
 
     // Create Supabase client
@@ -52,6 +54,12 @@ serve(async (req) => {
       console.error("Error fetching exercises:", exercisesError);
       throw new Error(`Error fetching exercises: ${exercisesError.message}`);
     }
+
+    if (!exercises || exercises.length === 0) {
+      throw new Error("No exercises found matching the criteria");
+    }
+
+    console.log(`Retrieved ${exercises.length} exercises from database`);
 
     // Build the prompt for the AI model
     const userProfile = `
@@ -79,7 +87,7 @@ Use only exercises from the provided exercise list.
       return {
         id: exercise.id,
         name: exercise.name,
-        description: exercise.description,
+        description: exercise.description || "",
         muscle_group: exercise.muscle_group,
         exercise_type: exercise.exercise_type,
         difficulty: exercise.difficulty,
@@ -90,7 +98,7 @@ Use only exercises from the provided exercise list.
     // Format the available exercises for the prompt
     const exerciseList = `
 Available Exercises:
-${exerciseDatabase.map((ex) => `- ${ex.name} (Type: ${ex.exercise_type}, Group: ${ex.muscle_group})`).join("\n")}
+${exerciseDatabase.map((ex) => `- ${ex.name} (ID: ${ex.id}, Type: ${ex.exercise_type}, Group: ${ex.muscle_group})`).join("\n")}
 `;
 
     // Instructions for output format
@@ -133,6 +141,8 @@ IMPORTANT RULES:
     // Combine all parts into one prompt
     const userMessage = `${userProfile}\n\n${exerciseList}\n\n${outputFormat}`;
 
+    console.log("Making request to Groq API");
+
     // Make request to Groq API
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -153,8 +163,8 @@ IMPORTANT RULES:
 
     // Check if response is ok
     if (!response.ok) {
-      const errorResponse = await response.text();
-      console.error("Groq API error:", errorResponse);
+      const errorText = await response.text();
+      console.error("Groq API error:", errorText);
       throw new Error(`Groq API error: ${response.status} ${response.statusText}`);
     }
 
@@ -165,6 +175,8 @@ IMPORTANT RULES:
       throw new Error("Invalid response from Groq API");
     }
 
+    console.log("Received response from Groq API");
+
     // Extract the workout plan from the response
     let workoutPlanText = data.choices[0].message.content;
     
@@ -173,19 +185,32 @@ IMPORTANT RULES:
     try {
       // Try to parse the whole response as JSON
       workoutPlan = JSON.parse(workoutPlanText);
+      console.log("Successfully parsed response as JSON");
     } catch (e) {
       // If that fails, try to extract JSON from the text
       try {
+        console.log("Extracting JSON from text response");
         const jsonMatch = workoutPlanText.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           workoutPlan = JSON.parse(jsonMatch[0]);
+          console.log("Successfully extracted and parsed JSON from text");
         } else {
+          console.error("No JSON pattern found in response");
           throw new Error("Could not extract valid JSON from response");
         }
       } catch (e2) {
+        console.error("Failed to parse extracted JSON:", e2);
         throw new Error("Failed to parse workout plan JSON: " + e2.message);
       }
     }
+
+    // Validate workout plan structure
+    if (!workoutPlan || !workoutPlan.workout_sessions) {
+      console.error("Invalid workout plan structure:", workoutPlan);
+      throw new Error("Invalid workout plan structure");
+    }
+
+    console.log("Enhancing workout plan with full exercise data");
 
     // Enhance the workout plan with full exercise data
     if (workoutPlan && workoutPlan.workout_sessions) {
@@ -207,11 +232,15 @@ IMPORTANT RULES:
                 description: exerciseData.description || "",
                 gif_url: exerciseData.gif_url || ""
               };
+            } else {
+              console.warn(`Exercise with ID ${exerciseId} not found in database`);
             }
           }
         }
       }
     }
+
+    console.log("Successfully generated workout plan");
 
     // Return the enhanced workout plan
     return new Response(
