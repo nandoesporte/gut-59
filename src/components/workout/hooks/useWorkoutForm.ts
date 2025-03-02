@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { supabase } from "@/integrations/supabase/client";
-import { WorkoutPreferences } from "../types";
+import { WorkoutPreferences, ActivityLevel, ExerciseType } from "../types";
 import { toast } from "sonner";
 import { usePaymentHandling } from "@/components/menu/hooks/usePaymentHandling";
 
@@ -88,14 +88,29 @@ export const useWorkoutForm = (onSubmit: (data: WorkoutPreferences) => void) => 
       }
 
       if (data) {
+        // Validate and cast the data to ensure it matches the expected enums
+        const gender = isValidGender(data.gender) ? data.gender : "male";
+        const goal = isValidGoal(data.goal) ? data.goal : "maintain";
+        const activity_level = isValidActivityLevel(data.activity_level) ? data.activity_level : "moderate";
+        
+        // Validate preferred exercise types
+        const preferred_exercise_types = Array.isArray(data.preferred_exercise_types) 
+          ? data.preferred_exercise_types.filter(isValidExerciseType)
+          : ["strength"];
+        
+        // If no valid types remain after filtering, use the default
+        const finalExerciseTypes = preferred_exercise_types.length > 0 
+          ? preferred_exercise_types 
+          : ["strength"];
+
         form.reset({
           age: data.age,
           weight: data.weight,
           height: data.height,
-          gender: data.gender,
-          goal: data.goal,
-          activity_level: data.activity_level,
-          preferred_exercise_types: data.preferred_exercise_types || ["strength"],
+          gender: gender,
+          goal: goal,
+          activity_level: activity_level,
+          preferred_exercise_types: finalExerciseTypes as ExerciseType[],
           training_location: data.available_equipment?.includes("all") 
             ? "gym" 
             : data.available_equipment?.includes("bodyweight") && data.available_equipment?.includes("dumbbells")
@@ -108,6 +123,23 @@ export const useWorkoutForm = (onSubmit: (data: WorkoutPreferences) => void) => 
     } catch (error) {
       console.error('Erro ao carregar preferências:', error);
     }
+  };
+
+  // Type guard functions
+  const isValidGender = (value: any): value is "male" | "female" => {
+    return value === "male" || value === "female";
+  };
+
+  const isValidGoal = (value: any): value is "lose_weight" | "maintain" | "gain_mass" => {
+    return value === "lose_weight" || value === "maintain" || value === "gain_mass";
+  };
+
+  const isValidActivityLevel = (value: any): value is ActivityLevel => {
+    return ["sedentary", "light", "moderate", "intense"].includes(value);
+  };
+
+  const isValidExerciseType = (value: any): value is ExerciseType => {
+    return ["strength", "cardio", "mobility"].includes(value);
   };
 
   const saveUserPreferences = async (data: FormSchema) => {
