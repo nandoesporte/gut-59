@@ -66,7 +66,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       
       console.log("Calling edge function with preferences:", safePreferences);
       
-      // Call the edge function to generate the workout plan
+      // Call the edge function to generate the workout plan with auth headers
       const { data, error: functionError } = await supabase.functions.invoke(
         "generate-workout-plan-llama",
         {

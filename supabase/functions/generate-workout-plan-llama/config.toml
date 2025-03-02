@@ -3,4 +3,5 @@ project_id = "sxjafhzikftdenqnkcri"
 # Increase the timeout for this function to allow the LLM more processing time
 timeout_seconds = 90
 import_map = "../import_map.json"
-verify_jwt = true
+verify_jwt = false
+
