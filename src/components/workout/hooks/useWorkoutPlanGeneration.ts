@@ -137,7 +137,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       
       // Now fetch the complete workout plan with all its sessions and exercises
       // to make sure we have the most up-to-date data
-      const { data: completePlan, error: fetchError } = await supabase
+      const { data: fetchedPlan, error: fetchError } = await supabase
         .from('workout_plans')
         .select(`
           id, user_id, goal, start_date, end_date,
@@ -146,7 +146,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
             session_exercises (
               id, sets, reps, rest_time_seconds, order_in_session,
               exercise:exercise_id (
-                id, name, description, gif_url, video_url
+                id, name, description, gif_url
               )
             )
           )
@@ -159,14 +159,41 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
         // Still continue as we at least saved the basic plan
       }
       
-      // Set the workout plan with the fetched data or fall back to original data with ID
-      if (completePlan) {
-        setWorkoutPlan(completePlan as WorkoutPlan);
+      // Transform the fetched data to match our WorkoutPlan type
+      if (fetchedPlan) {
+        // Create a properly typed WorkoutPlan object
+        const typedWorkoutPlan: WorkoutPlan = {
+          id: fetchedPlan.id,
+          user_id: fetchedPlan.user_id,
+          goal: fetchedPlan.goal,
+          start_date: fetchedPlan.start_date,
+          end_date: fetchedPlan.end_date,
+          workout_sessions: fetchedPlan.workout_sessions.map(session => ({
+            id: session.id,
+            day_number: session.day_number,
+            warmup_description: session.warmup_description,
+            cooldown_description: session.cooldown_description,
+            session_exercises: session.session_exercises.map(ex => ({
+              id: ex.id,
+              sets: ex.sets,
+              reps: ex.reps,
+              rest_time_seconds: ex.rest_time_seconds,
+              exercise: {
+                id: ex.exercise.id,
+                name: ex.exercise.name,
+                description: ex.exercise.description || '',
+                gif_url: ex.exercise.gif_url || ''
+              }
+            }))
+          }))
+        };
+        
+        setWorkoutPlan(typedWorkoutPlan);
       } else {
         // Fallback: use the original data but add the saved plan ID
         planData.id = savedPlan.id;
         planData.user_id = user.id;
-        setWorkoutPlan(planData);
+        setWorkoutPlan(planData as WorkoutPlan);
       }
       
       // Update profile generation count - fixed approach to avoid type error
