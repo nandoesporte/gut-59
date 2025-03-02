@@ -29,3 +29,7 @@ timeout_seconds = 180
 [functions.nutri-plus-agent]
 verify_jwt = false
 timeout_seconds = 180
+
+[functions.generate-workout-plan-llama]
+verify_jwt = true
+timeout_seconds = 180
