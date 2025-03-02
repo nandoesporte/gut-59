@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { useState, useEffect } from 'react';
 import { WorkoutPreferences } from '@/components/workout/types';
@@ -21,7 +20,6 @@ const Workout = () => {
       
       if (!user) return;
 
-      // Fetch workout plans with their sessions and exercises
       const { data: plans, error } = await supabase
         .from('workout_plans')
         .select(`
@@ -51,7 +49,6 @@ const Workout = () => {
     fetchWorkoutHistory();
   }, []);
 
-  // Log when preferences are set
   const handlePreferencesSubmit = (prefs: WorkoutPreferences) => {
     console.log('Preferências submetidas no componente Workout:', prefs);
     setPreferences(prefs);

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -24,12 +25,33 @@ export const useWorkoutForm = (onSubmit: (data: WorkoutPreferences) => void) => 
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [formData, setFormData] = useState<FormSchema | null>(null);
   const [isPaymentEnabled, setIsPaymentEnabled] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [user, setUser] = useState<{ id: string } | null>(null);
+  
   const {
     isProcessingPayment,
     hasPaid,
     currentPrice,
     handlePaymentAndContinue
   } = usePaymentHandling('workout');
+
+  // Create form with default values
+  const form = useForm<FormSchema>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      age: 30,
+      weight: 70,
+      height: 170,
+      gender: "male",
+      goal: "maintain",
+      activity_level: "moderate",
+      preferred_exercise_types: ["strength"],
+      training_location: "gym",
+    }
+  });
+
+  // Setup form watch to detect changes
+  const formValues = form.watch();
 
   useEffect(() => {
     const checkPaymentSettings = async () => {
@@ -51,26 +73,87 @@ export const useWorkoutForm = (onSubmit: (data: WorkoutPreferences) => void) => 
       }
     };
 
+    const getCurrentUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setUser(data.user);
+    };
+
     checkPaymentSettings();
+    getCurrentUser();
     loadUserPreferences();
   }, []);
 
-  const form = useForm<FormSchema>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      age: 30,
-      weight: 70,
-      height: 170,
-      gender: "male",
-      goal: "maintain",
-      activity_level: "moderate",
-      preferred_exercise_types: ["strength"],
-      training_location: "gym",
+  // Effect to save form values when they change
+  useEffect(() => {
+    // Don't try to save if user is not logged in, form is not initialized, 
+    // or we're in the middle of setting initial values
+    if (!user || isSaving) return;
+
+    // We need to check validity before saving
+    const isValid = form.formState.isValid;
+    
+    // Use a debounce to avoid too many saves
+    const timeoutId = setTimeout(() => {
+      // Only save if the form is valid and we have a user ID
+      if (isValid) {
+        savePartialData(formValues);
+      }
+    }, 1000); // 1 second debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [formValues, user]);
+
+  const savePartialData = async (data: FormSchema) => {
+    // Skip if not authenticated
+    if (!user) return;
+    
+    try {
+      setIsSaving(true);
+      
+      // Convert training location to available equipment format
+      const availableEquipment = data.training_location === "gym" 
+        ? ["all"] 
+        : data.training_location === "home"
+        ? ["bodyweight", "resistance-bands", "dumbbells"]
+        : data.training_location === "outdoors"
+        ? ["bodyweight", "resistance-bands"]
+        : ["bodyweight"];
+
+      console.log('Salvando parcialmente para usuário:', user.id);
+
+      const preferenceData = {
+        user_id: user.id,
+        age: data.age,
+        weight: data.weight,
+        height: data.height,
+        gender: data.gender,
+        goal: data.goal,
+        activity_level: data.activity_level,
+        preferred_exercise_types: data.preferred_exercise_types,
+        available_equipment: availableEquipment,
+        health_conditions: [],
+      };
+
+      const { error } = await supabase
+        .from('user_workout_preferences')
+        .upsert(preferenceData);
+
+      if (error) {
+        console.error('Erro ao auto-salvar preferências:', error);
+        // Don't show toast for auto-save errors to avoid annoying users
+      } else {
+        console.log('Preferências auto-salvas com sucesso');
+      }
+    } catch (error) {
+      console.error('Erro ao auto-salvar preferências:', error);
+    } finally {
+      setIsSaving(false);
     }
-  });
+  };
 
   const loadUserPreferences = async () => {
     try {
+      setIsSaving(true);
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) return;
@@ -127,6 +210,8 @@ export const useWorkoutForm = (onSubmit: (data: WorkoutPreferences) => void) => 
       }
     } catch (error) {
       console.error('Erro ao carregar preferências:', error);
+    } finally {
+      setIsSaving(false);
     }
   };
 
