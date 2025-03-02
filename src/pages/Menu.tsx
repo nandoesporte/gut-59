@@ -1,4 +1,3 @@
-
 import { Card } from "@/components/ui/card";
 import { InitialMenuContent } from "@/components/menu/InitialMenuContent";
 import { CalorieCalculatorStep } from "@/components/menu/CalorieCalculatorStep";
@@ -34,7 +33,6 @@ const Menu = () => {
     setFormData,
   } = useMenuController();
 
-  // Auto-scroll to meal plan when it's generated
   useEffect(() => {
     if (mealPlan && mealPlanRef.current) {
       console.log("Scrolling to meal plan section");
@@ -45,7 +43,6 @@ const Menu = () => {
     }
   }, [mealPlan]);
   
-  // Auto-scroll to restrictions card when moving to step 3
   useEffect(() => {
     if (currentStep === 3 && restrictionsCardRef.current) {
       console.log("Scrolling to restrictions section");
@@ -56,7 +53,6 @@ const Menu = () => {
     }
   }, [currentStep]);
 
-  // Debug para verificar as transições de etapa
   useEffect(() => {
     console.log("Etapa atual:", currentStep);
     console.log("Plano de refeição disponível:", !!mealPlan);
@@ -70,8 +66,6 @@ const Menu = () => {
 
   const handleRefreshMealPlan = async () => {
     try {
-      // Se houver função para gerar novo plano, poderia ser chamada aqui
-      // Por enquanto vamos apenas mostrar uma mensagem
       toast.info("Funcionalidade de atualização em desenvolvimento");
       return Promise.resolve();
     } catch (error) {
@@ -109,7 +103,6 @@ const Menu = () => {
           </div>
 
           <div className="space-y-6 sm:space-y-8">
-            {/* Etapa 1: Cálculo de Calorias */}
             <Card className="p-4 sm:p-6">
               <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center">
                 <span className={`bg-${currentStep >= 1 ? 'green' : 'gray'}-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2`}>1</span>
@@ -136,7 +129,6 @@ const Menu = () => {
               )}
             </Card>
 
-            {/* Etapa 2: Seleção de Alimentos */}
             <Card className={`p-4 sm:p-6 ${currentStep < 2 ? 'opacity-70' : ''}`}>
               <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center">
                 <span className={`bg-${currentStep >= 2 ? 'green' : 'gray'}-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2`}>2</span>
@@ -165,7 +157,6 @@ const Menu = () => {
               )}
             </Card>
 
-            {/* Etapa 3: Preferências Dietéticas */}
             <div ref={restrictionsCardRef}>
               <Card className={`p-4 sm:p-6 ${currentStep < 3 ? 'opacity-70' : ''}`}>
                 <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center">
@@ -192,7 +183,6 @@ const Menu = () => {
               </Card>
             </div>
 
-            {/* Etapa 4: Exibição do Plano */}
             {currentStep === 4 && mealPlan && (
               <div ref={mealPlanRef}>
                 <Card className="p-4 sm:p-6">
@@ -212,7 +202,6 @@ const Menu = () => {
               </div>
             )}
 
-            {/* Histórico de Planos */}
             <MealPlanHistory />
           </div>
         </div>
