@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -14,7 +15,8 @@ export const AIModelSettings = () => {
   const [aiSettings, setAiSettings] = useState({
     activeModel: 'llama3',
     systemPrompt: '',
-    useCustomPrompt: false
+    useCustomPrompt: false,
+    groqApiKey: ''
   });
 
   useEffect(() => {
@@ -36,7 +38,8 @@ export const AIModelSettings = () => {
         setAiSettings({
           activeModel: data.active_model || 'llama3',
           systemPrompt: data.system_prompt || getDefaultPrompt(),
-          useCustomPrompt: data.use_custom_prompt || false
+          useCustomPrompt: data.use_custom_prompt || false,
+          groqApiKey: data.groq_api_key || ''
         });
       }
     } catch (error) {
@@ -76,6 +79,7 @@ Você deve fornecer um plano completo, com exercícios, séries, repetições e 
             active_model: aiSettings.activeModel,
             system_prompt: aiSettings.systemPrompt,
             use_custom_prompt: aiSettings.useCustomPrompt,
+            groq_api_key: aiSettings.groqApiKey,
             updated_at: new Date().toISOString()
           })
           .eq('id', data.id);
@@ -90,6 +94,7 @@ Você deve fornecer um plano completo, com exercícios, séries, repetições e 
             active_model: aiSettings.activeModel,
             system_prompt: aiSettings.systemPrompt,
             use_custom_prompt: aiSettings.useCustomPrompt,
+            groq_api_key: aiSettings.groqApiKey,
             updated_at: new Date().toISOString()
           });
         
@@ -139,6 +144,21 @@ Você deve fornecer um plano completo, com exercícios, séries, repetições e 
               <SelectItem value="gpt4">GPT-4</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="groq-api-key">Chave da API Groq</Label>
+          <Input
+            id="groq-api-key"
+            type="password"
+            value={aiSettings.groqApiKey}
+            onChange={(e) => setAiSettings({...aiSettings, groqApiKey: e.target.value})}
+            disabled={loading}
+            placeholder="Insira a chave da API Groq"
+          />
+          <p className="text-sm text-muted-foreground">
+            Necessária para utilizar o modelo Llama 3 via Groq
+          </p>
         </div>
 
         <div className="flex items-center space-x-2">
