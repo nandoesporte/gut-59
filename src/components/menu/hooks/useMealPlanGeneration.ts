@@ -291,7 +291,7 @@ export const generateMealPlan = async ({
             console.log('[MEAL PLAN] Tentando usar Llama como segundo fallback');
             
             enhancedPayload.modelConfig = {
-              model: "nous-hermes-2-mixtral-8x7b", // Using the requested Nous-Hermes model
+              model: "nous-hermes-2-mixtral-8x7b", // Corrected model name
               provider: "llama"
             };
             
@@ -323,7 +323,7 @@ export const generateMealPlan = async ({
         
         try {
           enhancedPayload.modelConfig = {
-            model: "nous-hermes-2-mixtral-8x7b", // Using the requested Nous-Hermes model
+            model: "nous-hermes-2-mixtral-8x7b", // Corrected model name
             provider: "llama"
           };
           
