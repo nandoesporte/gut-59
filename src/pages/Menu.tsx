@@ -11,7 +11,7 @@ import { useMenuController } from "@/components/menu/MenuController";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useRef } from "react";
-import type { DietaryPreferences, ProtocolFood } from "@/components/menu/types";
+import type { DietaryPreferences } from "@/components/menu/types";
 
 const Menu = () => {
   const mealPlanRef = useRef<HTMLDivElement>(null);
@@ -27,9 +27,6 @@ const Menu = () => {
     mealPlan,
     formData,
     loading,
-    loadingMessage,
-    useNutriPlus,
-    setUseNutriPlus,
     handleCalculateCalories,
     handleFoodSelection,
     handleConfirmFoodSelection,
@@ -90,7 +87,7 @@ const Menu = () => {
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
         <div className="text-center px-4">
           <h3 className="text-lg font-semibold text-gray-900">
-            {loadingMessage || "Gerando seu plano alimentar personalizado..."}
+            Gerando seu plano alimentar personalizado...
           </h3>
           <p className="text-sm text-gray-500 mt-1">
             Este processo pode levar de 1 a 2 minutos.
@@ -120,10 +117,8 @@ const Menu = () => {
               </h2>
               {currentStep === 1 && (
                 <CalorieCalculatorStep
-                  formData={formData as any} // Use type assertion to bypass the type check temporarily
-                  onInputChange={(field, value) => {
-                    setFormData(prev => ({ ...prev, [field]: value }))
-                  }}
+                  formData={formData}
+                  onInputChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
                   onCalculate={handleCalculateCalories}
                   calorieNeeds={calorieNeeds}
                 />
@@ -181,8 +176,6 @@ const Menu = () => {
                   <DietaryPreferencesForm
                     onSubmit={handleDietaryPreferences}
                     onBack={() => setCurrentStep(2)}
-                    useNutriPlus={useNutriPlus}
-                    setUseNutriPlus={setUseNutriPlus}
                   />
                 )}
                 {currentStep > 3 && (

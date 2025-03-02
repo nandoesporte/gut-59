@@ -21,10 +21,4 @@ verify_jwt = false
 
 [functions.generate-meal-plan-llama]
 verify_jwt = false
-timeout_ms = 120000
-import_map_path = "./import_map.json"
-
-[functions.generate-meal-plan-nutri-plus]
-verify_jwt = false
-timeout_ms = 180000
-import_map_path = "./import_map.json"
+timeout_seconds = 60

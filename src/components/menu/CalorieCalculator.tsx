@@ -14,7 +14,7 @@ export interface CalorieCalculatorForm {
   weight: string;
   height: string;
   age: string;
-  gender: "male" | "female";  // Using the more specific union type
+  gender: "male" | "female";
   activityLevel: string;
   goal?: Goal;
 }

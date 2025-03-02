@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Coffee, Utensils, Apple, Moon } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -11,8 +10,8 @@ import { ProtocolFood } from "./types";
 
 interface FoodSelectorProps {
   protocolFoods: ProtocolFood[];
-  selectedFoods: string[];  // Changed to string[] to match expected type
-  onFoodSelection: (foodId: string, food?: ProtocolFood) => void;  // Updated parameter names
+  selectedFoods: string[];
+  onFoodSelection: (foodId: string, food?: ProtocolFood) => void;
   totalCalories: number;
   onBack: () => void;
   onConfirm: () => Promise<boolean> | void;
@@ -28,8 +27,8 @@ const MealSection = ({
   title: string;
   icon: React.ReactNode;
   foods: ProtocolFood[];
-  selectedFoods: string[];  // Changed to string[]
-  onFoodSelection: (foodId: string, food?: ProtocolFood) => void;  // Updated parameter types
+  selectedFoods: string[];
+  onFoodSelection: (foodId: string, food?: ProtocolFood) => void;
 }) => (
   <Card className="p-6 space-y-4 shadow-lg hover:shadow-xl transition-shadow">
     <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
@@ -43,7 +42,7 @@ const MealSection = ({
         <Button
           key={food.id}
           variant={selectedFoods.includes(food.id) ? "default" : "outline"}
-          onClick={() => onFoodSelection(food.id, food)}  // Pass both id and food object
+          onClick={() => onFoodSelection(food.id, food)}
           className={`
             h-auto py-3 px-4 w-full text-left justify-start
             ${selectedFoods.includes(food.id)

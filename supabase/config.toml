@@ -6,6 +6,7 @@ enabled = true
 port = 54321
 schemas = ["public", "storage"]
 
+[functions]
 [functions.create-asaas-payment]
 verify_jwt = true
 
@@ -44,12 +45,3 @@ verify_jwt = true
 
 [functions.groq-chat]
 verify_jwt = true
-
-[functions.llama-edge]
-verify_jwt = false
-
-[functions.generate-meal-plan-llama]
-verify_jwt = false
-
-[functions.generate-meal-plan-nutri-plus]
-verify_jwt = false
