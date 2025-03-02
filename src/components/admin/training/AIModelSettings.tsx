@@ -39,7 +39,8 @@ export const AIModelSettings = () => {
           activeModel: data.active_model || 'llama3',
           systemPrompt: data.system_prompt || getDefaultPrompt(),
           useCustomPrompt: data.use_custom_prompt || false,
-          groqApiKey: data.groq_api_key || ''
+          // Use type assertion to access the groq_api_key property
+          groqApiKey: (data as any).groq_api_key || ''
         });
       }
     } catch (error) {

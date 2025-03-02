@@ -49,6 +49,7 @@ export type Database = {
         Row: {
           active_model: string
           created_at: string | null
+          groq_api_key: string | null
           id: string
           name: string
           system_prompt: string
@@ -58,6 +59,7 @@ export type Database = {
         Insert: {
           active_model?: string
           created_at?: string | null
+          groq_api_key?: string | null
           id?: string
           name: string
           system_prompt: string
@@ -67,6 +69,7 @@ export type Database = {
         Update: {
           active_model?: string
           created_at?: string | null
+          groq_api_key?: string | null
           id?: string
           name?: string
           system_prompt?: string
