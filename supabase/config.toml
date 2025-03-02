@@ -45,3 +45,7 @@ verify_jwt = true
 
 [functions.groq-chat]
 verify_jwt = true
+
+[functions.generate-workout-plan-llama]
+verify_jwt = true
+timeout_seconds = 180
