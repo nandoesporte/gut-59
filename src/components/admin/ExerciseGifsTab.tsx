@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { ExerciseForm } from "./exercises/ExerciseForm";
 import { BatchUploadForm } from "./exercises/BatchUploadForm";
 import { FisioBatchUploadForm } from "./exercises/FisioBatchUploadForm";
+import { MultipleGifsUploadForm } from "./exercises/MultipleGifsUploadForm";
 import { ExerciseList } from "./exercises/ExerciseList";
 import { Exercise, PhysioExercise } from "./exercises/types";
 import { supabase } from "@/integrations/supabase/client";
@@ -138,8 +139,9 @@ export const ExerciseGifsTab = () => {
   return (
     <div className="space-y-8">
       <Tabs defaultValue="individual" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="individual">Upload Individual</TabsTrigger>
+          <TabsTrigger value="multiple">Upload Múltiplo</TabsTrigger>
           <TabsTrigger value="batch">Upload em Lote</TabsTrigger>
           <TabsTrigger value="fisio">Exercícios Fisioterapia</TabsTrigger>
         </TabsList>
@@ -148,6 +150,13 @@ export const ExerciseGifsTab = () => {
           <ExerciseForm 
             onSuccess={() => refetch()} 
             onCancel={() => {}} 
+          />
+        </TabsContent>
+
+        <TabsContent value="multiple">
+          <MultipleGifsUploadForm
+            onSuccess={() => refetch()}
+            onCancel={() => {}}
           />
         </TabsContent>
 
