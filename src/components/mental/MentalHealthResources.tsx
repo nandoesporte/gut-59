@@ -145,17 +145,26 @@ export const MentalHealthResources = () => {
         
         // Transition to next phase based on current phase
         if (phase === "prepare") {
-          // After prepare phase, go directly to inhale phase (skipping any hold)
-          breathe("inhale", BREATHING_CYCLE.inhale, newElapsedTime);
+          // After prepare phase, start count at 1 for the first real breath cycle
+          setExercise(prev => ({ 
+            ...prev, 
+            count: 1,
+            elapsedTime: newElapsedTime
+          }));
+          
+          // Give a small delay to ensure state updates before starting next phase
+          setTimeout(() => {
+            breathe("inhale", BREATHING_CYCLE.inhale, newElapsedTime);
+          }, 50);
         } else if (phase === "inhale") {
           breathe("hold", BREATHING_CYCLE.hold, newElapsedTime); // Hold breath
         } else if (phase === "hold") {
           breathe("exhale", BREATHING_CYCLE.exhale, newElapsedTime); // Exhale
         } else if (phase === "exhale") {
-          // After exhale, update the count and start a new cycle or complete
+          // After exhale, check if we should complete or continue with a new cycle
           const newCount = exercise.count + 1;
           
-          if (newCount >= exercise.totalBreaths || newElapsedTime >= 60) { // Stop at 1 minute (60 seconds)
+          if (newCount > exercise.totalBreaths || newElapsedTime >= 60) { // Stop at 1 minute (60 seconds)
             completeExercise();
             setExercise(prev => ({ 
               ...prev, 
