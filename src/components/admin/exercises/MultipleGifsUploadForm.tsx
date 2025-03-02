@@ -32,6 +32,7 @@ export const MultipleGifsUploadForm = ({
   const [exerciseType, setExerciseType] = useState<ExerciseType>("strength");
   const [difficulty, setDifficulty] = useState<Difficulty>("beginner");
   const [muscleGroup, setMuscleGroup] = useState("chest");
+  const [trainingLocation, setTrainingLocation] = useState("gym");
   const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
   const muscleGroupOptions = [
@@ -43,6 +44,13 @@ export const MultipleGifsUploadForm = ({
     { value: "core", label: "Core" },
     { value: "full_body", label: "Corpo Inteiro" },
     { value: "cardio", label: "Cardio" },
+  ];
+  
+  const locationOptions = [
+    { value: "gym", label: "Academia" },
+    { value: "home", label: "Casa" },
+    { value: "outdoor", label: "Ar Livre" },
+    { value: "anywhere", label: "Qualquer Lugar" },
   ];
 
   const validateFile = (file: File): boolean => {
@@ -112,6 +120,7 @@ export const MultipleGifsUploadForm = ({
           goals: ["fitness"],
           equipment_needed: [],
           is_compound_movement: false,
+          training_location: trainingLocation, // Add training location field
           // Default required fields for the exercises table
           max_reps: 12,
           min_reps: 8, 
@@ -148,7 +157,7 @@ export const MultipleGifsUploadForm = ({
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <Label>Tipo de Exercício</Label>
               <Select
@@ -196,6 +205,25 @@ export const MultipleGifsUploadForm = ({
                 </SelectTrigger>
                 <SelectContent>
                   {muscleGroupOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <Label>Local de Treino</Label>
+              <Select
+                value={trainingLocation}
+                onValueChange={setTrainingLocation}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o local de treino" />
+                </SelectTrigger>
+                <SelectContent>
+                  {locationOptions.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
                     </SelectItem>
