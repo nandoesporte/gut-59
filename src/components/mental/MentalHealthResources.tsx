@@ -9,7 +9,7 @@ import { Info, Timer } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface BreathingExercise {
-  phase: "inhale" | "hold" | "exhale";
+  phase: "prepare" | "inhale" | "hold" | "exhale";
   count: number;
   totalBreaths: number;
   isComplete: boolean;
@@ -24,6 +24,7 @@ interface MentalHealthSettings {
 
 // Define breathing cycle durations in seconds
 const BREATHING_CYCLE = {
+  prepare: 5,
   inhale: 4,
   hold: 7,
   exhale: 8
@@ -31,6 +32,7 @@ const BREATHING_CYCLE = {
 
 // Colors for each breathing phase
 const PHASE_COLORS = {
+  prepare: "#48A1A1", // Teal color
   inhale: "#48A1A1", // Teal color like in the image
   hold: "#9b87f5",   // Purple
   exhale: "#7E69AB"  // Darker purple
@@ -107,24 +109,24 @@ export const MentalHealthResources = () => {
     // Set starting state to show feedback immediately
     setIsStarting(true);
     
-    // Use setTimeout with 0ms to move exercise initialization to the next event loop
-    // This allows the UI to update with the loading state first
+    // Start with the prepare phase first
     setTimeout(() => {
       setExercise({
-        phase: "inhale",
+        phase: "prepare",
         count: 0,
         totalBreaths: 3, // Reduced to fit in 1 minute
         isComplete: false,
-        secondsLeft: BREATHING_CYCLE.inhale,
+        secondsLeft: BREATHING_CYCLE.prepare,
         elapsedTime: 0,
       });
       
-      breathe("inhale", BREATHING_CYCLE.inhale, 0);
+      // Start the prepare phase
+      breathe("prepare", BREATHING_CYCLE.prepare, 0);
       setIsStarting(false);
     }, 0);
   };
 
-  const breathe = (phase: "inhale" | "hold" | "exhale", duration: number, elapsedTime: number) => {
+  const breathe = (phase: "prepare" | "inhale" | "hold" | "exhale", duration: number, elapsedTime: number) => {
     setExercise(prev => ({
       ...prev,
       phase,
@@ -142,7 +144,10 @@ export const MentalHealthResources = () => {
         clearInterval(newTimer);
         
         // Transition to next phase based on current phase
-        if (phase === "inhale") {
+        if (phase === "prepare") {
+          // After prepare phase, start the first inhale phase
+          breathe("inhale", BREATHING_CYCLE.inhale, newElapsedTime);
+        } else if (phase === "inhale") {
           breathe("hold", BREATHING_CYCLE.hold, newElapsedTime); // Hold breath
         } else if (phase === "hold") {
           breathe("exhale", BREATHING_CYCLE.exhale, newElapsedTime); // Exhale
@@ -188,6 +193,7 @@ export const MentalHealthResources = () => {
 
   const getPhaseText = () => {
     switch (exercise.phase) {
+      case "prepare": return "Prepare-se";
       case "inhale": return "Inspire";
       case "hold": return "Segure";
       case "exhale": return "Expire";
@@ -201,6 +207,7 @@ export const MentalHealthResources = () => {
 
   const getPhaseInstruction = () => {
     switch (exercise.phase) {
+      case "prepare": return "Relaxe e prepare-se para começar";
       case "inhale": return "Inspire lentamente pelo nariz";
       case "hold": return "Segure o ar nos pulmões";
       case "exhale": return "Expire completamente pela boca";
@@ -241,13 +248,15 @@ export const MentalHealthResources = () => {
               </p>
             )}
             
-            {exercise.count > 0 && !exercise.isComplete ? (
+            {(exercise.count > 0 || exercise.phase === "prepare") && !exercise.isComplete ? (
               <div className="flex flex-col items-center space-y-6">
                 {/* Progress information */}
                 <div className="w-full text-center">
                   <p className="text-sm text-muted-foreground">
-                    Ciclo {exercise.count + 1} de {exercise.totalBreaths} • 
-                    <span className="ml-1">{Math.floor(exercise.elapsedTime)}s/{totalExerciseTime}s</span>
+                    {exercise.phase === "prepare" ? 
+                      "Preparando..." : 
+                      `Ciclo ${exercise.count + 1} de ${exercise.totalBreaths} • 
+                      ${Math.floor(exercise.elapsedTime)}s/${totalExerciseTime}s`}
                   </p>
                 </div>
                 
@@ -271,7 +280,9 @@ export const MentalHealthResources = () => {
                         ? "scale(1.0)" 
                         : exercise.phase === "hold" 
                           ? "scale(1.0)" 
-                          : "scale(0.85)"
+                          : exercise.phase === "exhale"
+                            ? "scale(0.85)"
+                            : "scale(0.95)" // for prepare phase
                     }}
                   >
                     {/* Central text showing phase */}
