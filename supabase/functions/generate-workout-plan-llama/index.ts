@@ -16,9 +16,10 @@ interface WorkoutPreferences {
   height: number;
   goal: string;
   activityLevel: string;
-  preferredExercises: string[];
+  preferredExerciseTypes: string[];
+  availableEquipment?: string[];
   healthConditions?: string[];
-  trainingLocation: string;
+  trainingLocation?: string;
 }
 
 serve(async (req) => {
@@ -29,7 +30,10 @@ serve(async (req) => {
 
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const { preferences, userId } = await req.json();
+    const requestData = await req.json();
+    const { preferences, userId, settings } = requestData;
+
+    console.log("Request received:", JSON.stringify({ preferences, userId, settings }, null, 2));
 
     if (!preferences || !userId) {
       return new Response(
@@ -38,20 +42,32 @@ serve(async (req) => {
       );
     }
 
-    // Recuperar as configurações do modelo
-    const { data: settings, error: settingsError } = await supabase
-      .from('ai_model_settings')
-      .select('*')
-      .eq('name', 'trene2025')
-      .maybeSingle();
+    // Validate preferences fields to ensure they exist
+    const validatedPreferences: WorkoutPreferences = {
+      age: preferences.age || 30,
+      gender: preferences.gender || "male",
+      weight: preferences.weight || 70,
+      height: preferences.height || 170,
+      goal: preferences.goal || "maintain",
+      activityLevel: preferences.activityLevel || "moderate",
+      preferredExerciseTypes: Array.isArray(preferences.preferredExerciseTypes) ? 
+                             preferences.preferredExerciseTypes : ["strength"],
+      availableEquipment: Array.isArray(preferences.availableEquipment) ? 
+                         preferences.availableEquipment : ["all"],
+      healthConditions: Array.isArray(preferences.healthConditions) ? 
+                       preferences.healthConditions : [],
+      trainingLocation: preferences.trainingLocation || "gym"
+    };
 
-    if (settingsError) {
-      console.error("Erro ao buscar configurações:", settingsError);
-      throw new Error("Erro ao buscar configurações do modelo");
-    }
+    // Use settings from request or defaults
+    const modelSettings = settings || {
+      active_model: 'llama3',
+      system_prompt: 'Você é TRENE2025, um treinador profissional especializado em criar planos de treino personalizados.',
+      use_custom_prompt: false
+    };
 
-    const systemPrompt = settings?.use_custom_prompt && settings?.system_prompt 
-      ? settings.system_prompt 
+    const systemPrompt = modelSettings.use_custom_prompt && modelSettings.system_prompt 
+      ? modelSettings.system_prompt 
       : `Você é TRENE2025, um treinador profissional especializado em criar planos de treino personalizados.
          Crie um plano de treino completo e detalhado com base nas informações do usuário.
          O plano deve ter 3-5 dias de treino por semana, com cada dia focando em grupos musculares específicos.
@@ -61,15 +77,16 @@ serve(async (req) => {
     const content = `
     Crie um plano de treino personalizado com as seguintes informações:
     
-    Idade: ${preferences.age}
-    Gênero: ${preferences.gender}
-    Peso: ${preferences.weight}kg
-    Altura: ${preferences.height}cm
-    Objetivo: ${preferences.goal}
-    Nível de atividade: ${preferences.activityLevel}
-    Exercícios preferidos: ${preferences.preferredExercises.join(', ')}
-    ${preferences.healthConditions?.length ? `Condições de saúde: ${preferences.healthConditions.join(', ')}` : ''}
-    Local de treino: ${preferences.trainingLocation}
+    Idade: ${validatedPreferences.age}
+    Gênero: ${validatedPreferences.gender}
+    Peso: ${validatedPreferences.weight}kg
+    Altura: ${validatedPreferences.height}cm
+    Objetivo: ${validatedPreferences.goal}
+    Nível de atividade: ${validatedPreferences.activityLevel}
+    Exercícios preferidos: ${validatedPreferences.preferredExerciseTypes.join(', ')}
+    ${validatedPreferences.healthConditions && validatedPreferences.healthConditions.length ? 
+      `Condições de saúde: ${validatedPreferences.healthConditions.join(', ')}` : 'Sem condições de saúde específicas'}
+    Local de treino: ${validatedPreferences.trainingLocation || 'academia'}
     
     Estruture o plano no seguinte formato JSON:
     {
@@ -102,6 +119,16 @@ serve(async (req) => {
 
     // Fazer a requisição para a API do Llama
     console.log("Enviando requisição para o Llama 3...");
+    
+    // Check if LLAMA_API_KEY is configured
+    if (!LLAMA_API_KEY) {
+      console.error("LLAMA_API_KEY não configurada");
+      return new Response(
+        JSON.stringify({ error: "Erro de configuração do serviço. Contate o administrador." }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      );
+    }
+    
     const llamaResponse = await fetch(LLAMA_API_URL, {
       method: "POST",
       headers: {

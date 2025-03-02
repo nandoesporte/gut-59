@@ -1,4 +1,5 @@
 
 project_id = "sxjafhzikftdenqnkcri"
-# Increase the timeout for this function to allow the LLM more processing time
-timeout_seconds = 60
+app_version = "v1"
+timeout_ms = 60000 # Aumentado para 60s pois o modelo pode demorar para responder
+import_map = "../import_map.json"
