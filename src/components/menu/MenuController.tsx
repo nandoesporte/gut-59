@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,8 +11,8 @@ import { searchFood } from "./utils/food-api";
 export interface CalorieCalculatorForm {
   weight: string;
   height: string;
-  age: string;  // Changed from number to string for compatibility
-  gender: "male" | "female";  // Changed from string to union type to match CalorieCalculator
+  age: string;
+  gender: "male" | "female";
   activityLevel: string;
   goal: string;
 }
@@ -24,14 +23,14 @@ export const useMenuController = () => {
   const [formData, setFormData] = useState<CalorieCalculatorForm>({
     weight: "70",
     height: "175",
-    age: "30",  // Changed from number to string
+    age: "30",
     gender: "male",
     activityLevel: "moderate",
     goal: "maintain",
   });
   const [calorieNeeds, setCalorieNeeds] = useState<number | null>(null);
   const [protocolFoods, setProtocolFoods] = useState<ProtocolFood[]>([]);
-  const [selectedFoods, setSelectedFoods] = useState<string[]>([]);  // Changed to string[] to match expected type
+  const [selectedFoods, setSelectedFoods] = useState<string[]>([]);
   const [totalCalories, setTotalCalories] = useState(0);
   const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
   const [loading, setLoading] = useState(false);
@@ -53,13 +52,11 @@ export const useMenuController = () => {
       recipientId?: string;
       qrCodeId?: string;
     }) => {
-      // Get user's wallet ID first
       const { data: userData } = await supabase.auth.getUser();
       if (!userData?.user?.id) {
         throw new Error("User not authenticated");
       }
       
-      // Get the wallet ID for this user
       const { data: walletData, error: walletError } = await supabase
         .from("wallets")
         .select("id")
@@ -71,14 +68,13 @@ export const useMenuController = () => {
         throw walletError;
       }
       
-      // Now insert the transaction with wallet_id instead of user_id
       const { data, error } = await supabase.from("fit_transactions").insert({
         amount,
-        transaction_type: type,  // Changed from type to transaction_type
+        transaction_type: type,
         description,
         recipient_id: recipientId,
         qr_code_id: qrCodeId,
-        wallet_id: walletData.id,  // Use wallet_id instead of user_id
+        wallet_id: walletData.id,
       });
 
       if (error) {
@@ -129,7 +125,6 @@ export const useMenuController = () => {
     const { weight, height, age, gender, activityLevel, goal } = formData;
     let bmr: number;
 
-    // Parse age from string to number
     const ageNum = parseInt(age, 10);
 
     if (gender === "male") {
@@ -183,7 +178,6 @@ export const useMenuController = () => {
 
     setSelectedFoods(newSelection);
     
-    // Calculate total calories based on selected food IDs
     const total = newSelection.reduce((acc, id) => {
       const food = protocolFoods.find(f => f.id === id);
       return acc + (food?.calories || 0);
@@ -208,7 +202,7 @@ export const useMenuController = () => {
     try {
       const accessResult = await verifyPlanAccess();
 
-      if (!accessResult.hasAccess) {
+      if (!accessResult.hasAccess && accessResult.requiresPayment) {
         const message =
           accessResult.message || "Pagamento necessário para gerar novo plano";
         console.log("Acesso negado:", message);
@@ -232,10 +226,11 @@ export const useMenuController = () => {
         return false;
       }
 
-      // Get the actual food objects from the selected IDs
       const selectedFoodObjects = protocolFoods.filter(food => 
         selectedFoods.includes(food.id)
       );
+
+      console.log("Iniciando geração do plano alimentar...");
 
       const mealPlanData = await generateMealPlan({
         userData: {
@@ -253,6 +248,7 @@ export const useMenuController = () => {
         addTransaction: addTransactionMutation.mutate,
       });
 
+      console.log("Plano alimentar gerado com sucesso:", mealPlanData);
       setMealPlan(mealPlanData);
       updateSearchParams(4);
       return true;
@@ -315,8 +311,8 @@ export const useMenuController = () => {
       console.log("Resposta da função grant-plan-access:", grantData);
 
       return {
-        hasAccess: grantData.hasAccess || false,
-        requiresPayment: grantData.requiresPayment || true,
+        hasAccess: !grantData.requiresPayment,
+        requiresPayment: grantData.requiresPayment || false,
         price: settings?.price || 0,
         message: grantData.message,
       };

@@ -1,293 +1,216 @@
 
-import { corsHeaders } from "../_shared/cors.ts";
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
-// Get environment variables
-const LLAMA_API_KEY = Deno.env.get("LLAMA_API_KEY");
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
+// Define CORS headers
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
-if (!LLAMA_API_KEY) {
-  console.error("LLAMA_API_KEY is not set");
-}
+// Create a Supabase client
+const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.error("SUPABASE_URL or SUPABASE_ANON_KEY is not set");
-}
-
-Deno.serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
+serve(async (req) => {
+  // Handle CORS preflight request
+  if (req.method === 'OPTIONS') {
     return new Response(null, {
+      headers: { ...corsHeaders },
       status: 204,
-      headers: corsHeaders,
     });
   }
 
   try {
-    // Get request body
+    // Parse request body
     const requestData = await req.json();
-    console.log("Generating meal plan with Llama API using nous-hermes-2-mixtral-8x7b model");
-    console.log("Request data:", JSON.stringify(requestData, null, 2));
-    
-    // Create system prompt
-    const systemPrompt = `You are an expert nutritionist with a focus on creating personalized meal plans. 
-Create a comprehensive 7-day meal plan that aligns with the user's daily caloric needs of ${requestData.userData.dailyCalories} calories.
-The meal plan should support their ${requestData.userData.goal} goal and take into account their personal details (weight: ${requestData.userData.weight}kg, height: ${requestData.userData.height}cm, age: ${requestData.userData.age}, gender: ${requestData.userData.gender}).
-They prefer to exercise at ${requestData.dietaryPreferences.trainingTime || "no specific time"}.
-Their activity level is ${requestData.userData.activityLevel}.
+    const { userData, selectedFoods, foodsByMealType, dietaryPreferences } = requestData;
 
-Include only foods from their selected list: ${requestData.selectedFoods.map(food => food.name).join(', ')}.
-
-${requestData.dietaryPreferences.hasAllergies ? `IMPORTANT - They have the following allergies: ${requestData.dietaryPreferences.allergies.join(', ')}. Avoid these allergenic foods entirely.` : 'They have no allergies.'} 
-
-${requestData.dietaryPreferences.dietaryRestrictions?.length > 0 ? `They have the following dietary restrictions: ${requestData.dietaryPreferences.dietaryRestrictions.join(', ')}. Respect these restrictions.` : 'They have no specific dietary restrictions.'}
-
-Structure the meal plan with the following format:
-- Daily meals should include: breakfast, morning snack, lunch, afternoon snack, and dinner
-- For each meal, provide:
-  * A brief description
-  * List of foods with portions in grams
-  * Approximate calories
-  * Macros (protein, carbs, fats, fiber in grams)
-- Include daily nutrition totals
-- Provide weekly averages for calories and macros
-- Add 5-7 personalized nutrition recommendations
-
-The response MUST be a valid JSON object with the following structure:
-{
-  "weeklyPlan": {
-    "monday": {
-      "dayName": "Monday",
-      "meals": {
-        "breakfast": {
-          "foods": [
-            {"name": "food name", "portion": number, "unit": "g", "details": "description"}
-          ],
-          "calories": number,
-          "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number},
-          "description": "meal description"
-        },
-        "morningSnack": {...},
-        "lunch": {...},
-        "afternoonSnack": {...},
-        "dinner": {...}
-      },
-      "dailyTotals": {"calories": number, "protein": number, "carbs": number, "fats": number, "fiber": number}
-    },
-    "tuesday": {...},
-    ...
-    "sunday": {...}
-  },
-  "weeklyTotals": {
-    "averageCalories": number,
-    "averageProtein": number,
-    "averageCarbs": number,
-    "averageFats": number,
-    "averageFiber": number
-  },
-  "recommendations": ["recommendation 1", "recommendation 2", ...]
-}
-
-Your response must be ONLY the valid JSON, nothing else. No explanations, no text, no markdown.`;
-
-    // Create prompt for Llama API
-    const userMessage = "Create a personalized meal plan based on the provided information.";
-
-    try {
-      // Call the Llama API with the correct endpoint and model
-      const response = await fetch("https://api.llama-api.com/api/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${LLAMA_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: "nous-hermes-2-mixtral-8x7b", // Corrected model name
-          messages: [
-            {
-              role: "system",
-              content: systemPrompt
-            },
-            {
-              role: "user",
-              content: userMessage
-            }
-          ],
-          temperature: 0.7,
-          max_tokens: 4000,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("Error from Llama API:", JSON.stringify(errorData, null, 2));
-        throw new Error(`HTTP error! status: ${response.status}, details: ${JSON.stringify(errorData)}`);
-      }
-
-      const responseData = await response.json();
-      console.log("Llama API response received.");
-      
-      // Extract the meal plan from the response
-      let mealPlanJson;
-      try {
-        // Get the content from the response
-        const content = responseData.choices[0].message.content;
-        
-        // Try to parse the JSON content
-        // First, try to clean up any potential markdown formatting
-        let cleanedContent = content;
-        if (content.includes("```json")) {
-          cleanedContent = content.split("```json")[1].split("```")[0].trim();
-        } else if (content.includes("```")) {
-          cleanedContent = content.split("```")[1].split("```")[0].trim();
-        }
-        
-        // Parse the JSON
-        mealPlanJson = JSON.parse(cleanedContent);
-        console.log("Successfully parsed meal plan JSON");
-      } catch (error) {
-        console.error("Error parsing meal plan JSON:", error);
-        console.log("Raw content:", responseData.choices[0].message.content);
-        // Provide a fallback simple meal plan
-        mealPlanJson = {
-          weeklyPlan: {
-            monday: {
-              dayName: "Monday",
-              meals: {
-                breakfast: {
-                  foods: [
-                    { name: "Default food", portion: 100, unit: "g", details: "Default description" }
-                  ],
-                  calories: 500,
-                  macros: { protein: 30, carbs: 50, fats: 20, fiber: 5 },
-                  description: "Default breakfast"
-                },
-                morningSnack: {
-                  foods: [
-                    { name: "Default snack", portion: 50, unit: "g", details: "Default description" }
-                  ],
-                  calories: 200,
-                  macros: { protein: 10, carbs: 25, fats: 10, fiber: 2 },
-                  description: "Default morning snack"
-                },
-                lunch: {
-                  foods: [
-                    { name: "Default lunch", portion: 150, unit: "g", details: "Default description" }
-                  ],
-                  calories: 700,
-                  macros: { protein: 40, carbs: 70, fats: 30, fiber: 8 },
-                  description: "Default lunch"
-                },
-                afternoonSnack: {
-                  foods: [
-                    { name: "Default snack", portion: 50, unit: "g", details: "Default description" }
-                  ],
-                  calories: 200,
-                  macros: { protein: 10, carbs: 25, fats: 10, fiber: 2 },
-                  description: "Default afternoon snack"
-                },
-                dinner: {
-                  foods: [
-                    { name: "Default dinner", portion: 150, unit: "g", details: "Default description" }
-                  ],
-                  calories: 600,
-                  macros: { protein: 35, carbs: 60, fats: 25, fiber: 7 },
-                  description: "Default dinner"
-                }
-              },
-              dailyTotals: { calories: 2200, protein: 125, carbs: 230, fats: 95, fiber: 24 }
-            }
-          },
-          weeklyTotals: {
-            averageCalories: 2200,
-            averageProtein: 125,
-            averageCarbs: 230,
-            averageFats: 95,
-            averageFiber: 24
-          },
-          recommendations: ["Eat a balanced diet.", "Stay hydrated.", "Consume protein with each meal."]
-        };
-        
-        // Copy the Monday plan to all days of the week
-        const mondayPlan = mealPlanJson.weeklyPlan.monday;
-        const daysOfWeek = ["tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
-        daysOfWeek.forEach(day => {
-          mealPlanJson.weeklyPlan[day] = JSON.parse(JSON.stringify(mondayPlan));
-          mealPlanJson.weeklyPlan[day].dayName = day.charAt(0).toUpperCase() + day.slice(1);
-        });
-      }
-
-      // Save the meal plan to the database if requested
-      if (requestData.userData.userId) {
-        try {
-          // Create a Supabase client
-          const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-          const supabase = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!);
-          
-          // Insert the meal plan into the database
-          const { data: planData, error: planError } = await supabase
-            .from('meal_plans')
-            .insert({
-              user_id: requestData.userData.userId,
-              plan_data: mealPlanJson,
-              daily_calories: requestData.userData.dailyCalories,
-              dietary_preferences: JSON.stringify(requestData.dietaryPreferences),
-              created_at: new Date().toISOString()
-            });
-            
-          if (planError) {
-            console.error("Error saving meal plan to database:", planError);
-          } else {
-            console.log("Meal plan saved to database successfully");
+    if (!userData || !selectedFoods) {
+      return new Response(
+        JSON.stringify({ error: "Invalid request data" }),
+        {
+          status: 400,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json"
           }
-        } catch (dbError) {
-          console.error("Error interacting with database:", dbError);
-        }
-      }
-
-      // Return the response
-      return new Response(
-        JSON.stringify({
-          mealPlan: mealPlanJson,
-          message: "Meal plan generated successfully with Llama API"
-        }),
-        {
-          status: 200,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-    } catch (llamaError) {
-      console.error("Error calling Llama API:", llamaError);
-      return new Response(
-        JSON.stringify({
-          error: `Error calling Llama API: ${llamaError.message}`,
-          message: "Failed to generate meal plan"
-        }),
-        {
-          status: 500,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
         }
       );
     }
-  } catch (error) {
-    console.error("Error processing request:", error);
-    return new Response(
-      JSON.stringify({
-        error: `Error processing request: ${error.message}`,
-        message: "Failed to process request"
-      }),
+
+    console.log("Generating meal plan for user:", userData.userId);
+    console.log("Using Llama API for meal plan generation");
+
+    // Prepare prompt for the Llama model
+    const systemPrompt = `
+      You are a professional nutritionist AI specialized in creating personalized meal plans.
+      Create a detailed weekly meal plan based on the user's requirements.
+      Include calories and macros (protein, carbs, fats, fiber) for each meal and daily totals.
+      Use only the foods provided in the selectedFoods list.
+      Format your response as a valid, clean JSON object without any explanations or markdown.
+    `;
+
+    // Create user prompt with all the details
+    const userPrompt = `
+      Create a 7-day meal plan for a person with these characteristics:
+      - Weight: ${userData.weight}kg
+      - Height: ${userData.height}cm
+      - Age: ${userData.age}
+      - Gender: ${userData.gender}
+      - Activity level: ${userData.activityLevel}
+      - Goal: ${userData.goal}
+      - Daily calorie target: ${userData.dailyCalories} calories
+
+      ${dietaryPreferences?.hasAllergies ? 
+        `Allergies: ${dietaryPreferences.allergies?.join(", ")}` : 
+        "No allergies"}
+      ${dietaryPreferences?.dietaryRestrictions?.length > 0 ? 
+        `Dietary restrictions: ${dietaryPreferences.dietaryRestrictions.join(", ")}` : 
+        "No dietary restrictions"}
+      ${dietaryPreferences?.trainingTime ? 
+        `Training time: ${dietaryPreferences.trainingTime}` : 
+        "No specific training time"}
+
+      Available foods (use ONLY these foods):
+      ${JSON.stringify(selectedFoods, null, 2)}
+
+      Create a JSON object with this structure:
       {
-        status: 400,
+        "weeklyPlan": {
+          "monday": {
+            "dayName": "Monday",
+            "meals": {
+              "breakfast": {
+                "foods": [
+                  {"name": "Food Name", "portion": 100, "unit": "g", "details": "Additional information"}
+                ],
+                "calories": 500,
+                "macros": {"protein": 30, "carbs": 40, "fats": 20, "fiber": 5}
+              },
+              "morningSnack": {...},
+              "lunch": {...},
+              "afternoonSnack": {...},
+              "dinner": {...}
+            },
+            "dailyTotals": {"calories": 2000, "protein": 120, "carbs": 180, "fats": 70, "fiber": 25}
+          },
+          "tuesday": {...},
+          ...
+          "sunday": {...}
+        },
+        "weeklyTotals": {
+          "averageCalories": 2000,
+          "averageProtein": 120,
+          "averageCarbs": 180,
+          "averageFats": 70,
+          "averageFiber": 25
+        },
+        "recommendations": {
+          "general": "General nutrition advice",
+          "preworkout": "Pre-workout meal advice",
+          "postworkout": "Post-workout meal advice",
+          "timing": ["Meal timing tip 1", "Meal timing tip 2"]
+        }
+      }
+
+      IMPORTANT: Return ONLY the JSON object, without any explanations, code blocks, or additional text.
+    `;
+
+    // Call the Llama API via our edge function
+    console.log("Calling Llama API via edge function...");
+    const { data: llamaResponse, error: llamaError } = await supabase.functions.invoke(
+      "llama-edge",
+      {
+        body: {
+          prompt: userPrompt,
+          model: "nous-hermes-2-mixtral-8x7b",
+          maxTokens: 4000,
+          temperature: 0.7
+        }
+      }
+    );
+
+    if (llamaError) {
+      console.error("Error calling Llama API:", llamaError);
+      throw new Error(`Failed to generate meal plan: ${llamaError.message}`);
+    }
+
+    if (!llamaResponse || !llamaResponse.choices || llamaResponse.choices.length === 0) {
+      console.error("Invalid response from Llama API:", llamaResponse);
+      throw new Error("Failed to generate meal plan: Invalid response");
+    }
+
+    // Extract and parse the response
+    const responseText = llamaResponse.choices[0].message.content.trim();
+    console.log("Llama API response (preview):", responseText.substring(0, 500) + "...");
+
+    // Try to extract JSON from the response
+    let mealPlanJson;
+    try {
+      // Try to extract JSON if it's wrapped in code blocks or has extra text
+      const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/) || 
+                        responseText.match(/```([\s\S]*?)```/) ||
+                        responseText.match(/\{[\s\S]*\}/);
+                        
+      const jsonStr = jsonMatch ? jsonMatch[0].replace(/```json\n|```/g, '') : responseText;
+      mealPlanJson = JSON.parse(jsonStr);
+    } catch (jsonError) {
+      console.error("Error parsing JSON from Llama response:", jsonError);
+      console.log("Response that failed to parse:", responseText);
+      throw new Error("Failed to parse meal plan data");
+    }
+
+    // Save the meal plan to the database if needed
+    if (userData.userId) {
+      try {
+        const { error: saveError } = await supabase
+          .from('meal_plans')
+          .insert({
+            user_id: userData.userId,
+            plan_data: mealPlanJson,
+            daily_calories: userData.dailyCalories,
+            dietary_preferences: dietaryPreferences ? JSON.stringify(dietaryPreferences) : null,
+            created_at: new Date().toISOString()
+          });
+
+        if (saveError) {
+          console.error("Error saving meal plan to database:", saveError);
+          // Continue even if save fails
+        } else {
+          console.log("Meal plan saved to database for user:", userData.userId);
+        }
+      } catch (dbError) {
+        console.error("Error during database save:", dbError);
+        // Continue even if save fails
+      }
+    }
+
+    // Return the meal plan
+    return new Response(
+      JSON.stringify({ mealPlan: mealPlanJson }),
+      {
         headers: {
           ...corsHeaders,
-          "Content-Type": "application/json",
-        },
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+  } catch (error) {
+    console.error("Error generating meal plan:", error);
+    return new Response(
+      JSON.stringify({
+        error: "Failed to generate meal plan",
+        details: error.message
+      }),
+      {
+        status: 500,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json"
+        }
       }
     );
   }
