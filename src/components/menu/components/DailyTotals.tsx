@@ -1,5 +1,5 @@
 
-import { MacroDistributionBar } from "./MacroDistributionBar";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface DailyTotalsProps {
   totalNutrition: {
@@ -13,33 +13,38 @@ interface DailyTotalsProps {
 
 export const DailyTotals = ({ totalNutrition }: DailyTotalsProps) => {
   return (
-    <div className="py-6 border-t mt-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h3 className="font-semibold text-lg text-green-700">Totais Diários</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-2 text-sm text-gray-600">
-            <div>Proteínas: {totalNutrition.protein}g</div>
-            <div>Carboidratos: {totalNutrition.carbs}g</div>
-            <div>Gorduras: {totalNutrition.fats}g</div>
-            <div>Fibras: {totalNutrition.fiber}g</div>
+    <Card>
+      <CardContent className="p-4">
+        <h3 className="text-lg font-medium mb-4">Totais Diários</h3>
+        <div className="flex justify-between items-center">
+          <div>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="flex items-center">
+                <span className="inline-block w-3 h-3 bg-blue-500 rounded-full mr-1.5"></span>
+                <span>Proteínas: {totalNutrition.protein}g</span>
+              </div>
+              <div className="flex items-center">
+                <span className="inline-block w-3 h-3 bg-green-500 rounded-full mr-1.5"></span>
+                <span>Carboidratos: {totalNutrition.carbs}g</span>
+              </div>
+              <div className="flex items-center">
+                <span className="inline-block w-3 h-3 bg-yellow-500 rounded-full mr-1.5"></span>
+                <span>Gorduras: {totalNutrition.fats}g</span>
+              </div>
+              <div className="flex items-center">
+                <span className="inline-block w-3 h-3 bg-purple-500 rounded-full mr-1.5"></span>
+                <span>Fibras: {totalNutrition.fiber || 0}g</span>
+              </div>
+            </div>
           </div>
-          <div className="mt-4">
-            <MacroDistributionBar
-              macros={{
-                protein: totalNutrition.protein,
-                carbs: totalNutrition.carbs,
-                fats: totalNutrition.fats
-              }}
-            />
+          <div className="text-right">
+            <div className="text-2xl font-bold text-green-600">
+              {totalNutrition.calories}
+            </div>
+            <div className="text-sm text-gray-600">kcal totais</div>
           </div>
         </div>
-        <div className="text-right">
-          <div className="text-2xl font-bold text-green-600">
-            {totalNutrition.calories}
-          </div>
-          <div className="text-sm text-gray-600">kcal totais</div>
-        </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 };

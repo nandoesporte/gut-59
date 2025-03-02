@@ -175,17 +175,24 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
                   <div>
                     <div className="space-y-4">
                       <DailyTotals
-                        calories={dayData.dailyTotals?.calories || 0}
-                        macros={dayData.dailyTotals || {}}
+                        totalNutrition={dayData.dailyTotals || {
+                          calories: 0,
+                          protein: 0,
+                          carbs: 0,
+                          fats: 0,
+                          fiber: 0
+                        }}
                       />
                       
                       <Card>
                         <CardContent className="p-4">
                           <h3 className="text-lg font-medium mb-4">Distribuição de Macronutrientes</h3>
                           <MacroDistributionBar
-                            protein={dayData.dailyTotals?.protein || 0}
-                            carbs={dayData.dailyTotals?.carbs || 0}
-                            fats={dayData.dailyTotals?.fats || 0}
+                            macros={{
+                              protein: dayData.dailyTotals?.protein || 0,
+                              carbs: dayData.dailyTotals?.carbs || 0,
+                              fats: dayData.dailyTotals?.fats || 0
+                            }}
                           />
                           <div className="flex text-xs text-gray-500 justify-between mt-2">
                             <div>Proteínas</div>
