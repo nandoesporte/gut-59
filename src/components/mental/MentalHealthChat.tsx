@@ -44,11 +44,12 @@ export const MentalHealthChat = () => {
     setIsLoading(true);
 
     try {
-      // Using the groq-chat edge function with Mixtral model
+      // Using the groq-chat edge function with Mistral Saba 24B model
       const { data, error } = await supabase.functions.invoke("groq-chat", {
         body: { 
           message: input,
-          history: messages
+          history: messages,
+          model: "mistral-saba-24b" // Specify the Mistral Saba 24B model
         },
       });
 
@@ -66,7 +67,7 @@ export const MentalHealthChat = () => {
       console.error("Erro ao enviar mensagem:", error);
       toast({
         title: "Erro na comunicação",
-        description: "Não foi possível obter resposta do modelo Mixtral. Tente novamente mais tarde.",
+        description: "Não foi possível obter resposta do modelo Mistral Saba 24B. Tente novamente mais tarde.",
         variant: "destructive",
       });
     } finally {

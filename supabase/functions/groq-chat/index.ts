@@ -1,9 +1,11 @@
 
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
+// Follow this setup guide to integrate the Deno language server with your editor:
+// https://deno.land/manual/getting_started/setup_your_environment
+// This enables autocomplete, go to definition, etc.
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const groqApiKey = Deno.env.get('GROQ_API_KEY');
-
+// Define CORS headers for browser requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -16,68 +18,95 @@ serve(async (req) => {
   }
 
   try {
-    const { message, history } = await req.json();
-
-    // Convert history to Groq's expected format
-    const messages = [
-      { 
-        role: "system", 
-        content: "Você é um assistente de saúde mental útil, empático e informativo. Você responde perguntas relacionadas à saúde mental, bem-estar emocional e psicológico. Você oferece conselhos gerais e estratégias de bem-estar, mas deixa claro que não substitui profissionais de saúde mental. Suas respostas são acolhedoras, respeitosas e em português do Brasil." 
-      }
-    ];
+    const { message, history, model = "mistral-saba-24b" } = await req.json();
     
-    // Add conversation history
-    if (history && Array.isArray(history)) {
-      history.forEach((msg) => {
-        messages.push({
-          role: msg.role,
-          content: msg.content
-        });
-      });
+    if (!message) {
+      return new Response(
+        JSON.stringify({ error: "Mensagem não fornecida" }),
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400 
+        }
+      );
     }
+
+    console.log(`Processando mensagem do usuário com o modelo ${model}`);
     
-    // Add current message
-    messages.push({
+    // Formatar histórico de mensagens para o formato esperado pela API Groq
+    const formattedHistory = history?.map((msg: { role: string; content: string }) => ({
+      role: msg.role === "user" ? "user" : "assistant",
+      content: msg.content
+    })) || [];
+    
+    // Adicionar a nova mensagem do usuário ao histórico
+    formattedHistory.push({
       role: "user",
       content: message
     });
+    
+    // Adicionar instruções de sistema
+    const systemPrompt = "Você é um assistente de saúde mental especializado em suporte emocional para pacientes brasileiros. Responda com empatia e em português brasileiro. Ofereça conselhos úteis, não-medicamentosos baseados em terapias cognitivo-comportamentais e práticas de bem-estar. Mantenha suas respostas concisas, com no máximo 3 parágrafos. Se o usuário apresentar sinais de crise ou emergência, sugira buscar ajuda profissional imediata.";
 
-    console.log("Sending request to Groq API with messages:", JSON.stringify(messages));
+    const messages = [
+      {
+        role: "system",
+        content: systemPrompt
+      },
+      ...formattedHistory
+    ];
 
-    // Using Mixtral 8x7B model
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
+    // Chamar a API Groq
+    const apiKey = Deno.env.get("GROQ_API_KEY");
+    if (!apiKey) {
+      throw new Error("GROQ_API_KEY não está definida");
+    }
+    
+    console.log(`Enviando ${messages.length} mensagens para a API Groq`);
+    
+    const response = await fetch(`https://api.groq.com/openai/v1/chat/completions`, {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${groqApiKey}`,
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'mixtral-8x7b-32768',
+        model: model,
         messages: messages,
-        max_tokens: 1024,
         temperature: 0.7,
-      }),
+        max_tokens: 800,
+      })
     });
 
     if (!response.ok) {
-      const errorData = await response.text();
-      console.error('Groq API error:', errorData);
-      throw new Error(`Groq API error: ${response.status} ${errorData}`);
+      const errorText = await response.text();
+      console.error(`Erro na API Groq: ${response.status}`, errorText);
+      throw new Error(`Erro na API Groq: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    console.log("Received response from Groq API:", JSON.stringify(data));
-
-    return new Response(JSON.stringify({ 
-      response: data.choices[0].message.content 
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.log("Resposta da API Groq recebida com sucesso");
+    
+    // Extrair a resposta do assistente
+    const assistantResponse = data.choices[0]?.message?.content || "Desculpe, não consegui processar sua solicitação.";
+    
+    return new Response(
+      JSON.stringify({ response: assistantResponse }),
+      { 
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      }
+    );
   } catch (error) {
-    console.error('Error in groq-chat function:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.error("Erro ao processar solicitação:", error);
+    
+    return new Response(
+      JSON.stringify({ 
+        error: "Erro ao processar a solicitação",
+        details: error.message 
+      }),
+      { 
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500 
+      }
+    );
   }
 });
