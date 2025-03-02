@@ -57,17 +57,46 @@ Você deve fornecer um plano completo, com exercícios, séries, repetições e 
     try {
       setLoading(true);
       
-      const { error } = await supabase
+      // Primeiro verificamos se o registro já existe
+      const { data, error: fetchError } = await supabase
         .from('ai_model_settings')
-        .upsert({
-          name: 'trene2025',
-          active_model: aiSettings.activeModel,
-          system_prompt: aiSettings.systemPrompt,
-          use_custom_prompt: aiSettings.useCustomPrompt,
-          updated_at: new Date().toISOString()
-        });
+        .select('id')
+        .eq('name', 'trene2025')
+        .maybeSingle();
+      
+      if (fetchError) throw fetchError;
+      
+      let saveError;
+      
+      if (data) {
+        // Se o registro existe, atualizamos usando o id
+        const { error } = await supabase
+          .from('ai_model_settings')
+          .update({
+            active_model: aiSettings.activeModel,
+            system_prompt: aiSettings.systemPrompt,
+            use_custom_prompt: aiSettings.useCustomPrompt,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', data.id);
+        
+        saveError = error;
+      } else {
+        // Se não existe, criamos um novo
+        const { error } = await supabase
+          .from('ai_model_settings')
+          .insert({
+            name: 'trene2025',
+            active_model: aiSettings.activeModel,
+            system_prompt: aiSettings.systemPrompt,
+            use_custom_prompt: aiSettings.useCustomPrompt,
+            updated_at: new Date().toISOString()
+          });
+        
+        saveError = error;
+      }
 
-      if (error) throw error;
+      if (saveError) throw saveError;
       
       toast.success('Configurações salvas com sucesso');
     } catch (error) {
