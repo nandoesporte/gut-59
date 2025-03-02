@@ -1,526 +1,297 @@
 
-import "xhr";
 import { serve } from "std/server";
+import xhr from "xhr";
 import { createClient } from "@supabase/supabase-js";
 
-// CORS headers for browser requests
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Initialize Supabase client with environment variables
-const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-// AIML API token
-const AIML_API_TOKEN = "JWT"; // Replace with your actual JWT token
+const AIML_API_KEY = "a5463eee746b41b8b267b7492648a9f3";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
 serve(async (req) => {
-  console.log("Edge Function: generate-meal-plan-llama started");
-  
   // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
+    console.log("Handling CORS preflight request");
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Parse the request body
+    console.log("Received request to generate-meal-plan-llama");
     const requestData = await req.json();
-    console.log("Received request data:", JSON.stringify(requestData, null, 2));
-
-    const { userData, selectedFoods, foodsByMealType, dietaryPreferences, modelConfig } = requestData;
     
-    if (!userData || !userData.dailyCalories) {
-      throw new Error("Missing required user data or calorie information");
+    console.log("Request data:", JSON.stringify(requestData, null, 2));
+    const { userData, selectedFoods, dietaryPreferences, modelConfig } = requestData;
+    
+    if (!userData || !selectedFoods) {
+      console.error("Missing required data in request");
+      return new Response(
+        JSON.stringify({ error: "Missing required userData or selectedFoods" }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      );
     }
 
-    // Create a system prompt with all the necessary details
-    const systemPrompt = createSystemPrompt(userData, selectedFoods, foodsByMealType, dietaryPreferences);
-    console.log("Generated system prompt");
-
-    // Create messages array for the AIML API
-    const messages = [
-      {
-        role: "system",
-        content: systemPrompt
-      },
-      {
-        role: "user",
-        content: `Generate a complete weekly meal plan for someone with ${userData.dailyCalories} calories per day, following their dietary preferences and using their preferred foods.`
-      }
-    ];
-
-    console.log("Calling AIML API with Nous-Hermes-2-Mixtral-8x7B-DPO model");
+    console.log(`Generating meal plan for user ${userData.userId} with ${selectedFoods.length} foods`);
+    console.log(`Dietary preferences:`, JSON.stringify(dietaryPreferences, null, 2));
+    
+    // Create a system prompt that guides the AI to generate a well-structured meal plan
+    const systemPrompt = createSystemPrompt(userData, dietaryPreferences);
+    
+    // Create a user prompt with the specific foods and requirements
+    const userPrompt = createUserPrompt(userData, selectedFoods, dietaryPreferences);
+    
+    console.log("Calling AIML API with model: NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO");
     
     // Call the AIML API
-    const aimlResponse = await callAIMLAPI(messages);
-    console.log("Received response from AIML API");
+    const response = await fetch("https://api.aimlapi.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${AIML_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
+        messages: [
+          {
+            role: "system",
+            content: systemPrompt
+          },
+          {
+            role: "user",
+            content: userPrompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 4000,
+        top_p: 0.95,
+        stream: false,
+        response_format: { type: "json_object" }
+      }),
+    });
 
-    // Parse the response and format it into a meal plan structure
-    const mealPlan = parseMealPlanResponse(aimlResponse, userData);
-    console.log("Successfully parsed meal plan structure");
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`AIML API error (${response.status}):`, errorText);
+      throw new Error(`AIML API returned error ${response.status}: ${errorText}`);
+    }
 
-    // Save the meal plan data to the database (optional)
+    const responseData = await response.json();
+    console.log("AIML API response received");
+    
+    // Extract the generated content
+    const generatedContent = responseData.choices?.[0]?.message?.content;
+    
+    if (!generatedContent) {
+      console.error("No content generated by AIML API:", JSON.stringify(responseData, null, 2));
+      throw new Error("No content in AIML API response");
+    }
+    
+    console.log("Parsing generated content as JSON");
+    let mealPlanData;
+    
     try {
-      const { data: savedPlan, error: saveError } = await supabase
-        .from('meal_plans')
-        .insert({
-          user_id: userData.userId,
-          plan_data: mealPlan,
-          daily_calories: userData.dailyCalories,
-          dietary_preferences: dietaryPreferences,
-          created_at: new Date().toISOString()
-        });
-        
-      if (saveError) {
-        console.error("Error saving meal plan to database:", saveError);
-      } else {
-        console.log("Meal plan saved to database");
+      // Try to parse the generated content as JSON
+      if (typeof generatedContent === 'string') {
+        // Look for JSON object in the response
+        const jsonMatch = generatedContent.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          mealPlanData = JSON.parse(jsonMatch[0]);
+        } else {
+          throw new Error("Could not find valid JSON in response");
+        }
+      } else if (typeof generatedContent === 'object') {
+        // Response already parsed as object
+        mealPlanData = generatedContent;
       }
-    } catch (dbError) {
-      console.error("Database error:", dbError);
-      // Continue even if saving fails
+    } catch (parseError) {
+      console.error("Error parsing meal plan JSON:", parseError);
+      console.log("Raw content received:", generatedContent);
+      throw new Error(`Failed to parse meal plan data: ${parseError.message}`);
+    }
+    
+    if (!mealPlanData || !mealPlanData.weeklyPlan) {
+      console.error("Invalid meal plan structure:", JSON.stringify(mealPlanData, null, 2));
+      throw new Error("Generated meal plan is missing required structure");
+    }
+    
+    // Add metadata to the meal plan
+    mealPlanData.userId = userData.userId;
+    mealPlanData.generatedAt = new Date().toISOString();
+    mealPlanData.userCalories = userData.dailyCalories;
+    
+    console.log("Successfully generated meal plan with structure:", Object.keys(mealPlanData).join(", "));
+    
+    // Save the meal plan to the database if userId is provided
+    if (userData.userId) {
+      try {
+        console.log("Saving meal plan to database for user:", userData.userId);
+        const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+        
+        const { data, error } = await supabase
+          .from("meal_plans")
+          .insert({
+            user_id: userData.userId,
+            plan_data: mealPlanData,
+            daily_calories: userData.dailyCalories,
+            dietary_preferences: dietaryPreferences,
+            created_at: new Date().toISOString()
+          });
+          
+        if (error) {
+          console.error("Error saving meal plan to database:", error);
+          // Continue even if save fails
+        } else {
+          console.log("Meal plan successfully saved to database");
+        }
+      } catch (dbError) {
+        console.error("Database error:", dbError);
+        // Continue even if save fails
+      }
     }
 
     return new Response(
-      JSON.stringify({ 
-        mealPlan,
-        status: "success",
-        model: "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO"
-      }),
+      JSON.stringify({ mealPlan: mealPlanData }),
       { 
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
       }
     );
   } catch (error) {
-    console.error("Error in generate-meal-plan-llama function:", error);
-    
-    if (error instanceof Error) {
-      console.error("Error name:", error.name);
-      console.error("Error message:", error.message);
-      console.error("Error stack:", error.stack);
-    }
-    
+    console.error("Error in generate-meal-plan-llama:", error);
     return new Response(
       JSON.stringify({ 
-        error: error instanceof Error ? error.message : "Unknown error",
-        status: "error" 
+        error: error.message || "An error occurred while generating the meal plan",
+        errorDetails: error.toString() 
       }),
       { 
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500
+        status: 500, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
       }
     );
   }
 });
 
-async function callAIMLAPI(messages: any[]) {
-  try {
-    console.log("Preparing AIML API request");
-    
-    const requestBody = {
-      max_tokens: 4096, // Larger token limit for complete meal plans
-      stream: false,
-      n: 1,
-      temperature: 0.7, // Good for creative yet structured content
-      model: "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
-      messages: messages,
-      response_format: {
-        type: "json_object" // Specify JSON for structured response
-      }
-    };
-    
-    console.log("AIML API request body:", JSON.stringify(requestBody, null, 2));
+// Helper function to create the system prompt
+function createSystemPrompt(userData: any, dietaryPreferences: any) {
+  return `You are a professional nutritionist specialized in creating personalized meal plans. 
+Your task is to create a complete weekly meal plan in JSON format based on the user's nutritional needs and food preferences.
 
-    // API call with a timeout to prevent hanging
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+Output MUST include:
+1. A "weeklyPlan" object with days of the week (monday through sunday)
+2. Each day must have "meals" containing breakfast, morningSnack, lunch, afternoonSnack, and dinner
+3. Each meal must include:
+   - foods: array of food items with name, portion, unit, and details
+   - calories: total calories for the meal
+   - macros: object with protein, carbs, fats, fiber in grams
+   - description: brief description of the meal
+4. Each day must include "dailyTotals" with total calories, protein, carbs, fats, fiber
+5. A "weeklyTotals" object with averageCalories, averageProtein, averageCarbs, averageFats, averageFiber
+6. A "recommendations" array with dietary and nutrition advice
+
+Ensure the meal plan:
+- Targets ${userData.dailyCalories} daily calories
+- Aligns with the goal: ${userData.goal}
+- Respects any dietary restrictions or allergies
+- Uses only the provided food items, adjusting portions to meet caloric goals
+- Distributes macronutrients appropriately throughout the day
+- Provides nutritionally balanced meals with adequate protein, carbs, fats, and fiber
+
+You MUST respond ONLY with a valid JSON object containing the meal plan.`;
+}
+
+// Helper function to create the user prompt with detailed food information
+function createUserPrompt(userData: any, selectedFoods: any[], dietaryPreferences: any) {
+  // Organize foods by category for better prompt structure
+  const foodsByCategory: Record<string, any[]> = {};
+  
+  selectedFoods.forEach(food => {
+    const category = food.food_group_id ? 
+      getCategoryFromFoodGroupId(food.food_group_id) : 
+      "other";
     
-    const response = await fetch('https://api.aimlapi.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${AIML_API_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-      signal: controller.signal
+    if (!foodsByCategory[category]) {
+      foodsByCategory[category] = [];
+    }
+    
+    foodsByCategory[category].push(food);
+  });
+  
+  // Format information about the user
+  const userInfo = `
+User Information:
+- Daily calorie target: ${userData.dailyCalories} calories
+- Weight: ${userData.weight} kg
+- Height: ${userData.height} cm
+- Age: ${userData.age} years
+- Gender: ${userData.gender}
+- Activity level: ${userData.activityLevel}
+- Goal: ${userData.goal}
+`;
+
+  // Format dietary preferences
+  const allergiesInfo = dietaryPreferences.hasAllergies && dietaryPreferences.allergies?.length > 0 ?
+    `The user has allergies to: ${dietaryPreferences.allergies.join(", ")}.` :
+    "The user has no allergies.";
+    
+  const dietaryRestrictionsInfo = dietaryPreferences.dietaryRestrictions?.length > 0 ?
+    `The user has these dietary restrictions: ${dietaryPreferences.dietaryRestrictions.join(", ")}.` :
+    "The user has no specific dietary restrictions.";
+    
+  const trainingTimeInfo = dietaryPreferences.trainingTime ?
+    `The user usually trains at: ${dietaryPreferences.trainingTime}.` :
+    "No specific training time provided.";
+
+  // Format the foods available
+  let foodsList = "Available Foods:\n";
+  
+  Object.entries(foodsByCategory).forEach(([category, foods]) => {
+    foodsList += `\n${category.toUpperCase()} foods:\n`;
+    
+    foods.forEach(food => {
+      foodsList += `- ${food.name}: ${food.calories} calories per ${food.portion || 100}${food.portionUnit || 'g'}, ` +
+        `Protein: ${food.protein || 0}g, Carbs: ${food.carbs || 0}g, Fats: ${food.fats || 0}g, Fiber: ${food.fiber || 0}g\n`;
     });
-    
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("AIML API error response:", errorText);
-      throw new Error(`AIML API error: ${response.status} - ${errorText}`);
-    }
-    
-    const data = await response.json();
-    console.log("AIML API response received");
-    
-    if (!data.choices || !data.choices[0] || !data.choices[0].message || !data.choices[0].message.content) {
-      console.error("Invalid AIML API response format:", JSON.stringify(data, null, 2));
-      throw new Error("Invalid response from AIML API");
-    }
-    
-    const content = data.choices[0].message.content;
-    return content;
-  } catch (error) {
-    console.error("Error calling AIML API:", error);
-    throw error;
-  }
-}
-
-function createSystemPrompt(userData: any, selectedFoods: any[], foodsByMealType: any, dietaryPreferences: any) {
-  return `
-  You are a professional nutrition expert. Your task is to create a personalized 7-day meal plan in JSON format.
-  
-  IMPORTANT GUIDELINES:
-  - Create a complete weekly meal plan with all 7 days (monday through sunday).
-  - For each day, include breakfast, morningSnack, lunch, afternoonSnack, and dinner.
-  - Make sure each day's total calories are around ${userData.dailyCalories} calories.
-  - For each meal, include a list of foods with portions, calories, and macronutrients.
-  - Calculate and include daily totals for calories, protein, carbs, fats, and fiber.
-  - Include weekly averages for calories, protein, carbs, fats, and fiber.
-  - Provide nutritional recommendations tailored to the user's goal: ${userData.goal}.
-  - Only use foods from the provided list.
-  - Be precise with portions to match calorie and macro targets.
-  
-  USER DATA:
-  - Weight: ${userData.weight} kg
-  - Height: ${userData.height} cm
-  - Age: ${userData.age} years
-  - Gender: ${userData.gender}
-  - Activity Level: ${userData.activityLevel}
-  - Goal: ${userData.goal}
-  - Daily Calorie Target: ${userData.dailyCalories} calories
-  
-  DIETARY PREFERENCES:
-  ${dietaryPreferences.hasAllergies ? 
-    `- Allergies: ${dietaryPreferences.allergies.join(', ')}` : 
-    '- No food allergies'
-  }
-  ${dietaryPreferences.dietaryRestrictions?.length > 0 ? 
-    `- Dietary Restrictions: ${dietaryPreferences.dietaryRestrictions.join(', ')}` : 
-    '- No dietary restrictions'
-  }
-  ${dietaryPreferences.trainingTime ? 
-    `- Training Time: ${dietaryPreferences.trainingTime}` : 
-    '- No specific training time'
-  }
-  
-  AVAILABLE FOODS (${selectedFoods.length} foods):
-  ${selectedFoods.map(food => 
-    `- ${food.name}: ${food.calories} kcal, protein ${food.protein}g, carbs ${food.carbs}g, fats ${food.fats}g, fiber ${food.fiber || 0}g`
-  ).join('\n')}
-  
-  RESPONSE FORMAT:
-  Your response must be a valid JSON object with the following structure:
-  {
-    "weeklyPlan": {
-      "monday": {
-        "dayName": "Monday",
-        "meals": {
-          "breakfast": {
-            "description": "...",
-            "foods": [
-              {"name": "Food Name", "portion": 100, "unit": "g", "details": "..."}
-            ],
-            "calories": 0,
-            "macros": {"protein": 0, "carbs": 0, "fats": 0, "fiber": 0}
-          },
-          // Similar structure for morningSnack, lunch, afternoonSnack, dinner
-        },
-        "dailyTotals": {"calories": 0, "protein": 0, "carbs": 0, "fats": 0, "fiber": 0}
-      },
-      // Similar structure for tuesday through sunday
-    },
-    "weeklyTotals": {
-      "averageCalories": 0,
-      "averageProtein": 0,
-      "averageCarbs": 0,
-      "averageFats": 0,
-      "averageFiber": 0
-    },
-    "recommendations": {
-      "general": "...",
-      "preworkout": "...",
-      "postworkout": "...",
-      "timing": ["...", "..."]
-    }
-  }
-  
-  Keep all numeric values as numbers (not strings). Ensure the response is a properly formatted JSON object with no errors.
-  `;
-}
-
-function parseMealPlanResponse(responseContent: string, userData: any) {
-  try {
-    // Try to parse the JSON from the response
-    let mealPlanData;
-    
-    // First, try to extract JSON if it's wrapped in markdown code blocks
-    const jsonRegex = /```(?:json)?([\s\S]*?)```/;
-    const match = responseContent.match(jsonRegex);
-    
-    if (match && match[1]) {
-      try {
-        mealPlanData = JSON.parse(match[1].trim());
-        console.log("Successfully extracted JSON from markdown code blocks");
-      } catch (innerError) {
-        console.error("Error parsing JSON from markdown:", innerError);
-      }
-    }
-    
-    // If that didn't work, try to parse the whole response as JSON
-    if (!mealPlanData) {
-      try {
-        mealPlanData = JSON.parse(responseContent.trim());
-        console.log("Successfully parsed response as JSON");
-      } catch (jsonError) {
-        console.error("Error parsing full response as JSON:", jsonError);
-        // Try one more approach: look for a JSON-like structure in the text
-        const possibleJsonStart = responseContent.indexOf('{');
-        const possibleJsonEnd = responseContent.lastIndexOf('}');
-        
-        if (possibleJsonStart >= 0 && possibleJsonEnd > possibleJsonStart) {
-          const jsonCandidate = responseContent.substring(possibleJsonStart, possibleJsonEnd + 1);
-          try {
-            mealPlanData = JSON.parse(jsonCandidate);
-            console.log("Successfully extracted JSON from text content");
-          } catch (extractError) {
-            console.error("Error parsing extracted JSON:", extractError);
-          }
-        }
-      }
-    }
-    
-    // If we still don't have valid data, create a default structure
-    if (!mealPlanData || !mealPlanData.weeklyPlan) {
-      console.log("Could not parse meal plan data, using default structure");
-      return createDefaultMealPlan(userData);
-    }
-    
-    // Validate and fix the meal plan structure if needed
-    validateAndFixMealPlanStructure(mealPlanData);
-    
-    // Add metadata
-    mealPlanData.userId = userData.userId;
-    mealPlanData.dailyCalories = userData.dailyCalories;
-    mealPlanData.goal = userData.goal;
-    mealPlanData.generatedAt = new Date().toISOString();
-    
-    return mealPlanData;
-  } catch (error) {
-    console.error("Error parsing meal plan response:", error);
-    // Return a default meal plan as fallback
-    return createDefaultMealPlan(userData);
-  }
-}
-
-function validateAndFixMealPlanStructure(mealPlan: any) {
-  // Check if weeklyPlan exists
-  if (!mealPlan.weeklyPlan) {
-    mealPlan.weeklyPlan = {};
-  }
-  
-  // Ensure all days of the week exist
-  const requiredDays = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
-  requiredDays.forEach(day => {
-    if (!mealPlan.weeklyPlan[day]) {
-      // If this day is missing, copy another day's data or create a default
-      const availableDays = Object.keys(mealPlan.weeklyPlan);
-      if (availableDays.length > 0) {
-        // Clone an existing day
-        const templateDay = JSON.parse(JSON.stringify(mealPlan.weeklyPlan[availableDays[0]]));
-        templateDay.dayName = day.charAt(0).toUpperCase() + day.slice(1);
-        mealPlan.weeklyPlan[day] = templateDay;
-      } else {
-        // Create a default day
-        mealPlan.weeklyPlan[day] = createDefaultDay(day);
-      }
-    }
-    
-    // Ensure each day has the required meals
-    const dayPlan = mealPlan.weeklyPlan[day];
-    if (!dayPlan.meals) {
-      dayPlan.meals = {};
-    }
-    
-    // Check each meal type
-    const mealTypes = ["breakfast", "morningSnack", "lunch", "afternoonSnack", "dinner"];
-    mealTypes.forEach(mealType => {
-      if (!dayPlan.meals[mealType]) {
-        dayPlan.meals[mealType] = createDefaultMeal(mealType);
-      }
-      
-      // Ensure each meal has the required properties
-      const meal = dayPlan.meals[mealType];
-      if (!meal.foods || !Array.isArray(meal.foods)) {
-        meal.foods = [];
-      }
-      if (typeof meal.calories !== 'number') {
-        meal.calories = estimateMealCalories(mealType);
-      }
-      if (!meal.macros) {
-        meal.macros = { protein: 0, carbs: 0, fats: 0, fiber: 0 };
-      }
-      if (!meal.description) {
-        meal.description = `${mealType.charAt(0).toUpperCase() + mealType.slice(1)} meal`;
-      }
-    });
-    
-    // Ensure daily totals
-    if (!dayPlan.dailyTotals) {
-      dayPlan.dailyTotals = calculateDailyTotals(dayPlan.meals);
-    }
   });
-  
-  // Ensure weekly totals
-  if (!mealPlan.weeklyTotals) {
-    mealPlan.weeklyTotals = calculateWeeklyAverages(mealPlan.weeklyPlan);
-  }
-  
-  // Ensure recommendations
-  if (!mealPlan.recommendations) {
-    mealPlan.recommendations = {
-      general: "Maintain a balanced diet with a variety of foods.",
-      preworkout: "Consume a meal rich in carbohydrates and moderate in protein 1-2 hours before training.",
-      postworkout: "After training, consume protein and carbohydrates within 30-60 minutes for optimal recovery.",
-      timing: [
-        "Eat breakfast within an hour of waking up",
-        "Space meals every 3-4 hours",
-        "Consume your last meal 2-3 hours before bedtime"
-      ]
-    };
-  }
+
+  return `${userInfo}
+
+${allergiesInfo}
+${dietaryRestrictionsInfo}
+${trainingTimeInfo}
+
+${foodsList}
+
+Create a complete 7-day meal plan using only these foods, adjusting portions as needed to meet the daily calorie target of ${userData.dailyCalories} calories.
+Ensure the meal plan is suitable for the user's goal of "${userData.goal}" and respects any allergies or dietary restrictions.
+
+For each day, include 5 meals: breakfast, morning snack, lunch, afternoon snack, and dinner.
+For each meal, specify the foods, portions, macronutrients, and total calories.
+Calculate daily totals for calories and macronutrients.
+Include weekly averages for calories and macronutrients.
+Provide nutritional recommendations based on the user's profile.
+
+Respond ONLY with a valid JSON object.`;
 }
 
-function createDefaultMeal(mealType: string) {
-  const calories = estimateMealCalories(mealType);
-  const protein = Math.round(calories * 0.25 / 4); // 25% of calories from protein (4 cal/g)
-  const carbs = Math.round(calories * 0.5 / 4);    // 50% of calories from carbs (4 cal/g)
-  const fats = Math.round(calories * 0.25 / 9);    // 25% of calories from fats (9 cal/g)
-  
-  return {
-    description: `${mealType.charAt(0).toUpperCase() + mealType.slice(1)} meal with balanced nutrients`,
-    foods: [
-      { name: "Food example", portion: 100, unit: "g", details: "Nutritious option" }
-    ],
-    calories,
-    macros: {
-      protein,
-      carbs,
-      fats,
-      fiber: Math.round(calories / 100) // Rough estimate
-    }
-  };
-}
-
-function estimateMealCalories(mealType: string) {
-  // Default distribution for a 2000 calorie diet
-  switch (mealType) {
-    case "breakfast": return 500;     // 25%
-    case "morningSnack": return 200;  // 10%
-    case "lunch": return 700;         // 35%
-    case "afternoonSnack": return 200; // 10%
-    case "dinner": return 400;        // 20%
-    default: return 300;
-  }
-}
-
-function calculateDailyTotals(meals: any) {
-  let calories = 0;
-  let protein = 0;
-  let carbs = 0;
-  let fats = 0;
-  let fiber = 0;
-  
-  Object.values(meals).forEach((meal: any) => {
-    calories += meal.calories || 0;
-    protein += meal.macros?.protein || 0;
-    carbs += meal.macros?.carbs || 0;
-    fats += meal.macros?.fats || 0;
-    fiber += meal.macros?.fiber || 0;
-  });
-  
-  return { calories, protein, carbs, fats, fiber };
-}
-
-function calculateWeeklyAverages(weeklyPlan: any) {
-  let totalCalories = 0;
-  let totalProtein = 0;
-  let totalCarbs = 0;
-  let totalFats = 0;
-  let totalFiber = 0;
-  let dayCount = 0;
-  
-  Object.values(weeklyPlan).forEach((day: any) => {
-    if (day.dailyTotals) {
-      totalCalories += day.dailyTotals.calories || 0;
-      totalProtein += day.dailyTotals.protein || 0;
-      totalCarbs += day.dailyTotals.carbs || 0;
-      totalFats += day.dailyTotals.fats || 0;
-      totalFiber += day.dailyTotals.fiber || 0;
-      dayCount++;
-    }
-  });
-  
-  const divisor = dayCount || 1; // Avoid division by zero
-  
-  return {
-    averageCalories: Math.round(totalCalories / divisor),
-    averageProtein: Math.round(totalProtein / divisor),
-    averageCarbs: Math.round(totalCarbs / divisor),
-    averageFats: Math.round(totalFats / divisor),
-    averageFiber: Math.round(totalFiber / divisor)
-  };
-}
-
-function createDefaultDay(dayName: string) {
-  const meals = {
-    breakfast: createDefaultMeal("breakfast"),
-    morningSnack: createDefaultMeal("morningSnack"),
-    lunch: createDefaultMeal("lunch"),
-    afternoonSnack: createDefaultMeal("afternoonSnack"),
-    dinner: createDefaultMeal("dinner")
+// Helper function to get category name from food group ID
+function getCategoryFromFoodGroupId(foodGroupId: number): string {
+  const categories: Record<number, string> = {
+    1: "breakfast",
+    2: "lunch",
+    3: "snack",
+    4: "dinner",
+    5: "fruit",
+    6: "vegetable",
+    7: "protein",
+    8: "grain",
+    9: "dairy"
   };
   
-  return {
-    dayName: dayName.charAt(0).toUpperCase() + dayName.slice(1),
-    meals,
-    dailyTotals: calculateDailyTotals(meals)
-  };
-}
-
-function createDefaultMealPlan(userData: any) {
-  const weeklyPlan: Record<string, any> = {};
-  const days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
-  
-  days.forEach(day => {
-    weeklyPlan[day] = createDefaultDay(day);
-  });
-  
-  const weeklyTotals = calculateWeeklyAverages(weeklyPlan);
-  
-  return {
-    userId: userData.userId,
-    dailyCalories: userData.dailyCalories,
-    goal: userData.goal,
-    weeklyPlan,
-    weeklyTotals,
-    recommendations: {
-      general: "Maintain a balanced diet with a variety of foods to ensure adequate nutrient intake.",
-      preworkout: "Consume a meal rich in carbohydrates and moderate in protein 1-2 hours before training.",
-      postworkout: "After training, consume protein and carbohydrates within 30-60 minutes for optimal recovery.",
-      timing: [
-        "Eat breakfast within an hour of waking up",
-        "Space meals every 3-4 hours",
-        "Consume your last meal 2-3 hours before bedtime"
-      ]
-    },
-    generatedAt: new Date().toISOString()
-  };
+  return categories[foodGroupId] || "other";
 }
