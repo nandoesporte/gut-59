@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -370,7 +369,7 @@ export const useMenuController = () => {
           console.error('Erro ao salvar preferências dietéticas:', prefsError);
         }
         
-        toast.loading("Gerando plano alimentar personalizado com Llama 3.2 1B...");
+        toast.loading("Gerando plano alimentar personalizado com agente Nutri+ e Llama 3...");
         
         try {
           const generatedMealPlan = await generateMealPlan({
@@ -406,7 +405,6 @@ export const useMenuController = () => {
       } else {
         console.log("Usuário não autenticado. Criando plano básico.");
         
-        // Create a basic meal plan for unauthenticated users with the correct structure
         const basicMealPlan: MealPlan = {
           userCalories: calorieNeeds,
           weeklyPlan: {
