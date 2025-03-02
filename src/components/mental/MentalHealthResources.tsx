@@ -152,18 +152,29 @@ export const MentalHealthResources = () => {
         } else if (phase === "hold") {
           breathe("exhale", BREATHING_CYCLE.exhale, newElapsedTime); // Exhale
         } else if (phase === "exhale") {
-          // Importante: Não resete o estado do exercise aqui, apenas atualize o contador
-          setExercise(prev => {
-            const newCount = prev.count + 1;
-            if (newCount >= prev.totalBreaths || newElapsedTime >= 60) { // Stop at 1 minute (60 seconds)
-              completeExercise();
-              return { ...prev, count: newCount, isComplete: true, elapsedTime: newElapsedTime };
-            } else {
-              // Iniciar novo ciclo de respiração sem redefinir o estado completamente
+          // After exhale, update the count and start a new cycle or complete
+          const newCount = exercise.count + 1;
+          
+          if (newCount >= exercise.totalBreaths || newElapsedTime >= 60) { // Stop at 1 minute (60 seconds)
+            completeExercise();
+            setExercise(prev => ({ 
+              ...prev, 
+              count: newCount, 
+              isComplete: true, 
+              elapsedTime: newElapsedTime 
+            }));
+          } else {
+            // Start a new breath cycle with inhale, maintaining the count and elapsed time
+            setExercise(prev => ({ 
+              ...prev, 
+              count: newCount,
+              elapsedTime: newElapsedTime
+            }));
+            // Important: We need a small delay to ensure state updates before starting next cycle
+            setTimeout(() => {
               breathe("inhale", BREATHING_CYCLE.inhale, newElapsedTime);
-              return { ...prev, count: newCount, elapsedTime: newElapsedTime };
-            }
-          });
+            }, 50);
+          }
         }
       } else {
         setExercise(prev => ({
@@ -249,7 +260,7 @@ export const MentalHealthResources = () => {
               </p>
             )}
             
-            {((exercise.count > 0 || exercise.phase === "prepare") && !exercise.isComplete) ? (
+            {(exercise.count > 0 || exercise.phase === "prepare") && !exercise.isComplete ? (
               <div className="flex flex-col items-center space-y-6">
                 {/* Progress information */}
                 <div className="w-full text-center">
