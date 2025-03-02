@@ -78,7 +78,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
           goal: planData.goal,
           start_date: planData.start_date || new Date().toISOString().split('T')[0],
           end_date: planData.end_date || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          // Do NOT include workout_sessions here as it's not a column in the table
+          // Removed workout_sessions as it's not a column in the table
         })
         .select()
         .single();
