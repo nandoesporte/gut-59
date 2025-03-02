@@ -1,5 +1,5 @@
 
 # Config for generate-meal-plan-llama function
 verify_jwt = false
-timeout_ms = 120000
+timeout_ms = 180000
 import_map_path = "./import_map.json"
