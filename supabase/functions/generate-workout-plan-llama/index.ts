@@ -1,372 +1,251 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
-import { corsHeaders } from "../_shared/cors.ts"
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.0";
+import { v4 as uuidv4 } from "https://esm.sh/uuid@9.0.1";
 
-const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY')
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || ''
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+// CORS headers for browser requests
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+// Get environment variables
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const groqApiKey = Deno.env.get('GROQ_API_KEY') || '';
 
-interface Preferences {
-  age: number
-  weight: number
-  height: number
-  gender: string
-  goal: string
-  activity_level: string
-  preferred_exercise_types: string[]
-  available_equipment: string[]
-  health_conditions?: string[]
+// Create a Supabase client with the service role key
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+// Function to fetch exercises from the database based on preferences
+async function fetchExercises(exerciseType: string) {
+  console.log(`Fetching exercises for type: ${exerciseType}`);
+  
+  const { data, error } = await supabaseAdmin
+    .from('exercises')
+    .select('*')
+    .eq('exercise_type', exerciseType)
+    .limit(50);
+  
+  if (error) {
+    console.error(`Error fetching exercises: ${error.message}`);
+    throw new Error(`Error fetching exercises: ${error.message}`);
+  }
+  
+  return data || [];
 }
 
-interface ModelSettings {
-  active_model: string
-  system_prompt: string
-  use_custom_prompt: boolean
-}
-
-serve(async (req: Request) => {
+// Main handler function
+serve(async (req) => {
+  console.log("Edge function invoked: generate-workout-plan-llama");
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    if (!GROQ_API_KEY) {
-      console.error('GROQ_API_KEY not found in environment variables')
-      throw new Error('GROQ_API_KEY not configured. Please set the environment variable.')
-    }
-
-    // Parse request body
-    const requestData = await req.json()
-    console.log('Request data received:', JSON.stringify(requestData))
-
-    // Validate that we have all required parameters
-    const { preferences, userId, settings } = requestData
+    const { preferences, userId, settings } = await req.json();
     
-    if (!preferences || !userId) {
-      throw new Error('Missing required parameters: preferences or userId')
+    if (!userId) {
+      throw new Error('User ID is required');
     }
 
-    // Validate preferences
-    const requiredFields = ['age', 'weight', 'height', 'gender', 'goal', 'activity_level', 'preferred_exercise_types']
-    for (const field of requiredFields) {
-      if (preferences[field] === undefined) {
-        throw new Error(`Missing required preference field: ${field}`)
-      }
-    }
-
-    // Get model settings
-    const modelSettings: ModelSettings = settings || {
-      active_model: 'llama3',
-      system_prompt: null,
-      use_custom_prompt: false
-    }
-
-    // Create system prompt
-    let systemPrompt = modelSettings.use_custom_prompt && modelSettings.system_prompt 
-      ? modelSettings.system_prompt 
-      : `Você é TRENE2025, um agente de IA especializado em educação física e nutrição esportiva. 
-Seu objetivo é criar planos de treino detalhados, personalizados e cientificamente embasados.
-Você deve fornecer um plano completo, com exercícios, séries, repetições e dicas específicas.`
+    console.log(`Generating workout plan for user: ${userId}`);
+    console.log(`Preferences received: ${JSON.stringify(preferences)}`);
+    console.log(`AI settings: ${JSON.stringify(settings)}`);
     
-    console.log('Using system prompt:', systemPrompt)
-
-    // Create user prompt
-    const userPrompt = createUserPrompt(preferences)
-    console.log('User prompt created')
-
-    // Generate plan using Groq API with llama3-8b-8192 model
-    console.log('Calling Groq API with llama3-8b-8192 model')
-    const workoutPlan = await generatePlanWithGroq(systemPrompt, userPrompt)
-    console.log('Received response from Groq API')
-
-    // Save the workout plan to the database
-    console.log('Saving workout plan to database')
-    const savedPlan = await saveWorkoutPlan(workoutPlan, userId)
-    console.log('Workout plan saved to database')
-
-    return new Response(JSON.stringify(savedPlan), {
+    // Set up default dates for the workout plan
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + 30); // 30-day plan by default
+    
+    // Generate the workout plan using Groq API with Llama 3
+    const workoutPlan = await generatePlanWithGroq(preferences, userId, settings);
+    
+    return new Response(JSON.stringify(workoutPlan), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
-    })
-
+    });
   } catch (error) {
-    console.error('Error generating workout plan:', error)
+    console.error(`Error in edge function: ${error.message}`);
     
     return new Response(
       JSON.stringify({ error: `Erro na geração do plano: ${error.message}` }),
-      { 
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500 
+        status: 500,
       }
-    )
+    );
   }
-})
+});
 
-function createUserPrompt(preferences: Preferences): string {
-  const { 
-    age, 
-    weight, 
-    height, 
-    gender, 
-    goal, 
-    activity_level, 
-    preferred_exercise_types = [], 
-    available_equipment = [], 
-    health_conditions = [] 
-  } = preferences
-
-  // Map goals to more descriptive text
-  const goalMap: Record<string, string> = {
-    lose_weight: "perder peso",
-    maintain: "manter o peso e tonificar o corpo",
-    gain_mass: "ganhar massa muscular"
-  }
-
-  // Map activity levels to descriptive text
-  const activityMap: Record<string, string> = {
-    sedentary: "sedentário (pouca ou nenhuma atividade física)",
-    light: "levemente ativo (atividade física leve 1-3 dias por semana)",
-    moderate: "moderadamente ativo (atividade física moderada 3-5 dias por semana)",
-    intense: "muito ativo (atividade física intensa 6-7 dias por semana)"
-  }
-
-  // Ensure arrays are handled properly
-  const exerciseTypes = Array.isArray(preferred_exercise_types) ? preferred_exercise_types.join(', ') : preferred_exercise_types
-  const equipment = Array.isArray(available_equipment) ? available_equipment.join(', ') : available_equipment
-  const healthIssues = Array.isArray(health_conditions) && health_conditions.length > 0 
-    ? `Condições de saúde a considerar: ${health_conditions.join(', ')}.` 
-    : "Sem condições de saúde especiais a considerar."
-
-  return `Crie um plano de treino personalizado para uma pessoa com as seguintes características:
-- Idade: ${age} anos
-- Peso: ${weight} kg
-- Altura: ${height} cm
-- Gênero: ${gender === 'male' ? 'masculino' : 'feminino'}
-- Objetivo: ${goalMap[goal] || goal}
-- Nível de atividade: ${activityMap[activity_level] || activity_level}
-- Tipos de exercícios preferidos: ${exerciseTypes}
-- Equipamentos disponíveis: ${equipment}
-- ${healthIssues}
-
-Forneça um plano completo para 5 dias de treino, com cada dia focando em grupos musculares diferentes.
-Para cada dia de treino, especifique:
-1. Exercícios detalhados (4-6 exercícios por dia)
-2. Número de séries para cada exercício
-3. Número de repetições para cada exercício
-4. Tempo de descanso entre séries
-5. Descrição do aquecimento adequado
-6. Descrição da volta à calma
-
-O plano deve ser cientificamente embasado e adequado ao perfil da pessoa. Inclua dicas para melhorar o desempenho durante os exercícios.
-
-A resposta deve estar em formato JSON seguindo esta estrutura exata:
-{
-  "id": "string (uuid)",
-  "user_id": "string (uuid)",
-  "goal": "string",
-  "start_date": "string (YYYY-MM-DD)",
-  "end_date": "string (YYYY-MM-DD)",
-  "workout_sessions": [
-    {
-      "id": "string (uuid)",
-      "day_number": number,
-      "warmup_description": "string",
-      "cooldown_description": "string",
-      "session_exercises": [
-        {
-          "id": "string (uuid)",
-          "sets": number,
-          "reps": number,
-          "rest_time_seconds": number,
-          "exercise": {
-            "id": "string (uuid)",
-            "name": "string",
-            "description": "string",
-            "gif_url": null
-          }
-        }
-      ]
-    }
-  ]
-}
-
-Não inclua nenhum texto adicional na resposta, apenas o JSON.`
-}
-
-async function generatePlanWithGroq(systemPrompt: string, userPrompt: string): Promise<any> {
-  const endpoint = 'https://api.groq.com/openai/v1/chat/completions'
-  
+// Generate workout plan using Groq API with Llama 3
+async function generatePlanWithGroq(preferences: any, userId: string, settings: any) {
   try {
-    console.log('Making request to Groq API')
-    const response = await fetch(endpoint, {
+    console.log("Starting to generate plan using Groq API with Llama 3");
+    
+    if (!groqApiKey) {
+      throw new Error('GROQ_API_KEY is not set');
+    }
+    
+    // Fetch a sample of exercises based on preferences
+    const exerciseType = preferences.preferred_exercise_types && preferences.preferred_exercise_types.length > 0 
+      ? preferences.preferred_exercise_types[0] 
+      : 'strength';
+    
+    const exercises = await fetchExercises(exerciseType);
+    
+    if (!exercises || exercises.length === 0) {
+      throw new Error(`No exercises found for type: ${exerciseType}`);
+    }
+    
+    console.log(`Successfully fetched ${exercises.length} exercises`);
+    
+    // Create a prompt that will generate a structured response
+    const systemPrompt = settings?.system_prompt || 
+      `Você é TRENE2025, um agente de IA especializado em educação física e nutrição esportiva. 
+      Seu objetivo é criar planos de treino detalhados, personalizados e cientificamente embasados.
+      Você deve fornecer um plano completo, com exercícios, séries, repetições e dicas específicas.`;
+    
+    const userPrompt = `
+      Crie um plano de treino personalizado para um usuário com as seguintes características:
+      - Idade: ${preferences.age} anos
+      - Peso: ${preferences.weight} kg
+      - Altura: ${preferences.height} cm
+      - Gênero: ${preferences.gender === 'male' ? 'masculino' : 'feminino'}
+      - Objetivo: ${preferences.goal}
+      - Nível de atividade: ${preferences.activity_level}
+      - Tipos de exercícios preferidos: ${preferences.preferred_exercise_types.join(', ')}
+      - Equipamentos disponíveis: ${preferences.available_equipment.join(', ')}
+      ${preferences.health_conditions.length > 0 ? `- Condições de saúde: ${preferences.health_conditions.join(', ')}` : ''}
+      
+      Crie um plano de treino estruturado para 5 dias da semana. Para cada dia, sugira exercícios específicos da lista a seguir:
+      ${exercises.slice(0, 10).map(ex => `- ${ex.name}`).join('\n')}
+      
+      Sua resposta DEVE seguir EXATAMENTE este formato JSON, sem nenhum texto adicional antes ou depois:
+      
+      {
+        "start_date": "YYYY-MM-DD",
+        "end_date": "YYYY-MM-DD",
+        "goal": "objetivo principal do plano",
+        "workout_sessions": [
+          {
+            "day_number": 1,
+            "warmup_description": "descrição do aquecimento",
+            "cooldown_description": "descrição do retorno à calma",
+            "session_exercises": [
+              {
+                "exercise": {
+                  "id": "id do exercício (use os ids reais da lista)",
+                  "name": "nome do exercício (use os nomes reais da lista)",
+                  "description": "breve descrição",
+                  "gif_url": "url do gif, se disponível"
+                },
+                "sets": 3,
+                "reps": 12,
+                "rest_time_seconds": 60
+              }
+              // mais exercícios para este dia
+            ]
+          }
+          // mais dias de treino
+        ]
+      }
+      
+      Importante: Use SOMENTE os exercícios da lista fornecida. Responda APENAS com o JSON, sem texto adicional.
+    `;
+    
+    console.log("Calling Groq API with Llama 3 model");
+    
+    // Call the Groq API with the Llama 3 model
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
-        'Content-Type': 'application/json'
+        'Authorization': `Bearer ${groqApiKey}`,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         model: 'llama3-8b-8192',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
+          { role: 'user', content: userPrompt },
         ],
         temperature: 0.7,
-        max_tokens: 4000
-      })
-    })
-
+        max_tokens: 4000,
+      }),
+    });
+    
     if (!response.ok) {
-      const errorData = await response.text()
-      console.error('Groq API error:', response.status, errorData)
-      throw new Error(`Erro na API Groq: ${response.status} ${errorData}`)
+      const errorData = await response.text();
+      console.error(`Groq API error: ${response.status} - ${errorData}`);
+      throw new Error(`Erro na API Groq: ${response.status}`);
     }
-
-    const data = await response.json()
-    console.log('Groq API response received')
-
-    if (!data.choices || !data.choices[0] || !data.choices[0].message || !data.choices[0].message.content) {
-      throw new Error('Resposta inválida da API Groq')
+    
+    const data = await response.json();
+    
+    if (!data || !data.choices || !data.choices[0] || !data.choices[0].message || !data.choices[0].message.content) {
+      console.error('Invalid response from Groq API:', data);
+      throw new Error('Resposta inválida da API Groq');
     }
-
-    const content = data.choices[0].message.content
+    
+    // Get the content from the response
+    const content = data.choices[0].message.content;
+    console.log('Raw response from Groq API:', content);
+    
+    // Try to extract and parse the JSON from the response
+    let jsonContent = content;
+    
+    // If the content includes markdown code blocks, extract the JSON
+    if (content.includes('```json')) {
+      jsonContent = content.split('```json')[1].split('```')[0].trim();
+    } else if (content.includes('```')) {
+      jsonContent = content.split('```')[1].split('```')[0].trim();
+    }
     
     try {
-      // Extract JSON from the response if needed
-      const jsonMatch = content.match(/\{[\s\S]*\}/)
-      const jsonString = jsonMatch ? jsonMatch[0] : content
-      return JSON.parse(jsonString)
+      // Parse the JSON content
+      const workoutPlan = JSON.parse(jsonContent);
+      
+      // Add user_id and id to the workout plan
+      const planWithIds = {
+        ...workoutPlan,
+        id: uuidv4(),
+        user_id: userId,
+      };
+      
+      // Add IDs to workout sessions and session exercises
+      planWithIds.workout_sessions = planWithIds.workout_sessions.map(session => ({
+        ...session,
+        id: uuidv4(),
+        session_exercises: session.session_exercises.map(exercise => ({
+          ...exercise,
+          id: uuidv4(),
+        })),
+      }));
+      
+      console.log('Successfully generated workout plan');
+      
+      // Save the workout plan to the database
+      const { error: saveError } = await supabaseAdmin
+        .from('workout_plans')
+        .insert([planWithIds]);
+      
+      if (saveError) {
+        console.error(`Error saving workout plan: ${saveError.message}`);
+        // Continue even if saving fails, to return the plan to the user
+      } else {
+        console.log('Workout plan saved to database');
+      }
+      
+      return planWithIds;
     } catch (parseError) {
-      console.error('Error parsing JSON from Groq response:', parseError)
-      console.log('Raw response content:', content)
-      throw new Error('Erro ao processar a resposta do modelo. Formato inválido.')
+      console.error('Error parsing JSON from Groq API response:', parseError);
+      console.error('Raw content that failed to parse:', jsonContent);
+      throw new Error('Erro ao processar a resposta do modelo. Formato inválido.');
     }
   } catch (error) {
-    console.error('Error calling Groq API:', error)
-    throw error
-  }
-}
-
-async function saveWorkoutPlan(workoutPlan: any, userId: string): Promise<any> {
-  try {
-    // Add user_id to the workout plan if not present
-    if (!workoutPlan.user_id) {
-      workoutPlan.user_id = userId
-    }
-
-    // Generate start and end dates if not present
-    if (!workoutPlan.start_date) {
-      const startDate = new Date()
-      workoutPlan.start_date = startDate.toISOString().split('T')[0]
-    }
-
-    if (!workoutPlan.end_date) {
-      const endDate = new Date()
-      endDate.setDate(endDate.getDate() + 30) // 30 days plan
-      workoutPlan.end_date = endDate.toISOString().split('T')[0]
-    }
-
-    // Insert workout plan
-    const { data: plan, error: planError } = await supabase
-      .from('workout_plans')
-      .insert({
-        id: workoutPlan.id,
-        user_id: workoutPlan.user_id,
-        goal: workoutPlan.goal,
-        start_date: workoutPlan.start_date,
-        end_date: workoutPlan.end_date
-      })
-      .select()
-      .single()
-
-    if (planError) {
-      console.error('Error inserting workout plan:', planError)
-      throw planError
-    }
-
-    // For each workout session
-    for (const session of workoutPlan.workout_sessions) {
-      // Insert workout session
-      const { data: sessionData, error: sessionError } = await supabase
-        .from('workout_sessions')
-        .insert({
-          id: session.id,
-          plan_id: workoutPlan.id,
-          day_number: session.day_number,
-          warmup_description: session.warmup_description,
-          cooldown_description: session.cooldown_description
-        })
-        .select()
-        .single()
-
-      if (sessionError) {
-        console.error('Error inserting workout session:', sessionError)
-        throw sessionError
-      }
-
-      // For each exercise in the session
-      for (const exerciseSession of session.session_exercises) {
-        // Check if exercise exists
-        let exerciseId = exerciseSession.exercise.id
-        const { data: existingExercise } = await supabase
-          .from('exercises')
-          .select('id')
-          .eq('id', exerciseId)
-          .maybeSingle()
-
-        // If exercise doesn't exist, create it
-        if (!existingExercise) {
-          const { data: newExercise, error: exerciseError } = await supabase
-            .from('exercises')
-            .insert({
-              id: exerciseId,
-              name: exerciseSession.exercise.name,
-              description: exerciseSession.exercise.description,
-              gif_url: exerciseSession.exercise.gif_url,
-              exercise_type: 'strength',
-              muscle_group: 'weight_training',
-              difficulty: 'beginner',
-              min_sets: 3,
-              max_sets: 5,
-              min_reps: 8,
-              max_reps: 12,
-              rest_time_seconds: 60
-            })
-            .select()
-            .single()
-
-          if (exerciseError) {
-            console.error('Error inserting exercise:', exerciseError)
-            throw exerciseError
-          }
-        }
-
-        // Insert session exercise
-        const { error: sessionExerciseError } = await supabase
-          .from('session_exercises')
-          .insert({
-            id: exerciseSession.id,
-            session_id: session.id,
-            exercise_id: exerciseId,
-            sets: exerciseSession.sets,
-            reps: exerciseSession.reps,
-            rest_time_seconds: exerciseSession.rest_time_seconds,
-            order_in_session: 0
-          })
-
-        if (sessionExerciseError) {
-          console.error('Error inserting session exercise:', sessionExerciseError)
-          throw sessionExerciseError
-        }
-      }
-    }
-
-    return workoutPlan
-  } catch (error) {
-    console.error('Error saving workout plan to database:', error)
-    throw error
+    console.error(`Error in generatePlanWithGroq: ${error.message}`);
+    throw error;
   }
 }
