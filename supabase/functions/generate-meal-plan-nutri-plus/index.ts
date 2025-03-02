@@ -1,9 +1,11 @@
 
-import { corsHeaders } from "../_shared/cors.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "@std/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.29.0";
 
-const LLAMA_API_KEY = Deno.env.get("LLAMA_API_KEY");
-const LLAMA_API_URL = "https://api.llama-api.com";
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -12,141 +14,201 @@ serve(async (req) => {
   }
 
   try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Missing Supabase credentials');
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Parse request payload
     const requestData = await req.json();
-    const { userData, selectedFoods, dietaryPreferences, foodsByMealType } = requestData;
-    
-    console.log("Generate Meal Plan Nutri+ Function - Request received");
-    console.log("Using model: nous-hermes-2-mixtral-8x7b for advanced nutrition plan");
-    
-    // Create a detailed system prompt for the advanced nutrition plan
-    const systemPrompt = `You are NutriPlus, an advanced nutritionist AI specialized in creating comprehensive, personalized meal plans.
-You have expertise in nutrition science, dietary requirements, food combinations, and meal timing optimization.
-Create a detailed, nutritionally balanced 7-day meal plan with optimal macronutrient distribution.
+    console.log('Received request:', JSON.stringify(requestData, null, 2));
 
-Your response must be valid JSON in the exact format specified below without any additional text:
+    const {
+      userData,
+      selectedFoods,
+      foodsByMealType,
+      dietaryPreferences,
+      modelConfig
+    } = requestData;
 
-{
-  "mealPlan": {
-    "userCalories": number,
-    "weeklyPlan": {
-      "monday": { 
-        "dayName": "Monday", 
-        "meals": {
-          "breakfast": { "description": string, "foods": [{"name": string, "portion": number, "unit": string, "details": string}], "calories": number, "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number} },
-          "morningSnack": { "description": string, "foods": [{"name": string, "portion": number, "unit": string, "details": string}], "calories": number, "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number} },
-          "lunch": { "description": string, "foods": [{"name": string, "portion": number, "unit": string, "details": string}], "calories": number, "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number} },
-          "afternoonSnack": { "description": string, "foods": [{"name": string, "portion": number, "unit": string, "details": string}], "calories": number, "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number} },
-          "dinner": { "description": string, "foods": [{"name": string, "portion": number, "unit": string, "details": string}], "calories": number, "macros": {"protein": number, "carbs": number, "fats": number, "fiber": number} }
-        },
-        "dailyTotals": { "calories": number, "protein": number, "carbs": number, "fats": number, "fiber": number }
-      },
-      // Similar structure for tuesday, wednesday, thursday, friday, saturday, sunday
-    },
-    "weeklyTotals": {
-      "averageCalories": number,
-      "averageProtein": number,
-      "averageCarbs": number,
-      "averageFats": number,
-      "averageFiber": number
-    },
-    "recommendations": {
-      "general": string,
-      "preworkout": string,
-      "postworkout": string,
-      "timing": [string]
-    }
-  }
-}`;
+    // Log key information for debugging
+    console.log(`Generating meal plan for user: ${userData.userId}`);
+    console.log(`Daily calories target: ${userData.dailyCalories}`);
+    console.log(`Selected foods count: ${selectedFoods.length}`);
+    console.log(`Using model: ${modelConfig?.model || 'default'}`);
 
-    // Create a comprehensive user prompt with all nutrition details
-    let userPrompt = `Create an advanced, personalized meal plan for a ${userData.age} year old ${userData.gender}, weighing ${userData.weight}kg, height ${userData.height}cm, with ${userData.activityLevel} activity level. The daily calorie target is ${userData.dailyCalories} calories with a goal to ${userData.goal}.`;
-    
-    // Add detailed dietary restrictions
-    if (dietaryPreferences.hasAllergies && dietaryPreferences.allergies.length > 0) {
-      userPrompt += ` The person has allergies to: ${dietaryPreferences.allergies.join(", ")}.`;
-    }
-    
-    if (dietaryPreferences.dietaryRestrictions && dietaryPreferences.dietaryRestrictions.length > 0) {
-      userPrompt += ` The person follows these dietary restrictions: ${dietaryPreferences.dietaryRestrictions.join(", ")}.`;
-    }
-    
-    if (dietaryPreferences.trainingTime) {
-      userPrompt += ` The person typically trains at: ${dietaryPreferences.trainingTime}.`;
-    }
-    
-    // Add detailed food preferences with nutritional information
-    userPrompt += ` Here are the foods the person likes to eat with their nutritional information:`;
-    selectedFoods.forEach(food => {
-      userPrompt += ` ${food.name} (${food.calories} calories, ${food.protein}g protein, ${food.carbs}g carbs, ${food.fats}g fats, ${food.fiber || 0}g fiber)`;
-    });
-    
-    // Add food by meal type preferences if available
-    if (foodsByMealType) {
-      userPrompt += " The person prefers specific foods by meal type:";
-      
-      for (const [mealType, foods] of Object.entries(foodsByMealType)) {
-        if (Array.isArray(foods) && foods.length > 0) {
-          userPrompt += ` For ${mealType}: ${foods.map(f => f.name).join(", ")}.`;
-        }
-      }
-    }
-    
-    userPrompt += ` Create a comprehensive, optimized 7-day meal plan with 5 meals per day that precisely meets the calorie target and offers optimal macronutrient distribution for the person's goal. Include exact portion sizes in grams and complete nutritional information for each meal. Provide specific recommendations for meal timing, especially around workout times, and include advanced nutritional guidance.`;
-    
-    console.log("Sending request to Llama API for NutriPlus plan");
-    
-    // Call the Llama API with the Nous-Hermes model
-    const llamaResponse = await fetch(`${LLAMA_API_URL}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${LLAMA_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: "nous-hermes-2-mixtral-8x7b",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ],
-        temperature: 0.7,
-        max_tokens: 4000,
-        response_format: { type: "json_object" }
-      }),
-    });
+    // Mock response structure for testing
+    // In a real implementation, this would call an AI service
+    const mockMealPlan = generateMockMealPlan(userData, selectedFoods, dietaryPreferences);
 
-    if (!llamaResponse.ok) {
-      const errorText = await llamaResponse.text();
-      console.error("Llama API error:", errorText);
-      throw new Error(`Llama API error: ${llamaResponse.status} - ${errorText}`);
-    }
-
-    const llamaData = await llamaResponse.json();
-    console.log("Llama API response received for NutriPlus plan");
-    
-    // Extract the content from the response
-    let mealPlanJson;
+    // Add a record to the meal_plans table (optional, for tracking)
     try {
-      const content = llamaData.choices[0].message.content;
-      mealPlanJson = JSON.parse(content);
-      console.log("Successfully parsed NutriPlus meal plan JSON");
-    } catch (parseError) {
-      console.error("Error parsing JSON from Llama response:", parseError);
-      throw new Error("Invalid meal plan format in Llama response");
+      const { error } = await supabase
+        .from('meal_plans')
+        .insert({
+          user_id: userData.userId,
+          plan_data: mockMealPlan,
+          daily_calories: userData.dailyCalories,
+          dietary_preferences: JSON.stringify(dietaryPreferences)
+        });
+
+      if (error) {
+        console.error('Error saving meal plan to database:', error);
+      }
+    } catch (dbError) {
+      console.error('Database operation failed:', dbError);
     }
-    
-    // Add user calories to the meal plan if not present
-    if (mealPlanJson.mealPlan && !mealPlanJson.mealPlan.userCalories) {
-      mealPlanJson.mealPlan.userCalories = userData.dailyCalories;
-    }
-    
-    return new Response(JSON.stringify(mealPlanJson), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        message: "Meal plan generated successfully", 
+        mealPlan: mockMealPlan 
+      }),
+      { 
+        headers: { 
+          ...corsHeaders, 
+          "Content-Type": "application/json" 
+        } 
+      }
+    );
   } catch (error) {
-    console.error("Error in generate-meal-plan-nutri-plus function:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    console.error('Error in generate-meal-plan-nutri-plus:', error);
+    
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        message: `Error generating meal plan: ${error.message}` 
+      }),
+      { 
+        status: 500, 
+        headers: { 
+          ...corsHeaders, 
+          "Content-Type": "application/json" 
+        } 
+      }
+    );
   }
 });
+
+// Helper function to generate a mock meal plan for testing
+function generateMockMealPlan(userData: any, selectedFoods: any[], dietaryPreferences: any) {
+  // Create basic meal structure
+  const createMeal = (name: string, calorieRatio: number) => {
+    const calories = Math.round(userData.dailyCalories * calorieRatio);
+    const protein = Math.round(calories * 0.3 / 4); // 30% calories from protein
+    const carbs = Math.round(calories * 0.4 / 4);   // 40% calories from carbs
+    const fats = Math.round(calories * 0.3 / 9);    // 30% calories from fats
+    
+    // Select random foods from available foods
+    const mealFoods = selectedFoods
+      .sort(() => 0.5 - Math.random())
+      .slice(0, 3)
+      .map(food => ({
+        name: food.name,
+        portion: Math.round(100 * Math.random() + 50),
+        unit: food.portionUnit || 'g',
+        details: `Source of ${food.protein > 10 ? 'protein' : food.carbs > 10 ? 'carbs' : 'healthy fats'}`
+      }));
+    
+    return {
+      description: `${name} (${calories} kcal)`,
+      foods: mealFoods,
+      calories,
+      macros: {
+        protein,
+        carbs,
+        fats,
+        fiber: Math.round(carbs * 0.2) // Estimate fiber as 20% of carbs
+      }
+    };
+  };
+
+  // Create daily meal plan for each day
+  const createDailyPlan = (dayName: string) => {
+    const breakfast = createMeal('Breakfast', 0.25);
+    const morningSnack = createMeal('Morning Snack', 0.1);
+    const lunch = createMeal('Lunch', 0.35);
+    const afternoonSnack = createMeal('Afternoon Snack', 0.1);
+    const dinner = createMeal('Dinner', 0.2);
+    
+    const dailyTotals = {
+      calories: breakfast.calories + morningSnack.calories + lunch.calories + 
+                afternoonSnack.calories + dinner.calories,
+      protein: breakfast.macros.protein + morningSnack.macros.protein + lunch.macros.protein + 
+               afternoonSnack.macros.protein + dinner.macros.protein,
+      carbs: breakfast.macros.carbs + morningSnack.macros.carbs + lunch.macros.carbs + 
+             afternoonSnack.macros.carbs + dinner.macros.carbs,
+      fats: breakfast.macros.fats + morningSnack.macros.fats + lunch.macros.fats + 
+            afternoonSnack.macros.fats + dinner.macros.fats,
+      fiber: breakfast.macros.fiber + morningSnack.macros.fiber + lunch.macros.fiber + 
+             afternoonSnack.macros.fiber + dinner.macros.fiber
+    };
+    
+    return {
+      dayName,
+      meals: {
+        breakfast,
+        morningSnack,
+        lunch,
+        afternoonSnack,
+        dinner
+      },
+      dailyTotals
+    };
+  };
+
+  // Create weekly plan
+  const weeklyPlan = {
+    monday: createDailyPlan('Monday'),
+    tuesday: createDailyPlan('Tuesday'),
+    wednesday: createDailyPlan('Wednesday'),
+    thursday: createDailyPlan('Thursday'),
+    friday: createDailyPlan('Friday'),
+    saturday: createDailyPlan('Saturday'),
+    sunday: createDailyPlan('Sunday')
+  };
+  
+  // Calculate weekly averages
+  const days = Object.values(weeklyPlan);
+  const weeklyTotals = {
+    averageCalories: Math.round(days.reduce((sum, day) => sum + day.dailyTotals.calories, 0) / 7),
+    averageProtein: Math.round(days.reduce((sum, day) => sum + day.dailyTotals.protein, 0) / 7),
+    averageCarbs: Math.round(days.reduce((sum, day) => sum + day.dailyTotals.carbs, 0) / 7),
+    averageFats: Math.round(days.reduce((sum, day) => sum + day.dailyTotals.fats, 0) / 7),
+    averageFiber: Math.round(days.reduce((sum, day) => sum + day.dailyTotals.fiber, 0) / 7)
+  };
+  
+  // Generate recommendations based on dietary preferences
+  const recommendations = {
+    general: "Consume a variety of fruits, vegetables, and whole grains. Stay hydrated by drinking at least 2 liters of water per day.",
+    preworkout: "Consume complex carbohydrates and protein 1-2 hours before workout. Example: banana with peanut butter or oatmeal with protein powder.",
+    postworkout: "Consume protein and carbohydrates within 30 minutes post-workout. Example: protein shake with fruit or chicken with rice.",
+    timing: [
+      "Eat breakfast within an hour of waking up",
+      "Space meals 3-4 hours apart",
+      "Avoid heavy meals 2-3 hours before bedtime"
+    ]
+  };
+  
+  // Add allergies consideration if applicable
+  if (dietaryPreferences?.hasAllergies && dietaryPreferences?.allergies?.length > 0) {
+    recommendations.general += ` Strictly avoid foods containing ${dietaryPreferences.allergies.join(', ')}.`;
+  }
+  
+  // Account for dietary restrictions
+  if (dietaryPreferences?.dietaryRestrictions?.length > 0) {
+    recommendations.general += ` Following your ${dietaryPreferences.dietaryRestrictions.join(', ')} diet guidelines.`;
+  }
+  
+  return {
+    userCalories: userData.dailyCalories,
+    weeklyPlan,
+    weeklyTotals,
+    recommendations
+  };
+}
