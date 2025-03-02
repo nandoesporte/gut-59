@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -218,62 +219,62 @@ const StepCounter = () => {
           }
         }
 
-        if ('Accelerometer' in window) {
-          sensor = new Accelerometer({ 
-            frequency: ACCELEROMETER_CONFIG.frequency
-          });
-          
-          let lastProcessTime = 0;
-          const processInterval = 1000 / ACCELEROMETER_CONFIG.frequency;
+        // Check if Accelerometer API is available in a type-safe way
+        if (typeof window !== 'undefined' && 'Accelerometer' in window) {
+          try {
+            sensor = new (window as any).Accelerometer({ 
+              frequency: ACCELEROMETER_CONFIG.frequency
+            });
+            
+            let lastProcessTime = 0;
+            const processInterval = 1000 / ACCELEROMETER_CONFIG.frequency;
 
-          sensor.addEventListener('reading', () => {
-            const now = Date.now();
-            if (now - lastProcessTime >= processInterval) {
-              detectStep({
-                x: sensor.x,
-                y: sensor.y,
-                z: sensor.z,
-                timestamp: now
-              });
-              lastProcessTime = now;
-            }
-          });
+            sensor.addEventListener('reading', () => {
+              const now = Date.now();
+              if (now - lastProcessTime >= processInterval) {
+                detectStep({
+                  x: sensor.x,
+                  y: sensor.y,
+                  z: sensor.z,
+                  timestamp: now
+                });
+                lastProcessTime = now;
+              }
+            });
 
-          sensor.start();
-          console.log('Acelerômetro iniciado');
+            sensor.start();
+            console.log('Acelerômetro iniciado');
+          } catch (accelerometerError) {
+            console.error('Erro ao iniciar Accelerometer API:', accelerometerError);
+            useDeviceMotionFallback();
+          }
         } else {
-          window.addEventListener('devicemotion', (event) => {
-            if (event.accelerationIncludingGravity) {
-              detectStep({
-                x: event.accelerationIncludingGravity.x || 0,
-                y: event.accelerationIncludingGravity.y || 0,
-                z: event.accelerationIncludingGravity.z || 0,
-                timestamp: Date.now()
-              });
-            }
-          });
-          console.log('DeviceMotion iniciado como fallback');
+          console.log('Accelerometer API não disponível, usando DeviceMotion como fallback');
+          useDeviceMotionFallback();
         }
       } catch (error) {
         console.error('Erro ao iniciar acelerômetro:', error);
         toast.error('Erro ao iniciar o contador de passos. Tentando DeviceMotion como alternativa...');
-        
-        try {
-          window.addEventListener('devicemotion', (event) => {
-            if (event.accelerationIncludingGravity) {
-              detectStep({
-                x: event.accelerationIncludingGravity.x || 0,
-                y: event.accelerationIncludingGravity.y || 0,
-                z: event.accelerationIncludingGravity.z || 0,
-                timestamp: Date.now()
-              });
-            }
-          });
-          console.log('DeviceMotion iniciado como fallback após erro');
-        } catch (fallbackError) {
-          console.error('Erro ao iniciar DeviceMotion:', fallbackError);
-          toast.error('Não foi possível iniciar o contador de passos');
-        }
+        useDeviceMotionFallback();
+      }
+    };
+
+    const useDeviceMotionFallback = () => {
+      try {
+        window.addEventListener('devicemotion', (event) => {
+          if (event.accelerationIncludingGravity) {
+            detectStep({
+              x: event.accelerationIncludingGravity.x || 0,
+              y: event.accelerationIncludingGravity.y || 0,
+              z: event.accelerationIncludingGravity.z || 0,
+              timestamp: Date.now()
+            });
+          }
+        });
+        console.log('DeviceMotion iniciado como fallback');
+      } catch (fallbackError) {
+        console.error('Erro ao iniciar DeviceMotion:', fallbackError);
+        toast.error('Não foi possível iniciar o contador de passos');
       }
     };
 
@@ -509,6 +510,7 @@ const StepCounter = () => {
               </div>
             </div>
           ) : (
+            // Always show step counter content, regardless of permission status
             <>
               <div className="text-center space-y-2">
                 <span className="text-6xl font-bold text-primary-600">
