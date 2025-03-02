@@ -127,17 +127,23 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
           
           // Then save each exercise in the session
           if (session.session_exercises && Array.isArray(session.session_exercises)) {
-            for (const exercise of session.session_exercises) {
+            for (const exerciseItem of session.session_exercises) {
+              // Verificar se temos um objeto de exercício válido com ID
+              if (!exerciseItem.exercise || !exerciseItem.exercise.id) {
+                console.warn("Invalid exercise item or missing ID:", exerciseItem);
+                continue; // Pular para o próximo exercício se não tiver ID
+              }
+              
               // Insert the session exercise
               const { error: exerciseError } = await supabase
                 .from('session_exercises')
                 .insert({
                   session_id: savedSession.id,
-                  exercise_id: exercise.exercise.id,
-                  sets: exercise.sets,
-                  reps: exercise.reps,
-                  rest_time_seconds: exercise.rest_time_seconds,
-                  order_in_session: session.session_exercises.indexOf(exercise),
+                  exercise_id: exerciseItem.exercise.id,
+                  sets: exerciseItem.sets,
+                  reps: exerciseItem.reps,
+                  rest_time_seconds: exerciseItem.rest_time_seconds,
+                  order_in_session: session.session_exercises.indexOf(exerciseItem),
                 });
                 
               if (exerciseError) {
@@ -191,13 +197,13 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
               sets: ex.sets,
               reps: ex.reps,
               rest_time_seconds: ex.rest_time_seconds,
-              exercise: {
+              exercise: ex.exercise ? {
                 id: ex.exercise.id,
                 name: ex.exercise.name,
                 description: ex.exercise.description || '',
                 gif_url: ex.exercise.gif_url || ''
-              }
-            }))
+              } : null
+            })).filter(ex => ex.exercise !== null) // Filtrar exercícios nulos
           }))
         };
         
