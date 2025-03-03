@@ -54,7 +54,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       let planData;
       try {
         // Forçar o uso da API Groq, sem permitir plano de fallback
-        planData = await generatePlanViaEdgeFunction(safePreferences, user.id, aiSettings, true);
+        planData = await generatePlanViaEdgeFunction(safePreferences, user.id, aiSettings, true, true);
       } catch (edgeFunctionError: any) {
         console.error("Erro na função edge:", edgeFunctionError);
         

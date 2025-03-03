@@ -51,7 +51,8 @@ export const generatePlanViaEdgeFunction = async (
   safePreferences: WorkoutPreferences, 
   userId: string, 
   aiSettings: any, 
-  forceGroqApi: boolean = false
+  forceTrene2025: boolean = false,
+  forceGroqApi: boolean = true // Always force Groq API by default
 ) => {
   console.log("Chamando função Edge com preferências:", safePreferences);
   console.log("Usando agente obrigatório: TRENE2025");
@@ -69,7 +70,7 @@ export const generatePlanViaEdgeFunction = async (
         userId: userId,
         settings: aiSettings || null,
         forceTrene2025: true, // Forçar uso do agente TRENE2025
-        forceGroqApi: forceGroqApi // Novo parâmetro para forçar o uso da API Groq
+        forceGroqApi: forceGroqApi // Forçar o uso da API Groq
       },
     }
   );

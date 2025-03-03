@@ -4,7 +4,6 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -22,48 +21,27 @@ serve(async (req) => {
     const { preferences, userId, settings, forceTrene2025 = false, forceGroqApi = false } = requestData;
 
     console.log("Processing workout plan generation request");
+    console.log("Using Groq API for Llama 3 model integration");
     
-    // Initialize Supabase client
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // Check for required API keys
+    // API Key validation
     const apiKey = settings?.groq_api_key || groqApiKey;
-    if (forceGroqApi && (!apiKey || apiKey.trim() === "")) {
-      throw new Error("Chave API Groq não configurada e é obrigatória para esta operação");
+    if (!apiKey || apiKey.trim() === "") {
+      throw new Error("Chave API Groq não configurada. Configure nas configurações de AI Model Settings ou nos segredos da função Edge.");
     }
 
-    // Determine which model to use
-    let model = "llama3-8b-8192";
-    let apiEndpoint = "https://api.groq.com/openai/v1/chat/completions";
-    let activeModel = settings?.active_model || "llama3";
+    // Determine which model to use (always using Llama 3 model via Groq)
+    const model = "llama3-8b-8192";
+    const apiEndpoint = "https://api.groq.com/openai/v1/chat/completions";
     
-    if (activeModel === "groq") {
-      model = "mixtral-8x7b-32768";
-    }
-
     // Prepare system prompt
-    let systemPrompt = getSystemPrompt(settings, forceTrene2025);
+    const systemPrompt = getSystemPrompt(settings, forceTrene2025);
     
     // Generate workout plan using Groq API
-    let workoutPlan;
+    console.log(`Gerando plano com modelo ${model} via API Groq`);
+    const workoutPlan = await generatePlanWithGroq(apiEndpoint, apiKey, model, systemPrompt, preferences);
     
-    if (apiKey && apiKey.trim() !== "") {
-      try {
-        workoutPlan = await generatePlanWithGroq(apiEndpoint, apiKey, model, systemPrompt, preferences);
-      } catch (groqError) {
-        console.error("Erro ao usar API Groq:", groqError);
-        
-        if (forceGroqApi) {
-          // Se a API Groq é obrigatória, repasse o erro
-          throw new Error(`Falha ao gerar plano via API Groq: ${groqError.message}`);
-        }
-        
-        // Se não for obrigatória, tente o plano de fallback
-        console.log("Erro na API Groq, tentando fallback...");
-        workoutPlan = null;
-      }
-    } else if (forceGroqApi) {
-      throw new Error("Chave API Groq não configurada e é obrigatória para esta operação");
+    if (!workoutPlan) {
+      throw new Error("Falha ao gerar o plano de treino");
     }
 
     // Return the generated workout plan
@@ -131,48 +109,55 @@ async function generatePlanWithGroq(apiEndpoint: string, apiKey: string, model: 
   // Create a detailed user prompt based on preferences
   const userPrompt = createUserPrompt(preferences);
   
-  const response = await fetch(apiEndpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
-      ],
-      temperature: 0.7,
-      max_tokens: 4000
-    })
-  });
-  
-  if (!response.ok) {
-    const errorData = await response.text();
-    console.error("API Error Response:", errorData);
-    throw new Error(`API error: ${response.status} - ${errorData}`);
-  }
-  
-  const result = await response.json();
-  
-  // Extract the assistant's message
-  const assistantMessage = result.choices[0].message.content;
-  
-  // Try to parse the JSON response
   try {
-    // Find JSON object in the response
-    const jsonMatch = assistantMessage.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("No JSON object found in the response");
+    const response = await fetch(apiEndpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 4000
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error("API Error Response:", errorData);
+      throw new Error(`API error: ${response.status} - ${errorData}`);
     }
     
-    const workoutPlan = JSON.parse(jsonMatch[0]);
-    return workoutPlan;
-  } catch (parseError) {
-    console.error("Error parsing workout plan JSON:", parseError);
-    console.log("Raw response:", assistantMessage);
-    throw new Error("Erro ao processar o plano de treino gerado");
+    const result = await response.json();
+    
+    // Extract the assistant's message
+    const assistantMessage = result.choices[0].message.content;
+    
+    // Try to parse the JSON response
+    try {
+      // Find JSON object in the response
+      const jsonMatch = assistantMessage.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        console.error("No JSON object found in the response");
+        console.log("Raw response:", assistantMessage);
+        throw new Error("No JSON object found in the response");
+      }
+      
+      const workoutPlan = JSON.parse(jsonMatch[0]);
+      return workoutPlan;
+    } catch (parseError) {
+      console.error("Error parsing workout plan JSON:", parseError);
+      console.log("Raw response:", assistantMessage);
+      throw new Error("Erro ao processar o plano de treino gerado");
+    }
+  } catch (error) {
+    console.error("Error generating plan with Groq:", error.message);
+    throw new Error(`Falha ao gerar plano via API Groq: ${error.message}`);
   }
 }
 
@@ -196,3 +181,4 @@ Informações básicas:
 Crie um plano de treino completo com 3 dias, respeitando as preferências acima. 
 Retorne apenas o objeto JSON com o plano completo, sem texto adicional.`;
 }
+
