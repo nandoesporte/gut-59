@@ -50,6 +50,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
         console.warn("Configurações do modelo de IA não encontradas. Usando padrões:", settingsError);
       }
       
+      // Adicionar um aviso se a chave Groq não estiver configurada
       if (aiSettings && (!aiSettings.groq_api_key || aiSettings.groq_api_key.trim() === '')) {
         // Verificar se precisamos da chave Groq com base no modelo ativo
         if (aiSettings.active_model === 'groq' || aiSettings.active_model === 'llama3') {
@@ -75,8 +76,8 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       console.log("Chamando função Edge com preferências:", safePreferences);
       console.log("Usando agente obrigatório: TRENE2025");
       
-      // Call the edge function to generate the workout plan without auth headers, 
-      // forcing the use of TRENE2025 settings
+      // Call the edge function to generate the workout plan with forceTrene2025=true
+      // This will bypass the auth header requirement
       const { data, error: functionError } = await supabase.functions.invoke(
         "generate-workout-plan-llama",
         {
