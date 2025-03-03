@@ -20,6 +20,8 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
   const [workoutPlan, setWorkoutPlan] = useState<WorkoutPlan | null>(null);
   const [progressData, setProgressData] = useState(getMockProgressData());
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const MAX_RETRIES = 2;
 
   const generatePlan = async () => {
     setLoading(true);
@@ -39,8 +41,25 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       // Sanitize preferences
       const safePreferences = sanitizePreferences(preferences);
       
-      // Generate plan via edge function
-      const planData = await generatePlanViaEdgeFunction(safePreferences, user.id, aiSettings);
+      console.log("Iniciando geração do plano de treino com TRENE2025...");
+      
+      // Generate plan via edge function with retry logic
+      let planData;
+      try {
+        planData = await generatePlanViaEdgeFunction(safePreferences, user.id, aiSettings);
+      } catch (edgeFunctionError: any) {
+        console.error("Erro na função edge:", edgeFunctionError);
+        
+        // If we've reached max retries, rethrow the error
+        if (retryCount >= MAX_RETRIES) {
+          throw new Error(`Falha após ${MAX_RETRIES} tentativas: ${edgeFunctionError.message}`);
+        }
+        
+        // Increment retry count and try again with a short delay
+        setRetryCount(prev => prev + 1);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return generatePlan(); // Retry the whole process
+      }
       
       // Save the main plan
       const savedPlan = await savePlanToDatabase(planData, user.id);
@@ -70,6 +89,8 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       await updatePlanGenerationCount(user.id);
       
       toast.success("Plano de treino gerado com sucesso pelo TRENE2025!");
+      // Reset retry count on success
+      setRetryCount(0);
     } catch (err: any) {
       console.error("Erro na geração do plano de treino:", err);
       setError(err.message || "Erro ao gerar plano de treino");
