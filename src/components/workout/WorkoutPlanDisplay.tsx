@@ -6,7 +6,7 @@ import { WorkoutLoadingState } from "./components/WorkoutLoadingState";
 import { WorkoutProgressChart } from "./components/WorkoutProgressChart";
 import { WorkoutError } from "./components/WorkoutError";
 import { Badge } from "@/components/ui/badge";
-import { FileDown, RotateCcw, Bot, Crown } from "lucide-react";
+import { FileDown, RotateCcw, Bot } from "lucide-react";
 import { generateWorkoutPDF } from "./utils/pdf-generator";
 import { useWorkoutPlanGeneration } from "./hooks/useWorkoutPlanGeneration";
 
@@ -28,7 +28,7 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
   };
 
   if (loading) {
-    return <WorkoutLoadingState message="Gerando seu plano de treino personalizado com TRENE2025 (IA especializada)" />;
+    return <WorkoutLoadingState message="Gerando seu plano de treino personalizado com TRENE2025" />;
   }
 
   if (error || !workoutPlan) {
@@ -44,8 +44,8 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
         <div>
           <h2 className="text-2xl font-semibold">Seu Plano de Treino</h2>
           <div className="flex items-center mt-2 gap-2">
-            <Badge variant="outline" className="flex items-center gap-1 bg-primary/10 border-primary/30">
-              <Crown className="w-3 h-3 text-primary" />
+            <Badge variant="outline" className="flex items-center gap-1 bg-primary/5">
+              <Bot className="w-3 h-3" />
               Gerado por TRENE2025 (IA Especialista)
             </Badge>
           </div>
