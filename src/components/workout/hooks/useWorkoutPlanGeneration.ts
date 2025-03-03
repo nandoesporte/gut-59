@@ -36,10 +36,10 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        throw new Error("Usuário não autenticado");
+        throw new Error("User not authenticated");
       }
       
-      // Get AI model settings - always use TRENE2025
+      // Get AI model settings
       const { data: aiSettings, error: settingsError } = await supabase
         .from('ai_model_settings')
         .select('*')
@@ -47,15 +47,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
         .single();
       
       if (settingsError) {
-        console.warn("Configurações do modelo de IA não encontradas. Usando padrões:", settingsError);
-      }
-      
-      if (aiSettings && (!aiSettings.groq_api_key || aiSettings.groq_api_key.trim() === '')) {
-        // Verificar se precisamos da chave Groq com base no modelo ativo
-        if (aiSettings.active_model === 'groq' || aiSettings.active_model === 'llama3') {
-          console.warn("Chave API Groq não configurada, necessária para os modelos Llama 3 e Groq");
-          toast.warning("Chave API Groq não configurada. Contate o administrador para melhor qualidade dos planos.");
-        }
+        console.warn("AI model settings not found, will use defaults:", settingsError);
       }
       
       // Ensure preferences arrays are defined before passing to the edge function
@@ -72,35 +64,32 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
           : []
       };
       
-      console.log("Chamando função Edge com preferências:", safePreferences);
-      console.log("Usando agente obrigatório: TRENE2025");
+      console.log("Calling edge function with preferences:", safePreferences);
       
-      // Call the edge function to generate the workout plan without auth headers, 
-      // forcing the use of TRENE2025 settings
+      // Call the edge function to generate the workout plan without auth headers
       const { data, error: functionError } = await supabase.functions.invoke(
         "generate-workout-plan-llama",
         {
           body: { 
             preferences: safePreferences, 
             userId: user.id,
-            settings: aiSettings || null,
-            forceTrene2025: true // Forçar uso do agente TRENE2025
+            settings: aiSettings || null
           },
         }
       );
       
       if (functionError) {
-        console.error("Erro na função Edge:", functionError);
-        throw new Error(`Erro ao gerar plano de treino: ${functionError.message}`);
+        console.error("Edge function error:", functionError);
+        throw new Error(`Error generating workout plan: ${functionError.message}`);
       }
       
       if (!data || !data.workoutPlan) {
-        throw new Error("Resposta inválida do gerador de plano de treino");
+        throw new Error("Invalid response from workout plan generator");
       }
       
       // Extract the complete plan data
       const planData = data.workoutPlan;
-      console.log("Dados do plano de treino recebidos:", planData);
+      console.log("Received workout plan data:", planData);
       
       // Get current date in Brasilia timezone
       const now = new Date();
@@ -124,11 +113,11 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
         .single();
       
       if (planError) {
-        console.error("Erro ao salvar plano de treino:", planError);
-        throw new Error(`Erro ao salvar plano de treino: ${planError.message}`);
+        console.error("Error saving workout plan:", planError);
+        throw new Error(`Error saving workout plan: ${planError.message}`);
       }
       
-      console.log("Plano de treino principal salvo:", savedPlan);
+      console.log("Saved main workout plan:", savedPlan);
       
       // Then save each workout session as a separate record
       if (planData.workout_sessions && Array.isArray(planData.workout_sessions)) {
@@ -146,18 +135,18 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
             .single();
           
           if (sessionError) {
-            console.error("Erro ao salvar sessão de treino:", sessionError);
+            console.error("Error saving workout session:", sessionError);
             continue; // Skip to the next session if there's an error
           }
           
-          console.log("Sessão de treino salva:", savedSession);
+          console.log("Saved workout session:", savedSession);
           
           // Then save each exercise in the session
           if (session.session_exercises && Array.isArray(session.session_exercises)) {
             for (const exerciseItem of session.session_exercises) {
               // Check if we have a valid exercise object with ID
               if (!exerciseItem.exercise || !exerciseItem.exercise.id) {
-                console.warn("Item de exercício inválido ou ID ausente:", exerciseItem);
+                console.warn("Invalid exercise item or missing ID:", exerciseItem);
                 continue; // Skip to the next exercise if there's no valid ID
               }
               
@@ -174,7 +163,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
                 });
                 
               if (exerciseError) {
-                console.error("Erro ao salvar exercício:", exerciseError);
+                console.error("Error saving exercise:", exerciseError);
               }
             }
           }
@@ -201,7 +190,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
         .single();
         
       if (fetchError) {
-        console.error("Erro ao buscar plano de treino completo:", fetchError);
+        console.error("Error fetching complete workout plan:", fetchError);
         // Still continue as we at least saved the basic plan
       }
       
@@ -262,7 +251,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
         .single();
         
       if (countError && countError.code !== 'PGRST116') {
-        console.error("Erro ao verificar contagem de geração de plano:", countError);
+        console.error("Error checking plan generation count:", countError);
       }
       
       if (countData) {
@@ -286,9 +275,9 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
           });
       }
       
-      toast.success("Plano de treino gerado com sucesso pelo TRENE2025!");
+      toast.success("Plano de treino gerado com sucesso!");
     } catch (err: any) {
-      console.error("Erro na geração do plano de treino:", err);
+      console.error("Error in workout plan generation:", err);
       setError(err.message || "Erro ao gerar plano de treino");
       toast.error(err.message || "Erro ao gerar plano de treino");
     } finally {
