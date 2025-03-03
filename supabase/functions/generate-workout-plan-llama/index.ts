@@ -1,195 +1,198 @@
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.43.0';
+// Follow this setup guide to integrate the Deno runtime into your application:
+// https://docs.deno.com/runtime/manual/getting_started/
 
-// Configure CORS headers for browser requests
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { corsHeaders } from "../_shared/cors.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+
+const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const groqApiKey = Deno.env.get("GROQ_API_KEY") || "";
 
 serve(async (req) => {
   // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     // Parse the request body
     const requestData = await req.json();
-    const { preferences, userId, settings, forceTrene2025 } = requestData;
+    const { preferences, userId, settings, forceTrene2025 = false, forceGroqApi = false } = requestData;
 
-    if (!preferences) {
-      throw new Error('Preferências de treino não fornecidas');
-    }
-
-    // Create a Supabase client with the Supabase URL and secret key
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { auth: { persistSession: false } }
-    );
-
-    console.log("Gerando plano com TRENE2025 (forçado):", forceTrene2025);
-
-    // Verificar se o API key da Groq está configurado
-    const groqApiKey = settings?.groq_api_key || Deno.env.get('GROQ_API_KEY');
+    console.log("Processing workout plan generation request");
     
-    // Se não tiver API key da Groq e o modelo ativo for groq ou llama3, gerar plano básico
-    if ((!groqApiKey || groqApiKey.trim() === '') && 
-        (settings?.active_model === 'groq' || settings?.active_model === 'llama3')) {
-      console.log("Chave API Groq não configurada. Gerando plano básico alternativo.");
-      const fallbackPlan = generateFallbackWorkoutPlan(preferences);
-      return new Response(
-        JSON.stringify({ workoutPlan: fallbackPlan }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Initialize Supabase client
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Check for required API keys
+    const apiKey = settings?.groq_api_key || groqApiKey;
+    if (forceGroqApi && (!apiKey || apiKey.trim() === "")) {
+      throw new Error("Chave API Groq não configurada e é obrigatória para esta operação");
     }
 
-    // Aqui implementaria a chamada real para a API da Groq/Llama 3
-    // Como estamos com problemas de autorização, vamos gerar um plano básico para evitar falhas
-    console.log("Gerando plano de treino com base nas preferências do usuário");
-    const workoutPlan = generateFallbackWorkoutPlan(preferences);
+    // Determine which model to use
+    let model = "llama3-8b-8192";
+    let apiEndpoint = "https://api.groq.com/openai/v1/chat/completions";
+    let activeModel = settings?.active_model || "llama3";
+    
+    if (activeModel === "groq") {
+      model = "mixtral-8x7b-32768";
+    }
 
-    return new Response(
-      JSON.stringify({ workoutPlan }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-
-  } catch (error) {
-    console.error("Erro na geração do plano de treino:", error.message);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { 
-        status: 400, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    // Prepare system prompt
+    let systemPrompt = getSystemPrompt(settings, forceTrene2025);
+    
+    // Generate workout plan using Groq API
+    let workoutPlan;
+    
+    if (apiKey && apiKey.trim() !== "") {
+      try {
+        workoutPlan = await generatePlanWithGroq(apiEndpoint, apiKey, model, systemPrompt, preferences);
+      } catch (groqError) {
+        console.error("Erro ao usar API Groq:", groqError);
+        
+        if (forceGroqApi) {
+          // Se a API Groq é obrigatória, repasse o erro
+          throw new Error(`Falha ao gerar plano via API Groq: ${groqError.message}`);
+        }
+        
+        // Se não for obrigatória, tente o plano de fallback
+        console.log("Erro na API Groq, tentando fallback...");
+        workoutPlan = null;
       }
-    );
+    } else if (forceGroqApi) {
+      throw new Error("Chave API Groq não configurada e é obrigatória para esta operação");
+    }
+
+    // Return the generated workout plan
+    return new Response(JSON.stringify({ 
+      workoutPlan: workoutPlan 
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200,
+    });
+  } catch (error) {
+    console.error("Error:", error.message);
+    return new Response(JSON.stringify({ error: error.message }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+    });
   }
 });
 
-// Função para gerar um plano de treino básico como fallback
-function generateFallbackWorkoutPlan(preferences: any) {
-  const { 
-    fitness_level, 
-    workout_frequency, 
-    preferred_exercise_types = [],
-    available_equipment = [],
-    fitness_goal
-  } = preferences;
-
-  console.log("Gerando plano fallback com preferências:", JSON.stringify(preferences, null, 2));
-
-  // Determinar tipo de treino com base no objetivo
-  let workoutType = "misto";
-  if (fitness_goal?.includes("força") || fitness_goal?.includes("hipertrofia")) {
-    workoutType = "força";
-  } else if (fitness_goal?.includes("perda de peso") || fitness_goal?.includes("emagrecer")) {
-    workoutType = "cardio";
-  } else if (fitness_goal?.includes("resistência")) {
-    workoutType = "resistência";
+// Function to get system prompt
+function getSystemPrompt(settings: any, forceTrene2025: boolean) {
+  // If settings specify to use custom prompt and one is provided, use it
+  if (settings?.use_custom_prompt && settings?.system_prompt) {
+    return settings.system_prompt;
   }
+  
+  // Default prompt
+  return `Você é TRENE2025, um agente de IA especializado em educação física e nutrição esportiva.
+Seu objetivo é criar planos de treino detalhados, personalizados e cientificamente embasados.
+Você deve fornecer um plano completo, com exercícios, séries, repetições e dicas específicas.
 
-  // Exercícios básicos para diferentes grupos musculares
-  const basicExercises = {
-    peito: [
-      { id: "e001", name: "Supino reto", muscle_group: "peito", exercise_type: "força" },
-      { id: "e002", name: "Flexão de braço", muscle_group: "peito", exercise_type: "força" }
-    ],
-    costas: [
-      { id: "e003", name: "Remada curvada", muscle_group: "costas", exercise_type: "força" },
-      { id: "e004", name: "Puxada alta", muscle_group: "costas", exercise_type: "força" }
-    ],
-    pernas: [
-      { id: "e005", name: "Agachamento", muscle_group: "pernas", exercise_type: "força" },
-      { id: "e006", name: "Leg press", muscle_group: "pernas", exercise_type: "força" }
-    ],
-    ombros: [
-      { id: "e007", name: "Elevação lateral", muscle_group: "ombros", exercise_type: "força" },
-      { id: "e008", name: "Desenvolvimento", muscle_group: "ombros", exercise_type: "força" }
-    ],
-    biceps: [
-      { id: "e009", name: "Rosca direta", muscle_group: "biceps", exercise_type: "força" },
-      { id: "e010", name: "Rosca martelo", muscle_group: "biceps", exercise_type: "força" }
-    ],
-    triceps: [
-      { id: "e011", name: "Tríceps testa", muscle_group: "triceps", exercise_type: "força" },
-      { id: "e012", name: "Tríceps corda", muscle_group: "triceps", exercise_type: "força" }
-    ],
-    abdominais: [
-      { id: "e013", name: "Abdominal", muscle_group: "abdominais", exercise_type: "força" },
-      { id: "e014", name: "Prancha", muscle_group: "abdominais", exercise_type: "força" }
-    ],
-    cardio: [
-      { id: "e015", name: "Corrida", muscle_group: "cardio", exercise_type: "cardio" },
-      { id: "e016", name: "Ciclismo", muscle_group: "cardio", exercise_type: "cardio" }
-    ]
-  };
-
-  // Filtrar exercícios com base em equipamentos disponíveis
-  const filteredExercises = { ...basicExercises };
-  if (available_equipment.length > 0) {
-    // Aqui poderia implementar uma lógica mais complexa para filtrar por equipamento
-    // Por enquanto apenas mantemos todos os exercícios
-  }
-
-  // Filtrar por tipos de exercícios preferidos
-  const filteredByType = { ...filteredExercises };
-  if (preferred_exercise_types.length > 0) {
-    // Implementar filtro por tipo de exercício
-    // Por enquanto mantemos todos
-  }
-
-  // Criar plano de treino com base na frequência
-  const frequency = parseInt(workout_frequency) || 3;
-  const workoutSessions = [];
-
-  for (let day = 1; day <= frequency; day++) {
-    const session = {
-      day_number: day,
-      warmup_description: "5-10 minutos de exercícios leves para aquecer os músculos e elevar a frequência cardíaca.",
-      cooldown_description: "5 minutos de alongamentos para os grupos musculares trabalhados.",
-      session_exercises: []
-    };
-
-    // Distribuir grupos musculares pelos dias
-    switch (day % 3) {
-      case 1: // Dia 1: Peito, Tríceps, Ombros
-        addExercisesToSession(session, filteredByType.peito, 2);
-        addExercisesToSession(session, filteredByType.triceps, 2);
-        addExercisesToSession(session, filteredByType.ombros, 1);
-        break;
-      case 2: // Dia 2: Costas, Bíceps, Abdômen
-        addExercisesToSession(session, filteredByType.costas, 2);
-        addExercisesToSession(session, filteredByType.biceps, 2);
-        addExercisesToSession(session, filteredByType.abdominais, 1);
-        break;
-      case 0: // Dia 3: Pernas, Abdômen, Cardio
-        addExercisesToSession(session, filteredByType.pernas, 3);
-        addExercisesToSession(session, filteredByType.abdominais, 1);
-        addExercisesToSession(session, filteredByType.cardio, 1);
-        break;
+Formato do plano de treino:
+{
+  "goal": "objetivo_do_treino",
+  "start_date": "data_inicio",
+  "end_date": "data_fim",
+  "workout_sessions": [
+    {
+      "day_number": 1,
+      "warmup_description": "descrição do aquecimento",
+      "cooldown_description": "descrição da volta à calma",
+      "session_exercises": [
+        {
+          "sets": 3,
+          "reps": 12,
+          "rest_time_seconds": 60,
+          "exercise": {
+            "id": "ID_DO_EXERCICIO",
+            "name": "Nome do Exercício",
+            "description": "Descrição detalhada",
+            "gif_url": "URL da animação",
+            "muscle_group": "grupo_muscular",
+            "exercise_type": "tipo_exercicio"
+          }
+        }
+      ]
     }
-
-    workoutSessions.push(session);
-  }
-
-  // Returnar o plano completo
-  return {
-    goal: preferences.fitness_goal || "Melhora da condição física geral",
-    workout_sessions: workoutSessions
-  };
+  ]
+}`;
 }
 
-// Função auxiliar para adicionar exercícios a uma sessão
-function addExercisesToSession(session: any, exercisePool: any[], count: number) {
-  for (let i = 0; i < Math.min(count, exercisePool.length); i++) {
-    const exercise = exercisePool[i];
-    session.session_exercises.push({
-      exercise: exercise,
-      sets: 3,
-      reps: "12-15",
-      rest_time_seconds: 60
-    });
+// Function to generate workout plan with Groq API
+async function generatePlanWithGroq(apiEndpoint: string, apiKey: string, model: string, systemPrompt: string, preferences: any) {
+  console.log(`Gerando plano com modelo ${model}`);
+  
+  // Create a detailed user prompt based on preferences
+  const userPrompt = createUserPrompt(preferences);
+  
+  const response = await fetch(apiEndpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      temperature: 0.7,
+      max_tokens: 4000
+    })
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.text();
+    console.error("API Error Response:", errorData);
+    throw new Error(`API error: ${response.status} - ${errorData}`);
   }
+  
+  const result = await response.json();
+  
+  // Extract the assistant's message
+  const assistantMessage = result.choices[0].message.content;
+  
+  // Try to parse the JSON response
+  try {
+    // Find JSON object in the response
+    const jsonMatch = assistantMessage.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("No JSON object found in the response");
+    }
+    
+    const workoutPlan = JSON.parse(jsonMatch[0]);
+    return workoutPlan;
+  } catch (parseError) {
+    console.error("Error parsing workout plan JSON:", parseError);
+    console.log("Raw response:", assistantMessage);
+    throw new Error("Erro ao processar o plano de treino gerado");
+  }
+}
+
+// Function to create a detailed user prompt based on preferences
+function createUserPrompt(preferences: any) {
+  return `Crie um plano de treino detalhado baseado nas seguintes preferências:
+
+Informações básicas:
+- Idade: ${preferences.age || "Não informada"}
+- Sexo: ${preferences.gender || "Não informado"}
+- Peso: ${preferences.weight || "Não informado"} kg
+- Altura: ${preferences.height || "Não informada"} cm
+- Nível de atividade: ${preferences.activity_level || "Moderado"}
+- Objetivo: ${preferences.goal || "Ganho de massa muscular"}
+- Local de treinamento: ${preferences.training_location || "Academia"}
+- Equipamentos disponíveis: ${(preferences.available_equipment || []).join(', ') || "Todos os equipamentos padrão de academia"}
+- Preferência de exercícios: ${(preferences.preferred_exercise_types || []).join(', ') || "Variados"}
+- Condições de saúde: ${(preferences.health_conditions || []).join(', ') || "Nenhuma"}
+- Frequência de treino por semana: ${preferences.days_per_week || 3}
+
+Crie um plano de treino completo com 3 dias, respeitando as preferências acima. 
+Retorne apenas o objeto JSON com o plano completo, sem texto adicional.`;
 }

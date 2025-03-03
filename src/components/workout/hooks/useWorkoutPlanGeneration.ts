@@ -38,15 +38,23 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       // Get AI model settings
       const aiSettings = await getAIModelSettings();
       
+      // Verificar se a chave da API Groq está configurada
+      if (!aiSettings || !aiSettings.groq_api_key || aiSettings.groq_api_key.trim() === '') {
+        // Se não tiver chave Groq configurada, notificar o usuário
+        toast.error("Chave API Groq não configurada. Entre em contato com o administrador.");
+        throw new Error("Chave API Groq não configurada. Use a página de administração para configurar.");
+      }
+      
       // Sanitize preferences
       const safePreferences = sanitizePreferences(preferences);
       
-      console.log("Iniciando geração do plano de treino com TRENE2025...");
+      console.log("Iniciando geração do plano de treino com TRENE2025 via API Groq...");
       
       // Generate plan via edge function with retry logic
       let planData;
       try {
-        planData = await generatePlanViaEdgeFunction(safePreferences, user.id, aiSettings);
+        // Forçar o uso da API Groq, sem permitir plano de fallback
+        planData = await generatePlanViaEdgeFunction(safePreferences, user.id, aiSettings, true);
       } catch (edgeFunctionError: any) {
         console.error("Erro na função edge:", edgeFunctionError);
         

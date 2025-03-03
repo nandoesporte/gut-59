@@ -25,11 +25,8 @@ export const getAIModelSettings = async () => {
 // Check if Groq API key is configured
 const checkGroqApiKey = (aiSettings: any) => {
   if (aiSettings && (!aiSettings.groq_api_key || aiSettings.groq_api_key.trim() === '')) {
-    // Verificar se precisamos da chave Groq com base no modelo ativo
-    if (aiSettings.active_model === 'groq' || aiSettings.active_model === 'llama3') {
-      console.warn("Chave API Groq não configurada, necessária para os modelos Llama 3 e Groq");
-      toast.warning("Chave API Groq não configurada. Contate o administrador para melhor qualidade dos planos.");
-    }
+    console.warn("Chave API Groq não configurada, necessária para os modelos Llama 3 e Groq");
+    toast.warning("Chave API Groq não configurada. Contate o administrador para poder gerar planos de treino.");
   }
 };
 
@@ -50,9 +47,19 @@ export const sanitizePreferences = (preferences: WorkoutPreferences) => {
 };
 
 // Generate workout plan via edge function
-export const generatePlanViaEdgeFunction = async (safePreferences: WorkoutPreferences, userId: string, aiSettings: any) => {
+export const generatePlanViaEdgeFunction = async (
+  safePreferences: WorkoutPreferences, 
+  userId: string, 
+  aiSettings: any, 
+  forceGroqApi: boolean = false
+) => {
   console.log("Chamando função Edge com preferências:", safePreferences);
   console.log("Usando agente obrigatório: TRENE2025");
+  
+  // Verificar se temos a chave da API Groq
+  if (forceGroqApi && (!aiSettings || !aiSettings.groq_api_key || aiSettings.groq_api_key.trim() === '')) {
+    throw new Error("Chave API Groq não configurada. Impossível gerar plano sem essa chave.");
+  }
   
   const { data, error: functionError } = await supabase.functions.invoke(
     "generate-workout-plan-llama",
@@ -61,7 +68,8 @@ export const generatePlanViaEdgeFunction = async (safePreferences: WorkoutPrefer
         preferences: safePreferences, 
         userId: userId,
         settings: aiSettings || null,
-        forceTrene2025: true // Forçar uso do agente TRENE2025
+        forceTrene2025: true, // Forçar uso do agente TRENE2025
+        forceGroqApi: forceGroqApi // Novo parâmetro para forçar o uso da API Groq
       },
     }
   );
