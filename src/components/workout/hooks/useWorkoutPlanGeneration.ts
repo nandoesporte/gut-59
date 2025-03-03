@@ -39,9 +39,17 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       const aiSettings = await getAIModelSettings();
       
       // Verificar se a chave da API Groq está configurada
-      if (!aiSettings || !aiSettings.groq_api_key || aiSettings.groq_api_key.trim() === '') {
-        // Se não tiver chave Groq configurada, notificar o usuário
-        toast.error("Chave API Groq não configurada. Entre em contato com o administrador.");
+      if (!aiSettings) {
+        toast.error("Configurações de IA não encontradas. Entre em contato com o administrador.");
+        throw new Error("Configurações de IA não encontradas. Configure via administração.");
+      }
+      
+      // Log the API key status (without showing the key itself)
+      console.log("Groq API key configured:", aiSettings.groq_api_key ? "Sim" : "Não");
+      
+      if (!aiSettings.groq_api_key || aiSettings.groq_api_key.trim() === '') {
+        // Fornecer feedback mais específico
+        toast.error("Chave API Groq não configurada. Acesse a aba 'Modelos de IA' no painel administrativo para configurar.");
         throw new Error("Chave API Groq não configurada. Use a página de administração para configurar.");
       }
       

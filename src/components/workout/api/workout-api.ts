@@ -14,20 +14,24 @@ export const getAIModelSettings = async () => {
     .single();
   
   if (settingsError) {
-    console.warn("Configurações do modelo de IA não encontradas. Usando padrões:", settingsError);
+    console.error("Erro ao buscar configurações do modelo de IA:", settingsError);
+    toast.error("Erro ao buscar configurações do modelo de IA");
+    return null;
   }
   
-  checkGroqApiKey(aiSettings);
+  if (!aiSettings) {
+    console.warn("Configurações do modelo de IA não encontradas.");
+    return null;
+  }
+  
+  // Check if Groq API key is configured
+  if (!aiSettings.groq_api_key || aiSettings.groq_api_key.trim() === '') {
+    console.warn("Chave API Groq não configurada, necessária para os modelos Llama 3");
+  } else {
+    console.log("Chave API Groq configurada corretamente");
+  }
   
   return aiSettings;
-};
-
-// Check if Groq API key is configured
-const checkGroqApiKey = (aiSettings: any) => {
-  if (aiSettings && (!aiSettings.groq_api_key || aiSettings.groq_api_key.trim() === '')) {
-    console.warn("Chave API Groq não configurada, necessária para os modelos Llama 3 e Groq");
-    toast.warning("Chave API Groq não configurada. Contate o administrador para poder gerar planos de treino.");
-  }
 };
 
 // Ensure preferences arrays are defined
@@ -62,29 +66,35 @@ export const generatePlanViaEdgeFunction = async (
     throw new Error("Chave API Groq não configurada. Impossível gerar plano sem essa chave.");
   }
   
-  const { data, error: functionError } = await supabase.functions.invoke(
-    "generate-workout-plan-llama",
-    {
-      body: { 
-        preferences: safePreferences, 
-        userId: userId,
-        settings: aiSettings || null,
-        forceTrene2025: true, // Forçar uso do agente TRENE2025
-        forceGroqApi: forceGroqApi // Forçar o uso da API Groq
-      },
+  try {
+    const { data, error: functionError } = await supabase.functions.invoke(
+      "generate-workout-plan-llama",
+      {
+        body: { 
+          preferences: safePreferences, 
+          userId: userId,
+          settings: aiSettings || null,
+          forceTrene2025: true, // Forçar uso do agente TRENE2025
+          forceGroqApi: forceGroqApi // Forçar o uso da API Groq
+        },
+      }
+    );
+    
+    if (functionError) {
+      console.error("Erro na função Edge:", functionError);
+      throw new Error(`Erro ao gerar plano de treino: ${functionError.message}`);
     }
-  );
-  
-  if (functionError) {
-    console.error("Erro na função Edge:", functionError);
-    throw new Error(`Erro ao gerar plano de treino: ${functionError.message}`);
+    
+    if (!data || !data.workoutPlan) {
+      console.error("Resposta inválida do gerador de plano de treino:", data);
+      throw new Error("Resposta inválida do gerador de plano de treino");
+    }
+    
+    return data.workoutPlan;
+  } catch (error) {
+    console.error("Erro ao chamar a função Edge:", error);
+    throw error;
   }
-  
-  if (!data || !data.workoutPlan) {
-    throw new Error("Resposta inválida do gerador de plano de treino");
-  }
-  
-  return data.workoutPlan;
 };
 
 // Save main workout plan
