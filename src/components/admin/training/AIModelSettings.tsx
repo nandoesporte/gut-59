@@ -59,7 +59,7 @@ export const AIModelSettings = () => {
   };
 
   const getDefaultPrompt = () => {
-    return `Você é TRENE2025, um agente de IA especializado em educação física e nutrição esportiva. 
+    return `Você é Trenner2025, um agente de IA especializado em educação física e nutrição esportiva. 
 Seu objetivo é criar planos de treino detalhados, personalizados e cientificamente embasados.
 Você deve fornecer um plano completo, com exercícios, séries, repetições e dicas específicas.`;
   };
@@ -145,7 +145,7 @@ Você deve fornecer um plano completo, com exercícios, séries, repetições e 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Configurações do Modelo de IA - TRENE2025</CardTitle>
+        <CardTitle>Configurações do Trenner2025 - Agente de IA</CardTitle>
         <CardDescription>
           Configure as opções para o modelo de IA usado para gerar planos de treino
         </CardDescription>

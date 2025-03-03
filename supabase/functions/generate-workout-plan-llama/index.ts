@@ -1,260 +1,564 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.33.1';
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.1";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+interface RequestBody {
+  preferences: any;
+  userId: string;
+  agentName?: string; // Optional parameter for agent name
+  settings?: any;
+}
 
 serve(async (req) => {
   // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    // Get environment variables
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") as string;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as string;
     
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Environment variables SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required');
-    }
-
-    // Create a Supabase client with the service role key
+    // Create Supabase client
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const requestData: RequestBody = await req.json();
     
-    // Get request payload
-    const { preferences, userId, settings } = await req.json();
+    // Extract data from request
+    const { preferences, userId, agentName = "TRENE2025", settings } = requestData;
     
     if (!preferences || !userId) {
-      throw new Error('Missing required parameters: preferences and userId are required');
+      return new Response(
+        JSON.stringify({ error: "Missing required parameters: preferences and userId" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+      );
     }
+
+    const startTime = Date.now();
+    console.log(`🏋️ Starting workout plan generation for user ${userId} with ${agentName}`);
+    console.log(`Preferences: ${JSON.stringify(preferences)}`);
+
+    // Determine which model to use
+    const useGroq = !settings || settings.active_model === "llama3" || settings.active_model === "groq";
+    const groqApiKey = settings?.groq_api_key || Deno.env.get("GROQ_API_KEY");
     
-    console.log("Request received for user", userId);
-    
-    // Check if we have settings and if not, fetch default settings
-    let modelSettings = settings;
-    if (!modelSettings) {
-      const { data: fetchedSettings, error: settingsError } = await supabase
-        .from('ai_model_settings')
-        .select('*')
-        .eq('name', 'trene2025')
-        .single();
-        
-      if (settingsError) {
-        throw new Error(`Error fetching AI model settings: ${settingsError.message}`);
-      }
-      
-      modelSettings = fetchedSettings;
+    if (useGroq && (!groqApiKey || groqApiKey.trim() === "")) {
+      return new Response(
+        JSON.stringify({ error: "Groq API key is required but not provided" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+      );
     }
-    
-    // Determine which model to use based on settings
-    const useGroq = modelSettings?.active_model === 'groq' || modelSettings?.active_model === 'llama3';
-    const groqApiKey = modelSettings?.groq_api_key;
-    
-    // Query to get available exercises
-    const { data: availableExercises, error: exercisesError } = await supabase
-      .from('exercises')
-      .select('*');
-      
+
+    // Log to help debug
+    console.log(`Using ${useGroq ? "Groq API with Llama 3" : "OpenAI"} for generating workout plan`);
+    console.log(`AI Settings: ${JSON.stringify(settings || "Using default settings")}`);
+
+    // Step 1: Fetch exercises based on preferences
+    const { data: exercises, error: exercisesError } = await supabase
+      .from("exercises")
+      .select("*")
+      .order("name");
+
     if (exercisesError) {
-      throw new Error(`Error fetching exercises: ${exercisesError.message}`);
+      console.error("Error fetching exercises:", exercisesError);
+      return new Response(
+        JSON.stringify({ error: "Failed to fetch exercises" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      );
+    }
+
+    // Filter exercises based on preferences
+    const filteredExercises = filterExercisesByPreferences(exercises, preferences);
+    console.log(`Filtered ${filteredExercises.length} exercises from ${exercises.length} total exercises`);
+
+    // Step 2: Generate the workout plan using LLM
+    let workoutPlan;
+    if (useGroq) {
+      // Use Groq with Llama 3
+      workoutPlan = await generateWorkoutPlanWithGroq(
+        filteredExercises, 
+        preferences,
+        settings?.system_prompt,
+        settings?.use_custom_prompt === true,
+        groqApiKey,
+        agentName
+      );
+    } else {
+      // Fallback to OpenAI
+      const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
+      workoutPlan = await generateWorkoutPlanWithOpenAI(
+        filteredExercises, 
+        preferences,
+        settings?.system_prompt,
+        settings?.use_custom_prompt === true,
+        openaiApiKey,
+        agentName
+      );
+    }
+
+    if (!workoutPlan) {
+      return new Response(
+        JSON.stringify({ error: "Failed to generate workout plan" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      );
+    }
+
+    // Log execution time
+    const executionTime = Date.now() - startTime;
+    console.log(`✅ Workout plan generated successfully in ${executionTime / 1000} seconds`);
+
+    // Return the workout plan
+    return new Response(
+      JSON.stringify({ workoutPlan }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } catch (error) {
+    console.error("Error generating workout plan:", error);
+    return new Response(
+      JSON.stringify({ error: `Failed to generate workout plan: ${error.message}` }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+    );
+  }
+});
+
+function filterExercisesByPreferences(exercises: any[], preferences: any) {
+  let filteredExercises = [...exercises];
+
+  // Filter by exercise types if specified
+  if (preferences.preferred_exercise_types && preferences.preferred_exercise_types.length > 0) {
+    filteredExercises = filteredExercises.filter(exercise => 
+      preferences.preferred_exercise_types.includes(exercise.exercise_type)
+    );
+  }
+
+  // Filter by equipment availability based on training location
+  if (preferences.available_equipment && preferences.available_equipment.length > 0) {
+    // If "all" is included, no need to filter by equipment
+    if (!preferences.available_equipment.includes("all")) {
+      filteredExercises = filteredExercises.filter(exercise => {
+        // If exercise doesn't require equipment, include it
+        if (!exercise.equipment_needed || exercise.equipment_needed.length === 0) {
+          return true;
+        }
+        
+        // Check if at least one of the exercise's required equipment is available
+        return exercise.equipment_needed.some((equipment: string) => 
+          preferences.available_equipment.includes(equipment)
+        );
+      });
+    }
+  }
+
+  // Additional filtering logic can be added here
+
+  // Ensure we have enough exercises (minimum 30)
+  if (filteredExercises.length < 30) {
+    console.log(`Warning: Only ${filteredExercises.length} exercises match the criteria. Adding more exercises...`);
+    
+    // Add more exercises that match at least the exercise type
+    const additionalExercises = exercises.filter(exercise => 
+      !filteredExercises.includes(exercise) && 
+      preferences.preferred_exercise_types.includes(exercise.exercise_type)
+    );
+    
+    filteredExercises = [...filteredExercises, ...additionalExercises];
+    
+    // If still not enough, add any exercises
+    if (filteredExercises.length < 30) {
+      const remainingExercises = exercises.filter(exercise => 
+        !filteredExercises.includes(exercise)
+      );
+      
+      filteredExercises = [...filteredExercises, ...remainingExercises.slice(0, 30 - filteredExercises.length)];
     }
     
-    // Start constructing the prompt
-    let prompt = `You are a professional fitness coach creating a personalized 7-day workout plan. Here are the user's preferences and details:
+    console.log(`Added additional exercises. Now using ${filteredExercises.length} exercises.`);
+  }
 
-- Age: ${preferences.age}
-- Gender: ${preferences.gender}
-- Weight: ${preferences.weight} kg
-- Height: ${preferences.height} cm
-- Goal: ${preferences.goal}
-- Activity Level: ${preferences.activity_level}
-- Preferred Exercise Types: ${preferences.preferred_exercise_types.join(', ')}
-- Available Equipment: ${preferences.available_equipment.join(', ')}
-`;
+  return filteredExercises;
+}
 
-    if (preferences.health_conditions && preferences.health_conditions.length > 0) {
-      prompt += `- Health Conditions: ${preferences.health_conditions.join(', ')}\n`;
-    }
+async function generateWorkoutPlanWithGroq(
+  exercises: any[],
+  preferences: any,
+  customSystemPrompt?: string,
+  useCustomPrompt = false,
+  apiKey?: string,
+  agentName = "TRENE2025"
+) {
+  const groqApiKey = apiKey || Deno.env.get("GROQ_API_KEY");
+  
+  if (!groqApiKey) {
+    throw new Error("Groq API key is required but not provided");
+  }
 
-    prompt += `
-Based on this information, create a detailed 7-day workout plan. The plan should be structured as a JSON object with the following format:
+  // Prepare the system prompt
+  const defaultSystemPrompt = `Você é ${agentName}, um agente de IA especializado em educação física e ciência do exercício. 
+Sua tarefa é criar um plano de treino personalizado com base nas preferências e necessidades do usuário. 
+Você deve utilizar apenas os exercícios fornecidos na lista de exercícios disponíveis. 
+Crie um plano de treino semanal detalhado, com dias específicos, séries, repetições e descrições.`;
+
+  const systemPrompt = useCustomPrompt && customSystemPrompt ? customSystemPrompt : defaultSystemPrompt;
+
+  // Prepare the exercises in a condensed format
+  const exerciseList = exercises.map(ex => ({
+    id: ex.id,
+    name: ex.name,
+    muscle_group: ex.muscle_group,
+    exercise_type: ex.exercise_type,
+    difficulty: ex.difficulty,
+    equipment_needed: ex.equipment_needed,
+    description: ex.description,
+    gif_url: ex.gif_url
+  }));
+
+  // Construct the prompt for the workout plan generation
+  const userPrompt = `
+Com base nas preferências do usuário a seguir, crie um plano de treino personalizado dividido por dias da semana.
+
+PREFERÊNCIAS DO USUÁRIO:
+- Idade: ${preferences.age} anos
+- Sexo: ${preferences.gender === 'male' ? 'Masculino' : 'Feminino'}
+- Peso: ${preferences.weight} kg
+- Altura: ${preferences.height} cm
+- Objetivo: ${translateGoal(preferences.goal)}
+- Nível de atividade física: ${translateActivityLevel(preferences.activity_level)}
+- Tipos de exercícios preferidos: ${translateExerciseTypes(preferences.preferred_exercise_types)}
+- Local de treino: ${translateTrainingLocation(preferences)}
+${preferences.health_conditions && preferences.health_conditions.length > 0 ? 
+  `- Condições de saúde: ${preferences.health_conditions.join(', ')}` : ''}
+
+EXERCÍCIOS DISPONÍVEIS:
+${JSON.stringify(exerciseList).substring(0, 14000)}
+
+INSTRUÇÕES:
+1. Crie um plano de treino para 7 dias, com descanso nos dias apropriados dependendo do nível do usuário.
+2. Para cada dia, inclua:
+   - Um aquecimento breve mas efetivo
+   - Lista de exercícios com séries e repetições específicas
+   - Tempo de descanso entre séries
+   - Uma volta à calma
+3. Escolha apenas exercícios da lista fornecida acima.
+4. As séries e repetições devem ser adequadas ao objetivo e nível do usuário.
+5. Respeite quaisquer condições de saúde mencionadas.
+
+FORMATO DE RESPOSTA: 
+Responda APENAS com um objeto JSON válido no seguinte formato sem nenhum texto adicional:
 
 {
-  "goal": "A clear statement about the goal of this workout plan",
-  "start_date": "2023-05-01",
-  "end_date": "2023-05-07",
+  "goal": "objetivo traduzido",
+  "start_date": "data de início no formato YYYY-MM-DD",
+  "end_date": "data de fim no formato YYYY-MM-DD",
   "workout_sessions": [
     {
-      "day_number": 1,
-      "warmup_description": "5-10 minutes of light cardio followed by dynamic stretching",
-      "cooldown_description": "5 minutes of static stretching, focusing on worked muscle groups",
+      "day_number": número do dia (1-7),
+      "warmup_description": "descrição do aquecimento",
+      "cooldown_description": "descrição da volta à calma",
       "session_exercises": [
         {
           "exercise": {
-            "id": 123,
-            "name": "Exercise Name",
-            "description": "Brief description",
-            "muscle_group": "Targeted muscles",
-            "exercise_type": "Type of exercise",
-            "gif_url": "URL to exercise animation"
+            "id": "id do exercício da lista",
+            "name": "nome do exercício",
+            "description": "descrição do exercício",
+            "gif_url": "url do gif do exercício",
+            "muscle_group": "grupo muscular",
+            "exercise_type": "tipo de exercício"
           },
-          "sets": 3,
-          "reps": "10-12",
-          "rest_time_seconds": 60
+          "sets": número de séries,
+          "reps": número de repetições,
+          "rest_time_seconds": tempo de descanso em segundos
         }
       ]
     }
   ]
 }
 
-You must choose exercises from the following list of available exercises:
-`;
+Lembre-se: sua resposta deve ser APENAS o objeto JSON válido, nada mais.`;
 
-    // Add the available exercises to the prompt
-    availableExercises.forEach(exercise => {
-      prompt += `
-ID: ${exercise.id} - ${exercise.name} - Muscle Group: ${exercise.muscle_group} - Type: ${exercise.exercise_type}`;
+  try {
+    console.log("Calling Groq API with Llama 3...");
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${groqApiKey}`
+      },
+      body: JSON.stringify({
+        model: "llama3-8b-8192",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        temperature: 0.5,
+        max_tokens: 4096
+      })
     });
 
-    prompt += `
-Important guidelines:
-1. Make sure all exercises are from the provided list
-2. Include the correct exercise ID from the list
-3. Provide realistic sets, reps, and rest times
-4. Tailor the plan to the user's goals and preferences
-5. Create a balanced program that includes proper warmup and cooldown for each session
-6. Structure rest days appropriately based on the exercise intensity
-7. ONLY use JSON format in your response, without any additional text
-
-Return only the JSON object as described above.`;
-
-    let llmResponse;
-    
-    // If we have a Groq API key and should use Groq
-    if (useGroq && groqApiKey) {
-      console.log("Using Groq API for workout plan generation");
-      
-      // Make API call to Groq
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${groqApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: "llama3-8b-8192",
-          messages: [
-            {
-              role: "system",
-              content: "You are an expert fitness coach that specializes in creating personalized workout plans. You always respond with valid JSON."
-            },
-            {
-              role: "user",
-              content: prompt
-            }
-          ],
-          temperature: 0.3,
-          max_tokens: 4000,
-        }),
-      });
-
-      if (!response.ok) {
-        const responseText = await response.text();
-        throw new Error(`Groq API error: ${response.status} - ${responseText}`);
-      }
-
-      const groqData = await response.json();
-      
-      if (!groqData.choices || groqData.choices.length === 0) {
-        throw new Error('No response from Groq API');
-      }
-
-      llmResponse = groqData.choices[0].message.content;
-    } 
-    // If we don't have a Groq API key or shouldn't use Groq
-    else {
-      // Check if we should use Groq but don't have an API key
-      if (useGroq) {
-        console.log("Groq API was selected but no API key found. Using fallback response.");
-        
-        // Create a simplified fallback workout plan
-        llmResponse = JSON.stringify({
-          goal: `${preferences.goal} workout plan (FALLBACK: Groq API key missing)`,
-          start_date: new Date().toISOString().split('T')[0],
-          end_date: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          workout_sessions: [
-            {
-              day_number: 1,
-              warmup_description: "5-10 minutes of light cardio followed by dynamic stretching",
-              cooldown_description: "5 minutes of static stretching, focusing on worked muscle groups",
-              session_exercises: availableExercises.slice(0, 4).map((ex, i) => ({
-                exercise: {
-                  id: ex.id,
-                  name: ex.name,
-                  description: ex.description || "",
-                  muscle_group: ex.muscle_group,
-                  exercise_type: ex.exercise_type,
-                  gif_url: ex.gif_url || ""
-                },
-                sets: 3,
-                reps: 10,
-                rest_time_seconds: 60
-              }))
-            }
-          ]
-        });
-      } else {
-        // In a real implementation, you would call another LLM service here
-        throw new Error('Alternative LLM service not implemented. Please configure Groq API key in settings.');
-      }
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error("Groq API Error:", errorData);
+      throw new Error(`Groq API Error: ${response.status} ${response.statusText}\n${errorData}`);
     }
-    
+
+    const data = await response.json();
+    console.log("Groq API response received:", data);
+
+    if (!data.choices || data.choices.length === 0) {
+      throw new Error("No response from Groq API");
+    }
+
+    // Extract and parse the workout plan from the response
+    const content = data.choices[0].message.content;
+    let workoutPlan;
+
     try {
-      // Extract the JSON object from the LLM response
-      let workoutPlanJson;
+      // Attempt to extract JSON if it's wrapped in code blocks or other text
+      const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || 
+                        content.match(/```\s*([\s\S]*?)\s*```/) || 
+                        content.match(/({[\s\S]*})/);
       
-      // Try to parse the whole response as JSON first
-      try {
-        workoutPlanJson = JSON.parse(llmResponse);
-      } catch (e) {
-        // If that fails, try to extract JSON from the text
-        const jsonMatch = llmResponse.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          workoutPlanJson = JSON.parse(jsonMatch[0]);
-        } else {
-          throw new Error('Could not extract valid JSON from LLM response');
-        }
-      }
+      const jsonString = jsonMatch ? jsonMatch[1] : content;
+      workoutPlan = JSON.parse(jsonString);
       
-      // Return the workout plan
-      return new Response(
-        JSON.stringify({ 
-          workoutPlan: workoutPlanJson
-        }),
-        { 
-          headers: { 
-            ...corsHeaders,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-    } catch (error) {
-      throw new Error(`Error parsing workout plan: ${error.message}`);
+      console.log("Successfully parsed workout plan JSON");
+    } catch (parseError) {
+      console.error("Error parsing workout plan JSON:", parseError);
+      console.log("Raw content:", content);
+      throw new Error(`Failed to parse workout plan: ${parseError.message}`);
     }
+
+    return workoutPlan;
   } catch (error) {
-    console.error(`Error: ${error.message}`);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { 
-        status: 400, 
-        headers: { 
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+    console.error("Error calling Groq API:", error);
+    throw new Error(`Failed to generate workout plan with Groq: ${error.message}`);
   }
-});
+}
+
+async function generateWorkoutPlanWithOpenAI(
+  exercises: any[],
+  preferences: any,
+  customSystemPrompt?: string,
+  useCustomPrompt = false,
+  apiKey?: string,
+  agentName = "TRENE2025"
+) {
+  const openaiApiKey = apiKey || Deno.env.get("OPENAI_API_KEY");
+  
+  if (!openaiApiKey) {
+    throw new Error("OpenAI API key is required but not provided");
+  }
+
+  // Prepare the system prompt
+  const defaultSystemPrompt = `Você é ${agentName}, um agente de IA especializado em educação física e ciência do exercício. 
+Sua tarefa é criar um plano de treino personalizado com base nas preferências e necessidades do usuário. 
+Você deve utilizar apenas os exercícios fornecidos na lista de exercícios disponíveis. 
+Crie um plano de treino semanal detalhado, com dias específicos, séries, repetições e descrições.`;
+
+  const systemPrompt = useCustomPrompt && customSystemPrompt ? customSystemPrompt : defaultSystemPrompt;
+
+  // Prepare the exercises in a condensed format
+  const exerciseList = exercises.map(ex => ({
+    id: ex.id,
+    name: ex.name,
+    muscle_group: ex.muscle_group,
+    exercise_type: ex.exercise_type,
+    difficulty: ex.difficulty,
+    equipment_needed: ex.equipment_needed,
+    description: ex.description,
+    gif_url: ex.gif_url
+  }));
+
+  // Construct the prompt for the workout plan generation
+  const userPrompt = `
+Com base nas preferências do usuário a seguir, crie um plano de treino personalizado dividido por dias da semana.
+
+PREFERÊNCIAS DO USUÁRIO:
+- Idade: ${preferences.age} anos
+- Sexo: ${preferences.gender === 'male' ? 'Masculino' : 'Feminino'}
+- Peso: ${preferences.weight} kg
+- Altura: ${preferences.height} cm
+- Objetivo: ${translateGoal(preferences.goal)}
+- Nível de atividade física: ${translateActivityLevel(preferences.activity_level)}
+- Tipos de exercícios preferidos: ${translateExerciseTypes(preferences.preferred_exercise_types)}
+- Local de treino: ${translateTrainingLocation(preferences)}
+${preferences.health_conditions && preferences.health_conditions.length > 0 ? 
+  `- Condições de saúde: ${preferences.health_conditions.join(', ')}` : ''}
+
+EXERCÍCIOS DISPONÍVEIS:
+${JSON.stringify(exerciseList).substring(0, 14000)}
+
+INSTRUÇÕES:
+1. Crie um plano de treino para 7 dias, com descanso nos dias apropriados dependendo do nível do usuário.
+2. Para cada dia, inclua:
+   - Um aquecimento breve mas efetivo
+   - Lista de exercícios com séries e repetições específicas
+   - Tempo de descanso entre séries
+   - Uma volta à calma
+3. Escolha apenas exercícios da lista fornecida acima.
+4. As séries e repetições devem ser adequadas ao objetivo e nível do usuário.
+5. Respeite quaisquer condições de saúde mencionadas.
+
+FORMATO DE RESPOSTA: 
+Responda APENAS com um objeto JSON válido no seguinte formato sem nenhum texto adicional:
+
+{
+  "goal": "objetivo traduzido",
+  "start_date": "data de início no formato YYYY-MM-DD",
+  "end_date": "data de fim no formato YYYY-MM-DD",
+  "workout_sessions": [
+    {
+      "day_number": número do dia (1-7),
+      "warmup_description": "descrição do aquecimento",
+      "cooldown_description": "descrição da volta à calma",
+      "session_exercises": [
+        {
+          "exercise": {
+            "id": "id do exercício da lista",
+            "name": "nome do exercício",
+            "description": "descrição do exercício",
+            "gif_url": "url do gif do exercício",
+            "muscle_group": "grupo muscular",
+            "exercise_type": "tipo de exercício"
+          },
+          "sets": número de séries,
+          "reps": número de repetições,
+          "rest_time_seconds": tempo de descanso em segundos
+        }
+      ]
+    }
+  ]
+}
+
+Lembre-se: sua resposta deve ser APENAS o objeto JSON válido, nada mais.`;
+
+  try {
+    console.log("Calling OpenAI API...");
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${openaiApiKey}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        temperature: 0.5,
+        max_tokens: 4000
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error("OpenAI API Error:", errorData);
+      throw new Error(`OpenAI API Error: ${response.status} ${response.statusText}\n${errorData}`);
+    }
+
+    const data = await response.json();
+    console.log("OpenAI API response received");
+
+    if (!data.choices || data.choices.length === 0) {
+      throw new Error("No response from OpenAI API");
+    }
+
+    // Extract and parse the workout plan from the response
+    const content = data.choices[0].message.content;
+    let workoutPlan;
+
+    try {
+      // Attempt to extract JSON if it's wrapped in code blocks or other text
+      const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || 
+                        content.match(/```\s*([\s\S]*?)\s*```/) || 
+                        content.match(/({[\s\S]*})/);
+      
+      const jsonString = jsonMatch ? jsonMatch[1] : content;
+      workoutPlan = JSON.parse(jsonString);
+      
+      console.log("Successfully parsed workout plan JSON");
+    } catch (parseError) {
+      console.error("Error parsing workout plan JSON:", parseError);
+      console.log("Raw content:", content);
+      throw new Error(`Failed to parse workout plan: ${parseError.message}`);
+    }
+
+    return workoutPlan;
+  } catch (error) {
+    console.error("Error calling OpenAI API:", error);
+    throw new Error(`Failed to generate workout plan with OpenAI: ${error.message}`);
+  }
+}
+
+function translateGoal(goal: string): string {
+  switch (goal) {
+    case "lose_weight":
+      return "Perder Peso";
+    case "maintain":
+      return "Manter Peso";
+    case "gain_mass":
+      return "Ganhar Massa";
+    default:
+      return goal;
+  }
+}
+
+function translateActivityLevel(level: string): string {
+  switch (level) {
+    case "sedentary":
+      return "Sedentário";
+    case "light":
+      return "Leve";
+    case "moderate":
+      return "Moderado";
+    case "intense":
+      return "Intenso";
+    default:
+      return level;
+  }
+}
+
+function translateExerciseTypes(types: string[]): string {
+  if (!types || types.length === 0) {
+    return "Todos";
+  }
+  
+  return types.map(type => {
+    switch (type) {
+      case "strength":
+        return "Força";
+      case "cardio":
+        return "Cardio";
+      case "mobility":
+        return "Mobilidade";
+      default:
+        return type;
+    }
+  }).join(", ");
+}
+
+function translateTrainingLocation(preferences: any): string {
+  if (!preferences.available_equipment) {
+    return "Não especificado";
+  }
+  
+  if (preferences.available_equipment.includes("all")) {
+    return "Academia";
+  }
+  
+  if (preferences.available_equipment.includes("dumbbells")) {
+    return "Casa";
+  }
+  
+  if (preferences.available_equipment.includes("bodyweight") && !preferences.available_equipment.includes("dumbbells")) {
+    return "Ar Livre";
+  }
+  
+  return "Sem Equipamentos";
+}
