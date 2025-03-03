@@ -21,6 +21,7 @@ serve(async (req) => {
     const { preferences, userId, settings, forceTrene2025 = false, forceGroqApi = false } = requestData;
 
     console.log("Processing workout plan generation request");
+    console.log("User preferences:", JSON.stringify(preferences));
     console.log("Using Groq API for Llama 3 model integration");
     
     // API Key validation
@@ -33,16 +34,19 @@ serve(async (req) => {
     const model = "llama3-8b-8192";
     const apiEndpoint = "https://api.groq.com/openai/v1/chat/completions";
     
+    console.log(`Generating plan with model ${model} via Groq API`);
+    
     // Prepare system prompt
     const systemPrompt = getSystemPrompt(settings, forceTrene2025);
     
     // Generate workout plan using Groq API
-    console.log(`Gerando plano com modelo ${model} via API Groq`);
     const workoutPlan = await generatePlanWithGroq(apiEndpoint, apiKey, model, systemPrompt, preferences);
     
     if (!workoutPlan) {
       throw new Error("Falha ao gerar o plano de treino");
     }
+
+    console.log("Workout plan generated successfully:", JSON.stringify(workoutPlan).substring(0, 200) + "...");
 
     // Return the generated workout plan
     return new Response(JSON.stringify({ 
@@ -52,7 +56,7 @@ serve(async (req) => {
       status: 200,
     });
   } catch (error) {
-    console.error("Error:", error.message);
+    console.error("Error generating workout plan:", error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
@@ -104,12 +108,13 @@ Formato do plano de treino:
 
 // Function to generate workout plan with Groq API
 async function generatePlanWithGroq(apiEndpoint: string, apiKey: string, model: string, systemPrompt: string, preferences: any) {
-  console.log(`Gerando plano com modelo ${model}`);
+  console.log(`Generating plan with model ${model}`);
   
   // Create a detailed user prompt based on preferences
   const userPrompt = createUserPrompt(preferences);
   
   try {
+    console.log("Sending request to Groq API...");
     const response = await fetch(apiEndpoint, {
       method: "POST",
       headers: {
@@ -133,6 +138,7 @@ async function generatePlanWithGroq(apiEndpoint: string, apiKey: string, model: 
       throw new Error(`API error: ${response.status} - ${errorData}`);
     }
     
+    console.log("Received response from Groq API");
     const result = await response.json();
     
     // Extract the assistant's message
@@ -148,7 +154,10 @@ async function generatePlanWithGroq(apiEndpoint: string, apiKey: string, model: 
         throw new Error("No JSON object found in the response");
       }
       
-      const workoutPlan = JSON.parse(jsonMatch[0]);
+      const jsonString = jsonMatch[0];
+      console.log("Extracted JSON:", jsonString.substring(0, 200) + "...");
+      
+      const workoutPlan = JSON.parse(jsonString);
       return workoutPlan;
     } catch (parseError) {
       console.error("Error parsing workout plan JSON:", parseError);
@@ -181,4 +190,3 @@ Informações básicas:
 Crie um plano de treino completo com 3 dias, respeitando as preferências acima. 
 Retorne apenas o objeto JSON com o plano completo, sem texto adicional.`;
 }
-

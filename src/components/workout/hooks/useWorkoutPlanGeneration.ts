@@ -55,6 +55,12 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       try {
         // Forçar o uso da API Groq, sem permitir plano de fallback
         planData = await generatePlanViaEdgeFunction(safePreferences, user.id, aiSettings, true, true);
+        
+        if (!planData || !planData.workout_sessions || !Array.isArray(planData.workout_sessions)) {
+          throw new Error("Plano de treino gerado é inválido ou incompleto");
+        }
+        
+        console.log("Plano gerado com sucesso:", planData);
       } catch (edgeFunctionError: any) {
         console.error("Erro na função edge:", edgeFunctionError);
         
