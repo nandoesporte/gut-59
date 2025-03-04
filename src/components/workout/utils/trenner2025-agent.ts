@@ -53,13 +53,15 @@ export async function saveWorkoutPlan(workoutPlan: WorkoutPlan, userId: string):
       }
     }
 
-    // Insert into workout_plans table
+    // According to the error, we need to structure our insert to match the expected schema
+    // Insert the main plan details
     const { data, error } = await supabase
       .from('workout_plans')
       .insert({
         user_id: userId,
-        plan_data: workoutPlan,
-        plan_name: `Plano de ${workoutPlan.goal || 'Treino'} - ${new Date().toLocaleDateString('pt-BR')}`
+        goal: workoutPlan.goal,
+        start_date: workoutPlan.start_date,
+        end_date: workoutPlan.end_date
       })
       .select()
       .single();
@@ -69,10 +71,76 @@ export async function saveWorkoutPlan(workoutPlan: WorkoutPlan, userId: string):
       return null;
     }
 
+    // Now that we have the plan ID, we need to save the sessions
+    const planId = data.id;
+    
+    // Save each workout session
+    for (const session of workoutPlan.workout_sessions) {
+      // Insert the session
+      const { data: sessionData, error: sessionError } = await supabase
+        .from('workout_sessions')
+        .insert({
+          plan_id: planId,
+          day_number: session.day_number,
+          warmup_description: session.warmup_description,
+          cooldown_description: session.cooldown_description
+        })
+        .select()
+        .single();
+      
+      if (sessionError) {
+        console.error("Error saving workout session:", sessionError);
+        continue;
+      }
+      
+      // Save each exercise for this session
+      for (const sessionExercise of session.session_exercises) {
+        // Insert or get the exercise first
+        let exerciseId = sessionExercise.exercise.id;
+        
+        // If the exercise isn't already in the database, add it
+        if (!exerciseId.startsWith('exercise_')) {
+          const { data: exerciseData, error: exerciseError } = await supabase
+            .from('exercises')
+            .insert({
+              name: sessionExercise.exercise.name,
+              description: sessionExercise.exercise.description,
+              gif_url: sessionExercise.exercise.gif_url,
+              muscle_group: sessionExercise.exercise.muscle_group,
+              exercise_type: sessionExercise.exercise.exercise_type
+            })
+            .select()
+            .single();
+          
+          if (exerciseError) {
+            console.error("Error saving exercise:", exerciseError);
+            continue;
+          }
+          
+          exerciseId = exerciseData.id;
+        }
+        
+        // Insert the session exercise
+        const { error: sessionExerciseError } = await supabase
+          .from('session_exercises')
+          .insert({
+            session_id: sessionData.id,
+            exercise_id: exerciseId,
+            sets: sessionExercise.sets,
+            reps: sessionExercise.reps,
+            rest_time_seconds: sessionExercise.rest_time_seconds
+          });
+        
+        if (sessionExerciseError) {
+          console.error("Error saving session exercise:", sessionExerciseError);
+        }
+      }
+    }
+
     // Return the workout plan with the database ID
     return {
       ...workoutPlan,
-      id: data.id
+      id: planId
     };
   } catch (err) {
     console.error("Exception in saveWorkoutPlan:", err);
