@@ -2,6 +2,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { WorkoutPreferences } from "../types";
 import { WorkoutPlan } from "../types/workout-plan";
+import { MuscleGroup, ExerciseType } from "@/components/admin/exercises/types";
 
 export async function generateWorkoutPlanWithTrenner2025(
   preferences: WorkoutPreferences, 
@@ -105,13 +106,21 @@ export async function saveWorkoutPlan(workoutPlan: WorkoutPlan, userId: string):
         
         // If the exercise isn't already in the database, add it
         if (!exerciseId.startsWith('exercise_')) {
+          // Get the muscle group and properly cast it to the expected enum type
+          const muscleGroup = (() => {
+            const mg = sessionExercise.exercise.muscle_group || 'chest';
+            // Make sure the muscle group is one of the valid values
+            const validMuscleGroups: MuscleGroup[] = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core', 'full_body', 'cardio', 'mobility', 'weight_training', 'stretching', 'ball_exercises', 'resistance_band'];
+            return validMuscleGroups.includes(mg as MuscleGroup) ? mg as MuscleGroup : 'chest' as MuscleGroup;
+          })();
+
           // Create exercise with only the fields that are in the database schema
           const exerciseToInsert = {
             name: sessionExercise.exercise.name,
             description: sessionExercise.exercise.description || '',
             gif_url: sessionExercise.exercise.gif_url || '',
-            muscle_group: sessionExercise.exercise.muscle_group || 'chest',
-            exercise_type: sessionExercise.exercise.exercise_type as "strength" | "cardio" | "mobility" || 'strength',
+            muscle_group: muscleGroup,
+            exercise_type: (sessionExercise.exercise.exercise_type as ExerciseType) || ('strength' as ExerciseType),
             difficulty: 'beginner' as const,
             equipment_needed: ['bodyweight'] as string[],
           };
