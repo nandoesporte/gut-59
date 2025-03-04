@@ -37,7 +37,6 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
   };
 
   const handleReset = () => {
-    // Show confirmation toast before resetting
     toast.info("Criando novo plano de treino...");
     onReset();
   };
