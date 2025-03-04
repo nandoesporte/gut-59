@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
@@ -102,6 +103,7 @@ serve(async (req) => {
 });
 
 // Function to organize exercises by muscle groups with consideration for user's goal
+// and ensuring at least one exercise from each muscle group
 function organizeExercisesByMuscleGroups(exercises, preferences) {
   console.log(`Organizing ${exercises.length} exercises by muscle groups and relevance to user goal: ${preferences.goal}`);
   
@@ -159,16 +161,33 @@ function organizeExercisesByMuscleGroups(exercises, preferences) {
     });
   });
   
-  // Now create a balanced list that takes top N exercises from each muscle group
+  // First, ensure we have at least one exercise from each muscle group
   const organizedExercises = [];
-  const maxExercisesPerGroup = 10; // Take top 10 from each group
+  
+  // Guarantee at least one exercise from each muscle group if available
+  muscleGroups.forEach(group => {
+    const groupExercises = exercisesByMuscleGroup[group] || [];
+    if (groupExercises.length > 0) {
+      // Take the best exercise from this muscle group
+      organizedExercises.push(groupExercises[0]);
+      console.log(`Selected top exercise for ${group}: ${groupExercises[0]?.name || 'Unknown'}`);
+    } else {
+      console.log(`No exercises available for muscle group: ${group}`);
+    }
+  });
+  
+  // Then add more exercises to reach the desired count
+  const maxExercisesPerGroup = 8; // Take up to 8 from each group (adjusted from 10)
   
   muscleGroups.forEach(group => {
     const groupExercises = exercisesByMuscleGroup[group] || [];
-    const topGroupExercises = groupExercises.slice(0, maxExercisesPerGroup);
-    
-    console.log(`Selected ${topGroupExercises.length} exercises for muscle group: ${group}`);
-    organizedExercises.push(...topGroupExercises);
+    // Skip the first one since we already added it
+    if (groupExercises.length > 1) {
+      // Add the rest of the top exercises (up to maxExercisesPerGroup)
+      const remainingTopExercises = groupExercises.slice(1, maxExercisesPerGroup);
+      organizedExercises.push(...remainingTopExercises);
+      console.log(`Added ${remainingTopExercises.length} more exercises for muscle group: ${group}`);
+    }
   });
   
   // Add additional exercises that didn't make it into the top N for each group
@@ -194,9 +213,19 @@ function organizeExercisesByMuscleGroups(exercises, preferences) {
   
   console.log(`Successfully organized exercises. Total selected: ${organizedExercises.length}`);
   
+  // Log the distribution of muscle groups in the final selection
+  const muscleGroupDistribution = {};
+  muscleGroups.forEach(group => {
+    muscleGroupDistribution[group] = organizedExercises.filter(ex => ex.muscle_group === group).length;
+  });
+  console.log(`Muscle group distribution: ${JSON.stringify(muscleGroupDistribution)}`);
+  
   // Log the top muscle groups for confirmation
-  const topMuscleGroups = organizedExercises.slice(0, 6).map(ex => ex.muscle_group);
-  console.log(`Top 6 muscle groups after organizing: ${topMuscleGroups.join(', ')}`);
+  const topExercises = organizedExercises.slice(0, 6);
+  console.log(`Top 6 exercises after sorting:`);
+  topExercises.forEach(ex => {
+    console.log(`- ${ex.name} (${ex.muscle_group || 'unknown group'}, ${ex.exercise_type || 'unknown type'})`);
+  });
   
   return organizedExercises;
 }
