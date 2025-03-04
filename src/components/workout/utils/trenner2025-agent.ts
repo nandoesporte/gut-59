@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { WorkoutPreferences } from "../types";
 import { WorkoutPlan } from "../types/workout-plan";
@@ -11,10 +12,11 @@ export async function generateWorkoutPlanWithTrenner2025(
 ): Promise<{ workoutPlan: WorkoutPlan | null; error: string | null; rawResponse?: any }> {
   try {
     console.log("Generating workout plan with Trenner2025 agent...");
-    console.log("Preferences:", preferences);
+    console.log("Preferences:", JSON.stringify(preferences, null, 2));
     
     // Add a unique request ID to prevent duplicate processing
     const generationRequestId = requestId || `${userId}_${Date.now()}`;
+    console.log("Using request ID:", generationRequestId);
     
     // First fetch all exercises to provide to the AI
     const { data: exercises, error: exercisesError } = await supabase
@@ -27,9 +29,14 @@ export async function generateWorkoutPlanWithTrenner2025(
       return { workoutPlan: null, error: `Error fetching exercises: ${exercisesError.message}` };
     }
     
+    console.log(`Fetched ${exercises.length} exercises from the database`);
+    
     // Filter exercises based on preferences to send a relevant subset to the AI
     const filteredExercises = filterExercisesByPreferences(exercises, preferences);
     console.log(`Filtered ${filteredExercises.length} exercises from ${exercises.length} total exercises based on user preferences`);
+    
+    console.log("Invoking edge function: generate-workout-plan-llama");
+    const startTime = Date.now();
     
     const { data, error } = await supabase.functions.invoke('generate-workout-plan-llama', {
       body: { 
@@ -41,6 +48,9 @@ export async function generateWorkoutPlanWithTrenner2025(
         exercises: filteredExercises
       }
     });
+
+    const endTime = Date.now();
+    console.log(`Edge function completed in ${((endTime - startTime) / 1000).toFixed(2)} seconds`);
 
     if (error) {
       console.error("Error invoking generate-workout-plan-llama function:", error);
@@ -63,15 +73,26 @@ export async function generateWorkoutPlanWithTrenner2025(
       return { workoutPlan: null, error: `Erro ao gerar plano de treino: ${error.message}` };
     }
 
+    console.log("Received response from edge function");
+    
     // Log a resposta completa para diagnóstico
-    console.log("COMPLETE EDGE FUNCTION RESPONSE:", JSON.stringify(data, null, 2));
+    console.log("EDGE FUNCTION RESPONSE STRUCTURE:", JSON.stringify(Object.keys(data || {}), null, 2));
 
-    if (!data || !data.workoutPlan) {
-      console.error("No workout plan returned:", data);
+    if (!data) {
+      console.error("No data returned from edge function");
       return { 
         workoutPlan: null, 
-        error: "Resposta inválida do serviço de geração de plano de treino", 
-        rawResponse: data  // Retornando a resposta bruta mesmo em caso de erro
+        error: "Resposta vazia do serviço de geração de plano de treino", 
+        rawResponse: data
+      };
+    }
+    
+    if (!data.workoutPlan) {
+      console.error("No workout plan in the returned data:", data);
+      return { 
+        workoutPlan: null, 
+        error: "Resposta não contém plano de treino", 
+        rawResponse: data
       };
     }
 
@@ -80,7 +101,7 @@ export async function generateWorkoutPlanWithTrenner2025(
     return { 
       workoutPlan: data.workoutPlan, 
       error: null,
-      rawResponse: data  // Retornando a resposta bruta junto com o plano
+      rawResponse: data
     };
   } catch (err: any) {
     console.error("Exception in generateWorkoutPlanWithTrenner2025:", err);
@@ -230,6 +251,8 @@ function filterExercisesByPreferences(exercises: any[], preferences: WorkoutPref
 
 export async function saveWorkoutPlan(workoutPlan: WorkoutPlan, userId: string): Promise<WorkoutPlan | null> {
   try {
+    console.log("Starting to save workout plan to database...");
+    
     // Add current date as start date if not provided
     if (!workoutPlan.start_date) {
       const today = new Date();
@@ -243,6 +266,8 @@ export async function saveWorkoutPlan(workoutPlan: WorkoutPlan, userId: string):
       }
     }
 
+    console.log("Saving main workout plan to workout_plans table...");
+    
     // According to the error, we need to structure our insert to match the expected schema
     // Insert the main plan details
     const { data, error } = await supabase
@@ -263,17 +288,23 @@ export async function saveWorkoutPlan(workoutPlan: WorkoutPlan, userId: string):
 
     // Now that we have the plan ID, we need to save the sessions
     const planId = data.id;
+    console.log(`Workout plan saved with ID: ${planId}, now saving sessions...`);
     
     // Save each workout session
     for (const session of workoutPlan.workout_sessions) {
+      console.log(`Saving session for day ${session.day_number}...`);
+      
       // Insert the session
       const { data: sessionData, error: sessionError } = await supabase
         .from('workout_sessions')
         .insert({
           plan_id: planId,
           day_number: session.day_number,
+          day_name: session.day_name,
+          focus: session.focus,
           warmup_description: session.warmup_description,
-          cooldown_description: session.cooldown_description
+          cooldown_description: session.cooldown_description,
+          training_load: session.training_load
         })
         .select()
         .single();
@@ -282,6 +313,8 @@ export async function saveWorkoutPlan(workoutPlan: WorkoutPlan, userId: string):
         console.error("Error saving workout session:", sessionError);
         continue;
       }
+      
+      console.log(`Session saved with ID: ${sessionData.id}, now saving exercises...`);
       
       // Save each exercise for this session
       for (let i = 0; i < session.session_exercises.length; i++) {
@@ -292,6 +325,8 @@ export async function saveWorkoutPlan(workoutPlan: WorkoutPlan, userId: string):
         
         // If the exercise isn't already in the database, add it
         if (!exerciseId.startsWith('exercise_')) {
+          console.log(`Exercise ${sessionExercise.exercise.name} not in database, creating...`);
+          
           // Get the muscle group and properly cast it to the expected enum type
           const muscleGroup = (() => {
             const mg = sessionExercise.exercise.muscle_group || 'chest';
@@ -324,7 +359,10 @@ export async function saveWorkoutPlan(workoutPlan: WorkoutPlan, userId: string):
           }
           
           exerciseId = exerciseData.id;
+          console.log(`Created new exercise with ID: ${exerciseId}`);
         }
+        
+        console.log(`Saving session exercise: ${sessionExercise.exercise.name}`);
         
         // Insert the session exercise - making sure to include the order_in_session field
         const { error: sessionExerciseError } = await supabase
@@ -335,15 +373,20 @@ export async function saveWorkoutPlan(workoutPlan: WorkoutPlan, userId: string):
             sets: sessionExercise.sets,
             reps: sessionExercise.reps,
             rest_time_seconds: sessionExercise.rest_time_seconds,
+            intensity: sessionExercise.intensity || 'moderate',
             order_in_session: i + 1 // Add the required order_in_session field
           });
         
         if (sessionExerciseError) {
           console.error("Error saving session exercise:", sessionExerciseError);
+        } else {
+          console.log(`Session exercise saved successfully`);
         }
       }
     }
 
+    console.log("Full workout plan saved to database successfully!");
+    
     // Return the workout plan with the database ID
     return {
       ...workoutPlan,

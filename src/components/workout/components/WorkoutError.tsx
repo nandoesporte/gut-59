@@ -1,6 +1,6 @@
 
 import { Button } from "@/components/ui/button";
-import { RotateCcw, AlertCircle, Settings, Wifi, RefreshCw } from "lucide-react";
+import { RotateCcw, AlertCircle, Settings, Wifi, RefreshCw, Clock } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
 
 interface WorkoutErrorProps {
@@ -27,6 +27,9 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
                            errorMessage?.includes("net::ERR") ||
                            errorMessage?.includes("ECONNREFUSED") ||
                            errorMessage?.includes("timeout") ||
+                           errorMessage?.includes("AbortError") ||
+                           errorMessage?.includes("connection closed") ||
+                           errorMessage?.includes("Connection closed") ||
                            errorMessage?.includes("Erro de conexão");
 
   const isShutdownError = errorMessage?.includes("shutdown") || 
@@ -34,6 +37,10 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
                           errorMessage?.includes("aborted") ||
                           errorMessage?.includes("net::ERR_CONNECTION_RESET") ||
                           errorMessage?.includes("connection reset");
+                          
+  const isEmptyResponseError = errorMessage?.includes("resposta vazia") ||
+                              errorMessage?.includes("Resposta não contém plano") ||
+                              errorMessage?.includes("Não foi possível gerar o plano de treino - resposta vazia");
 
   const hasValidationErrors = errorMessage?.includes("Validation errors");
   const hasParsingErrors = errorMessage?.includes("Error parsing workout plan JSON") || 
@@ -46,6 +53,8 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
         <div className="bg-red-100 dark:bg-red-900/20 p-3 rounded-full">
           {isConnectionError ? (
             <Wifi className="w-8 h-8 text-red-600 dark:text-red-400" />
+          ) : isEmptyResponseError ? (
+            <Clock className="w-8 h-8 text-red-600 dark:text-red-400" />
           ) : (
             <AlertCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
           )}
@@ -55,6 +64,8 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
       <h3 className="text-xl font-semibold text-red-600 dark:text-red-400">
         {isConnectionError 
           ? "Erro de conexão ao gerar o plano de treino" 
+          : isEmptyResponseError
+          ? "O serviço não retornou um plano de treino válido"
           : "Erro ao gerar o plano de treino com Trenner2025"}
       </h3>
       
@@ -96,6 +107,16 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
               <li>O serviço pode estar temporariamente indisponível. Aguarde alguns minutos e tente novamente</li>
               <li>Se o problema persistir, pode haver uma interrupção no serviço</li>
               <li>Você também pode tentar usar um navegador diferente ou limpar o cache</li>
+              <li><strong>Tente recarregar a página completamente</strong> para restaurar a conexão</li>
+            </>
+          ) : isEmptyResponseError ? (
+            <>
+              <li>O serviço foi executado com sucesso, mas não retornou um plano de treino válido</li>
+              <li>Este pode ser um problema temporário do serviço</li>
+              <li>Tente simplificar suas preferências de treino e gerar novamente</li>
+              <li>Tente novamente em alguns minutos</li>
+              <li>Você pode verificar na aba "Resposta da IA" se há alguma informação sobre o problema</li>
+              <li>Se o problema persistir, entre em contato com o suporte</li>
             </>
           ) : isShutdownError ? (
             <>

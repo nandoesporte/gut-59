@@ -30,7 +30,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
   const generationInProgress = useRef(false);
   const generationAttempted = useRef(false);
   const retryCount = useRef(0);
-  const MAX_RETRIES = 2; // Maximum number of automatic retries
+  const MAX_RETRIES = 3; // Increasing max retries to 3 for better resilience
 
   const generatePlan = async () => {
     // Prevent concurrent generations
@@ -70,21 +70,26 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       const requestId = `${user.id}_${Date.now()}`;
       
       // Generate the workout plan using Trenner2025 agent
+      console.log("Calling generateWorkoutPlanWithTrenner2025...");
       const { workoutPlan: generatedPlan, error: generationError, rawResponse: rawResponseData } = 
         await generateWorkoutPlanWithTrenner2025(preferences, user.id, aiSettings || undefined, requestId);
       
       // Store the raw response
       if (rawResponseData) {
-        console.log("RAW RESPONSE FROM EDGE FUNCTION:", rawResponseData);
+        console.log("RAW RESPONSE FROM EDGE FUNCTION:", JSON.stringify(rawResponseData, null, 2));
         setRawResponse(rawResponseData);
+      } else {
+        console.warn("No raw response data received from edge function");
       }
       
       if (generationError) {
+        console.error("Generation error:", generationError);
         throw new Error(generationError);
       }
       
       if (!generatedPlan) {
-        throw new Error("Não foi possível gerar o plano de treino");
+        console.error("No workout plan generated");
+        throw new Error("Não foi possível gerar o plano de treino - resposta vazia");
       }
       
       console.log("Workout plan successfully generated, saving to database...");
@@ -117,7 +122,10 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
         err.message.includes("Network Error") ||
         err.message.includes("net::ERR") ||
         err.message.includes("ECONNREFUSED") ||
-        err.message.includes("timeout")
+        err.message.includes("timeout") ||
+        err.message.includes("AbortError") ||
+        err.message.includes("connection closed") ||
+        err.message.includes("Connection closed")
       );
       
       if (isNetworkError && retryCount.current < MAX_RETRIES) {
@@ -125,11 +133,14 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
         retryCount.current += 1;
         toast.warning(`Problema de conexão. Tentando novamente (${retryCount.current}/${MAX_RETRIES})...`);
         
-        // Wait a bit before retrying
+        // Wait a bit before retrying with exponential backoff
+        const backoffTime = 1000 * Math.pow(2, retryCount.current - 1); // 1s, 2s, 4s
+        console.log(`Retrying in ${backoffTime}ms...`);
+        
         setTimeout(() => {
           generationInProgress.current = false;
           generatePlan();
-        }, 3000);
+        }, backoffTime);
         return;
       }
       
@@ -145,7 +156,8 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
           toast.error(err.message);
         } else if (isNetworkError) {
           // Format network error message for better user experience
-          setError("Erro de conexão com o serviço de geração de plano. Por favor, verifique sua conexão e tente novamente.");
+          const networkErrorMsg = "Erro de conexão com o serviço de geração de plano. Por favor, verifique sua conexão e tente novamente.";
+          setError(networkErrorMsg);
           toast.error("Erro de conexão. Tente novamente mais tarde.");
         } else {
           setError(`Erro ao gerar plano de treino: ${err.message}`);
