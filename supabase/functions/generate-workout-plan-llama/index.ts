@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.1";
 
@@ -221,10 +222,49 @@ async function generateWorkoutPlanWithGroq(
     throw new Error("Invalid Groq API key format. Keys should start with 'gsk_'");
   }
 
-  const defaultSystemPrompt = `Você é ${agentName}, um agente de IA especializado em educação física e ciência do exercício. 
-Sua tarefa é criar um plano de treino personalizado com base nas preferências e necessidades do usuário. 
-Você deve utilizar apenas os exercícios fornecidos na lista de exercícios disponíveis. 
-Crie um plano de treino semanal detalhado, com dias específicos, séries, repetições e descrições.`;
+  const defaultSystemPrompt = `Você é ${agentName}, um excelente profissional de educação física, especializado em gerar planos de exercícios personalizados. Com base nos dados fornecidos pelo usuário, você deve:
+
+Coletar os Dados do Usuário:
+- Idade, peso, altura, sexo.
+- Objetivo (perder peso, manter peso, ganhar massa).
+- Nível de atividade física (sedentário, leve, moderado, intenso).
+- Tipos de exercícios preferidos (força, cardio, mobilidade).
+- Local de treino (academia, casa, ar livre, sem equipamentos).
+
+Consultar o Banco de Dados:
+- Acessar os exercícios disponíveis para buscar exercícios que correspondam às preferências e necessidades do usuário.
+
+Gerar o Plano de Exercícios:
+- Criar um plano personalizado com base nos dados do usuário.
+- Incluir exercícios que correspondam ao objetivo, nível de atividade física e local de treino.
+
+Para cada exercício, incluir:
+- Nome do exercício.
+- Descrição (séries, repetições, duração e carga).
+- GIF demonstrativo (usando o gif_url fornecido).
+
+Gerar um plano de treinos para 7 dias, incluindo:
+- Exercícios, séries, repetições, descanso e carga de treino (intensidade, volume e progressão).
+- Um aquecimento e alongamento para cada sessão.
+- Adaptações dos exercícios ao local de treino.
+- Priorização da queima de gordura, combinando treinos de força e cardio.
+- Sugestões de progressão semanal (aumento de carga, repetições ou intensidade).
+- Crítica do plano gerado, sugerindo melhorias se necessário.
+
+Exemplo de Carga de Treino:
+- Intensidade: Moderada a alta (70-85% da capacidade máxima).
+- Volume: 3-4 séries por exercício, com 10-15 repetições.
+- Progressão: Aumentar carga ou repetições semanalmente (5-10%).
+
+Formato de Saída (para cada dia):
+- Dia da semana: Tipo de treino (Força, Cardio, etc.).
+- Aquecimento: Descrição.
+- Exercícios: Nome, séries, repetições, carga, descanso.
+- Alongamento: Descrição.
+- Carga de Treino: Intensidade, volume, progressão.
+- Crítica e Sugestões: Análise do plano gerado.
+
+IMPORTANTE: Cada dia deve ser diferente. O plano deve ser variado e personalizado. Crie um plano único e não use templates pré-definidos.`;
 
   const systemPrompt = useCustomPrompt && customSystemPrompt ? customSystemPrompt : defaultSystemPrompt;
 
@@ -258,14 +298,18 @@ EXERCÍCIOS DISPONÍVEIS:
 ${JSON.stringify(exerciseList.slice(0, 40)).substring(0, 8000)}
 
 INSTRUÇÕES:
-1. Crie um plano de treino para 5 dias (não é necessário cobrir todos os 7 dias)
+1. Crie um plano de treino completo para 7 dias da semana (Segunda a Domingo)
 2. Para cada dia, inclua:
-   - Um aquecimento breve (1-2 linhas)
-   - 3-5 exercícios com séries e repetições específicas
-   - Tempo de descanso entre séries
-   - Uma volta à calma breve (1-2 linhas)
-3. Escolha apenas exercícios da lista fornecida acima.
-4. Responda APENAS com o JSON válido - nada mais.
+   - Um aquecimento específico para o treino do dia
+   - Lista de exercícios com séries, repetições e tempo de descanso entre séries
+   - Sugestões de carga (intensidade)
+   - Um alongamento/volta à calma
+   - Informações sobre a carga de treino: intensidade, volume e progressão
+3. Escolha apenas exercícios da lista fornecida acima
+4. Alterne os grupos musculares e tipos de exercícios durante a semana
+5. Inclua pelo menos um dia de descanso ou treino leve
+6. Adicione uma crítica e sugestões ao final do plano
+7. Responda com um objeto JSON válido seguindo o formato abaixo
 
 FORMATO DE RESPOSTA: 
 {
@@ -274,9 +318,11 @@ FORMATO DE RESPOSTA:
   "end_date": "2023-03-07",
   "workout_sessions": [
     {
-      "day_number": número do dia (1-5),
-      "warmup_description": "descrição do aquecimento",
-      "cooldown_description": "descrição da volta à calma",
+      "day_number": número do dia (1-7),
+      "day_name": "Nome do dia (Segunda-feira, etc.)",
+      "focus": "Foco do treino (Ex: Força Superior, Cardio, etc.)",
+      "warmup_description": "descrição detalhada do aquecimento",
+      "cooldown_description": "descrição detalhada da volta à calma",
       "session_exercises": [
         {
           "exercise": {
@@ -289,11 +335,22 @@ FORMATO DE RESPOSTA:
           },
           "sets": número de séries,
           "reps": número de repetições,
-          "rest_time_seconds": tempo de descanso em segundos
+          "rest_time_seconds": tempo de descanso em segundos,
+          "intensity": "descrição da intensidade recomendada"
         }
-      ]
+      ],
+      "training_load": {
+        "intensity": "descrição da intensidade geral (Ex: Moderada 70-75%)",
+        "volume": "descrição do volume (Ex: 15 séries no total)",
+        "progression": "sugestão de progressão (Ex: Aumentar 5% na carga)"
+      }
     }
-  ]
+  ],
+  "critique": {
+    "strengths": ["ponto forte 1", "ponto forte 2"],
+    "suggestions": ["sugestão 1", "sugestão 2"],
+    "notes": "notas adicionais sobre o plano"
+  }
 }`;
 
   try {
@@ -310,7 +367,7 @@ FORMATO DE RESPOSTA:
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
         ],
-        temperature: 0.3,
+        temperature: 0.7,
         max_tokens: 4096,
         response_format: { type: "json_object" }
       })
