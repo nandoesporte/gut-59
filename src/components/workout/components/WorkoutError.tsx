@@ -1,6 +1,6 @@
 
 import { Button } from "@/components/ui/button";
-import { RotateCcw, AlertCircle, Settings } from "lucide-react";
+import { RotateCcw, AlertCircle, Settings, Wifi, RefreshCw } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
 
 interface WorkoutErrorProps {
@@ -10,6 +10,8 @@ interface WorkoutErrorProps {
 
 export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
   const navigate = useNavigate();
+  
+  // Determine error type
   const isGroqKeyError = errorMessage?.includes("Groq API key") || 
                          errorMessage?.includes("API Groq") ||
                          errorMessage?.includes("Invalid API Key") ||
@@ -18,6 +20,14 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
                          
   const isGroqJsonError = errorMessage?.includes("Groq API Error") && 
                           errorMessage?.includes("json_validate_failed");
+
+  const isConnectionError = errorMessage?.includes("Failed to send a request") || 
+                           errorMessage?.includes("Failed to fetch") ||
+                           errorMessage?.includes("Network Error") ||
+                           errorMessage?.includes("net::ERR") ||
+                           errorMessage?.includes("ECONNREFUSED") ||
+                           errorMessage?.includes("timeout") ||
+                           errorMessage?.includes("Erro de conexão");
 
   const isShutdownError = errorMessage?.includes("shutdown") || 
                           errorMessage?.includes("timeout") ||
@@ -34,12 +44,18 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
     <div className="text-center space-y-4 p-12 border border-red-200 rounded-lg bg-red-50 dark:bg-red-900/10">
       <div className="flex justify-center">
         <div className="bg-red-100 dark:bg-red-900/20 p-3 rounded-full">
-          <AlertCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
+          {isConnectionError ? (
+            <Wifi className="w-8 h-8 text-red-600 dark:text-red-400" />
+          ) : (
+            <AlertCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
+          )}
         </div>
       </div>
       
       <h3 className="text-xl font-semibold text-red-600 dark:text-red-400">
-        Erro ao gerar o plano de treino com Trenner2025
+        {isConnectionError 
+          ? "Erro de conexão ao gerar o plano de treino" 
+          : "Erro ao gerar o plano de treino com Trenner2025"}
       </h3>
       
       <p className="text-muted-foreground">
@@ -71,6 +87,15 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
               <li>Por exemplo, selecione menos tipos de exercícios ou equipamentos</li>
               <li>Se o problema persistir, você pode tentar novamente mais tarde</li>
               <li>O erro pode ser temporário devido à instabilidade do modelo</li>
+            </>
+          ) : isConnectionError ? (
+            <>
+              <li>Não foi possível conectar ao serviço de geração de plano de treino</li>
+              <li>Verifique sua conexão com a internet e tente novamente</li>
+              <li>Se você está usando uma VPN ou proxy, tente desativá-los temporariamente</li>
+              <li>O serviço pode estar temporariamente indisponível. Aguarde alguns minutos e tente novamente</li>
+              <li>Se o problema persistir, pode haver uma interrupção no serviço</li>
+              <li>Você também pode tentar usar um navegador diferente ou limpar o cache</li>
             </>
           ) : isShutdownError ? (
             <>
@@ -107,10 +132,26 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
             Ir para Configurações
           </Button>
         )}
-        <Button onClick={onReset} variant="outline" className="border-red-200 hover:bg-red-100 dark:hover:bg-red-900/20">
+        
+        <Button 
+          onClick={onReset} 
+          variant="outline" 
+          className="border-red-200 hover:bg-red-100 dark:hover:bg-red-900/20"
+        >
           <RotateCcw className="w-4 h-4 mr-2" />
           Tentar Novamente
         </Button>
+        
+        {isConnectionError && (
+          <Button 
+            onClick={() => window.location.reload()} 
+            variant="default" 
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Recarregar Página
+          </Button>
+        )}
       </div>
     </div>
   );

@@ -29,6 +29,8 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
   const [rawResponse, setRawResponse] = useState<any>(null);
   const generationInProgress = useRef(false);
   const generationAttempted = useRef(false);
+  const retryCount = useRef(0);
+  const MAX_RETRIES = 2; // Maximum number of automatic retries
 
   const generatePlan = async () => {
     // Prevent concurrent generations
@@ -102,10 +104,57 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       
       toast.success("Plano de treino gerado com sucesso pelo Trenner2025!");
       console.log("Workout plan generation and saving completed successfully");
+      
+      // Reset retry counter on successful generation
+      retryCount.current = 0;
     } catch (err: any) {
       console.error("Erro na geração do plano de treino:", err);
-      setError(err.message || "Erro ao gerar plano de treino");
-      toast.error(err.message || "Erro ao gerar plano de treino");
+      
+      // Check if this is a network or edge function connection error
+      const isNetworkError = err.message && (
+        err.message.includes("Failed to send a request to the Edge Function") ||
+        err.message.includes("Failed to fetch") ||
+        err.message.includes("Network Error") ||
+        err.message.includes("net::ERR") ||
+        err.message.includes("ECONNREFUSED") ||
+        err.message.includes("timeout")
+      );
+      
+      if (isNetworkError && retryCount.current < MAX_RETRIES) {
+        // Attempt automatic retry for network errors
+        retryCount.current += 1;
+        toast.warning(`Problema de conexão. Tentando novamente (${retryCount.current}/${MAX_RETRIES})...`);
+        
+        // Wait a bit before retrying
+        setTimeout(() => {
+          generationInProgress.current = false;
+          generatePlan();
+        }, 3000);
+        return;
+      }
+      
+      // Check for specific Groq API key errors in the error message
+      if (err.message) {
+        if (err.message.includes("Invalid API Key") || 
+            err.message.includes("invalid_api_key") ||
+            err.message.includes("Groq API Error") ||
+            err.message.includes("Validation errors") ||
+            err.message.includes("json_validate_failed")) {
+          
+          setError(err.message);
+          toast.error(err.message);
+        } else if (isNetworkError) {
+          // Format network error message for better user experience
+          setError("Erro de conexão com o serviço de geração de plano. Por favor, verifique sua conexão e tente novamente.");
+          toast.error("Erro de conexão. Tente novamente mais tarde.");
+        } else {
+          setError(`Erro ao gerar plano de treino: ${err.message}`);
+          toast.error(err.message || "Erro ao gerar plano de treino");
+        }
+      } else {
+        setError("Erro desconhecido ao gerar o plano de treino");
+        toast.error("Erro desconhecido ao gerar o plano de treino");
+      }
     } finally {
       setLoading(false);
       generationInProgress.current = false;
