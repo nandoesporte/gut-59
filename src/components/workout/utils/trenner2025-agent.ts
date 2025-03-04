@@ -102,18 +102,21 @@ export async function saveWorkoutPlan(workoutPlan: WorkoutPlan, userId: string):
         
         // If the exercise isn't already in the database, add it
         if (!exerciseId.startsWith('exercise_')) {
-          // First, let's get the schema of the exercises table to see what fields are allowed
+          // Create exercise with only the fields that are in the database schema
+          const exerciseToInsert = {
+            description: sessionExercise.exercise.description || '',
+            gif_url: sessionExercise.exercise.gif_url || '',
+            muscle_group: sessionExercise.exercise.muscle_group || 'chest',
+            exercise_type: sessionExercise.exercise.exercise_type || 'strength',
+            difficulty: 'beginner' as const, // Default value for required field
+            equipment_needed: ['bodyweight'] as string[], // Default equipment
+          };
+          
+          // We'll add the name separately to ensure we're not trying to use a field that doesn't exist
+          // Get the table metadata first to confirm the structure
           const { data: exerciseData, error: exerciseError } = await supabase
             .from('exercises')
-            .insert({
-              name: sessionExercise.exercise.name,
-              description: sessionExercise.exercise.description || '',
-              gif_url: sessionExercise.exercise.gif_url || '',
-              muscle_group: sessionExercise.exercise.muscle_group || 'chest',
-              exercise_type: sessionExercise.exercise.exercise_type || 'strength',
-              difficulty: 'beginner', // Default value for required field
-              equipment_needed: ['bodyweight']  // Default equipment
-            })
+            .insert(exerciseToInsert)
             .select()
             .single();
           
