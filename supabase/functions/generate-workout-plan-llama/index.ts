@@ -42,12 +42,20 @@ serve(async (req) => {
     const useGroq = !settings || settings.active_model === "llama3" || settings.active_model === "groq";
     let groqApiKey = settings?.groq_api_key || Deno.env.get("GROQ_API_KEY");
     
-    if (groqApiKey && (
-        groqApiKey.includes("Validation errors") || 
-        groqApiKey.includes("must have required property")
-    )) {
-      console.error("Groq API key contains validation errors:", groqApiKey);
-      groqApiKey = null;
+    if (groqApiKey) {
+      if (groqApiKey.includes("Validation errors") || 
+          groqApiKey.includes("must have required property") ||
+          groqApiKey.includes("Error:") || 
+          !groqApiKey.trim().startsWith("gsk_")) {
+        
+        console.error("Invalid Groq API key detected:", groqApiKey);
+        return new Response(
+          JSON.stringify({ 
+            error: `Groq API key contains validation errors: ${groqApiKey}` 
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        );
+      }
     }
     
     if (useGroq) {
@@ -199,6 +207,10 @@ async function generateWorkoutPlanWithGroq(
   if (!apiKey || apiKey.trim() === "") {
     throw new Error("Groq API key is required but not provided");
   }
+  
+  if (!apiKey.startsWith("gsk_")) {
+    throw new Error("Invalid Groq API key format. Keys should start with 'gsk_'");
+  }
 
   const defaultSystemPrompt = `Você é ${agentName}, um agente de IA especializado em educação física e ciência do exercício. 
 Sua tarefa é criar um plano de treino personalizado com base nas preferências e necessidades do usuário. 
@@ -334,8 +346,15 @@ Lembre-se: sua resposta deve ser APENAS o objeto JSON válido, nada mais.`;
   } catch (error) {
     console.error("Error calling Groq API:", error);
     
-    if (error.message && error.message.includes("Invalid API Key")) {
-      throw new Error("Invalid Groq API key. Please update your API key in the admin settings.");
+    if (error.message) {
+      if (error.message.includes("Invalid API Key") || 
+          error.message.includes("invalid_api_key")) {
+        throw new Error("Invalid Groq API key. Please update your API key in the admin settings.");
+      }
+      
+      if (error.message.includes("Validation errors")) {
+        throw new Error(`Groq API key contains validation errors: ${error.message}`);
+      }
     }
     
     throw new Error(`Failed to generate workout plan with Groq: ${error.message}`);

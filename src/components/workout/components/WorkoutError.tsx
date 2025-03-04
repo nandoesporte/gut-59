@@ -13,7 +13,10 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
   const isGroqKeyError = errorMessage?.includes("Groq API key") || 
                          errorMessage?.includes("API Groq") ||
                          errorMessage?.includes("Invalid API Key") ||
-                         errorMessage?.includes("invalid_api_key");
+                         errorMessage?.includes("invalid_api_key") ||
+                         errorMessage?.includes("Validation errors");
+
+  const hasValidationErrors = errorMessage?.includes("Validation errors");
 
   return (
     <div className="text-center space-y-4 p-12 border border-red-200 rounded-lg bg-red-50 dark:bg-red-900/10">
@@ -37,9 +40,15 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
           {isGroqKeyError ? (
             <>
               <li>É necessário configurar uma chave API válida da Groq na página de administração</li>
+              {hasValidationErrors && (
+                <li className="text-red-600">
+                  A chave atual contém erros de validação e precisa ser substituída por uma nova chave válida
+                </li>
+              )}
               <li>O agente Trenner2025 usa a API Groq com o modelo Llama 3 para funcionar</li>
               <li>Obtenha uma chave gratuita em <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" className="underline text-blue-600 dark:text-blue-400">console.groq.com/keys</a></li>
-              <li>Vá para <code className="bg-red-200 dark:bg-red-800/30 p-1 rounded text-xs">Admin &gt; Treino &gt; Configurações do AI</code> e adicione a chave da API</li>
+              <li>As chaves da Groq sempre começam com <code className="bg-red-200 dark:bg-red-800/30 p-1 rounded text-xs">gsk_</code> seguido por uma string alfanumérica</li>
+              <li>Vá para <code className="bg-red-200 dark:bg-red-800/30 p-1 rounded text-xs">Admin &gt; Treino &gt; Modelos de IA</code> e adicione a chave da API</li>
               <li>Se você já adicionou uma chave, verifique se ela está correta e válida</li>
             </>
           ) : (

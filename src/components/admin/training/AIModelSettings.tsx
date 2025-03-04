@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, ExternalLink } from 'lucide-react';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export const AIModelSettings = () => {
@@ -21,6 +21,7 @@ export const AIModelSettings = () => {
     groqApiKey: ''
   });
   const [showMissingKeyAlert, setShowMissingKeyAlert] = useState(false);
+  const [keyError, setKeyError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSettings();
@@ -39,18 +40,32 @@ export const AIModelSettings = () => {
       
       if (data) {
         const useGroq = data.active_model === 'groq' || data.active_model === 'llama3';
-        const hasGroqKey = data.groq_api_key && 
-                          data.groq_api_key.trim() !== '' && 
-                          !data.groq_api_key.includes("Validation") &&
-                          !data.groq_api_key.includes("must have required property");
         
-        setShowMissingKeyAlert(useGroq && !hasGroqKey);
+        // Check if API key contains validation errors
+        let apiKeyHasError = false;
+        let keyContent = data.groq_api_key || '';
+        let errorMessage = null;
+        
+        if (keyContent) {
+          if (keyContent.includes("Validation") || 
+              keyContent.includes("must have required property") ||
+              keyContent.includes("Error:")) {
+            apiKeyHasError = true;
+            errorMessage = keyContent;
+            keyContent = ''; // Clear the invalid key
+          }
+        }
+        
+        const hasGroqKey = keyContent && keyContent.trim() !== '';
+        
+        setShowMissingKeyAlert(useGroq && (!hasGroqKey || apiKeyHasError));
+        setKeyError(apiKeyHasError ? errorMessage : null);
         
         setAiSettings({
           activeModel: data.active_model || 'llama3',
           systemPrompt: data.system_prompt || getDefaultPrompt(),
           useCustomPrompt: data.use_custom_prompt || false,
-          groqApiKey: data.groq_api_key || ''
+          groqApiKey: keyContent
         });
       }
     } catch (error) {
@@ -80,16 +95,16 @@ Você deve fornecer um plano completo, com exercícios, séries, repetições e 
         toast.warning('Uma chave da API Groq é necessária para utilizar o modelo Llama 3');
       }
       
-      // Clean up the API key if it contains validation errors
-      let cleanedGroqApiKey = aiSettings.groqApiKey;
-      if (cleanedGroqApiKey && (
-          cleanedGroqApiKey.includes("Validation") || 
-          cleanedGroqApiKey.includes("must have required property")
-      )) {
-        cleanedGroqApiKey = '';
+      // Clear any error message when saving
+      setKeyError(null);
+      
+      // If the provided key is empty or doesn't look like a valid Groq key format
+      // (Groq keys typically start with "gsk_" followed by alphanumeric characters)
+      if (hasGroqKey && !aiSettings.groqApiKey.startsWith('gsk_')) {
+        toast.warning('A chave da API Groq não parece estar no formato correto (deve começar com "gsk_")');
       }
       
-      // Primeiro verificamos se o registro já existe
+      // First check if the record exists
       const { data, error: fetchError } = await supabase
         .from('ai_model_settings')
         .select('id')
@@ -101,21 +116,21 @@ Você deve fornecer um plano completo, com exercícios, séries, repetições e 
       let saveError;
       
       if (data) {
-        // Se o registro existe, atualizamos usando o id
+        // If the record exists, update using the id
         const { error } = await supabase
           .from('ai_model_settings')
           .update({
             active_model: aiSettings.activeModel,
             system_prompt: aiSettings.systemPrompt,
             use_custom_prompt: aiSettings.useCustomPrompt,
-            groq_api_key: cleanedGroqApiKey,
+            groq_api_key: aiSettings.groqApiKey,
             updated_at: new Date().toISOString()
           })
           .eq('id', data.id);
         
         saveError = error;
       } else {
-        // Se não existe, criamos um novo
+        // If it doesn't exist, create a new one
         const { error } = await supabase
           .from('ai_model_settings')
           .insert({
@@ -123,7 +138,7 @@ Você deve fornecer um plano completo, com exercícios, séries, repetições e 
             active_model: aiSettings.activeModel,
             system_prompt: aiSettings.systemPrompt,
             use_custom_prompt: aiSettings.useCustomPrompt,
-            groq_api_key: cleanedGroqApiKey,
+            groq_api_key: aiSettings.groqApiKey,
             updated_at: new Date().toISOString()
           });
         
@@ -175,7 +190,15 @@ Você deve fornecer um plano completo, com exercícios, séries, repetições e 
           <Alert variant="destructive" className="mb-4">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              A chave da API Groq não está configurada ou contém erros. Os modelos Llama 3 e Groq não funcionarão sem uma chave válida.
+              {keyError ? (
+                <>
+                  <p>A chave da API Groq contém erros de validação:</p>
+                  <p className="text-xs mt-1 font-mono bg-red-950/30 p-1 rounded">{keyError}</p>
+                  <p className="mt-2">Por favor, obtenha uma nova chave válida no site da Groq.</p>
+                </>
+              ) : (
+                <>A chave da API Groq não está configurada ou contém erros. Os modelos Llama 3 e Groq não funcionarão sem uma chave válida.</>
+              )}
             </AlertDescription>
           </Alert>
         )}
@@ -213,9 +236,23 @@ Você deve fornecer um plano completo, com exercícios, séries, repetições e 
             Necessária para utilizar o modelo Llama 3 via Groq
           </p>
           {showMissingKeyAlert && (
-            <p className="text-sm text-red-500">
-              Obtenha uma chave API gratuita em <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" className="underline">console.groq.com/keys</a>
-            </p>
+            <div className="text-sm text-red-500 space-y-1">
+              <p>
+                Obtenha uma chave API gratuita em{" "}
+                <a 
+                  href="https://console.groq.com/keys" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="underline inline-flex items-center"
+                >
+                  console.groq.com/keys
+                  <ExternalLink className="w-3 h-3 ml-1" />
+                </a>
+              </p>
+              <p>
+                As chaves Groq começam com <code className="bg-red-100 dark:bg-red-900/20 px-1 py-0.5 rounded">gsk_</code> seguido por caracteres alfanuméricos
+              </p>
+            </div>
           )}
         </div>
 
