@@ -319,7 +319,8 @@ async function generateWorkoutPlanWithTrenner2025(
           }
         ],
         temperature: 0.7,
-        max_tokens: 4000
+        max_tokens: 4000,
+        response_format: { type: "json_object" }
       })
     });
 
@@ -333,22 +334,40 @@ async function generateWorkoutPlanWithTrenner2025(
     let generatedPlan;
     
     try {
-      // Try to extract and parse the JSON from the completion
+      // Extract the content from the response
       const content = data.choices[0].message.content;
+      console.log("Raw response content type:", typeof content);
       
-      // Look for a JSON object in the content
-      const jsonMatch = content.match(/```json\s*({[\s\S]*?})\s*```/) || 
-                        content.match(/{[\s\S]*"workout_sessions"[\s\S]*}/);
-      
-      if (jsonMatch) {
-        generatedPlan = JSON.parse(jsonMatch[1] || jsonMatch[0]);
+      // Check if the content is already a JSON object
+      if (typeof content === 'object' && content !== null) {
+        generatedPlan = content;
       } else {
-        // If no JSON pattern is found, try to parse the whole content
-        generatedPlan = JSON.parse(content);
+        // Try to parse the string as JSON
+        try {
+          generatedPlan = JSON.parse(content);
+        } catch (jsonError) {
+          console.error("JSON parsing error:", jsonError);
+          console.log("Content that failed to parse:", content);
+          
+          // Try to extract a JSON object from the content using regex
+          const jsonMatch = content.match(/```json\s*({[\s\S]*?})\s*```/) || 
+                            content.match(/{[\s\S]*"workout_sessions"[\s\S]*}/);
+          
+          if (jsonMatch) {
+            try {
+              generatedPlan = JSON.parse(jsonMatch[1] || jsonMatch[0]);
+            } catch (regexJsonError) {
+              console.error("Regex JSON extraction failed:", regexJsonError);
+              throw new Error("Cannot parse JSON from the response");
+            }
+          } else {
+            // If no JSON pattern is found, create a structured error response
+            throw new Error(`Failed to parse JSON from response: ${jsonError.message}`);
+          }
+        }
       }
     } catch (parseError) {
-      console.error("Failed to parse JSON from response:", parseError);
-      console.log("Raw response content:", data.choices[0].message.content);
+      console.error("Failed to parse response:", parseError);
       
       // Create a basic structure with the raw content to avoid breaking the UI
       generatedPlan = {
@@ -358,8 +377,8 @@ async function generateWorkoutPlanWithTrenner2025(
         start_date: new Date().toISOString(),
         end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         workout_sessions: [],
-        raw_content: data.choices[0].message.content,
-        parse_error: parseError.message
+        parse_error: parseError.message,
+        raw_content: data.choices[0].message.content
       };
     }
     

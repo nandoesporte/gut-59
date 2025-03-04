@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { FisioPreferences } from "./types";
@@ -22,6 +21,7 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
   const [loading, setLoading] = useState(true);
   const [rehabPlan, setRehabPlan] = useState<RehabPlan | null>(null);
   const [selectedDay, setSelectedDay] = useState<string>("day1");
+  const [loadingTime, setLoadingTime] = useState(0);
 
   const generatePlan = async () => {
     try {
@@ -68,7 +68,11 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
   }, []);
 
   if (loading) {
-    return <WorkoutLoadingState message="Gerando seu plano de reabilitação personalizado" />;
+    return <WorkoutLoadingState 
+      message="Gerando seu plano de reabilitação personalizado" 
+      onRetry={() => generatePlan()}
+      timePassed={loadingTime}
+    />;
   }
 
   if (!rehabPlan) {
