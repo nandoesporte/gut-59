@@ -8,7 +8,7 @@ interface Exercise {
   exercise_type?: string;
 }
 
-interface SessionExercise {
+export interface SessionExercise {
   id: string;
   sets: number;
   reps: number;
