@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
@@ -45,9 +44,9 @@ serve(async (req) => {
       throw new Error("GROQ API key is required but not configured in environment variables");
     }
 
-    console.log("Sorting exercises by relevance to user goal...");
-    const sortedExercises = sortExercisesByGoal(exercises, preferences);
-    console.log(`Exercises sorted by relevance to user goal: ${preferences.goal}`);
+    console.log("Organizing exercises by muscle groups and relevance to user goal...");
+    const sortedExercises = organizeExercisesByMuscleGroups(exercises, preferences);
+    console.log(`Exercises organized by muscle groups with relevance to user goal: ${preferences.goal}`);
 
     console.log("Generating workout plan with Trenner2025 agent...");
     const startTime = performance.now();
@@ -102,46 +101,104 @@ serve(async (req) => {
   }
 });
 
-// Function to sort exercises by relevance to user's goal
-function sortExercisesByGoal(exercises, preferences) {
-  console.log(`Sorting ${exercises.length} exercises by relevance to user goal: ${preferences.goal}`);
+// Function to organize exercises by muscle groups with consideration for user's goal
+function organizeExercisesByMuscleGroups(exercises, preferences) {
+  console.log(`Organizing ${exercises.length} exercises by muscle groups and relevance to user goal: ${preferences.goal}`);
+  
+  // Define main muscle groups to ensure coverage
+  const muscleGroups = [
+    'chest', 'back', 'legs', 'shoulders', 'arms', 'core', 'full_body'
+  ];
   
   // Priority map based on exercise type and user goal
-  const priorityMap = {
+  const typePriorityMap = {
     "strength": preferences.goal === "gain_mass" ? 10 : 5,
     "cardio": preferences.goal === "lose_weight" ? 10 : 5,
     "mobility": 3
   };
-
-  // Make a copy of the exercises array to avoid modifying the original
-  const sortedExercises = [...exercises];
   
-  // Sort exercises by relevance
-  sortedExercises.sort((a, b) => {
-    // First prioritize exercises with GIFs
-    if (a.gif_url && !b.gif_url) return -1;
-    if (!a.gif_url && b.gif_url) return 1;
-    
-    // Then prioritize by exercise type relevance to goal
-    const aScore = priorityMap[a.exercise_type] || 0;
-    const bScore = priorityMap[b.exercise_type] || 0;
-    
-    // If scores are equal, prioritize by description completeness
-    if (aScore === bScore) {
-      const aHasDescription = a.description && a.description.length > 10;
-      const bHasDescription = b.description && b.description.length > 10;
-      
-      if (aHasDescription && !bHasDescription) return -1;
-      if (!aHasDescription && bHasDescription) return 1;
-    }
-    
-    return bScore - aScore; // Higher scores first
+  // Group exercises by muscle group
+  const exercisesByMuscleGroup = {};
+  
+  // Initialize all muscle groups with empty arrays
+  muscleGroups.forEach(group => {
+    exercisesByMuscleGroup[group] = [];
   });
   
-  console.log(`Successfully sorted exercises by relevance to goal: ${preferences.goal}`);
-  console.log(`Top 3 exercise types after sorting: ${sortedExercises.slice(0, 3).map(ex => ex.exercise_type).join(', ')}`);
+  // Assign exercises to their respective muscle groups
+  exercises.forEach(exercise => {
+    const muscleGroup = exercise.muscle_group || 'full_body';
+    if (exercisesByMuscleGroup[muscleGroup]) {
+      exercisesByMuscleGroup[muscleGroup].push(exercise);
+    } else {
+      exercisesByMuscleGroup['full_body'].push(exercise); // Default to full_body if unknown
+    }
+  });
   
-  return sortedExercises;
+  // Sort exercises within each muscle group by relevance to goal
+  Object.keys(exercisesByMuscleGroup).forEach(group => {
+    exercisesByMuscleGroup[group].sort((a, b) => {
+      // First prioritize exercises with GIFs
+      if (a.gif_url && !b.gif_url) return -1;
+      if (!a.gif_url && b.gif_url) return 1;
+      
+      // Then prioritize by exercise type relevance to goal
+      const aScore = typePriorityMap[a.exercise_type] || 0;
+      const bScore = typePriorityMap[b.exercise_type] || 0;
+      
+      // If scores are equal, prioritize by description completeness
+      if (aScore === bScore) {
+        const aHasDescription = a.description && a.description.length > 10;
+        const bHasDescription = b.description && b.description.length > 10;
+        
+        if (aHasDescription && !bHasDescription) return -1;
+        if (!aHasDescription && bHasDescription) return 1;
+      }
+      
+      return bScore - aScore; // Higher scores first
+    });
+  });
+  
+  // Now create a balanced list that takes top N exercises from each muscle group
+  const organizedExercises = [];
+  const maxExercisesPerGroup = 10; // Take top 10 from each group
+  
+  muscleGroups.forEach(group => {
+    const groupExercises = exercisesByMuscleGroup[group] || [];
+    const topGroupExercises = groupExercises.slice(0, maxExercisesPerGroup);
+    
+    console.log(`Selected ${topGroupExercises.length} exercises for muscle group: ${group}`);
+    organizedExercises.push(...topGroupExercises);
+  });
+  
+  // Add additional exercises that didn't make it into the top N for each group
+  // to ensure we have a good variety but still maintain the organization by importance
+  let remainingExercises = [];
+  muscleGroups.forEach(group => {
+    const groupExercises = exercisesByMuscleGroup[group] || [];
+    if (groupExercises.length > maxExercisesPerGroup) {
+      remainingExercises.push(...groupExercises.slice(maxExercisesPerGroup));
+    }
+  });
+  
+  // Sort remaining exercises by priority
+  remainingExercises.sort((a, b) => {
+    const aScore = typePriorityMap[a.exercise_type] || 0;
+    const bScore = typePriorityMap[b.exercise_type] || 0;
+    return bScore - aScore;
+  });
+  
+  // Add some remaining exercises to ensure variety
+  const maxRemainingToAdd = Math.min(remainingExercises.length, 30);
+  organizedExercises.push(...remainingExercises.slice(0, maxRemainingToAdd));
+  
+  console.log(`Successfully organized exercises. Total selected: ${organizedExercises.length}`);
+  
+  // Log the top muscle groups for confirmation
+  const topMuscleGroups = organizedExercises.slice(0, 6).map(ex => ex.muscle_group);
+  console.log(`Top 6 muscle groups after organizing: ${topMuscleGroups.join(', ')}`);
+  
+  return organizedExercises;
 }
 
 async function generateWorkoutPlanWithTrenner2025(
@@ -400,4 +457,3 @@ async function generateWorkoutPlanWithTrenner2025(
     throw new Error(`Failed to generate workout plan: ${error.message}`);
   }
 }
-

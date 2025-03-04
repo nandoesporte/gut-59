@@ -196,39 +196,83 @@ function filterExercisesByPreferences(exercises: any[], preferences: WorkoutPref
     console.log(`Added additional exercises. Now using ${filteredExercises.length} exercises.`);
   }
 
-  // Sort exercises by relevance to user's goals and preferences
-  // This gives the AI the most relevant exercises first in the prompt
+  // Group exercises by muscle groups to ensure balanced distribution
+  const muscleGroups = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core', 'full_body'];
+  const exercisesByMuscleGroup: Record<string, any[]> = {};
+  
+  // Initialize muscle group arrays
+  muscleGroups.forEach(group => {
+    exercisesByMuscleGroup[group] = [];
+  });
+  
+  // Distribute exercises to their muscle groups
+  filteredExercises.forEach(exercise => {
+    const muscleGroup = exercise.muscle_group || 'full_body';
+    if (exercisesByMuscleGroup[muscleGroup]) {
+      exercisesByMuscleGroup[muscleGroup].push(exercise);
+    } else {
+      exercisesByMuscleGroup['full_body'].push(exercise);
+    }
+  });
+  
+  // Priority map based on exercise type and user goal
   const priorityMap: Record<string, number> = {
     "strength": preferences.goal === "gain_mass" ? 10 : 5,
     "cardio": preferences.goal === "lose_weight" ? 10 : 5,
     "mobility": 3
   };
 
-  filteredExercises.sort((a, b) => {
-    // First prioritize exercises with GIFs
-    if (a.gif_url && !b.gif_url) return -1;
-    if (!a.gif_url && b.gif_url) return 1;
-    
-    // Then prioritize by exercise type relevance to goal
-    const aScore = priorityMap[a.exercise_type] || 0;
-    const bScore = priorityMap[b.exercise_type] || 0;
-    
-    // If scores are equal, prioritize by description completeness
-    if (aScore === bScore) {
-      const aHasDescription = a.description && a.description.length > 10;
-      const bHasDescription = b.description && b.description.length > 10;
+  // Sort exercises within each muscle group
+  Object.keys(exercisesByMuscleGroup).forEach(group => {
+    exercisesByMuscleGroup[group].sort((a, b) => {
+      // First prioritize exercises with GIFs
+      if (a.gif_url && !b.gif_url) return -1;
+      if (!a.gif_url && b.gif_url) return 1;
       
-      if (aHasDescription && !bHasDescription) return -1;
-      if (!aHasDescription && bHasDescription) return 1;
-    }
-    
-    return bScore - aScore; // Higher scores first
+      // Then prioritize by exercise type relevance to goal
+      const aScore = priorityMap[a.exercise_type] || 0;
+      const bScore = priorityMap[b.exercise_type] || 0;
+      
+      return bScore - aScore; // Higher scores first
+    });
   });
-
-  console.log(`Exercises sorted by relevance to user goal: ${preferences.goal}`);
   
+  // Create a balanced list by taking top exercises from each muscle group
+  const organizedExercises: any[] = [];
+  const maxPerGroup = 7; // Take up to 7 exercises from each group
+  
+  muscleGroups.forEach(group => {
+    const groupExercises = exercisesByMuscleGroup[group] || [];
+    organizedExercises.push(...groupExercises.slice(0, maxPerGroup));
+  });
+  
+  // Add any remaining exercises needed to meet minimum count
+  if (organizedExercises.length < 40) {
+    let remainingNeeded = 40 - organizedExercises.length;
+    let remainingExercises: any[] = [];
+    
+    muscleGroups.forEach(group => {
+      const groupExercises = exercisesByMuscleGroup[group] || [];
+      if (groupExercises.length > maxPerGroup) {
+        remainingExercises.push(...groupExercises.slice(maxPerGroup));
+      }
+    });
+    
+    // Sort remaining by priority
+    remainingExercises.sort((a, b) => {
+      const aScore = priorityMap[a.exercise_type] || 0;
+      const bScore = priorityMap[b.exercise_type] || 0;
+      return bScore - aScore;
+    });
+    
+    organizedExercises.push(...remainingExercises.slice(0, remainingNeeded));
+  }
+  
+  console.log(`Final organized exercise count: ${organizedExercises.length}`);
+  console.log(`Top muscle groups: ${organizedExercises.slice(0, 6).map(ex => ex.muscle_group).join(', ')}`);
+
   // Remove unnecessary properties to reduce payload size
-  return filteredExercises.map(ex => ({
+  return organizedExercises.map(ex => ({
     id: ex.id,
     name: ex.name,
     muscle_group: ex.muscle_group,
