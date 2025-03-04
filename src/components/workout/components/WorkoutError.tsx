@@ -11,7 +11,9 @@ interface WorkoutErrorProps {
 export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
   const navigate = useNavigate();
   const isGroqKeyError = errorMessage?.includes("Groq API key") || 
-                         errorMessage?.includes("Chave API Groq");
+                         errorMessage?.includes("API Groq") ||
+                         errorMessage?.includes("Invalid API Key") ||
+                         errorMessage?.includes("invalid_api_key");
 
   return (
     <div className="text-center space-y-4 p-12 border border-red-200 rounded-lg bg-red-50 dark:bg-red-900/10">

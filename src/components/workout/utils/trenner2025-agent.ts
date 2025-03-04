@@ -34,6 +34,9 @@ export async function generateWorkoutPlanWithTrenner2025(
     return { workoutPlan: data.workoutPlan, error: null };
   } catch (err: any) {
     console.error("Exception in generateWorkoutPlanWithTrenner2025:", err);
+    if (err.message && err.message.includes("Groq API Error")) {
+      return { workoutPlan: null, error: "Erro com a chave da API Groq. Por favor, configure uma chave válida nas configurações do admin." };
+    }
     return { workoutPlan: null, error: err.message };
   }
 }
@@ -104,13 +107,13 @@ export async function saveWorkoutPlan(workoutPlan: WorkoutPlan, userId: string):
         if (!exerciseId.startsWith('exercise_')) {
           // Create exercise with only the fields that are in the database schema
           const exerciseToInsert = {
-            name: sessionExercise.exercise.name, // Add the required name field
+            name: sessionExercise.exercise.name,
             description: sessionExercise.exercise.description || '',
             gif_url: sessionExercise.exercise.gif_url || '',
             muscle_group: sessionExercise.exercise.muscle_group || 'chest',
-            exercise_type: sessionExercise.exercise.exercise_type || 'strength',
-            difficulty: 'beginner' as const, // Default value for required field
-            equipment_needed: ['bodyweight'] as string[], // Default equipment
+            exercise_type: sessionExercise.exercise.exercise_type as "strength" | "cardio" | "mobility" || 'strength',
+            difficulty: 'beginner' as const,
+            equipment_needed: ['bodyweight'] as string[],
           };
           
           // Insert the exercise with all required fields
