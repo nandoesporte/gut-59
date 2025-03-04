@@ -262,9 +262,9 @@ async function generateWorkoutPlanWithGroq(
     gif_url: ex.gif_url
   }));
 
-  // Simplified user prompt to reduce complexity
+  // Simplified user prompt to reduce complexity and explicitly mention JSON format
   const userPrompt = `
-Com base nas preferências do usuário a seguir, crie um plano de treino personalizado dividido por dias da semana.
+Com base nas preferências do usuário a seguir, crie um plano de treino personalizado dividido por dias da semana. Responda com um objeto JSON.
 
 PREFERÊNCIAS DO USUÁRIO:
 - Idade: ${preferences.age} anos
@@ -279,7 +279,7 @@ ${preferences.health_conditions && preferences.health_conditions.length > 0 ?
   `- Condições de saúde: ${preferences.health_conditions.join(', ')}` : ''}
 
 EXERCÍCIOS DISPONÍVEIS:
-${JSON.stringify(exerciseList.slice(0, 30)).substring(0, 6000)}
+${JSON.stringify(exerciseList.slice(0, 20)).substring(0, 4000)}
 
 INSTRUÇÕES:
 1. Crie um plano de treino para 5 dias
@@ -289,9 +289,9 @@ INSTRUÇÕES:
    - Tempo de descanso entre séries
    - Uma volta à calma breve
 3. Escolha apenas exercícios da lista fornecida acima.
-4. Siga exatamente o formato de resposta solicitado abaixo.
+4. Siga exatamente o formato de resposta JSON solicitado abaixo.
 
-FORMATO DE RESPOSTA: 
+FORMATO DE RESPOSTA JSON: 
 {
   "goal": "objetivo traduzido",
   "start_date": "2023-03-01",
@@ -335,7 +335,7 @@ FORMATO DE RESPOSTA:
           { role: "user", content: userPrompt }
         ],
         temperature: 0.2, // Reduced temperature for more predictable outputs
-        max_tokens: 3500, // Reduced max tokens to prevent overly complex responses
+        max_tokens: 3000, // Reduced max tokens to prevent overly complex responses
         response_format: { type: "json_object" }
       })
     });
@@ -368,17 +368,19 @@ FORMATO DE RESPOSTA:
       } else if (typeof content === 'string') {
         console.log("Parsing string content from Groq API");
         
+        // Try different JSON extraction patterns
         const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || 
                           content.match(/```\s*([\s\S]*?)\s*```/) || 
                           content.match(/({[\s\S]*})/);
         
         if (jsonMatch) {
-          const jsonString = jsonMatch[1];
+          const jsonString = jsonMatch[1].trim();
           workoutPlan = JSON.parse(jsonString);
           console.log("Successfully parsed JSON from markdown/code block");
         } else {
-          console.error("No JSON pattern found in content");
-          throw new Error("Could not extract valid JSON from model response");
+          // If no special pattern, try to parse the whole content
+          workoutPlan = JSON.parse(content);
+          console.log("Successfully parsed JSON from raw content");
         }
       } else {
         throw new Error(`Unexpected content type: ${typeof content}`);
