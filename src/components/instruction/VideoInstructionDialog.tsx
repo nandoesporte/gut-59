@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -20,7 +21,7 @@ export function VideoInstructionDialog() {
 
   // Check if the user has already seen the instruction video
   useEffect(() => {
-    const hasSeenVideo = localStorage.getItem("hasSeenInstructionVideo");
+    const hasSeenVideo = localStorage.getItem("hasSeenNutriInstructionVideo");
     if (!hasSeenVideo) {
       setOpen(true);
     }
@@ -48,7 +49,7 @@ export function VideoInstructionDialog() {
   });
 
   const handleMarkAsViewed = () => {
-    localStorage.setItem("hasSeenInstructionVideo", "true");
+    localStorage.setItem("hasSeenNutriInstructionVideo", "true");
     setOpen(false);
     toast.success("Obrigado por assistir ao vídeo de instruções!");
   };
@@ -57,7 +58,7 @@ export function VideoInstructionDialog() {
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
       // Prevent closing if localStorage item doesn't exist
-      const hasSeenVideo = localStorage.getItem("hasSeenInstructionVideo");
+      const hasSeenVideo = localStorage.getItem("hasSeenNutriInstructionVideo");
       if (!hasSeenVideo) {
         toast.error("Por favor, assista o vídeo de instruções antes de continuar.");
         return;
@@ -70,7 +71,7 @@ export function VideoInstructionDialog() {
   useEffect(() => {
     if (!isLoading && !video && open) {
       toast.info("Carregando página de instruções...");
-      localStorage.setItem("hasSeenInstructionVideo", "true");
+      localStorage.setItem("hasSeenNutriInstructionVideo", "true");
       setOpen(false);
       navigate("/instructions");
     }
@@ -81,8 +82,11 @@ export function VideoInstructionDialog() {
       <DialogContent className="sm:max-w-3xl" onInteractOutside={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-center">
-            {video?.title || "Vídeo de Instruções"}
+            {video?.title || "Vídeo de Instruções do Nutri"}
           </DialogTitle>
+          <DialogDescription className="text-center text-gray-500">
+            Assista este vídeo para conhecer as funcionalidades nutricionais
+          </DialogDescription>
         </DialogHeader>
 
         {isLoading ? (

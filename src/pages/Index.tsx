@@ -1,4 +1,3 @@
-
 import Profile from "@/components/Profile";
 import Messages from "@/components/Messages";
 import MessagesPersonal from "@/components/MessagesPersonal";
@@ -13,7 +12,6 @@ import { WaterTracker } from "@/components/food-diary/WaterTracker";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { GraduationCap } from "lucide-react";
-import { VideoInstructionDialog } from "@/components/instruction/VideoInstructionDialog";
 
 const Index = () => {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -70,7 +68,6 @@ const Index = () => {
 
   return (
     <div className="space-y-8 flex flex-col items-center">
-      <VideoInstructionDialog />
       <div className="w-full">
         <Profile />
       </div>
