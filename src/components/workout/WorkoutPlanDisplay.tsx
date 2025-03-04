@@ -40,6 +40,7 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
     />;
   }
 
+  // Preserve the original plan without any modifications
   return (
     <div className="space-y-8">
       <WorkoutPlanHeader 

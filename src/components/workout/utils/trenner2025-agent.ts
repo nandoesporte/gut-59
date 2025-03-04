@@ -13,11 +13,15 @@ export async function generateWorkoutPlanWithTrenner2025(
     console.log("Generating workout plan with Trenner2025 agent...");
     console.log("Preferences:", preferences);
     
+    // Add a unique request ID to prevent duplicate processing
+    const requestId = `${userId}_${Date.now()}`;
+    
     const { data, error } = await supabase.functions.invoke('generate-workout-plan-llama', {
       body: { 
         preferences, 
         userId,
-        settings: aiSettings
+        settings: aiSettings,
+        requestId: requestId // Add a unique ID to help identify duplicate requests
       }
     });
 

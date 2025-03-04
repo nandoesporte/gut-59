@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { WorkoutPreferences } from "../types";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,8 +26,16 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
   const [workoutPlan, setWorkoutPlan] = useState<WorkoutPlan | null>(null);
   const [progressData, setProgressData] = useState(mockProgressData);
   const [error, setError] = useState<string | null>(null);
+  const generationInProgress = useRef(false);
 
   const generatePlan = async () => {
+    // Prevent concurrent generations
+    if (generationInProgress.current) {
+      console.log("Workout plan generation already in progress, skipping...");
+      return;
+    }
+    
+    generationInProgress.current = true;
     setLoading(true);
     setError(null);
     
@@ -50,6 +58,8 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
         console.warn("Erro ao buscar configurações de IA, usando padrões:", aiSettingsError);
       }
       
+      console.log("Starting generation of workout plan with Trenner2025...");
+      
       // Generate the workout plan using Trenner2025 agent
       const { workoutPlan: generatedPlan, error: generationError } = 
         await generateWorkoutPlanWithTrenner2025(preferences, user.id, aiSettings || undefined);
@@ -61,6 +71,8 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       if (!generatedPlan) {
         throw new Error("Não foi possível gerar o plano de treino");
       }
+      
+      console.log("Workout plan successfully generated, saving to database...");
       
       // Save the workout plan to the database
       const savedPlan = await saveWorkoutPlan(generatedPlan, user.id);
@@ -75,18 +87,24 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       await updatePlanGenerationCount(user.id);
       
       toast.success("Plano de treino gerado com sucesso pelo Trenner2025!");
+      console.log("Workout plan generation and saving completed successfully");
     } catch (err: any) {
       console.error("Erro na geração do plano de treino:", err);
       setError(err.message || "Erro ao gerar plano de treino");
       toast.error(err.message || "Erro ao gerar plano de treino");
     } finally {
       setLoading(false);
+      generationInProgress.current = false;
     }
   };
 
-  // Generate the plan when the component mounts
+  // Generate the plan when the component mounts, but only once
   useEffect(() => {
-    generatePlan();
+    // Only generate if we don't have a plan already
+    if (!workoutPlan && !loading && !error && !generationInProgress.current) {
+      console.log("Initial workout plan generation starting...");
+      generatePlan();
+    }
   }, []);
 
   return { loading, workoutPlan, progressData, error, generatePlan };

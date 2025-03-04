@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.1";
 
@@ -12,7 +11,22 @@ interface RequestBody {
   userId: string;
   agentName?: string; // Optional parameter for agent name
   settings?: any;
+  requestId?: string; // Added to help track and prevent duplicate requests
 }
+
+// Store recent request IDs to prevent duplicates (simple in-memory cache)
+const recentRequests = new Map<string, number>();
+const DUPLICATE_REQUEST_WINDOW_MS = 60000; // 1 minute window
+
+// Clean up old request IDs periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, timestamp] of recentRequests.entries()) {
+    if (now - timestamp > DUPLICATE_REQUEST_WINDOW_MS) {
+      recentRequests.delete(id);
+    }
+  }
+}, 30000); // Clean every 30 seconds
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -27,13 +41,27 @@ serve(async (req) => {
 
     const requestData: RequestBody = await req.json();
     
-    const { preferences, userId, agentName = "TRENE2025", settings } = requestData;
+    const { preferences, userId, agentName = "TRENE2025", settings, requestId } = requestData;
     
     if (!preferences || !userId) {
       return new Response(
         JSON.stringify({ error: "Missing required parameters: preferences and userId" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
+    }
+
+    // Check for duplicate requests if a requestId was provided
+    if (requestId) {
+      if (recentRequests.has(requestId)) {
+        console.log(`🔄 Duplicate request detected with ID: ${requestId}, skipping processing`);
+        return new Response(
+          JSON.stringify({ error: "Duplicate request detected. Please try again in a minute." }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 429 }
+        );
+      }
+      
+      // Store this request ID
+      recentRequests.set(requestId, Date.now());
     }
 
     const startTime = Date.now();
