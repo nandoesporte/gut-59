@@ -94,20 +94,25 @@ export async function saveWorkoutPlan(workoutPlan: WorkoutPlan, userId: string):
       }
       
       // Save each exercise for this session
-      for (const sessionExercise of session.session_exercises) {
+      for (let i = 0; i < session.session_exercises.length; i++) {
+        const sessionExercise = session.session_exercises[i];
+        
         // Insert or get the exercise first
         let exerciseId = sessionExercise.exercise.id;
         
         // If the exercise isn't already in the database, add it
         if (!exerciseId.startsWith('exercise_')) {
+          // Check what fields are required for the exercises table
           const { data: exerciseData, error: exerciseError } = await supabase
             .from('exercises')
             .insert({
+              // Only include fields that are explicitly defined in the exercises table
               name: sessionExercise.exercise.name,
-              description: sessionExercise.exercise.description,
-              gif_url: sessionExercise.exercise.gif_url,
-              muscle_group: sessionExercise.exercise.muscle_group,
-              exercise_type: sessionExercise.exercise.exercise_type
+              description: sessionExercise.exercise.description || '',
+              gif_url: sessionExercise.exercise.gif_url || '',
+              muscle_group: sessionExercise.exercise.muscle_group || 'chest',
+              exercise_type: sessionExercise.exercise.exercise_type || 'strength',
+              difficulty: 'beginner' // Default value for required field
             })
             .select()
             .single();
@@ -120,7 +125,7 @@ export async function saveWorkoutPlan(workoutPlan: WorkoutPlan, userId: string):
           exerciseId = exerciseData.id;
         }
         
-        // Insert the session exercise
+        // Insert the session exercise - making sure to include the order_in_session field
         const { error: sessionExerciseError } = await supabase
           .from('session_exercises')
           .insert({
@@ -128,7 +133,8 @@ export async function saveWorkoutPlan(workoutPlan: WorkoutPlan, userId: string):
             exercise_id: exerciseId,
             sets: sessionExercise.sets,
             reps: sessionExercise.reps,
-            rest_time_seconds: sessionExercise.rest_time_seconds
+            rest_time_seconds: sessionExercise.rest_time_seconds,
+            order_in_session: i + 1 // Add the required order_in_session field
           });
         
         if (sessionExerciseError) {
