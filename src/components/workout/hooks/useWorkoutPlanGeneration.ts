@@ -26,6 +26,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
   const [workoutPlan, setWorkoutPlan] = useState<WorkoutPlan | null>(null);
   const [progressData, setProgressData] = useState(mockProgressData);
   const [error, setError] = useState<string | null>(null);
+  const [rawResponse, setRawResponse] = useState<any>(null); // Adicionando estado para armazenar a resposta bruta
   const generationInProgress = useRef(false);
   const generationAttempted = useRef(false);
 
@@ -40,6 +41,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
     generationAttempted.current = true;
     setLoading(true);
     setError(null);
+    setRawResponse(null); // Resetando a resposta bruta
     
     try {
       // Get the current user
@@ -66,8 +68,14 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       const requestId = `${user.id}_${Date.now()}`;
       
       // Generate the workout plan using Trenner2025 agent
-      const { workoutPlan: generatedPlan, error: generationError } = 
+      const { workoutPlan: generatedPlan, error: generationError, rawResponse: rawResponseData } = 
         await generateWorkoutPlanWithTrenner2025(preferences, user.id, aiSettings || undefined, requestId);
+      
+      // Armazenar a resposta bruta
+      if (rawResponseData) {
+        console.log("RAW RESPONSE FROM EDGE FUNCTION:", rawResponseData);
+        setRawResponse(rawResponseData);
+      }
       
       if (generationError) {
         throw new Error(generationError);
@@ -78,6 +86,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       }
       
       console.log("Workout plan successfully generated, saving to database...");
+      console.log("COMPLETE GENERATED PLAN:", JSON.stringify(generatedPlan, null, 2));
       
       // Save the workout plan to the database exactly as received from the AI
       const savedPlan = await saveWorkoutPlan(generatedPlan, user.id);
@@ -112,5 +121,5 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
     }
   }, []);
 
-  return { loading, workoutPlan, progressData, error, generatePlan };
+  return { loading, workoutPlan, progressData, error, generatePlan, rawResponse };
 };

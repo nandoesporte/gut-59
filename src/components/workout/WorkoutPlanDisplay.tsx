@@ -11,6 +11,7 @@ import { useWorkoutPlanGeneration } from "./hooks/useWorkoutPlanGeneration";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WorkoutPlanHeader } from "./components/WorkoutPlanHeader";
 import { WorkoutPlanDetailed } from "./components/WorkoutPlanDetailed";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface WorkoutPlanDisplayProps {
   preferences: WorkoutPreferences;
@@ -18,7 +19,7 @@ interface WorkoutPlanDisplayProps {
 }
 
 export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayProps) => {
-  const { loading, workoutPlan, progressData, error, generatePlan } = useWorkoutPlanGeneration(preferences);
+  const { loading, workoutPlan, progressData, error, generatePlan, rawResponse } = useWorkoutPlanGeneration(preferences);
 
   const handleExportPDF = async () => {
     if (!workoutPlan) return;
@@ -50,9 +51,10 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
       />
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid grid-cols-2 mb-4">
+        <TabsList className="grid grid-cols-3 mb-4">
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
           <TabsTrigger value="details">Detalhes Completos</TabsTrigger>
+          <TabsTrigger value="raw">Resposta da IA</TabsTrigger>
         </TabsList>
         
         <TabsContent value="overview">
@@ -61,6 +63,19 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
         
         <TabsContent value="details">
           <WorkoutPlanDetailed plan={workoutPlan} />
+        </TabsContent>
+        
+        <TabsContent value="raw">
+          <Card>
+            <CardHeader>
+              <CardTitle>Resposta Bruta da IA</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="bg-gray-100 p-4 rounded-md overflow-auto max-h-[500px]">
+                <pre className="text-xs">{rawResponse ? JSON.stringify(rawResponse, null, 2) : "Nenhuma resposta bruta disponível"}</pre>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
       
