@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WorkoutPlanHeader } from "./components/WorkoutPlanHeader";
 import { WorkoutPlanDetailed } from "./components/WorkoutPlanDetailed";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { toast } from "sonner";
 
 interface WorkoutPlanDisplayProps {
   preferences: WorkoutPreferences;
@@ -23,11 +24,23 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
 
   const handleExportPDF = async () => {
     if (!workoutPlan) return;
-    await generateWorkoutPDF(workoutPlan);
+    try {
+      await generateWorkoutPDF(workoutPlan);
+      toast.success("PDF gerado com sucesso!");
+    } catch (err) {
+      console.error("Erro ao gerar PDF:", err);
+      toast.error("Erro ao gerar PDF. Tente novamente.");
+    }
   };
 
   const handleRetry = () => {
     generatePlan();
+  };
+
+  const handleReset = () => {
+    // Show confirmation toast before resetting
+    toast.info("Criando novo plano de treino...");
+    onReset();
   };
 
   if (loading) {
@@ -45,7 +58,6 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
     />;
   }
 
-  // Preserve the original plan without any modifications
   return (
     <div className="space-y-8">
       <WorkoutPlanHeader 
@@ -87,7 +99,7 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
       
       <div className="flex justify-center">
         <Button 
-          onClick={onReset} 
+          onClick={handleReset} 
           variant="outline"
           size="lg"
           className="hover:bg-primary/5"

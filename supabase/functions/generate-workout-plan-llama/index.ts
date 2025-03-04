@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
@@ -42,16 +43,21 @@ serve(async (req) => {
       throw new Error("GROQ API key is required but not configured in environment variables");
     }
 
+    console.log("Sorting exercises by relevance to user goal...");
+    const sortedExercises = sortExercisesByGoal(exercises, preferences);
+    console.log(`Exercises sorted by relevance to user goal: ${preferences.goal}`);
+
     console.log("Generating workout plan with Llama 3 via Groq API...");
+    const startTime = performance.now();
     const workoutPlan = await generateWorkoutPlanWithGroq(
-      exercises,
+      sortedExercises,
       preferences,
       undefined,
       false,
       GROQ_API_KEY
     );
-    
-    console.log("Workout plan generated successfully");
+    const endTime = performance.now();
+    console.log(`✅ Workout plan generated successfully in ${((endTime - startTime) / 1000).toFixed(2)} seconds`);
     
     // Return the successful response with CORS headers
     return new Response(
@@ -86,12 +92,54 @@ serve(async (req) => {
   }
 });
 
+// Function to sort exercises by relevance to user's goal
+function sortExercisesByGoal(exercises, preferences) {
+  console.log(`Sorting ${exercises.length} exercises by relevance to user goal: ${preferences.goal}`);
+  
+  // Priority map based on exercise type and user goal
+  const priorityMap = {
+    "strength": preferences.goal === "gain_mass" ? 10 : 5,
+    "cardio": preferences.goal === "lose_weight" ? 10 : 5,
+    "mobility": 3
+  };
+
+  // Make a copy of the exercises array to avoid modifying the original
+  const sortedExercises = [...exercises];
+  
+  // Sort exercises by relevance
+  sortedExercises.sort((a, b) => {
+    // First prioritize exercises with GIFs
+    if (a.gif_url && !b.gif_url) return -1;
+    if (!a.gif_url && b.gif_url) return 1;
+    
+    // Then prioritize by exercise type relevance to goal
+    const aScore = priorityMap[a.exercise_type] || 0;
+    const bScore = priorityMap[b.exercise_type] || 0;
+    
+    // If scores are equal, prioritize by description completeness
+    if (aScore === bScore) {
+      const aHasDescription = a.description && a.description.length > 10;
+      const bHasDescription = b.description && b.description.length > 10;
+      
+      if (aHasDescription && !bHasDescription) return -1;
+      if (!aHasDescription && bHasDescription) return 1;
+    }
+    
+    return bScore - aScore; // Higher scores first
+  });
+  
+  console.log(`Successfully sorted exercises by relevance to goal: ${preferences.goal}`);
+  console.log(`Top 3 exercise types after sorting: ${sortedExercises.slice(0, 3).map(ex => ex.exercise_type).join(', ')}`);
+  
+  return sortedExercises;
+}
+
 async function generateWorkoutPlanWithGroq(
-  exercises: any[],
-  preferences: any,
-  customSystemPrompt?: string,
+  exercises,
+  preferences,
+  customSystemPrompt,
   useCustomPrompt = false,
-  apiKey?: string,
+  apiKey,
   agentName = "TRENE2025"
 ) {
   if (!apiKey || apiKey.trim() === "") {
@@ -166,6 +214,7 @@ IMPORTANTE:
 
   const systemPrompt = useCustomPrompt && customSystemPrompt ? customSystemPrompt : defaultSystemPrompt;
 
+  // Use the sorted exercises
   const exerciseList = exercises.map(ex => ({
     id: ex.id,
     name: ex.name,
