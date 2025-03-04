@@ -2,44 +2,46 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
-// Get environment variables
-const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
-
-// Set up CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 serve(async (req) => {
-  console.log("🏋️ Starting generate-workout-plan-llama function...");
-  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    console.log("Handling CORS preflight request");
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Parse request data
-    const requestData = await req.json();
-    const { preferences, userId, exercises = [], requestId } = requestData;
+    // Initialize tracking of when the edge function fully starts
+    console.log("✅ Edge function initialized and running");
     
-    console.log(`Processing workout request for user ${userId}`);
-    console.log(`Request ID: ${requestId}`);
-    console.log(`Number of exercises provided: ${exercises.length}`);
+    // Get API key from environment variables
+    const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
     
+    // Parse request body
+    const { exercises, preferences, customPrompt, requestId } = await req.json();
+    
+    // Validate the input
     if (!preferences) {
-      throw new Error("No preferences provided in request");
+      throw new Error("Preferences must be provided");
     }
     
-    if (!exercises || exercises.length === 0) {
-      throw new Error("No exercises provided in request");
+    if (!exercises || !Array.isArray(exercises)) {
+      throw new Error("Exercises must be provided as an array");
     }
-
-    // Check if GROQ API key is available
+    
+    // Validate that we have the required preferences for the workout plan
+    const requiredFields = ["age", "weight", "height", "gender", "goal", "activity_level", "preferred_exercise_types"];
+    
+    for (const field of requiredFields) {
+      if (!preferences[field]) {
+        throw new Error(`Missing required preference: ${field}`);
+      }
+    }
+    
     if (!GROQ_API_KEY) {
-      console.error("No GROQ API key found in environment variables");
       throw new Error("GROQ API key is required but not configured in environment variables");
     }
 
@@ -47,9 +49,9 @@ serve(async (req) => {
     const sortedExercises = sortExercisesByGoal(exercises, preferences);
     console.log(`Exercises sorted by relevance to user goal: ${preferences.goal}`);
 
-    console.log("Generating workout plan with Llama 3 via Groq API...");
+    console.log("Generating workout plan with Trenner2025 agent...");
     const startTime = performance.now();
-    const workoutPlan = await generateWorkoutPlanWithGroq(
+    const workoutPlan = await generateWorkoutPlanWithTrenner2025(
       sortedExercises,
       preferences,
       undefined,
@@ -61,32 +63,40 @@ serve(async (req) => {
     
     // Return the successful response with CORS headers
     return new Response(
-      JSON.stringify({
-        workoutPlan,
-        success: true,
+      JSON.stringify({ 
+        workoutPlan: workoutPlan,
+        rawResponse: workoutPlan
       }),
-      {
-        headers: {
+      { 
+        headers: { 
           ...corsHeaders,
-          "Content-Type": "application/json",
-        },
+          'Content-Type': 'application/json' 
+        } 
       }
     );
   } catch (error) {
-    console.error("Error in generate-workout-plan-llama function:", error);
+    console.error("Error in edge function:", error);
     
-    // Return a proper error response with CORS headers
+    // Format error message
+    let errorMessage = error.message || "An unknown error occurred";
+    
+    // Check for specific error types and format accordingly
+    if (errorMessage.includes("GROQ_API_KEY") || errorMessage.includes("api_key")) {
+      errorMessage = "API key configuration error: " + errorMessage;
+    }
+    
+    // Return error response with CORS headers
     return new Response(
-      JSON.stringify({
-        error: error.message || "An error occurred while generating the workout plan",
-        success: false,
+      JSON.stringify({ 
+        error: errorMessage,
+        success: false 
       }),
-      {
+      { 
         status: 500,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        } 
       }
     );
   }
@@ -134,83 +144,101 @@ function sortExercisesByGoal(exercises, preferences) {
   return sortedExercises;
 }
 
-async function generateWorkoutPlanWithGroq(
+async function generateWorkoutPlanWithTrenner2025(
   exercises,
   preferences,
   customSystemPrompt,
   useCustomPrompt = false,
   apiKey,
-  agentName = "TRENE2025"
+  agentName = "TRENNER2025"
 ) {
   if (!apiKey || apiKey.trim() === "") {
-    throw new Error("Groq API key is required but not provided");
+    throw new Error("Invalid API Key for Groq");
+  }
+
+  // Define the default system prompt based on the Trenner2025 agent requirements
+  const defaultSystemPrompt = `
+  Você é o Trenner2025, um agente especializado em criar planos de treino personalizados. 
+  Seu trabalho é criar planos detalhados baseados nas informações do usuário.
+  
+  REGRAS DE DECISÃO:
+  
+  1. OBJETIVO:
+     - Perder Peso: Prioriza cardio e treinos de alta intensidade (HIIT).
+     - Manter Peso: Combina cardio e força com intensidade moderada.
+     - Ganhar Massa: Foca em treinos de força com cargas progressivas.
+  
+  2. NÍVEL DE ATIVIDADE FÍSICA:
+     - Sedentário: Treinos mais curtos e de baixa intensidade.
+     - Leve: 1-3 dias de treino com foco em adaptação.
+     - Moderado: 3-5 dias de treino com intensidade média.
+     - Intenso: 6-7 dias de treino com alta intensidade.
+  
+  3. LOCAL DE TREINO:
+     - Academia: Inclui exercícios com equipamentos profissionais.
+     - Casa: Usa equipamentos básicos (halteres, elásticos, etc.).
+     - Ar Livre: Foca em exercícios funcionais e cardio.
+     - Sem Equipamentos: Utiliza apenas peso corporal.
+  
+  4. TIPOS DE EXERCÍCIOS PREFERIDOS:
+     - Força: Prioriza exercícios com pesos e resistência.
+     - Cardio: Inclui corrida, bicicleta, HIIT, etc.
+     - Mobilidade: Foca em alongamentos, yoga e exercícios de flexibilidade.
+  
+  FORMATO DE SAÍDA:
+  {
+    "id": "UUID",
+    "user_id": "UUID",
+    "goal": "objetivo_do_treino",
+    "start_date": "data_inicio",
+    "end_date": "data_fim",
+    "workout_sessions": [
+      {
+        "id": "UUID",
+        "day_number": 1,
+        "day_name": "Nome do treino (ex: Peito e Tríceps)",
+        "focus": "Foco do treino",
+        "warmup_description": "Descrição do aquecimento",
+        "cooldown_description": "Descrição do desaquecimento",
+        "session_exercises": [
+          {
+            "id": "UUID",
+            "sets": 4,
+            "reps": 10,
+            "rest_time_seconds": 60,
+            "intensity": "Moderada/Alta/Máxima",
+            "exercise": {
+              "id": "UUID",
+              "name": "Nome do exercício",
+              "gif_url": "URL_GIF",
+              "description": "Descrição do exercício",
+              "muscle_group": "grupo_muscular",
+              "exercise_type": "tipo_exercicio"
+            }
+          }
+        ],
+        "training_load": {
+          "intensity": "Descrição da intensidade",
+          "volume": "Descrição do volume",
+          "progression": "Descrição da progressão"
+        }
+      }
+    ],
+    "critique": {
+      "strengths": [
+        "Ponto forte 1",
+        "Ponto forte 2"
+      ],
+      "suggestions": [
+        "Sugestão 1",
+        "Sugestão 2"
+      ],
+      "notes": "Notas adicionais sobre o plano"
+    }
   }
   
-  if (!apiKey.startsWith("gsk_")) {
-    throw new Error("Invalid Groq API key format. Keys should start with 'gsk_'");
-  }
-
-  const defaultSystemPrompt = `Você é ${agentName}, um excelente profissional de educação física, especializado em gerar planos de exercícios personalizados. Com base nos dados fornecidos pelo usuário, você deve:
-
-Coletar os Dados do Usuário:
-- Idade, peso, altura, sexo.
-- Objetivo (perder peso, manter peso, ganhar massa).
-- Nível de atividade física (sedentário, leve, moderado, intenso).
-- Tipos de exercícios preferidos (força, cardio, mobilidade).
-- Local de treino (academia, casa, ar livre, sem equipamentos).
-
-Consultar o Banco de Dados:
-- Analisar CUIDADOSAMENTE cada exercício considerando sua descrição, grupo muscular, tipo, GIF e equipamento necessário.
-- Escolher exercícios ideais para as condições físicas e objetivos específicos do usuário.
-- PRIORIZAR exercícios com GIFs disponíveis para melhor visualização do usuário.
-- UTILIZAR os metadados detalhados de cada exercício para fazer as escolhas mais adequadas.
-
-Gerar o Plano de Exercícios:
-- Criar um plano personalizado com base nos dados do usuário.
-- Incluir exercícios que correspondam ao objetivo, nível de atividade física e local de treino.
-- SEMPRE priorizar exercícios que possuam GIFs (gif_url não vazio).
-- SEMPRE analisar as descrições dos exercícios para entender exatamente como eles funcionam.
-- Garantir variedade e progressão adequada de exercícios.
-- Considerar quaisquer condições de saúde ou limitações indicadas.
-
-Para cada exercício, incluir:
-- Nome do exercício exatamente como está na lista.
-- ID do exercício exatamente como está na lista.
-- Descrição detalhada (séries, repetições, duração e carga).
-- GIF demonstrativo (usando o gif_url fornecido).
-- Informações sobre grupo muscular trabalhado.
-
-Gerar um plano de treinos para 7 dias, incluindo:
-- Exercícios, séries, repetições, descanso e carga de treino (intensidade, volume e progressão).
-- Um aquecimento específico para cada tipo de treino.
-- Um alongamento apropriado após cada sessão.
-- Adaptações dos exercícios ao local de treino.
-- Priorização da queima de gordura, combinando treinos de força e cardio.
-- Sugestões de progressão semanal (aumento de carga, repetições ou intensidade).
-- Crítica do plano gerado, sugerindo melhorias se necessário.
-
-Exemplo de Carga de Treino:
-- Intensidade: Moderada a alta (70-85% da capacidade máxima).
-- Volume: 3-4 séries por exercício, com 10-15 repetições.
-- Progressão: Aumentar carga ou repetições semanalmente (5-10%).
-
-Formato de Saída (para cada dia):
-- Dia da semana: Tipo de treino (Força, Cardio, etc.).
-- Aquecimento: Descrição detalhada e específica para o treino do dia.
-- Exercícios: Nome, séries, repetições, carga, descanso.
-- Alongamento: Descrição específica para os músculos trabalhados.
-- Carga de Treino: Intensidade, volume, progressão.
-- Crítica e Sugestões: Análise do plano gerado.
-
-IMPORTANTE: 
-- Cada dia deve ser diferente. 
-- SEMPRE priorize exercícios com GIFs disponíveis.
-- ANALISE as descrições dos exercícios para entender sua execução.
-- Considere as restrições de equipamento e condições de saúde.
-- O plano deve ser variado e personalizado.
-- Use os IDs dos exercícios fornecidos para identificá-los corretamente.
-- Crie um plano único e não use templates pré-definidos.
-- Utilize as descrições detalhadas dos exercícios para escolher os mais adequados.`;
+  Gere um plano completo com 4-6 dias de treino baseado no objetivo e nível da pessoa.
+  `;
 
   const systemPrompt = useCustomPrompt && customSystemPrompt ? customSystemPrompt : defaultSystemPrompt;
 
@@ -218,103 +246,39 @@ IMPORTANTE:
   const exerciseList = exercises.map(ex => ({
     id: ex.id,
     name: ex.name,
-    muscle_group: ex.muscle_group,
-    exercise_type: ex.exercise_type,
-    difficulty: ex.difficulty,
-    equipment_needed: ex.equipment_needed,
     description: ex.description,
     gif_url: ex.gif_url,
-    primary_muscles_worked: ex.primary_muscles_worked,
-    secondary_muscles_worked: ex.secondary_muscles_worked,
-    min_sets: ex.min_sets,
-    max_sets: ex.max_sets,
-    min_reps: ex.min_reps,
-    max_reps: ex.max_reps,
-    rest_time_seconds: ex.rest_time_seconds,
-    suitable_for_conditions: ex.suitable_for_conditions,
-    contraindicated_conditions: ex.contraindicated_conditions
+    muscle_group: ex.muscle_group,
+    exercise_type: ex.exercise_type,
+    difficulty: ex.difficulty
   }));
 
-  const userPrompt = `
-Com base nas preferências do usuário a seguir, crie um plano de treino personalizado dividido por dias da semana.
-
-PREFERÊNCIAS DO USUÁRIO:
-- Idade: ${preferences.age} anos
-- Sexo: ${preferences.gender === 'male' ? 'Masculino' : 'Feminino'}
-- Peso: ${preferences.weight} kg
-- Altura: ${preferences.height} cm
-- Objetivo: ${translateGoal(preferences.goal)}
-- Nível de atividade física: ${translateActivityLevel(preferences.activity_level)}
-- Tipos de exercícios preferidos: ${translateExerciseTypes(preferences.preferred_exercise_types)}
-- Local de treino: ${translateTrainingLocation(preferences)}
-${preferences.health_conditions && preferences.health_conditions.length > 0 ? 
-  `- Condições de saúde: ${preferences.health_conditions.join(', ')}` : ''}
-
-INSTRUÇÕES DETALHADAS:
-1. ANALISE CUIDADOSAMENTE as descrições, metadados e GIFs de cada exercício para escolher os mais adequados
-2. PRIORIZE exercícios que possuem GIFs (gif_url não vazio) para que o usuário possa visualizar a execução correta
-3. UTILIZE o ID correto de cada exercício exatamente como fornecido na lista
-4. Escolha exercícios adequados ao equipamento disponível para o usuário (${translateTrainingLocation(preferences)})
-5. Crie um plano de treino completo para 7 dias da semana (Segunda a Domingo)
-6. Para cada dia, inclua:
-   - Um aquecimento específico e detalhado para o treino do dia
-   - Lista de exercícios com séries, repetições e tempo de descanso entre séries
-   - Sugestões de intensidade considerando o nível do usuário
-   - Um alongamento/volta à calma apropriado para os músculos trabalhados
-   - Informações sobre a carga de treino: intensidade, volume e progressão
-7. Escolha apenas exercícios da lista fornecida abaixo, analisando suas descrições e metadados
-8. Alterne os grupos musculares e tipos de exercícios durante a semana de forma equilibrada
-9. Inclua pelo menos um dia de descanso ou treino leve/recuperativo
-10. Adicione uma crítica e sugestões ao final do plano
-11. Responda com um objeto JSON válido seguindo o formato abaixo
-
-EXERCÍCIOS DISPONÍVEIS:
-${JSON.stringify(exerciseList).substring(0, 8000)}
-
-FORMATO DE RESPOSTA: 
-{
-  "goal": "objetivo traduzido",
-  "start_date": "2023-03-01",
-  "end_date": "2023-03-07",
-  "workout_sessions": [
-    {
-      "day_number": número do dia (1-7),
-      "day_name": "Nome do dia (Segunda-feira, etc.)",
-      "focus": "Foco do treino (Ex: Força Superior, Cardio, etc.)",
-      "warmup_description": "descrição detalhada do aquecimento",
-      "cooldown_description": "descrição detalhada da volta à calma",
-      "session_exercises": [
-        {
-          "exercise": {
-            "id": "id do exercício da lista",
-            "name": "nome do exercício",
-            "description": "descrição do exercício",
-            "gif_url": "url do gif do exercício",
-            "muscle_group": "grupo muscular",
-            "exercise_type": "tipo de exercício"
-          },
-          "sets": número de séries,
-          "reps": número de repetições,
-          "rest_time_seconds": tempo de descanso em segundos,
-          "intensity": "descrição da intensidade recomendada"
-        }
-      ],
-      "training_load": {
-        "intensity": "descrição da intensidade geral (Ex: Moderada 70-75%)",
-        "volume": "descrição do volume (Ex: 15 séries no total)",
-        "progression": "sugestão de progressão (Ex: Aumentar 5% na carga)"
-      }
+  // Calculate the BMI
+  const bmi = preferences.weight / ((preferences.height / 100) ** 2);
+  
+  // Get the weight range for the exercises based on user gender, weight, and goal
+  let suggestedWeightRange;
+  
+  if (preferences.gender === "male") {
+    if (preferences.goal === "gain_mass") {
+      suggestedWeightRange = `${Math.round(preferences.weight * 0.6)} - ${Math.round(preferences.weight * 0.8)} kg`;
+    } else if (preferences.goal === "lose_weight") {
+      suggestedWeightRange = `${Math.round(preferences.weight * 0.3)} - ${Math.round(preferences.weight * 0.5)} kg`;
+    } else {
+      suggestedWeightRange = `${Math.round(preferences.weight * 0.4)} - ${Math.round(preferences.weight * 0.6)} kg`;
     }
-  ],
-  "critique": {
-    "strengths": ["ponto forte 1", "ponto forte 2"],
-    "suggestions": ["sugestão 1", "sugestão 2"],
-    "notes": "notas adicionais sobre o plano"
+  } else {
+    if (preferences.goal === "gain_mass") {
+      suggestedWeightRange = `${Math.round(preferences.weight * 0.5)} - ${Math.round(preferences.weight * 0.7)} kg`;
+    } else if (preferences.goal === "lose_weight") {
+      suggestedWeightRange = `${Math.round(preferences.weight * 0.2)} - ${Math.round(preferences.weight * 0.4)} kg`;
+    } else {
+      suggestedWeightRange = `${Math.round(preferences.weight * 0.3)} - ${Math.round(preferences.weight * 0.5)} kg`;
+    }
   }
-}`;
 
   try {
-    console.log("Calling Groq API with Llama 3...");
+    console.log("Calling Groq API with Llama 3 70B model...");
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -322,153 +286,95 @@ FORMATO DE RESPOSTA:
         "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "llama3-8b-8192",
+        model: "llama3-70b-8192",
         messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
+          {
+            role: "system",
+            content: systemPrompt
+          },
+          {
+            role: "user",
+            content: `
+            Por favor, crie um plano de treino personalizado para um usuário com as seguintes características:
+            
+            Peso: ${preferences.weight} kg
+            Altura: ${preferences.height} cm
+            Idade: ${preferences.age} anos
+            Sexo: ${preferences.gender === "male" ? "Masculino" : "Feminino"}
+            Objetivo: ${preferences.goal === "lose_weight" ? "Perder Peso" : preferences.goal === "maintain" ? "Manter Peso" : "Ganhar Massa"}
+            Nível de Atividade Física: ${preferences.activity_level === "sedentary" ? "Sedentário" : 
+                                     preferences.activity_level === "light" ? "Leve" : 
+                                     preferences.activity_level === "moderate" ? "Moderado" : "Intenso"}
+            Tipos de Exercícios Preferidos: ${preferences.preferred_exercise_types.join(", ")}
+            Local de Treino: ${preferences.available_equipment.includes("all") ? "Academia" : 
+                             preferences.available_equipment.includes("dumbbells") ? "Casa" : 
+                             preferences.available_equipment.includes("resistance-bands") ? "Ar Livre" : "Sem Equipamentos"}
+            
+            BMI: ${bmi.toFixed(1)}
+            Peso sugerido para exercícios: ${suggestedWeightRange}
+            
+            Você tem acesso a ${exerciseList.length} exercícios. Adicione para cada sessão apenas os exercícios relevantes para aquele dia de treino.
+            Não invente exercícios. Use apenas os exercícios que estão na lista fornecida.
+            `
+          }
         ],
         temperature: 0.7,
-        max_tokens: 4096,
-        response_format: { type: "json_object" }
+        max_tokens: 4000
       })
     });
 
     if (!response.ok) {
-      const errorData = await response.text();
+      const errorData = await response.json();
       console.error("Groq API Error:", errorData);
-      
-      if (errorData.includes("json_validate_failed")) {
-        throw new Error(errorData);
-      }
-      
-      throw new Error(`Groq API Error: ${response.status} ${response.statusText}\n${errorData}`);
+      throw new Error(`Groq API Error: ${JSON.stringify(errorData)}`);
     }
 
     const data = await response.json();
-    console.log("Groq API response received");
-
-    if (!data.choices || data.choices.length === 0) {
-      throw new Error("No response from Groq API");
-    }
-
-    const content = data.choices[0].message.content;
-    let workoutPlan;
-
+    let generatedPlan;
+    
     try {
-      if (typeof content === 'object') {
-        workoutPlan = content;
-        console.log("Using pre-parsed JSON from Groq API");
-      } else if (typeof content === 'string') {
-        console.log("Parsing string content from Groq API");
-        
-        const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || 
-                          content.match(/```\s*([\s\S]*?)\s*```/) || 
-                          content.match(/({[\s\S]*})/);
-        
-        if (jsonMatch) {
-          const jsonString = jsonMatch[1];
-          workoutPlan = JSON.parse(jsonString);
-          console.log("Successfully parsed JSON from markdown/code block");
-        } else {
-          console.error("No JSON pattern found in content");
-          throw new Error("Could not extract valid JSON from model response");
-        }
+      // Try to extract and parse the JSON from the completion
+      const content = data.choices[0].message.content;
+      
+      // Look for a JSON object in the content
+      const jsonMatch = content.match(/```json\s*({[\s\S]*?})\s*```/) || 
+                        content.match(/{[\s\S]*"workout_sessions"[\s\S]*}/);
+      
+      if (jsonMatch) {
+        generatedPlan = JSON.parse(jsonMatch[1] || jsonMatch[0]);
       } else {
-        throw new Error(`Unexpected content type: ${typeof content}`);
+        // If no JSON pattern is found, try to parse the whole content
+        generatedPlan = JSON.parse(content);
       }
-      
-      console.log("Successfully processed workout plan response");
-      
-      // Verify that exercise GIFs are included where possible
-      let totalExercises = 0;
-      let exercisesWithGifs = 0;
-      
-      workoutPlan.workout_sessions.forEach(session => {
-        session.session_exercises.forEach(ex => {
-          totalExercises++;
-          if (ex.exercise.gif_url) {
-            exercisesWithGifs++;
-          }
-        });
-      });
-      
-      console.log(`Generated plan includes ${exercisesWithGifs}/${totalExercises} exercises with GIFs`);
-      
     } catch (parseError) {
-      console.error("Error parsing workout plan JSON:", parseError);
-      console.log("Raw content:", content);
-      throw new Error(`Error parsing workout plan JSON: ${parseError.message}`);
-    }
-
-    // Make sure we return the workout plan or throw a clear error
-    if (!workoutPlan) {
-      throw new Error("Failed to generate a valid workout plan");
+      console.error("Failed to parse JSON from response:", parseError);
+      console.log("Raw response content:", data.choices[0].message.content);
+      
+      // Create a basic structure with the raw content to avoid breaking the UI
+      generatedPlan = {
+        id: crypto.randomUUID(),
+        user_id: "system",
+        goal: `${preferences.goal}`,
+        start_date: new Date().toISOString(),
+        end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        workout_sessions: [],
+        raw_content: data.choices[0].message.content,
+        parse_error: parseError.message
+      };
     }
     
-    return workoutPlan;
+    // Ensure the plan has the required structure
+    if (!generatedPlan.id) generatedPlan.id = crypto.randomUUID();
+    if (!generatedPlan.user_id) generatedPlan.user_id = "system";
+    if (!generatedPlan.start_date) generatedPlan.start_date = new Date().toISOString();
+    if (!generatedPlan.end_date) generatedPlan.end_date = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    
+    // Add raw content for reference
+    generatedPlan.raw_assistant_response = data.choices[0].message.content;
+    
+    return generatedPlan;
   } catch (error) {
     console.error("Error calling Groq API:", error);
-    
-    if (error.message) {
-      if (error.message.includes("Invalid API Key") || 
-          error.message.includes("invalid_api_key")) {
-        throw new Error("Invalid Groq API key. Please update your API key in the admin settings.");
-      }
-      
-      if (error.message.includes("Validation errors")) {
-        throw new Error(`Groq API key contains validation errors: ${error.message}`);
-      }
-      
-      if (error.message.includes("json_validate_failed")) {
-        throw new Error(error.message);
-      }
-    }
-    
-    throw new Error(`Failed to generate workout plan with Groq: ${error.message}`);
+    throw new Error(`Failed to generate workout plan: ${error.message}`);
   }
-}
-
-// Helper functions for translating user preferences to more readable format
-function translateGoal(goal) {
-  const goalMap = {
-    lose_weight: "Perder peso",
-    maintain: "Manter peso",
-    gain_mass: "Ganhar massa muscular"
-  };
-  return goalMap[goal] || goal;
-}
-
-function translateActivityLevel(level) {
-  const levelMap = {
-    sedentary: "Sedentário",
-    light: "Levemente ativo",
-    moderate: "Moderadamente ativo",
-    very_active: "Muito ativo",
-    extra_active: "Extremamente ativo"
-  };
-  return levelMap[level] || level;
-}
-
-function translateExerciseTypes(types) {
-  if (!types || types.length === 0) return "Todos";
-  
-  const typeMap = {
-    strength: "Força",
-    cardio: "Cardio",
-    mobility: "Mobilidade"
-  };
-  
-  return types.map(type => typeMap[type] || type).join(', ');
-}
-
-function translateTrainingLocation(preferences) {
-  if (preferences.available_equipment && preferences.available_equipment.includes("all")) {
-    return "Academia com todos equipamentos";
-  }
-  
-  if (preferences.available_equipment && preferences.available_equipment.length > 0) {
-    return `Com equipamentos: ${preferences.available_equipment.join(', ')}`;
-  }
-  
-  return "Sem equipamentos";
 }
