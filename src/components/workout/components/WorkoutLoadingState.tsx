@@ -9,8 +9,10 @@ interface WorkoutLoadingStateProps {
 export const WorkoutLoadingState = ({ message = "Gerando seu plano de treino personalizado" }: WorkoutLoadingStateProps) => {
   const [dots, setDots] = useState('');
   const [step, setStep] = useState(0);
+  const [loadingTime, setLoadingTime] = useState(0);
   
   const steps = [
+    "Inicializando serviço",
     "Analisando preferências",
     "Selecionando exercícios ideais",
     "Montando rotina de treino",
@@ -35,6 +37,18 @@ export const WorkoutLoadingState = ({ message = "Gerando seu plano de treino per
     return () => clearInterval(interval);
   }, []);
   
+  // Count loading time
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setLoadingTime(prev => prev + 1);
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
+  
+  // Display a patience message after 15 seconds
+  const showPatienceMessage = loadingTime > 15;
+  
   return (
     <div className="flex flex-col items-center justify-center p-12 space-y-8 text-center">
       <div className="relative">
@@ -51,6 +65,12 @@ export const WorkoutLoadingState = ({ message = "Gerando seu plano de treino per
           Isso pode levar alguns instantes.
         </p>
         
+        {showPatienceMessage && (
+          <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg text-sm mt-4 max-w-md mx-auto text-blue-700 dark:text-blue-300">
+            <p>O serviço está demorando mais que o normal. Por favor, seja paciente enquanto nosso sistema trabalha na criação do seu plano personalizado.</p>
+          </div>
+        )}
+        
         <div className="flex flex-col space-y-2 max-w-md mx-auto mt-4">
           {steps.map((stepText, index) => (
             <div key={index} className="flex items-center space-x-2">
@@ -60,6 +80,10 @@ export const WorkoutLoadingState = ({ message = "Gerando seu plano de treino per
               </p>
             </div>
           ))}
+        </div>
+        
+        <div className="text-xs text-muted-foreground mt-6">
+          Tempo de carregamento: {loadingTime}s
         </div>
       </div>
     </div>

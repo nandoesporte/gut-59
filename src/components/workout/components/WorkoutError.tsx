@@ -1,6 +1,6 @@
 
 import { Button } from "@/components/ui/button";
-import { RotateCcw, AlertCircle, Settings, Wifi, RefreshCw, Clock } from "lucide-react";
+import { RotateCcw, AlertCircle, Settings, Wifi, RefreshCw, Clock, Terminal } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
 
 interface WorkoutErrorProps {
@@ -32,6 +32,11 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
                            errorMessage?.includes("Connection closed") ||
                            errorMessage?.includes("Erro de conexão");
 
+  const isInitializationError = errorMessage?.includes("Erro de inicialização") ||
+                               errorMessage?.includes("presa no estágio") ||
+                               errorMessage?.includes("função não conseguiu iniciar") ||
+                               errorMessage?.includes("booted");
+
   const isShutdownError = errorMessage?.includes("shutdown") || 
                           errorMessage?.includes("timeout") ||
                           errorMessage?.includes("aborted") ||
@@ -55,6 +60,8 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
             <Wifi className="w-8 h-8 text-red-600 dark:text-red-400" />
           ) : isEmptyResponseError ? (
             <Clock className="w-8 h-8 text-red-600 dark:text-red-400" />
+          ) : isInitializationError ? (
+            <Terminal className="w-8 h-8 text-red-600 dark:text-red-400" />
           ) : (
             <AlertCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
           )}
@@ -66,6 +73,8 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
           ? "Erro de conexão ao gerar o plano de treino" 
           : isEmptyResponseError
           ? "O serviço não retornou um plano de treino válido"
+          : isInitializationError
+          ? "Erro de inicialização da função de geração de plano"
           : "Erro ao gerar o plano de treino com Trenner2025"}
       </h3>
       
@@ -98,6 +107,16 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
               <li>Por exemplo, selecione menos tipos de exercícios ou equipamentos</li>
               <li>Se o problema persistir, você pode tentar novamente mais tarde</li>
               <li>O erro pode ser temporário devido à instabilidade do modelo</li>
+            </>
+          ) : isInitializationError ? (
+            <>
+              <li>A função de geração de plano não conseguiu iniciar corretamente</li>
+              <li>Este é geralmente um problema temporário do servidor</li>
+              <li>Tente recarregar a página completamente para uma nova sessão</li>
+              <li>Aguarde alguns minutos e tente novamente</li>
+              <li>Se estiver usando VPN ou proxy, tente desativá-los temporariamente</li>
+              <li>Se o problema persistir após várias tentativas, entre em contato com o suporte</li>
+              <li><strong>Recarregar a página completamente</strong> geralmente resolve esse tipo de problema</li>
             </>
           ) : isConnectionError ? (
             <>
@@ -163,7 +182,7 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
           Tentar Novamente
         </Button>
         
-        {isConnectionError && (
+        {(isConnectionError || isInitializationError) && (
           <Button 
             onClick={() => window.location.reload()} 
             variant="default" 

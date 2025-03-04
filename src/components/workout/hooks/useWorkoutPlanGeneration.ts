@@ -31,6 +31,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
   const generationAttempted = useRef(false);
   const retryCount = useRef(0);
   const MAX_RETRIES = 3; // Increasing max retries to 3 for better resilience
+  const edgeFunctionStarted = useRef(false);
 
   const generatePlan = async () => {
     // Prevent concurrent generations
@@ -44,6 +45,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
     setLoading(true);
     setError(null);
     setRawResponse(null);
+    edgeFunctionStarted.current = false;
     
     try {
       // Get the current user
@@ -69,10 +71,22 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       // Generate a unique request ID to prevent duplicate processing
       const requestId = `${user.id}_${Date.now()}`;
       
+      // Add a timeout to detect if the edge function gets stuck
+      const edgeFunctionTimeoutId = setTimeout(() => {
+        if (!edgeFunctionStarted.current) {
+          console.error("Edge function init timeout - function may be stuck at booted stage");
+          throw new Error("Timeout ao iniciar função de geração do plano. A função parece estar presa no estágio inicial.");
+        }
+      }, 5000); // 5 second timeout to detect initialization issues
+      
       // Generate the workout plan using Trenner2025 agent
       console.log("Calling generateWorkoutPlanWithTrenner2025...");
       const { workoutPlan: generatedPlan, error: generationError, rawResponse: rawResponseData } = 
         await generateWorkoutPlanWithTrenner2025(preferences, user.id, aiSettings || undefined, requestId);
+      
+      // Clear the timeout as the function has responded
+      clearTimeout(edgeFunctionTimeoutId);
+      edgeFunctionStarted.current = true;
       
       // Store the raw response
       if (rawResponseData) {
@@ -123,18 +137,26 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
         err.message.includes("net::ERR") ||
         err.message.includes("ECONNREFUSED") ||
         err.message.includes("timeout") ||
+        err.message.includes("Timeout") ||
         err.message.includes("AbortError") ||
         err.message.includes("connection closed") ||
-        err.message.includes("Connection closed")
+        err.message.includes("Connection closed") ||
+        err.message.includes("presa no estágio")
       );
       
-      if (isNetworkError && retryCount.current < MAX_RETRIES) {
+      const isInitializationError = err.message && (
+        err.message.includes("presa no estágio") ||
+        err.message.includes("booted") ||
+        err.message.includes("Timeout ao iniciar")
+      );
+      
+      if ((isNetworkError || isInitializationError) && retryCount.current < MAX_RETRIES) {
         // Attempt automatic retry for network errors
         retryCount.current += 1;
         toast.warning(`Problema de conexão. Tentando novamente (${retryCount.current}/${MAX_RETRIES})...`);
         
         // Wait a bit before retrying with exponential backoff
-        const backoffTime = 1000 * Math.pow(2, retryCount.current - 1); // 1s, 2s, 4s
+        const backoffTime = 2000 * Math.pow(2, retryCount.current - 1); // 2s, 4s, 8s
         console.log(`Retrying in ${backoffTime}ms...`);
         
         setTimeout(() => {
@@ -144,7 +166,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
         return;
       }
       
-      // Check for specific Groq API key errors in the error message
+      // Format specialized error messages for different error conditions
       if (err.message) {
         if (err.message.includes("Invalid API Key") || 
             err.message.includes("invalid_api_key") ||
@@ -154,6 +176,11 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
           
           setError(err.message);
           toast.error(err.message);
+        } else if (isInitializationError) {
+          // Specific error message for initialization problems
+          const initErrorMsg = "Erro de inicialização da função de geração de plano. A função não conseguiu iniciar corretamente. Por favor, tente novamente ou contate o suporte.";
+          setError(initErrorMsg);
+          toast.error("Erro de inicialização. Tente novamente.");
         } else if (isNetworkError) {
           // Format network error message for better user experience
           const networkErrorMsg = "Erro de conexão com o serviço de geração de plano. Por favor, verifique sua conexão e tente novamente.";
