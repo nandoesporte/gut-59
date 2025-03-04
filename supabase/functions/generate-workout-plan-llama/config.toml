@@ -2,3 +2,4 @@
 project_id = "sxjafhzikftdenqnkcri"
 import_map = "../import_map.json"
 verify_jwt = true
+timeout_seconds = 180
