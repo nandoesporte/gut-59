@@ -23,6 +23,19 @@ export async function generateWorkoutPlanWithTrenner2025(
 
     if (error) {
       console.error("Error invoking generate-workout-plan-llama function:", error);
+      
+      // Check for specific Groq API key errors in the error message
+      if (error.message && (
+          error.message.includes("Invalid API Key") || 
+          error.message.includes("invalid_api_key") ||
+          error.message.includes("Groq API Error")
+        )) {
+        return { 
+          workoutPlan: null, 
+          error: "Erro com a chave da API Groq. Por favor, configure uma chave válida nas configurações do admin." 
+        };
+      }
+      
       return { workoutPlan: null, error: `Erro ao gerar plano de treino: ${error.message}` };
     }
 
@@ -35,8 +48,15 @@ export async function generateWorkoutPlanWithTrenner2025(
     return { workoutPlan: data.workoutPlan, error: null };
   } catch (err: any) {
     console.error("Exception in generateWorkoutPlanWithTrenner2025:", err);
-    if (err.message && err.message.includes("Groq API Error")) {
-      return { workoutPlan: null, error: "Erro com a chave da API Groq. Por favor, configure uma chave válida nas configurações do admin." };
+    if (err.message && (
+        err.message.includes("Groq API Error") || 
+        err.message.includes("Invalid API Key") || 
+        err.message.includes("invalid_api_key")
+      )) {
+      return { 
+        workoutPlan: null, 
+        error: "Erro com a chave da API Groq. Por favor, configure uma chave válida nas configurações do admin." 
+      };
     }
     return { workoutPlan: null, error: err.message };
   }
