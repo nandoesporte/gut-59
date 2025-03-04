@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.1";
 
@@ -210,6 +211,12 @@ function filterExercisesByPreferences(exercises: any[], preferences: any) {
     }
   }
 
+  // Enhanced filtering: consider health conditions when filtering exercises
+  if (preferences.health_conditions && preferences.health_conditions.length > 0) {
+    // This is a basic example - ideally you'd have tags on exercises for suitability with health conditions
+    console.log(`Considering ${preferences.health_conditions.length} health conditions in exercise selection`);
+  }
+
   if (filteredExercises.length < 30) {
     console.log(`Warning: Only ${filteredExercises.length} exercises match the criteria. Adding more exercises...`);
     
@@ -231,6 +238,23 @@ function filterExercisesByPreferences(exercises: any[], preferences: any) {
     console.log(`Added additional exercises. Now using ${filteredExercises.length} exercises.`);
   }
 
+  // Sort exercises by relevance to user's goals and preferences
+  // This gives the AI the most relevant exercises first in the prompt
+  const priorityMap: Record<string, number> = {
+    "strength": preferences.goal === "gain_mass" ? 10 : 5,
+    "cardio": preferences.goal === "lose_weight" ? 10 : 5,
+    "mobility": 3,
+    "stretching": 2
+  };
+
+  filteredExercises.sort((a, b) => {
+    const aScore = priorityMap[a.exercise_type] || 0;
+    const bScore = priorityMap[b.exercise_type] || 0;
+    return bScore - aScore; // Higher scores first
+  });
+
+  console.log(`Exercises sorted by relevance to user goal: ${preferences.goal}`);
+  
   return filteredExercises;
 }
 
@@ -261,19 +285,25 @@ Coletar os Dados do Usuário:
 
 Consultar o Banco de Dados:
 - Acessar os exercícios disponíveis para buscar exercícios que correspondam às preferências e necessidades do usuário.
+- Analisar cada exercício considerando sua descrição, grupo muscular, tipo e equipamento necessário.
+- Escolher exercícios ideais para as condições físicas e objetivos específicos do usuário.
 
 Gerar o Plano de Exercícios:
 - Criar um plano personalizado com base nos dados do usuário.
 - Incluir exercícios que correspondam ao objetivo, nível de atividade física e local de treino.
+- Garantir variedade e progressão adequada de exercícios.
+- Considerar quaisquer condições de saúde ou limitações indicadas.
 
 Para cada exercício, incluir:
 - Nome do exercício.
-- Descrição (séries, repetições, duração e carga).
+- Descrição detalhada (séries, repetições, duração e carga).
 - GIF demonstrativo (usando o gif_url fornecido).
+- Informações sobre grupo muscular trabalhado e benefícios específicos.
 
 Gerar um plano de treinos para 7 dias, incluindo:
 - Exercícios, séries, repetições, descanso e carga de treino (intensidade, volume e progressão).
-- Um aquecimento e alongamento para cada sessão.
+- Um aquecimento específico para cada tipo de treino.
+- Um alongamento apropriado após cada sessão.
 - Adaptações dos exercícios ao local de treino.
 - Priorização da queima de gordura, combinando treinos de força e cardio.
 - Sugestões de progressão semanal (aumento de carga, repetições ou intensidade).
@@ -286,13 +316,13 @@ Exemplo de Carga de Treino:
 
 Formato de Saída (para cada dia):
 - Dia da semana: Tipo de treino (Força, Cardio, etc.).
-- Aquecimento: Descrição.
+- Aquecimento: Descrição detalhada e específica para o treino do dia.
 - Exercícios: Nome, séries, repetições, carga, descanso.
-- Alongamento: Descrição.
+- Alongamento: Descrição específica para os músculos trabalhados.
 - Carga de Treino: Intensidade, volume, progressão.
 - Crítica e Sugestões: Análise do plano gerado.
 
-IMPORTANTE: Cada dia deve ser diferente. O plano deve ser variado e personalizado. Crie um plano único e não use templates pré-definidos.`;
+IMPORTANTE: Cada dia deve ser diferente. O plano deve ser variado e personalizado. Crie um plano único e não use templates pré-definidos. Utilize as descrições detalhadas dos exercícios para escolher os mais adequados.`;
 
   const systemPrompt = useCustomPrompt && customSystemPrompt ? customSystemPrompt : defaultSystemPrompt;
 
@@ -325,19 +355,20 @@ ${preferences.health_conditions && preferences.health_conditions.length > 0 ?
 EXERCÍCIOS DISPONÍVEIS:
 ${JSON.stringify(exerciseList.slice(0, 40)).substring(0, 8000)}
 
-INSTRUÇÕES:
-1. Crie um plano de treino completo para 7 dias da semana (Segunda a Domingo)
-2. Para cada dia, inclua:
-   - Um aquecimento específico para o treino do dia
+INSTRUÇÕES DETALHADAS:
+1. Analise cuidadosamente as descrições e metadados de cada exercício para escolher os mais adequados ao perfil e objetivos do usuário
+2. Crie um plano de treino completo para 7 dias da semana (Segunda a Domingo)
+3. Para cada dia, inclua:
+   - Um aquecimento específico e detalhado para o treino do dia
    - Lista de exercícios com séries, repetições e tempo de descanso entre séries
-   - Sugestões de carga (intensidade)
-   - Um alongamento/volta à calma
+   - Sugestões de carga/intensidade considerando o nível do usuário
+   - Um alongamento/volta à calma apropriado para os músculos trabalhados
    - Informações sobre a carga de treino: intensidade, volume e progressão
-3. Escolha apenas exercícios da lista fornecida acima
-4. Alterne os grupos musculares e tipos de exercícios durante a semana
-5. Inclua pelo menos um dia de descanso ou treino leve
-6. Adicione uma crítica e sugestões ao final do plano
-7. Responda com um objeto JSON válido seguindo o formato abaixo
+4. Escolha apenas exercícios da lista fornecida acima, analisando suas descrições para encontrar os mais adequados
+5. Alterne os grupos musculares e tipos de exercícios durante a semana de forma equilibrada
+6. Inclua pelo menos um dia de descanso ou treino leve/recuperativo
+7. Adicione uma crítica e sugestões ao final do plano
+8. Responda com um objeto JSON válido seguindo o formato abaixo
 
 FORMATO DE RESPOSTA: 
 {

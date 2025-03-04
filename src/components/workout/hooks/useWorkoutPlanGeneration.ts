@@ -27,6 +27,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
   const [progressData, setProgressData] = useState(mockProgressData);
   const [error, setError] = useState<string | null>(null);
   const generationInProgress = useRef(false);
+  const generationAttempted = useRef(false);
 
   const generatePlan = async () => {
     // Prevent concurrent generations
@@ -36,6 +37,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
     }
     
     generationInProgress.current = true;
+    generationAttempted.current = true;
     setLoading(true);
     setError(null);
     
@@ -60,9 +62,12 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       
       console.log("Starting generation of workout plan with Trenner2025...");
       
+      // Generate a unique request ID to prevent duplicate processing
+      const requestId = `${user.id}_${Date.now()}`;
+      
       // Generate the workout plan using Trenner2025 agent
       const { workoutPlan: generatedPlan, error: generationError } = 
-        await generateWorkoutPlanWithTrenner2025(preferences, user.id, aiSettings || undefined);
+        await generateWorkoutPlanWithTrenner2025(preferences, user.id, aiSettings || undefined, requestId);
       
       if (generationError) {
         throw new Error(generationError);
@@ -74,7 +79,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       
       console.log("Workout plan successfully generated, saving to database...");
       
-      // Save the workout plan to the database
+      // Save the workout plan to the database exactly as received from the AI
       const savedPlan = await saveWorkoutPlan(generatedPlan, user.id);
       
       if (!savedPlan) {
@@ -100,8 +105,8 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
 
   // Generate the plan when the component mounts, but only once
   useEffect(() => {
-    // Only generate if we don't have a plan already
-    if (!workoutPlan && !loading && !error && !generationInProgress.current) {
+    // Only generate if we don't have a plan already and haven't attempted generation
+    if (!workoutPlan && !loading && !error && !generationInProgress.current && !generationAttempted.current) {
       console.log("Initial workout plan generation starting...");
       generatePlan();
     }
