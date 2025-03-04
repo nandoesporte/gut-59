@@ -19,7 +19,7 @@ export const WorkoutLoadingState = ({ message = "Carregando..." }: WorkoutLoadin
       <div className="space-y-4">
         <h3 className="text-xl font-semibold">{message}</h3>
         <p className="text-muted-foreground max-w-md">
-          Nosso assistente Trenner2025 está criando um plano personalizado de acordo com suas preferências. 
+          Estamos criando um plano personalizado de acordo com suas preferências. 
           Isso pode levar alguns instantes.
         </p>
         

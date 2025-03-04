@@ -31,7 +31,7 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
   };
 
   if (loading) {
-    return <WorkoutLoadingState message="Gerando seu plano de treino personalizado com Trenner2025" />;
+    return <WorkoutLoadingState message="Gerando seu plano de treino personalizado" />;
   }
 
   if (error || !workoutPlan) {
