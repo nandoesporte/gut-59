@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { FisioPreferences } from "./types";
@@ -23,9 +24,23 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
   const [selectedDay, setSelectedDay] = useState<string>("day1");
   const [loadingTime, setLoadingTime] = useState(0);
 
+  // Update the loading time counter
+  useEffect(() => {
+    let interval: number | null = null;
+    if (loading) {
+      interval = window.setInterval(() => {
+        setLoadingTime(prev => prev + 1);
+      }, 1000);
+    }
+    return () => {
+      if (interval) window.clearInterval(interval);
+    };
+  }, [loading]);
+
   const generatePlan = async () => {
     try {
       setLoading(true);
+      setLoadingTime(0); // Reset loading time counter
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {

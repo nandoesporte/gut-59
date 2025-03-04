@@ -315,6 +315,9 @@ async function generateWorkoutPlanWithTrenner2025(
             
             Você tem acesso a ${exerciseList.length} exercícios. Adicione para cada sessão apenas os exercícios relevantes para aquele dia de treino.
             Não invente exercícios. Use apenas os exercícios que estão na lista fornecida.
+            
+            Retorne um objeto json com o plano de treino completo seguindo o formato especificado no prompt do sistema.
+            Garanta que a saída seja um JSON válido para que eu possa processar programaticamente.
             `
           }
         ],
@@ -397,3 +400,4 @@ async function generateWorkoutPlanWithTrenner2025(
     throw new Error(`Failed to generate workout plan: ${error.message}`);
   }
 }
+

@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
@@ -206,6 +205,7 @@ INSTRUCTIONS:
 }
 
 Prioritize using the foods from the preferred foods list, especially respecting the meal type categorization if provided.
+Por favor, responda com um JSON válido que eu possa processar programaticamente.
 `;
 }
 
