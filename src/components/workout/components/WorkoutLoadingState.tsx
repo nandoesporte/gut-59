@@ -1,15 +1,23 @@
 
 import React, { useState, useEffect } from 'react';
-import { Dumbbell } from 'lucide-react';
+import { Dumbbell, RotateCcw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface WorkoutLoadingStateProps {
   message?: string;
+  onRetry?: () => void;
+  timePassed?: number;
 }
 
-export const WorkoutLoadingState = ({ message = "Gerando seu plano de treino personalizado" }: WorkoutLoadingStateProps) => {
+export const WorkoutLoadingState = ({ 
+  message = "Gerando seu plano de treino personalizado", 
+  onRetry, 
+  timePassed = 0 
+}: WorkoutLoadingStateProps) => {
   const [dots, setDots] = useState('');
   const [step, setStep] = useState(0);
-  const [loadingTime, setLoadingTime] = useState(0);
+  const [loadingTime, setLoadingTime] = useState(timePassed);
+  const [showRetryOption, setShowRetryOption] = useState(false);
   
   const steps = [
     "Inicializando serviço",
@@ -46,8 +54,27 @@ export const WorkoutLoadingState = ({ message = "Gerando seu plano de treino per
     return () => clearInterval(interval);
   }, []);
   
-  // Display a patience message after 15 seconds
-  const showPatienceMessage = loadingTime > 15;
+  // Show retry option after 30 seconds
+  useEffect(() => {
+    if (loadingTime > 30 && onRetry) {
+      setShowRetryOption(true);
+    }
+  }, [loadingTime, onRetry]);
+  
+  // Display different patience messages based on loading time
+  const getPatienceMessage = () => {
+    if (loadingTime > 60) {
+      return "A geração está demorando mais que o esperado. Você pode tentar novamente ou aguardar mais um pouco.";
+    } else if (loadingTime > 30) {
+      return "O serviço está demorando mais que o normal. Por favor, seja paciente enquanto nosso sistema trabalha na criação do seu plano personalizado.";
+    } else if (loadingTime > 15) {
+      return "Estamos finalizando seu plano. Isso pode levar alguns instantes adicionais.";
+    }
+    return null;
+  };
+  
+  const patienceMessage = getPatienceMessage();
+  const showPatienceMessage = patienceMessage !== null;
   
   return (
     <div className="flex flex-col items-center justify-center p-12 space-y-8 text-center">
@@ -67,7 +94,7 @@ export const WorkoutLoadingState = ({ message = "Gerando seu plano de treino per
         
         {showPatienceMessage && (
           <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg text-sm mt-4 max-w-md mx-auto text-blue-700 dark:text-blue-300">
-            <p>O serviço está demorando mais que o normal. Por favor, seja paciente enquanto nosso sistema trabalha na criação do seu plano personalizado.</p>
+            <p>{patienceMessage}</p>
           </div>
         )}
         
@@ -85,6 +112,19 @@ export const WorkoutLoadingState = ({ message = "Gerando seu plano de treino per
         <div className="text-xs text-muted-foreground mt-6">
           Tempo de carregamento: {loadingTime}s
         </div>
+        
+        {showRetryOption && onRetry && (
+          <div className="mt-4">
+            <Button 
+              onClick={onRetry} 
+              variant="outline" 
+              className="border-primary hover:bg-primary/10"
+            >
+              <RotateCcw className="w-4 h-4 mr-2" />
+              Tentar Novamente
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

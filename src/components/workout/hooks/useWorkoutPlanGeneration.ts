@@ -27,11 +27,34 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
   const [progressData, setProgressData] = useState(mockProgressData);
   const [error, setError] = useState<string | null>(null);
   const [rawResponse, setRawResponse] = useState<any>(null);
+  const [loadingTime, setLoadingTime] = useState(0);
   const generationInProgress = useRef(false);
   const generationAttempted = useRef(false);
   const retryCount = useRef(0);
-  const MAX_RETRIES = 3; // Increasing max retries to 3 for better resilience
+  const MAX_RETRIES = 3;
   const edgeFunctionStarted = useRef(false);
+  const loadingTimer = useRef<NodeJS.Timeout | null>(null);
+
+  // Update loading time while loading
+  useEffect(() => {
+    if (loading) {
+      loadingTimer.current = setInterval(() => {
+        setLoadingTime(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (loadingTimer.current) {
+        clearInterval(loadingTimer.current);
+        loadingTimer.current = null;
+      }
+    }
+    
+    return () => {
+      if (loadingTimer.current) {
+        clearInterval(loadingTimer.current);
+        loadingTimer.current = null;
+      }
+    };
+  }, [loading]);
 
   const generatePlan = async () => {
     // Prevent concurrent generations
@@ -45,6 +68,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
     setLoading(true);
     setError(null);
     setRawResponse(null);
+    setLoadingTime(0);
     edgeFunctionStarted.current = false;
     
     try {
@@ -124,8 +148,9 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       toast.success("Plano de treino gerado com sucesso pelo Trenner2025!");
       console.log("Workout plan generation and saving completed successfully");
       
-      // Reset retry counter on successful generation
+      // Reset retry counter and loading time on successful generation
       retryCount.current = 0;
+      setLoadingTime(0);
     } catch (err: any) {
       console.error("Erro na geração do plano de treino:", err);
       
@@ -209,5 +234,13 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
     }
   }, []);
 
-  return { loading, workoutPlan, progressData, error, generatePlan, rawResponse };
+  return { 
+    loading, 
+    workoutPlan, 
+    progressData, 
+    error, 
+    generatePlan, 
+    rawResponse,
+    loadingTime 
+  };
 };

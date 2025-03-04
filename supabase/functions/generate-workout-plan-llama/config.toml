@@ -3,3 +3,5 @@ project_id = "sxjafhzikftdenqnkcri"
 verify_jwt = false
 timeout_seconds = 300
 import_map = "../import_map.json"
+# Added memory / compute configuration
+compute_mode = "compute-optimized"

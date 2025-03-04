@@ -1,3 +1,90 @@
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+
+// Get environment variables
+const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
+
+// Set up CORS headers
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+serve(async (req) => {
+  console.log("🏋️ Starting generate-workout-plan-llama function...");
+  
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    console.log("Handling CORS preflight request");
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    // Parse request data
+    const requestData = await req.json();
+    const { preferences, userId, exercises = [], requestId } = requestData;
+    
+    console.log(`Processing workout request for user ${userId}`);
+    console.log(`Request ID: ${requestId}`);
+    console.log(`Number of exercises provided: ${exercises.length}`);
+    
+    if (!preferences) {
+      throw new Error("No preferences provided in request");
+    }
+    
+    if (!exercises || exercises.length === 0) {
+      throw new Error("No exercises provided in request");
+    }
+
+    // Check if GROQ API key is available
+    if (!GROQ_API_KEY) {
+      console.error("No GROQ API key found in environment variables");
+      throw new Error("GROQ API key is required but not configured in environment variables");
+    }
+
+    console.log("Generating workout plan with Llama 3 via Groq API...");
+    const workoutPlan = await generateWorkoutPlanWithGroq(
+      exercises,
+      preferences,
+      undefined,
+      false,
+      GROQ_API_KEY
+    );
+    
+    console.log("Workout plan generated successfully");
+    
+    // Return the successful response with CORS headers
+    return new Response(
+      JSON.stringify({
+        workoutPlan,
+        success: true,
+      }),
+      {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  } catch (error) {
+    console.error("Error in generate-workout-plan-llama function:", error);
+    
+    // Return a proper error response with CORS headers
+    return new Response(
+      JSON.stringify({
+        error: error.message || "An error occurred while generating the workout plan",
+        success: false,
+      }),
+      {
+        status: 500,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+});
 
 async function generateWorkoutPlanWithGroq(
   exercises: any[],
@@ -264,6 +351,11 @@ FORMATO DE RESPOSTA:
       throw new Error(`Error parsing workout plan JSON: ${parseError.message}`);
     }
 
+    // Make sure we return the workout plan or throw a clear error
+    if (!workoutPlan) {
+      throw new Error("Failed to generate a valid workout plan");
+    }
+    
     return workoutPlan;
   } catch (error) {
     console.error("Error calling Groq API:", error);
@@ -285,4 +377,49 @@ FORMATO DE RESPOSTA:
     
     throw new Error(`Failed to generate workout plan with Groq: ${error.message}`);
   }
+}
+
+// Helper functions for translating user preferences to more readable format
+function translateGoal(goal) {
+  const goalMap = {
+    lose_weight: "Perder peso",
+    maintain: "Manter peso",
+    gain_mass: "Ganhar massa muscular"
+  };
+  return goalMap[goal] || goal;
+}
+
+function translateActivityLevel(level) {
+  const levelMap = {
+    sedentary: "Sedentário",
+    light: "Levemente ativo",
+    moderate: "Moderadamente ativo",
+    very_active: "Muito ativo",
+    extra_active: "Extremamente ativo"
+  };
+  return levelMap[level] || level;
+}
+
+function translateExerciseTypes(types) {
+  if (!types || types.length === 0) return "Todos";
+  
+  const typeMap = {
+    strength: "Força",
+    cardio: "Cardio",
+    mobility: "Mobilidade"
+  };
+  
+  return types.map(type => typeMap[type] || type).join(', ');
+}
+
+function translateTrainingLocation(preferences) {
+  if (preferences.available_equipment && preferences.available_equipment.includes("all")) {
+    return "Academia com todos equipamentos";
+  }
+  
+  if (preferences.available_equipment && preferences.available_equipment.length > 0) {
+    return `Com equipamentos: ${preferences.available_equipment.join(', ')}`;
+  }
+  
+  return "Sem equipamentos";
 }

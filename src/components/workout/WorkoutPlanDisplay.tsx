@@ -19,7 +19,7 @@ interface WorkoutPlanDisplayProps {
 }
 
 export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayProps) => {
-  const { loading, workoutPlan, progressData, error, generatePlan, rawResponse } = useWorkoutPlanGeneration(preferences);
+  const { loading, workoutPlan, progressData, error, generatePlan, rawResponse, loadingTime } = useWorkoutPlanGeneration(preferences);
 
   const handleExportPDF = async () => {
     if (!workoutPlan) return;
@@ -31,7 +31,11 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
   };
 
   if (loading) {
-    return <WorkoutLoadingState message="Gerando seu plano de treino personalizado" />;
+    return <WorkoutLoadingState 
+      message="Gerando seu plano de treino personalizado" 
+      onRetry={handleRetry}
+      timePassed={loadingTime}
+    />;
   }
 
   if (error || !workoutPlan) {
