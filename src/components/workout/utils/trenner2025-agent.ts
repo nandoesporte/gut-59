@@ -29,7 +29,8 @@ export async function generateWorkoutPlanWithTrenner2025(
         if (error.message.includes("Invalid API Key") || 
             error.message.includes("invalid_api_key") ||
             error.message.includes("Groq API Error") ||
-            error.message.includes("Validation errors")) {
+            error.message.includes("Validation errors") ||
+            error.message.includes("json_validate_failed")) {
           
           return { 
             workoutPlan: null, 
@@ -54,7 +55,8 @@ export async function generateWorkoutPlanWithTrenner2025(
         err.message.includes("Groq API Error") || 
         err.message.includes("Invalid API Key") || 
         err.message.includes("invalid_api_key") ||
-        err.message.includes("Validation errors"))) {
+        err.message.includes("Validation errors") ||
+        err.message.includes("json_validate_failed"))) {
       return { 
         workoutPlan: null, 
         error: err.message 

@@ -15,10 +15,14 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
                          errorMessage?.includes("Invalid API Key") ||
                          errorMessage?.includes("invalid_api_key") ||
                          errorMessage?.includes("Validation errors");
+                         
+  const isGroqJsonError = errorMessage?.includes("Groq API Error") && 
+                          errorMessage?.includes("json_validate_failed");
 
   const hasValidationErrors = errorMessage?.includes("Validation errors");
   const hasParsingErrors = errorMessage?.includes("Error parsing workout plan JSON") || 
-                           errorMessage?.includes("SyntaxError");
+                           errorMessage?.includes("SyntaxError") ||
+                           errorMessage?.includes("json_validate_failed");
 
   return (
     <div className="text-center space-y-4 p-12 border border-red-200 rounded-lg bg-red-50 dark:bg-red-900/10">
@@ -53,11 +57,21 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
               <li>Vá para <code className="bg-red-200 dark:bg-red-800/30 p-1 rounded text-xs">Admin &gt; Treino &gt; Modelos de IA</code> e adicione a chave da API</li>
               <li>Se você já adicionou uma chave, verifique se ela está correta e válida</li>
             </>
+          ) : isGroqJsonError ? (
+            <>
+              <li>O modelo de IA falhou ao gerar um JSON válido para o plano de treino</li>
+              <li>Este é um erro na resposta do serviço Groq (Llama 3)</li>
+              <li>Tente simplificar suas preferências de treino e gerar novamente</li>
+              <li>Por exemplo, selecione menos tipos de exercícios ou equipamentos</li>
+              <li>Se o problema persistir, você pode tentar novamente mais tarde</li>
+              <li>O erro pode ser temporário devido à instabilidade do modelo</li>
+            </>
           ) : hasParsingErrors ? (
             <>
               <li>Ocorreu um erro ao processar a resposta do modelo de IA</li>
               <li>Isso pode acontecer quando o modelo gera uma resposta malformatada</li>
               <li>Tente simplificar suas preferências de treino e gerar novamente</li>
+              <li>Selecione menos tipos de exercícios ou equipamentos</li>
               <li>Se o problema persistir, entre em contato com o suporte</li>
             </>
           ) : (

@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.1";
 
@@ -117,6 +116,15 @@ serve(async (req) => {
       }
     } catch (error) {
       console.error("Error during workout plan generation:", error);
+      
+      // Check if error is a JSON validation error from Groq
+      if (error.message && error.message.includes("json_validate_failed")) {
+        return new Response(
+          JSON.stringify({ error: `Groq API Error: ${error.message}` }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        );
+      }
+      
       generationError = error.message || "Unknown error during generation";
     }
 
@@ -247,29 +255,26 @@ ${preferences.health_conditions && preferences.health_conditions.length > 0 ?
   `- Condições de saúde: ${preferences.health_conditions.join(', ')}` : ''}
 
 EXERCÍCIOS DISPONÍVEIS:
-${JSON.stringify(exerciseList).substring(0, 14000)}
+${JSON.stringify(exerciseList.slice(0, 40)).substring(0, 8000)}
 
 INSTRUÇÕES:
-1. Crie um plano de treino para 7 dias, com descanso nos dias apropriados dependendo do nível do usuário.
+1. Crie um plano de treino para 5 dias (não é necessário cobrir todos os 7 dias)
 2. Para cada dia, inclua:
-   - Um aquecimento breve mas efetivo
-   - Lista de exercícios com séries e repetições específicas
+   - Um aquecimento breve (1-2 linhas)
+   - 3-5 exercícios com séries e repetições específicas
    - Tempo de descanso entre séries
-   - Uma volta à calma
+   - Uma volta à calma breve (1-2 linhas)
 3. Escolha apenas exercícios da lista fornecida acima.
-4. As séries e repetições devem ser adequadas ao objetivo e nível do usuário.
-5. Respeite quaisquer condições de saúde mencionadas.
+4. Responda APENAS com o JSON válido - nada mais.
 
 FORMATO DE RESPOSTA: 
-Responda APENAS com um objeto JSON válido no seguinte formato sem nenhum texto adicional:
-
 {
   "goal": "objetivo traduzido",
-  "start_date": "data de início no formato YYYY-MM-DD",
-  "end_date": "data de fim no formato YYYY-MM-DD",
+  "start_date": "2023-03-01",
+  "end_date": "2023-03-07",
   "workout_sessions": [
     {
-      "day_number": número do dia (1-7),
+      "day_number": número do dia (1-5),
       "warmup_description": "descrição do aquecimento",
       "cooldown_description": "descrição da volta à calma",
       "session_exercises": [
@@ -289,9 +294,7 @@ Responda APENAS com um objeto JSON válido no seguinte formato sem nenhum texto 
       ]
     }
   ]
-}
-
-Lembre-se: sua resposta deve ser APENAS o objeto JSON válido, nada mais.`;
+}`;
 
   try {
     console.log("Calling Groq API with Llama 3...");
@@ -307,15 +310,20 @@ Lembre-se: sua resposta deve ser APENAS o objeto JSON válido, nada mais.`;
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
         ],
-        temperature: 0.5,
+        temperature: 0.3,
         max_tokens: 4096,
-        response_format: { type: "json_object" } // Enforce JSON response format
+        response_format: { type: "json_object" }
       })
     });
 
     if (!response.ok) {
       const errorData = await response.text();
       console.error("Groq API Error:", errorData);
+      
+      if (errorData.includes("json_validate_failed")) {
+        throw new Error(errorData);
+      }
+      
       throw new Error(`Groq API Error: ${response.status} ${response.statusText}\n${errorData}`);
     }
 
@@ -330,48 +338,23 @@ Lembre-se: sua resposta deve ser APENAS o objeto JSON válido, nada mais.`;
     let workoutPlan;
 
     try {
-      // Handle different response formats
       if (typeof content === 'object') {
-        // If content is already parsed as JSON
         workoutPlan = content;
         console.log("Using pre-parsed JSON from Groq API");
       } else if (typeof content === 'string') {
         console.log("Parsing string content from Groq API");
         
-        // Try different parsing approaches
-        try {
-          // Try direct JSON parse first
-          workoutPlan = JSON.parse(content);
-          console.log("Successfully parsed direct JSON");
-        } catch (parseError) {
-          console.log("Direct JSON parse failed, trying to extract JSON from markdown or text");
-          
-          // Try to extract JSON from markdown code blocks
-          const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || 
-                            content.match(/```\s*([\s\S]*?)\s*```/) || 
-                            content.match(/({[\s\S]*})/);
-          
-          if (jsonMatch) {
-            try {
-              const jsonString = jsonMatch[1];
-              console.log("Found JSON in markdown/code block, attempting to parse");
-              
-              // Clean the JSON string before parsing
-              const cleanedJsonString = jsonString
-                .replace(/,(\s*[\]}])/g, '$1') // Remove trailing commas
-                .replace(/([^\\])\\([^"\\/bfnrtu])/g, '$1$2'); // Remove invalid escapes
-              
-              workoutPlan = JSON.parse(cleanedJsonString);
-              console.log("Successfully parsed JSON from markdown/code block");
-            } catch (markdownParseError) {
-              console.error("Failed to parse JSON from markdown:", markdownParseError);
-              console.log("Extracted content:", jsonMatch[1]);
-              throw new Error(`Failed to parse workout plan JSON: ${markdownParseError.message}`);
-            }
-          } else {
-            console.error("No JSON pattern found in content");
-            throw new Error("Could not extract valid JSON from model response");
-          }
+        const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || 
+                          content.match(/```\s*([\s\S]*?)\s*```/) || 
+                          content.match(/({[\s\S]*})/);
+        
+        if (jsonMatch) {
+          const jsonString = jsonMatch[1];
+          workoutPlan = JSON.parse(jsonString);
+          console.log("Successfully parsed JSON from markdown/code block");
+        } else {
+          console.error("No JSON pattern found in content");
+          throw new Error("Could not extract valid JSON from model response");
         }
       } else {
         throw new Error(`Unexpected content type: ${typeof content}`);
@@ -396,6 +379,10 @@ Lembre-se: sua resposta deve ser APENAS o objeto JSON válido, nada mais.`;
       
       if (error.message.includes("Validation errors")) {
         throw new Error(`Groq API key contains validation errors: ${error.message}`);
+      }
+      
+      if (error.message.includes("json_validate_failed")) {
+        throw new Error(error.message);
       }
     }
     
