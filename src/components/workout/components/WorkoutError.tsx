@@ -19,6 +19,12 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
   const isGroqJsonError = errorMessage?.includes("Groq API Error") && 
                           errorMessage?.includes("json_validate_failed");
 
+  const isShutdownError = errorMessage?.includes("shutdown") || 
+                          errorMessage?.includes("timeout") ||
+                          errorMessage?.includes("aborted") ||
+                          errorMessage?.includes("net::ERR_CONNECTION_RESET") ||
+                          errorMessage?.includes("connection reset");
+
   const hasValidationErrors = errorMessage?.includes("Validation errors");
   const hasParsingErrors = errorMessage?.includes("Error parsing workout plan JSON") || 
                            errorMessage?.includes("SyntaxError") ||
@@ -65,6 +71,14 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
               <li>Por exemplo, selecione menos tipos de exercícios ou equipamentos</li>
               <li>Se o problema persistir, você pode tentar novamente mais tarde</li>
               <li>O erro pode ser temporário devido à instabilidade do modelo</li>
+            </>
+          ) : isShutdownError ? (
+            <>
+              <li>O serviço de geração de plano de treino foi interrompido ou atingiu o tempo limite</li>
+              <li>Isso pode acontecer quando o servidor está sobrecarregado ou quando a solicitação é muito complexa</li>
+              <li>Tente simplificar suas preferências de treino (selecione menos tipos de exercícios)</li>
+              <li>Tente novamente em alguns minutos quando o servidor estiver menos ocupado</li>
+              <li>Se o problema persistir, entre em contato com o suporte técnico</li>
             </>
           ) : hasParsingErrors ? (
             <>
