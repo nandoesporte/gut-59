@@ -26,7 +26,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
   const [workoutPlan, setWorkoutPlan] = useState<WorkoutPlan | null>(null);
   const [progressData, setProgressData] = useState(mockProgressData);
   const [error, setError] = useState<string | null>(null);
-  const [rawResponse, setRawResponse] = useState<any>(null); // Adicionando estado para armazenar a resposta bruta
+  const [rawResponse, setRawResponse] = useState<any>(null);
   const generationInProgress = useRef(false);
   const generationAttempted = useRef(false);
 
@@ -41,7 +41,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
     generationAttempted.current = true;
     setLoading(true);
     setError(null);
-    setRawResponse(null); // Resetando a resposta bruta
+    setRawResponse(null);
     
     try {
       // Get the current user
@@ -71,7 +71,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       const { workoutPlan: generatedPlan, error: generationError, rawResponse: rawResponseData } = 
         await generateWorkoutPlanWithTrenner2025(preferences, user.id, aiSettings || undefined, requestId);
       
-      // Armazenar a resposta bruta
+      // Store the raw response
       if (rawResponseData) {
         console.log("RAW RESPONSE FROM EDGE FUNCTION:", rawResponseData);
         setRawResponse(rawResponseData);

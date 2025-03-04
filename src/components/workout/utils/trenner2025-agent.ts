@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { WorkoutPreferences } from "../types";
 import { WorkoutPlan } from "../types/workout-plan";
@@ -17,12 +16,29 @@ export async function generateWorkoutPlanWithTrenner2025(
     // Add a unique request ID to prevent duplicate processing
     const generationRequestId = requestId || `${userId}_${Date.now()}`;
     
+    // First fetch all exercises to provide to the AI
+    const { data: exercises, error: exercisesError } = await supabase
+      .from("exercises")
+      .select("*")
+      .order("name");
+      
+    if (exercisesError) {
+      console.error("Error fetching exercises:", exercisesError);
+      return { workoutPlan: null, error: `Error fetching exercises: ${exercisesError.message}` };
+    }
+    
+    // Filter exercises based on preferences to send a relevant subset to the AI
+    const filteredExercises = filterExercisesByPreferences(exercises, preferences);
+    console.log(`Filtered ${filteredExercises.length} exercises from ${exercises.length} total exercises based on user preferences`);
+    
     const { data, error } = await supabase.functions.invoke('generate-workout-plan-llama', {
       body: { 
         preferences, 
         userId,
         settings: aiSettings,
-        requestId: generationRequestId
+        requestId: generationRequestId,
+        // Pass filtered exercises to the edge function
+        exercises: filteredExercises
       }
     });
 
@@ -81,6 +97,135 @@ export async function generateWorkoutPlanWithTrenner2025(
     }
     return { workoutPlan: null, error: err.message };
   }
+}
+
+// Helper function to filter exercises based on user preferences
+function filterExercisesByPreferences(exercises: any[], preferences: WorkoutPreferences) {
+  let filteredExercises = [...exercises];
+
+  // Filter by preferred exercise types
+  if (preferences.preferred_exercise_types && preferences.preferred_exercise_types.length > 0) {
+    filteredExercises = filteredExercises.filter(exercise => 
+      preferences.preferred_exercise_types.includes(exercise.exercise_type)
+    );
+  }
+
+  // Filter by available equipment
+  if (preferences.available_equipment && preferences.available_equipment.length > 0) {
+    if (!preferences.available_equipment.includes("all")) {
+      filteredExercises = filteredExercises.filter(exercise => {
+        if (!exercise.equipment_needed || exercise.equipment_needed.length === 0) {
+          return true; // Include exercises that don't need equipment
+        }
+        
+        return exercise.equipment_needed.some((equipment: string) => 
+          preferences.available_equipment.includes(equipment)
+        );
+      });
+    }
+  }
+
+  // Consider health conditions when filtering exercises
+  if (preferences.health_conditions && preferences.health_conditions.length > 0) {
+    console.log(`Considering ${preferences.health_conditions.length} health conditions in exercise selection`);
+    
+    // Exclude exercises contraindicated for user's health conditions
+    filteredExercises = filteredExercises.filter(exercise => {
+      if (!exercise.contraindicated_conditions || exercise.contraindicated_conditions.length === 0) {
+        return true;
+      }
+      
+      // Check if any of user's health conditions match contraindicated conditions
+      return !preferences.health_conditions.some(condition => 
+        exercise.contraindicated_conditions.includes(condition)
+      );
+    });
+    
+    // Prioritize exercises suitable for user's health conditions
+    filteredExercises.sort((a, b) => {
+      const aScore = a.suitable_for_conditions ? 
+        preferences.health_conditions.filter(c => a.suitable_for_conditions.includes(c)).length : 0;
+      const bScore = b.suitable_for_conditions ? 
+        preferences.health_conditions.filter(c => b.suitable_for_conditions.includes(c)).length : 0;
+      return bScore - aScore; // Higher scores first
+    });
+  }
+
+  // Ensure we have enough exercises to build a good plan
+  if (filteredExercises.length < 30) {
+    console.log(`Warning: Only ${filteredExercises.length} exercises match the criteria. Adding more exercises...`);
+    
+    // Add exercises of preferred types
+    const additionalExercises = exercises.filter(exercise => 
+      !filteredExercises.includes(exercise) && 
+      preferences.preferred_exercise_types.includes(exercise.exercise_type)
+    );
+    
+    filteredExercises = [...filteredExercises, ...additionalExercises];
+    
+    // If still not enough, add any other exercises
+    if (filteredExercises.length < 30) {
+      const remainingExercises = exercises.filter(exercise => 
+        !filteredExercises.includes(exercise)
+      );
+      
+      filteredExercises = [...filteredExercises, ...remainingExercises.slice(0, 30 - filteredExercises.length)];
+    }
+    
+    console.log(`Added additional exercises. Now using ${filteredExercises.length} exercises.`);
+  }
+
+  // Sort exercises by relevance to user's goals and preferences
+  // This gives the AI the most relevant exercises first in the prompt
+  const priorityMap: Record<string, number> = {
+    "strength": preferences.goal === "gain_mass" ? 10 : 5,
+    "cardio": preferences.goal === "lose_weight" ? 10 : 5,
+    "mobility": 3
+  };
+
+  filteredExercises.sort((a, b) => {
+    // First prioritize exercises with GIFs
+    if (a.gif_url && !b.gif_url) return -1;
+    if (!a.gif_url && b.gif_url) return 1;
+    
+    // Then prioritize by exercise type relevance to goal
+    const aScore = priorityMap[a.exercise_type] || 0;
+    const bScore = priorityMap[b.exercise_type] || 0;
+    
+    // If scores are equal, prioritize by description completeness
+    if (aScore === bScore) {
+      const aHasDescription = a.description && a.description.length > 10;
+      const bHasDescription = b.description && b.description.length > 10;
+      
+      if (aHasDescription && !bHasDescription) return -1;
+      if (!aHasDescription && bHasDescription) return 1;
+    }
+    
+    return bScore - aScore; // Higher scores first
+  });
+
+  console.log(`Exercises sorted by relevance to user goal: ${preferences.goal}`);
+  
+  // Remove unnecessary properties to reduce payload size
+  return filteredExercises.map(ex => ({
+    id: ex.id,
+    name: ex.name,
+    muscle_group: ex.muscle_group,
+    exercise_type: ex.exercise_type,
+    difficulty: ex.difficulty,
+    equipment_needed: ex.equipment_needed,
+    description: ex.description,
+    gif_url: ex.gif_url,
+    primary_muscles_worked: ex.primary_muscles_worked,
+    secondary_muscles_worked: ex.secondary_muscles_worked,
+    suitable_for_conditions: ex.suitable_for_conditions,
+    contraindicated_conditions: ex.contraindicated_conditions,
+    rest_time_seconds: ex.rest_time_seconds,
+    min_sets: ex.min_sets,
+    max_sets: ex.max_sets,
+    min_reps: ex.min_reps,
+    max_reps: ex.max_reps
+  }));
 }
 
 export async function saveWorkoutPlan(workoutPlan: WorkoutPlan, userId: string): Promise<WorkoutPlan | null> {
