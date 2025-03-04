@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { FisioPreferences } from "./types";
@@ -24,7 +23,6 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
   const [selectedDay, setSelectedDay] = useState<string>("day1");
   const [loadingTime, setLoadingTime] = useState(0);
 
-  // Update the loading time counter
   useEffect(() => {
     let interval: number | null = null;
     if (loading) {
@@ -40,7 +38,7 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
   const generatePlan = async () => {
     try {
       setLoading(true);
-      setLoadingTime(0); // Reset loading time counter
+      setLoadingTime(0);
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -48,7 +46,6 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
         return;
       }
 
-      // Use only Groq API via Edge Function for rehab plan generation
       const { data: response, error } = await supabase.functions.invoke('generate-rehab-plan-groq', {
         body: { 
           preferences, 
@@ -84,9 +81,9 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
 
   if (loading) {
     return <WorkoutLoadingState 
-      message="Gerando seu plano de reabilitação personalizado" 
+      loadingTime={loadingTime} 
       onRetry={() => generatePlan()}
-      timePassed={loadingTime}
+      timePassed={loadingTime > 30}
     />;
   }
 
@@ -177,7 +174,6 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
   };
 
   const renderDailyPlan = (day: string) => {
-    // If rehabPlan has days property, use it
     if (rehabPlan.days && rehabPlan.days[day]) {
       const dayPlan = rehabPlan.days[day];
       return (
@@ -215,7 +211,6 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
       );
     }
     
-    // Fallback message if no day plan is available
     return (
       <div className="text-center p-8">
         <p className="text-gray-500">Detalhes do plano para este dia não disponíveis.</p>
@@ -223,7 +218,6 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
     );
   };
 
-  // Generate day tabs based on rehabPlan structure
   const generateDayTabs = () => {
     if (!rehabPlan || !rehabPlan.days) return [];
     

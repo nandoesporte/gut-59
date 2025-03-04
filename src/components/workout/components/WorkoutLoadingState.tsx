@@ -6,10 +6,10 @@ import { Progress } from "@/components/ui/progress";
 interface WorkoutLoadingStateProps {
   loadingTime: number;
   onRetry?: () => void;
-  timePassed?: boolean;
+  timePassed: boolean;
 }
 
-export const WorkoutLoadingState = ({ loadingTime, onRetry, timePassed = false }: WorkoutLoadingStateProps) => {
+export const WorkoutLoadingState = ({ loadingTime, onRetry, timePassed }: WorkoutLoadingStateProps) => {
   // Calculate progress percentage (max 90% to indicate it's still loading)
   const progressPercentage = Math.min(90, (loadingTime / 30) * 100);
   

@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { WorkoutPreferences } from "./types";
 import { CurrentWorkoutPlan } from "./components/CurrentWorkoutPlan";
@@ -45,9 +44,9 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
 
   if (loading) {
     return <WorkoutLoadingState 
-      message="Gerando seu plano de treino personalizado" 
+      loadingTime={loadingTime} 
       onRetry={handleRetry}
-      timePassed={loadingTime}
+      timePassed={loadingTime > 30}
     />;
   }
 
