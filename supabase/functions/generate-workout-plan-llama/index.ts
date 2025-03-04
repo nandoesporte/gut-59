@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.1";
 
@@ -307,7 +308,8 @@ Lembre-se: sua resposta deve ser APENAS o objeto JSON válido, nada mais.`;
           { role: "user", content: userPrompt }
         ],
         temperature: 0.5,
-        max_tokens: 4096
+        max_tokens: 4096,
+        response_format: { type: "json_object" } // Enforce JSON response format
       })
     });
 
@@ -328,18 +330,58 @@ Lembre-se: sua resposta deve ser APENAS o objeto JSON válido, nada mais.`;
     let workoutPlan;
 
     try {
-      const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || 
-                        content.match(/```\s*([\s\S]*?)\s*```/) || 
-                        content.match(/({[\s\S]*})/);
+      // Handle different response formats
+      if (typeof content === 'object') {
+        // If content is already parsed as JSON
+        workoutPlan = content;
+        console.log("Using pre-parsed JSON from Groq API");
+      } else if (typeof content === 'string') {
+        console.log("Parsing string content from Groq API");
+        
+        // Try different parsing approaches
+        try {
+          // Try direct JSON parse first
+          workoutPlan = JSON.parse(content);
+          console.log("Successfully parsed direct JSON");
+        } catch (parseError) {
+          console.log("Direct JSON parse failed, trying to extract JSON from markdown or text");
+          
+          // Try to extract JSON from markdown code blocks
+          const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || 
+                            content.match(/```\s*([\s\S]*?)\s*```/) || 
+                            content.match(/({[\s\S]*})/);
+          
+          if (jsonMatch) {
+            try {
+              const jsonString = jsonMatch[1];
+              console.log("Found JSON in markdown/code block, attempting to parse");
+              
+              // Clean the JSON string before parsing
+              const cleanedJsonString = jsonString
+                .replace(/,(\s*[\]}])/g, '$1') // Remove trailing commas
+                .replace(/([^\\])\\([^"\\/bfnrtu])/g, '$1$2'); // Remove invalid escapes
+              
+              workoutPlan = JSON.parse(cleanedJsonString);
+              console.log("Successfully parsed JSON from markdown/code block");
+            } catch (markdownParseError) {
+              console.error("Failed to parse JSON from markdown:", markdownParseError);
+              console.log("Extracted content:", jsonMatch[1]);
+              throw new Error(`Failed to parse workout plan JSON: ${markdownParseError.message}`);
+            }
+          } else {
+            console.error("No JSON pattern found in content");
+            throw new Error("Could not extract valid JSON from model response");
+          }
+        }
+      } else {
+        throw new Error(`Unexpected content type: ${typeof content}`);
+      }
       
-      const jsonString = jsonMatch ? jsonMatch[1] : content;
-      workoutPlan = JSON.parse(jsonString);
-      
-      console.log("Successfully parsed workout plan JSON");
+      console.log("Successfully processed workout plan response");
     } catch (parseError) {
       console.error("Error parsing workout plan JSON:", parseError);
       console.log("Raw content:", content);
-      throw new Error(`Failed to parse workout plan: ${parseError.message}`);
+      throw new Error(`Error parsing workout plan JSON: ${parseError.message}`);
     }
 
     return workoutPlan;
