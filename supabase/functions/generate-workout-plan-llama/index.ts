@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.1";
 
@@ -221,10 +222,32 @@ async function generateWorkoutPlanWithGroq(
     throw new Error("Invalid Groq API key format. Keys should start with 'gsk_'");
   }
 
-  const defaultSystemPrompt = `Você é ${agentName}, um agente de IA especializado em educação física e ciência do exercício. 
-Sua tarefa é criar um plano de treino personalizado com base nas preferências e necessidades do usuário. 
-Você deve utilizar apenas os exercícios fornecidos na lista de exercícios disponíveis. 
-Crie um plano de treino semanal detalhado, com dias específicos, séries, repetições e descrições.`;
+  // New detailed system prompt as requested
+  const defaultSystemPrompt = `Você é ${agentName}, um excelente profissional de educação física, especializado em gerar planos de exercícios personalizados. Com base nos dados fornecidos pelo usuário, você deve:
+
+1. Coletar os Dados do Usuário:
+   - Idade, peso, altura, sexo
+   - Objetivo (perder peso, manter peso, ganhar massa)
+   - Nível de atividade física (sedentário, leve, moderado, intenso)
+   - Tipos de exercícios preferidos (força, cardio, mobilidade)
+   - Local de treino (academia, casa, ar livre, sem equipamentos)
+
+2. Consultar o Banco de Dados:
+   - Acessar exercícios que correspondam às preferências e necessidades do usuário
+
+3. Gerar o Plano de Exercícios:
+   - Criar um plano personalizado com base nos dados do usuário
+   - Incluir exercícios que correspondam ao objetivo, nível de atividade física e local de treino
+   - Para cada exercício, incluir: nome, descrição, séries, repetições, duração e carga
+   - Incluir aquecimento e alongamento para cada sessão
+   - Adaptar os exercícios ao local de treino
+   - Combinar treinos de força e cardio adequadamente
+   - Incluir sugestões de progressão semanal
+
+4. Retornar o Plano:
+   - Exibir o plano de exercícios em formato estruturado JSON
+   - Garantir que o plano seja fácil de entender e seguir
+   - Incluir crítica e sugestões para melhorar o plano`;
 
   const systemPrompt = useCustomPrompt && customSystemPrompt ? customSystemPrompt : defaultSystemPrompt;
 
@@ -239,6 +262,7 @@ Crie um plano de treino semanal detalhado, com dias específicos, séries, repet
     gif_url: ex.gif_url
   }));
 
+  // Simplified user prompt to reduce complexity
   const userPrompt = `
 Com base nas preferências do usuário a seguir, crie um plano de treino personalizado dividido por dias da semana.
 
@@ -255,17 +279,17 @@ ${preferences.health_conditions && preferences.health_conditions.length > 0 ?
   `- Condições de saúde: ${preferences.health_conditions.join(', ')}` : ''}
 
 EXERCÍCIOS DISPONÍVEIS:
-${JSON.stringify(exerciseList.slice(0, 40)).substring(0, 8000)}
+${JSON.stringify(exerciseList.slice(0, 30)).substring(0, 6000)}
 
 INSTRUÇÕES:
-1. Crie um plano de treino para 5 dias (não é necessário cobrir todos os 7 dias)
+1. Crie um plano de treino para 5 dias
 2. Para cada dia, inclua:
-   - Um aquecimento breve (1-2 linhas)
+   - Um aquecimento breve
    - 3-5 exercícios com séries e repetições específicas
    - Tempo de descanso entre séries
-   - Uma volta à calma breve (1-2 linhas)
+   - Uma volta à calma breve
 3. Escolha apenas exercícios da lista fornecida acima.
-4. Responda APENAS com o JSON válido - nada mais.
+4. Siga exatamente o formato de resposta solicitado abaixo.
 
 FORMATO DE RESPOSTA: 
 {
@@ -310,8 +334,8 @@ FORMATO DE RESPOSTA:
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
         ],
-        temperature: 0.3,
-        max_tokens: 4096,
+        temperature: 0.2, // Reduced temperature for more predictable outputs
+        max_tokens: 3500, // Reduced max tokens to prevent overly complex responses
         response_format: { type: "json_object" }
       })
     });
@@ -404,10 +428,32 @@ async function generateWorkoutPlanWithOpenAI(
     throw new Error("OpenAI API key is required but not provided");
   }
 
-  const defaultSystemPrompt = `Você é ${agentName}, um agente de IA especializado em educação física e ciência do exercício. 
-Sua tarefa é criar um plano de treino personalizado com base nas preferências e necessidades do usuário. 
-Você deve utilizar apenas os exercícios fornecidos na lista de exercícios disponíveis. 
-Crie um plano de treino semanal detalhado, com dias específicos, séries, repetições e descrições.`;
+  // New detailed system prompt as requested
+  const defaultSystemPrompt = `Você é ${agentName}, um excelente profissional de educação física, especializado em gerar planos de exercícios personalizados. Com base nos dados fornecidos pelo usuário, você deve:
+
+1. Coletar os Dados do Usuário:
+   - Idade, peso, altura, sexo
+   - Objetivo (perder peso, manter peso, ganhar massa)
+   - Nível de atividade física (sedentário, leve, moderado, intenso)
+   - Tipos de exercícios preferidos (força, cardio, mobilidade)
+   - Local de treino (academia, casa, ar livre, sem equipamentos)
+
+2. Consultar o Banco de Dados:
+   - Acessar exercícios que correspondam às preferências e necessidades do usuário
+
+3. Gerar o Plano de Exercícios:
+   - Criar um plano personalizado com base nos dados do usuário
+   - Incluir exercícios que correspondam ao objetivo, nível de atividade física e local de treino
+   - Para cada exercício, incluir: nome, descrição, séries, repetições, duração e carga
+   - Incluir aquecimento e alongamento para cada sessão
+   - Adaptar os exercícios ao local de treino
+   - Combinar treinos de força e cardio adequadamente
+   - Incluir sugestões de progressão semanal
+
+4. Retornar o Plano:
+   - Exibir o plano de exercícios em formato estruturado JSON
+   - Garantir que o plano seja fácil de entender e seguir
+   - Incluir crítica e sugestões para melhorar o plano`;
 
   const systemPrompt = useCustomPrompt && customSystemPrompt ? customSystemPrompt : defaultSystemPrompt;
 
@@ -499,7 +545,8 @@ Lembre-se: sua resposta deve ser APENAS o objeto JSON válido, nada mais.`;
           { role: "user", content: userPrompt }
         ],
         temperature: 0.5,
-        max_tokens: 4000
+        max_tokens: 4000,
+        response_format: { type: "json_object" }
       })
     });
 
@@ -520,13 +567,8 @@ Lembre-se: sua resposta deve ser APENAS o objeto JSON válido, nada mais.`;
     let workoutPlan;
 
     try {
-      const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || 
-                        content.match(/```\s*([\s\S]*?)\s*```/) || 
-                        content.match(/({[\s\S]*})/);
-      
-      const jsonString = jsonMatch ? jsonMatch[1] : content;
-      workoutPlan = JSON.parse(jsonString);
-      
+      // Since we're using response_format: { type: "json_object" }, we should get pure JSON
+      workoutPlan = typeof content === 'string' ? JSON.parse(content) : content;
       console.log("Successfully parsed workout plan JSON");
     } catch (parseError) {
       console.error("Error parsing workout plan JSON:", parseError);
