@@ -39,9 +39,20 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
         throw new Error("Usuário não autenticado");
       }
       
+      // Fetch AI model settings
+      const { data: aiSettings, error: aiSettingsError } = await supabase
+        .from('ai_model_settings')
+        .select('*')
+        .eq('name', 'trene2025')
+        .maybeSingle();
+        
+      if (aiSettingsError) {
+        console.warn("Erro ao buscar configurações de IA, usando padrões:", aiSettingsError);
+      }
+      
       // Generate the workout plan using Trenner2025 agent
       const { workoutPlan: generatedPlan, error: generationError } = 
-        await generateWorkoutPlanWithTrenner2025(preferences, user.id);
+        await generateWorkoutPlanWithTrenner2025(preferences, user.id, aiSettings || undefined);
       
       if (generationError) {
         throw new Error(generationError);

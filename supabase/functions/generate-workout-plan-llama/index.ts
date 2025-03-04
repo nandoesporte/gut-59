@@ -49,15 +49,18 @@ serve(async (req) => {
     const groqApiKey = settings?.groq_api_key || Deno.env.get("GROQ_API_KEY");
     
     if (useGroq && (!groqApiKey || groqApiKey.trim() === "")) {
-      return new Response(
-        JSON.stringify({ error: "Groq API key is required but not provided" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
-      );
+      console.error("Groq API key is missing or invalid");
+      // Fall back to OpenAI if Groq API key is not available
+      console.log("Falling back to OpenAI due to missing Groq API key");
+      const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
+      
+      if (!openaiApiKey || openaiApiKey.trim() === "") {
+        return new Response(
+          JSON.stringify({ error: "No valid API keys available. Please configure Groq or OpenAI API keys." }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        );
+      }
     }
-
-    // Log to help debug
-    console.log(`Using ${useGroq ? "Groq API with Llama 3" : "OpenAI"} for generating workout plan`);
-    console.log(`AI Settings: ${JSON.stringify(settings || "Using default settings")}`);
 
     // Step 1: Fetch exercises based on preferences
     const { data: exercises, error: exercisesError } = await supabase
@@ -79,26 +82,42 @@ serve(async (req) => {
 
     // Step 2: Generate the workout plan using LLM
     let workoutPlan;
-    if (useGroq) {
-      // Use Groq with Llama 3
-      workoutPlan = await generateWorkoutPlanWithGroq(
-        filteredExercises, 
-        preferences,
-        settings?.system_prompt,
-        settings?.use_custom_prompt === true,
-        groqApiKey,
-        agentName
-      );
-    } else {
-      // Fallback to OpenAI
-      const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
-      workoutPlan = await generateWorkoutPlanWithOpenAI(
-        filteredExercises, 
-        preferences,
-        settings?.system_prompt,
-        settings?.use_custom_prompt === true,
-        openaiApiKey,
-        agentName
+    let generationError = null;
+    
+    try {
+      if (useGroq && groqApiKey && groqApiKey.trim() !== "") {
+        // Use Groq with Llama 3
+        console.log("Attempting to generate workout plan with Groq (Llama 3)");
+        workoutPlan = await generateWorkoutPlanWithGroq(
+          filteredExercises, 
+          preferences,
+          settings?.system_prompt,
+          settings?.use_custom_prompt === true,
+          groqApiKey,
+          agentName
+        );
+      } else {
+        // Fallback to OpenAI
+        console.log("Using OpenAI for workout plan generation");
+        const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
+        workoutPlan = await generateWorkoutPlanWithOpenAI(
+          filteredExercises, 
+          preferences,
+          settings?.system_prompt,
+          settings?.use_custom_prompt === true,
+          openaiApiKey,
+          agentName
+        );
+      }
+    } catch (error) {
+      console.error("Error during workout plan generation:", error);
+      generationError = error.message || "Unknown error during generation";
+    }
+
+    if (generationError) {
+      return new Response(
+        JSON.stringify({ error: `Failed to generate workout plan: ${generationError}` }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
       );
     }
 
