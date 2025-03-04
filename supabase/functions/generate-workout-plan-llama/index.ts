@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.1";
 
@@ -44,20 +43,19 @@ serve(async (req) => {
     console.log(`🏋️ Starting workout plan generation for user ${userId} with ${agentName}`);
     console.log(`Preferences: ${JSON.stringify(preferences)}`);
 
-    // Determine which model to use
+    // Determine which model to use and validate API key
     const useGroq = !settings || settings.active_model === "llama3" || settings.active_model === "groq";
     const groqApiKey = settings?.groq_api_key || Deno.env.get("GROQ_API_KEY");
     
-    if (useGroq && (!groqApiKey || groqApiKey.trim() === "")) {
-      console.error("Groq API key is missing or invalid");
-      // Fall back to OpenAI if Groq API key is not available
-      console.log("Falling back to OpenAI due to missing Groq API key");
-      const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
-      
-      if (!openaiApiKey || openaiApiKey.trim() === "") {
+    // Validate Groq API key if we're using Groq
+    if (useGroq) {
+      if (!groqApiKey || groqApiKey.trim() === "" || groqApiKey.includes("Validation errors")) {
+        console.error("Groq API key is missing, invalid or contains validation errors:", groqApiKey);
         return new Response(
-          JSON.stringify({ error: "No valid API keys available. Please configure Groq or OpenAI API keys." }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+          JSON.stringify({ 
+            error: "Invalid or missing Groq API key. Please configure a valid key in Admin settings." 
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
         );
       }
     }
@@ -85,7 +83,7 @@ serve(async (req) => {
     let generationError = null;
     
     try {
-      if (useGroq && groqApiKey && groqApiKey.trim() !== "") {
+      if (useGroq) {
         // Use Groq with Llama 3
         console.log("Attempting to generate workout plan with Groq (Llama 3)");
         workoutPlan = await generateWorkoutPlanWithGroq(
@@ -100,6 +98,9 @@ serve(async (req) => {
         // Fallback to OpenAI
         console.log("Using OpenAI for workout plan generation");
         const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
+        if (!openaiApiKey || openaiApiKey.trim() === "") {
+          throw new Error("OpenAI API key is missing or invalid");
+        }
         workoutPlan = await generateWorkoutPlanWithOpenAI(
           filteredExercises, 
           preferences,
@@ -211,10 +212,8 @@ async function generateWorkoutPlanWithGroq(
   apiKey?: string,
   agentName = "TRENE2025"
 ) {
-  const groqApiKey = apiKey || Deno.env.get("GROQ_API_KEY");
-  
-  if (!groqApiKey) {
-    throw new Error("Groq API key is required but not provided");
+  if (!apiKey || apiKey.trim() === "" || apiKey.includes("Validation errors")) {
+    throw new Error("Groq API key is required and valid but not provided or contains validation errors");
   }
 
   // Prepare the system prompt
@@ -306,7 +305,7 @@ Lembre-se: sua resposta deve ser APENAS o objeto JSON válido, nada mais.`;
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${groqApiKey}`
+        "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
         model: "llama3-8b-8192",
@@ -326,7 +325,7 @@ Lembre-se: sua resposta deve ser APENAS o objeto JSON válido, nada mais.`;
     }
 
     const data = await response.json();
-    console.log("Groq API response received:", data);
+    console.log("Groq API response received");
 
     if (!data.choices || data.choices.length === 0) {
       throw new Error("No response from Groq API");

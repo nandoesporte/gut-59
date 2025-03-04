@@ -39,7 +39,7 @@ export const AIModelSettings = () => {
       
       if (data) {
         const useGroq = data.active_model === 'groq' || data.active_model === 'llama3';
-        const hasGroqKey = data.groq_api_key && data.groq_api_key.trim() !== '';
+        const hasGroqKey = data.groq_api_key && data.groq_api_key.trim() !== '' && !data.groq_api_key.includes("Validation");
         
         setShowMissingKeyAlert(useGroq && !hasGroqKey);
         
@@ -67,6 +67,15 @@ Você deve fornecer um plano completo, com exercícios, séries, repetições e 
   const handleSave = async () => {
     try {
       setLoading(true);
+      
+      // Validate the Groq API key if the model uses Groq
+      const useGroq = aiSettings.activeModel === 'groq' || aiSettings.activeModel === 'llama3';
+      const hasGroqKey = aiSettings.groqApiKey && aiSettings.groqApiKey.trim() !== '';
+      
+      if (useGroq && !hasGroqKey) {
+        setShowMissingKeyAlert(true);
+        toast.warning('Uma chave da API Groq é necessária para utilizar o modelo Llama 3');
+      }
       
       // Primeiro verificamos se o registro já existe
       const { data, error: fetchError } = await supabase
@@ -112,8 +121,6 @@ Você deve fornecer um plano completo, com exercícios, séries, repetições e 
       if (saveError) throw saveError;
       
       // Check if we need to show the missing key alert
-      const useGroq = aiSettings.activeModel === 'groq' || aiSettings.activeModel === 'llama3';
-      const hasGroqKey = aiSettings.groqApiKey && aiSettings.groqApiKey.trim() !== '';
       setShowMissingKeyAlert(useGroq && !hasGroqKey);
       
       toast.success('Configurações salvas com sucesso');
