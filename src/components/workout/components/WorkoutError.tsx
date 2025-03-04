@@ -32,13 +32,15 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
       </p>
 
       <div className="bg-red-100 dark:bg-red-900/10 p-4 rounded-lg text-left text-sm max-w-2xl mx-auto">
-        <p className="font-semibold mb-2">Possíveis soluções:</p>
+        <p className="font-semibold mb-2">Como resolver:</p>
         <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
           {isGroqKeyError ? (
             <>
-              <li>Configure a chave da API Groq na página de administração</li>
-              <li>O agente Trenner2025 requer a API Groq para funcionar corretamente</li>
-              <li>Obtenha uma chave gratuita em <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" className="underline">console.groq.com/keys</a></li>
+              <li>É necessário configurar uma chave API válida da Groq na página de administração</li>
+              <li>O agente Trenner2025 usa a API Groq com o modelo Llama 3 para funcionar</li>
+              <li>Obtenha uma chave gratuita em <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" className="underline text-blue-600 dark:text-blue-400">console.groq.com/keys</a></li>
+              <li>Vá para <code className="bg-red-200 dark:bg-red-800/30 p-1 rounded text-xs">Admin &gt; Treino &gt; Configurações do AI</code> e adicione a chave da API</li>
+              <li>Se você já adicionou uma chave, verifique se ela está correta e válida</li>
             </>
           ) : (
             <>
@@ -54,7 +56,7 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
       
       <div className="pt-2 flex justify-center gap-4">
         {isGroqKeyError && (
-          <Button onClick={() => navigate('/admin')} variant="default">
+          <Button onClick={() => navigate('/admin')} variant="default" className="bg-blue-600 hover:bg-blue-700">
             <Settings className="w-4 h-4 mr-2" />
             Ir para Configurações
           </Button>

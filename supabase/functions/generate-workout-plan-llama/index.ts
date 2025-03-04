@@ -14,22 +14,18 @@ interface RequestBody {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Get environment variables
     const supabaseUrl = Deno.env.get("SUPABASE_URL") as string;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as string;
     
-    // Create Supabase client
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const requestData: RequestBody = await req.json();
     
-    // Extract data from request
     const { preferences, userId, agentName = "TRENE2025", settings } = requestData;
     
     if (!preferences || !userId) {
@@ -43,24 +39,29 @@ serve(async (req) => {
     console.log(`🏋️ Starting workout plan generation for user ${userId} with ${agentName}`);
     console.log(`Preferences: ${JSON.stringify(preferences)}`);
 
-    // Determine which model to use and validate API key
     const useGroq = !settings || settings.active_model === "llama3" || settings.active_model === "groq";
-    const groqApiKey = settings?.groq_api_key || Deno.env.get("GROQ_API_KEY");
+    let groqApiKey = settings?.groq_api_key || Deno.env.get("GROQ_API_KEY");
     
-    // Validate Groq API key if we're using Groq
+    if (groqApiKey && (
+        groqApiKey.includes("Validation errors") || 
+        groqApiKey.includes("must have required property")
+    )) {
+      console.error("Groq API key contains validation errors:", groqApiKey);
+      groqApiKey = null;
+    }
+    
     if (useGroq) {
-      if (!groqApiKey || groqApiKey.trim() === "" || groqApiKey.includes("Validation errors")) {
-        console.error("Groq API key is missing, invalid or contains validation errors:", groqApiKey);
+      if (!groqApiKey || groqApiKey.trim() === "") {
+        console.error("Groq API key is missing or empty");
         return new Response(
           JSON.stringify({ 
-            error: "Invalid or missing Groq API key. Please configure a valid key in Admin settings." 
+            error: "Groq API key is missing. Please configure a valid key in Admin settings." 
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
         );
       }
     }
 
-    // Step 1: Fetch exercises based on preferences
     const { data: exercises, error: exercisesError } = await supabase
       .from("exercises")
       .select("*")
@@ -74,17 +75,14 @@ serve(async (req) => {
       );
     }
 
-    // Filter exercises based on preferences
     const filteredExercises = filterExercisesByPreferences(exercises, preferences);
     console.log(`Filtered ${filteredExercises.length} exercises from ${exercises.length} total exercises`);
 
-    // Step 2: Generate the workout plan using LLM
     let workoutPlan;
     let generationError = null;
     
     try {
       if (useGroq) {
-        // Use Groq with Llama 3
         console.log("Attempting to generate workout plan with Groq (Llama 3)");
         workoutPlan = await generateWorkoutPlanWithGroq(
           filteredExercises, 
@@ -95,8 +93,6 @@ serve(async (req) => {
           agentName
         );
       } else {
-        // Fallback to OpenAI
-        console.log("Using OpenAI for workout plan generation");
         const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
         if (!openaiApiKey || openaiApiKey.trim() === "") {
           throw new Error("OpenAI API key is missing or invalid");
@@ -129,11 +125,9 @@ serve(async (req) => {
       );
     }
 
-    // Log execution time
     const executionTime = Date.now() - startTime;
     console.log(`✅ Workout plan generated successfully in ${executionTime / 1000} seconds`);
 
-    // Return the workout plan
     return new Response(
       JSON.stringify({ workoutPlan }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -150,24 +144,19 @@ serve(async (req) => {
 function filterExercisesByPreferences(exercises: any[], preferences: any) {
   let filteredExercises = [...exercises];
 
-  // Filter by exercise types if specified
   if (preferences.preferred_exercise_types && preferences.preferred_exercise_types.length > 0) {
     filteredExercises = filteredExercises.filter(exercise => 
       preferences.preferred_exercise_types.includes(exercise.exercise_type)
     );
   }
 
-  // Filter by equipment availability based on training location
   if (preferences.available_equipment && preferences.available_equipment.length > 0) {
-    // If "all" is included, no need to filter by equipment
     if (!preferences.available_equipment.includes("all")) {
       filteredExercises = filteredExercises.filter(exercise => {
-        // If exercise doesn't require equipment, include it
         if (!exercise.equipment_needed || exercise.equipment_needed.length === 0) {
           return true;
         }
         
-        // Check if at least one of the exercise's required equipment is available
         return exercise.equipment_needed.some((equipment: string) => 
           preferences.available_equipment.includes(equipment)
         );
@@ -175,13 +164,9 @@ function filterExercisesByPreferences(exercises: any[], preferences: any) {
     }
   }
 
-  // Additional filtering logic can be added here
-
-  // Ensure we have enough exercises (minimum 30)
   if (filteredExercises.length < 30) {
     console.log(`Warning: Only ${filteredExercises.length} exercises match the criteria. Adding more exercises...`);
     
-    // Add more exercises that match at least the exercise type
     const additionalExercises = exercises.filter(exercise => 
       !filteredExercises.includes(exercise) && 
       preferences.preferred_exercise_types.includes(exercise.exercise_type)
@@ -189,7 +174,6 @@ function filterExercisesByPreferences(exercises: any[], preferences: any) {
     
     filteredExercises = [...filteredExercises, ...additionalExercises];
     
-    // If still not enough, add any exercises
     if (filteredExercises.length < 30) {
       const remainingExercises = exercises.filter(exercise => 
         !filteredExercises.includes(exercise)
@@ -212,11 +196,10 @@ async function generateWorkoutPlanWithGroq(
   apiKey?: string,
   agentName = "TRENE2025"
 ) {
-  if (!apiKey || apiKey.trim() === "" || apiKey.includes("Validation errors")) {
-    throw new Error("Groq API key is required and valid but not provided or contains validation errors");
+  if (!apiKey || apiKey.trim() === "") {
+    throw new Error("Groq API key is required but not provided");
   }
 
-  // Prepare the system prompt
   const defaultSystemPrompt = `Você é ${agentName}, um agente de IA especializado em educação física e ciência do exercício. 
 Sua tarefa é criar um plano de treino personalizado com base nas preferências e necessidades do usuário. 
 Você deve utilizar apenas os exercícios fornecidos na lista de exercícios disponíveis. 
@@ -224,7 +207,6 @@ Crie um plano de treino semanal detalhado, com dias específicos, séries, repet
 
   const systemPrompt = useCustomPrompt && customSystemPrompt ? customSystemPrompt : defaultSystemPrompt;
 
-  // Prepare the exercises in a condensed format
   const exerciseList = exercises.map(ex => ({
     id: ex.id,
     name: ex.name,
@@ -236,7 +218,6 @@ Crie um plano de treino semanal detalhado, com dias específicos, séries, repet
     gif_url: ex.gif_url
   }));
 
-  // Construct the prompt for the workout plan generation
   const userPrompt = `
 Com base nas preferências do usuário a seguir, crie um plano de treino personalizado dividido por dias da semana.
 
@@ -331,12 +312,10 @@ Lembre-se: sua resposta deve ser APENAS o objeto JSON válido, nada mais.`;
       throw new Error("No response from Groq API");
     }
 
-    // Extract and parse the workout plan from the response
     const content = data.choices[0].message.content;
     let workoutPlan;
 
     try {
-      // Attempt to extract JSON if it's wrapped in code blocks or other text
       const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || 
                         content.match(/```\s*([\s\S]*?)\s*```/) || 
                         content.match(/({[\s\S]*})/);
@@ -354,6 +333,11 @@ Lembre-se: sua resposta deve ser APENAS o objeto JSON válido, nada mais.`;
     return workoutPlan;
   } catch (error) {
     console.error("Error calling Groq API:", error);
+    
+    if (error.message && error.message.includes("Invalid API Key")) {
+      throw new Error("Invalid Groq API key. Please update your API key in the admin settings.");
+    }
+    
     throw new Error(`Failed to generate workout plan with Groq: ${error.message}`);
   }
 }
@@ -372,7 +356,6 @@ async function generateWorkoutPlanWithOpenAI(
     throw new Error("OpenAI API key is required but not provided");
   }
 
-  // Prepare the system prompt
   const defaultSystemPrompt = `Você é ${agentName}, um agente de IA especializado em educação física e ciência do exercício. 
 Sua tarefa é criar um plano de treino personalizado com base nas preferências e necessidades do usuário. 
 Você deve utilizar apenas os exercícios fornecidos na lista de exercícios disponíveis. 
@@ -380,7 +363,6 @@ Crie um plano de treino semanal detalhado, com dias específicos, séries, repet
 
   const systemPrompt = useCustomPrompt && customSystemPrompt ? customSystemPrompt : defaultSystemPrompt;
 
-  // Prepare the exercises in a condensed format
   const exerciseList = exercises.map(ex => ({
     id: ex.id,
     name: ex.name,
@@ -392,7 +374,6 @@ Crie um plano de treino semanal detalhado, com dias específicos, séries, repet
     gif_url: ex.gif_url
   }));
 
-  // Construct the prompt for the workout plan generation
   const userPrompt = `
 Com base nas preferências do usuário a seguir, crie um plano de treino personalizado dividido por dias da semana.
 
@@ -487,12 +468,10 @@ Lembre-se: sua resposta deve ser APENAS o objeto JSON válido, nada mais.`;
       throw new Error("No response from OpenAI API");
     }
 
-    // Extract and parse the workout plan from the response
     const content = data.choices[0].message.content;
     let workoutPlan;
 
     try {
-      // Attempt to extract JSON if it's wrapped in code blocks or other text
       const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || 
                         content.match(/```\s*([\s\S]*?)\s*```/) || 
                         content.match(/({[\s\S]*})/);

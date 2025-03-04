@@ -39,7 +39,10 @@ export const AIModelSettings = () => {
       
       if (data) {
         const useGroq = data.active_model === 'groq' || data.active_model === 'llama3';
-        const hasGroqKey = data.groq_api_key && data.groq_api_key.trim() !== '' && !data.groq_api_key.includes("Validation");
+        const hasGroqKey = data.groq_api_key && 
+                          data.groq_api_key.trim() !== '' && 
+                          !data.groq_api_key.includes("Validation") &&
+                          !data.groq_api_key.includes("must have required property");
         
         setShowMissingKeyAlert(useGroq && !hasGroqKey);
         
@@ -77,6 +80,15 @@ Você deve fornecer um plano completo, com exercícios, séries, repetições e 
         toast.warning('Uma chave da API Groq é necessária para utilizar o modelo Llama 3');
       }
       
+      // Clean up the API key if it contains validation errors
+      let cleanedGroqApiKey = aiSettings.groqApiKey;
+      if (cleanedGroqApiKey && (
+          cleanedGroqApiKey.includes("Validation") || 
+          cleanedGroqApiKey.includes("must have required property")
+      )) {
+        cleanedGroqApiKey = '';
+      }
+      
       // Primeiro verificamos se o registro já existe
       const { data, error: fetchError } = await supabase
         .from('ai_model_settings')
@@ -96,7 +108,7 @@ Você deve fornecer um plano completo, com exercícios, séries, repetições e 
             active_model: aiSettings.activeModel,
             system_prompt: aiSettings.systemPrompt,
             use_custom_prompt: aiSettings.useCustomPrompt,
-            groq_api_key: aiSettings.groqApiKey,
+            groq_api_key: cleanedGroqApiKey,
             updated_at: new Date().toISOString()
           })
           .eq('id', data.id);
@@ -111,7 +123,7 @@ Você deve fornecer um plano completo, com exercícios, séries, repetições e 
             active_model: aiSettings.activeModel,
             system_prompt: aiSettings.systemPrompt,
             use_custom_prompt: aiSettings.useCustomPrompt,
-            groq_api_key: aiSettings.groqApiKey,
+            groq_api_key: cleanedGroqApiKey,
             updated_at: new Date().toISOString()
           });
         
@@ -124,6 +136,7 @@ Você deve fornecer um plano completo, com exercícios, séries, repetições e 
       setShowMissingKeyAlert(useGroq && !hasGroqKey);
       
       toast.success('Configurações salvas com sucesso');
+      fetchSettings(); // Reload settings to ensure they're up to date
     } catch (error) {
       console.error('Erro ao salvar configurações:', error);
       toast.error('Erro ao salvar configurações de IA');
@@ -162,7 +175,7 @@ Você deve fornecer um plano completo, com exercícios, séries, repetições e 
           <Alert variant="destructive" className="mb-4">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              A chave da API Groq não está configurada. Os modelos Llama 3 e Groq não funcionarão sem ela.
+              A chave da API Groq não está configurada ou contém erros. Os modelos Llama 3 e Groq não funcionarão sem uma chave válida.
             </AlertDescription>
           </Alert>
         )}
