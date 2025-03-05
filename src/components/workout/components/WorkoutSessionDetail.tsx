@@ -11,6 +11,23 @@ interface WorkoutSessionDetailProps {
 }
 
 export const WorkoutSessionDetail = ({ session, getDayName }: WorkoutSessionDetailProps) => {
+  // Função para filtrar exercícios únicos
+  const getUniqueExercises = () => {
+    if (!session.session_exercises) return [];
+    
+    const uniqueExercises = new Map();
+    return session.session_exercises.filter(ex => {
+      const exerciseId = ex.exercise?.id;
+      if (!exerciseId || uniqueExercises.has(exerciseId)) {
+        return false;
+      }
+      uniqueExercises.set(exerciseId, true);
+      return true;
+    });
+  };
+
+  const uniqueExercises = getUniqueExercises();
+
   return (
     <AccordionItem key={session.day_number} value={`day-${session.day_number}`}>
       <AccordionTrigger className="bg-white rounded-t-lg shadow px-4 hover:no-underline hover:bg-gray-50">
@@ -37,9 +54,9 @@ export const WorkoutSessionDetail = ({ session, getDayName }: WorkoutSessionDeta
           <div>
             <h4 className="font-medium text-primary mb-3">Exercícios</h4>
             <div className="space-y-4">
-              {session.session_exercises.map((exerciseSession) => (
+              {uniqueExercises.map((exerciseSession, index) => (
                 <WorkoutExerciseDetail 
-                  key={exerciseSession.id || `${session.day_number}-${exerciseSession.exercise.id}`}
+                  key={exerciseSession.id || `${session.day_number}-${exerciseSession.exercise.id}-${index}`}
                   exerciseSession={exerciseSession}
                 />
               ))}
