@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { WorkoutPreferences } from "../types";
 import { WorkoutPlan } from "../types/workout-plan";
@@ -196,6 +197,7 @@ function processWorkoutPlan(workoutPlan: WorkoutPlan, databaseExercises: any[]):
   const exactNameMap = new Map();
   const normalizedNameMap = new Map();
   const simplifiedNameMap = new Map();
+  const lowerCaseNameMap = new Map();
   
   // Build maps for various name matching strategies
   databaseExercises.forEach(exercise => {
@@ -205,6 +207,9 @@ function processWorkoutPlan(workoutPlan: WorkoutPlan, databaseExercises: any[]):
     // Normalized name matching (remove accents, special chars)
     const normalizedName = normalizeExerciseName(exercise.name);
     normalizedNameMap.set(normalizedName, exercise);
+    
+    // Lowercase name mapping
+    lowerCaseNameMap.set(exercise.name.toLowerCase(), exercise);
     
     // Simplified name matching (remove common words, equipment mentions)
     const simplifiedName = exercise.name.toLowerCase()
@@ -234,13 +239,18 @@ function processWorkoutPlan(workoutPlan: WorkoutPlan, databaseExercises: any[]):
             // 1. Exact match
             dbExercise = exactNameMap.get(exerciseName.toLowerCase());
             
-            // 2. Normalized match
+            // 2. Lowercase match
+            if (!dbExercise) {
+              dbExercise = lowerCaseNameMap.get(exerciseName.toLowerCase());
+            }
+            
+            // 3. Normalized match
             if (!dbExercise) {
               const normalizedName = normalizeExerciseName(exerciseName);
               dbExercise = normalizedNameMap.get(normalizedName);
             }
             
-            // 3. Simplified match
+            // 4. Simplified match
             if (!dbExercise) {
               const simplifiedName = exerciseName.toLowerCase()
                 .replace(/\s+/g, ' ')
@@ -253,7 +263,19 @@ function processWorkoutPlan(workoutPlan: WorkoutPlan, databaseExercises: any[]):
               dbExercise = simplifiedNameMap.get(simplifiedName);
             }
             
-            // 4. Fuzzy match if still not found
+            // 5. Try partial matching if still not found
+            if (!dbExercise) {
+              // Find exercises that contain this exercise name as a substring
+              for (const [key, value] of exactNameMap.entries()) {
+                if (key.includes(exerciseName.toLowerCase()) || 
+                    exerciseName.toLowerCase().includes(key)) {
+                  dbExercise = value;
+                  break;
+                }
+              }
+            }
+            
+            // 6. Fallback to fuzzy match if still not found
             if (!dbExercise) {
               dbExercise = findBestMatchingExercise(exerciseName, databaseExercises);
             }
@@ -270,7 +292,6 @@ function processWorkoutPlan(workoutPlan: WorkoutPlan, databaseExercises: any[]):
                 gif_url: dbExercise.gif_url, // Use the correct GIF URL from database
                 muscle_group: dbExercise.muscle_group,
                 exercise_type: dbExercise.exercise_type
-                // Note: 'difficulty' is not included as it's not in the Exercise type
               };
             } else {
               console.warn(`No database match found for exercise "${sessionExercise.exercise.name}"`);
@@ -307,7 +328,7 @@ function findBestMatchingExercise(name: string, exercises: any[]): any | null {
     const exerciseName = normalizeExerciseName(exercise.name);
     const score = calculateSimilarity(normalizedName, exerciseName);
     
-    if (score > highestScore && score > 0.7) { // Only accept matches with >70% similarity
+    if (score > highestScore && score > 0.6) { // Lower threshold to 60% for better matching
       highestScore = score;
       bestMatch = exercise;
     }

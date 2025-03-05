@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
@@ -323,7 +322,13 @@ async function generateWorkoutPlanWithTrenner2025(
     }
   }
   
-  Gere um plano completo com 4-6 dias de treino baseado no objetivo e nível da pessoa.
+  IMPORTANTE:
+  1. Crie um plano COMPLETO com 6 dias de treino (Segunda a Sábado) e Domingo como dia de descanso.
+  2. Para cada dia, inclua 5-8 exercícios diferentes, não apenas 2-3 exercícios.
+  3. Organize os dias por grupos musculares, por exemplo: Segunda (Peito/Tríceps), Terça (Costas/Bíceps), etc.
+  4. Use APENAS exercícios da lista fornecida - não invente nenhum exercício novo.
+  5. Certifique-se de adicionar descrições detalhadas para aquecimento e desaquecimento.
+  6. Inclua detalhes de séries, repetições e descanso para cada exercício.
   `;
 
   const systemPrompt = useCustomPrompt && customSystemPrompt ? customSystemPrompt : defaultSystemPrompt;
@@ -399,10 +404,14 @@ async function generateWorkoutPlanWithTrenner2025(
             BMI: ${bmi.toFixed(1)}
             Peso sugerido para exercícios: ${suggestedWeightRange}
             
-            Você tem acesso a ${exerciseList.length} exercícios. Adicione para cada sessão apenas os exercícios relevantes para aquele dia de treino.
-            Não invente exercícios. Use apenas os exercícios que estão na lista fornecida.
+            IMPORTANTE:
+            1. Você tem acesso a ${exerciseList.length} exercícios. 
+            2. Estruture o plano com 6 dias de treino (Segunda a Sábado) e descanso no Domingo.
+            3. Inclua 5-8 exercícios diferentes para CADA dia de treino, não apenas 2-3.
+            4. Não invente exercícios. Use apenas os exercícios que estão na lista fornecida.
+            5. Cada dia deve ter um foco em grupos musculares específicos, como: Segunda (Peito/Tríceps), Terça (Costas/Bíceps), etc.
             
-            Retorne um objeto json com o plano de treino completo seguindo o formato especificado no prompt do sistema.
+            Retorne um objeto JSON com o plano de treino completo seguindo o formato especificado no prompt do sistema.
             Garanta que a saída seja um JSON válido para que eu possa processar programaticamente.
             `
           }

@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { WorkoutPlan } from "../types/workout-plan";
 import { Calendar, Clock, Dumbbell } from "lucide-react";
 import { formatInTimeZone } from 'date-fns-tz';
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { formatImageUrl } from "@/utils/imageUtils";
 
 // Timezone configuration
@@ -15,7 +15,7 @@ interface CurrentWorkoutPlanProps {
 }
 
 export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
-  const [imageStatuses, setImageStatuses] = useState<Record<string, { loading: boolean, error: boolean }>>({}); 
+  const [imageStatuses, setImageStatuses] = useState<Record<string, { loading: boolean, error: boolean }>>({});
 
   if (!plan || !plan.workout_sessions) {
     return null;
@@ -23,7 +23,7 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
 
   // Function to handle errors in loading images
   const handleImageError = (id: string, gifUrl?: string) => {
-    console.error("Error loading GIF:", gifUrl);
+    console.log("Error loading GIF:", gifUrl);
     setImageStatuses(prev => ({
       ...prev,
       [id]: { loading: false, error: true }
@@ -108,13 +108,15 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
           </CardHeader>
           <CardContent className="p-6">
             <div className="space-y-6">
-              <div className="bg-primary-50 p-4 rounded-lg">
-                <h5 className="font-medium text-primary-700 mb-2">Aquecimento</h5>
-                <p className="text-sm text-gray-600">{session.warmup_description}</p>
-              </div>
+              {session.warmup_description && (
+                <div className="bg-primary-50 p-4 rounded-lg">
+                  <h5 className="font-medium text-primary-700 mb-2">Aquecimento</h5>
+                  <p className="text-sm text-gray-600">{session.warmup_description}</p>
+                </div>
+              )}
 
               <div className="space-y-8">
-                {session.session_exercises?.map((exerciseSession) => {
+                {session.session_exercises && session.session_exercises.map((exerciseSession) => {
                   const exerciseId = exerciseSession.id || `${session.day_number}-${exerciseSession.exercise?.id || 'unknown'}`;
                   const imageStatus = initImageStatus(exerciseId);
                   
@@ -123,8 +125,7 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
                     ? formatImageUrl(exerciseSession.exercise.gif_url)
                     : "/placeholder.svg";
                   
-                  // Log for diagnostic
-                  console.log(`Exercício: ${exerciseSession.exercise?.name}, GIF URL original: ${exerciseSession.exercise?.gif_url}, formatada: ${gifUrl}`);
+                  console.log(`Exercise: ${exerciseSession.exercise?.name}, original GIF URL: ${exerciseSession.exercise?.gif_url}, formatted: ${gifUrl}`);
                   
                   return (
                     <div 
@@ -198,10 +199,12 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
                 })}
               </div>
 
-              <div className="bg-primary-50 p-4 rounded-lg mt-6">
-                <h5 className="font-medium text-primary-700 mb-2">Volta à calma</h5>
-                <p className="text-sm text-gray-600">{session.cooldown_description}</p>
-              </div>
+              {session.cooldown_description && (
+                <div className="bg-primary-50 p-4 rounded-lg mt-6">
+                  <h5 className="font-medium text-primary-700 mb-2">Volta à calma</h5>
+                  <p className="text-sm text-gray-600">{session.cooldown_description}</p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
