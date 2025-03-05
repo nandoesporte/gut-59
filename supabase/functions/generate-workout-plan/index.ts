@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
@@ -47,10 +48,10 @@ serve(async (req) => {
 
     const systemPrompt = prompts[0].prompt;
     
-    // Buscar exercícios disponíveis
+    // Buscar exercícios disponíveis - Garantir que coletamos o gif_url e outros campos importantes
     console.log('Buscando exercícios disponíveis...');
     const exercisesResponse = await fetch(
-      `${SUPABASE_URL}/rest/v1/exercises?select=id,name,gif_url,description,muscle_group,equipment&limit=100`, 
+      `${SUPABASE_URL}/rest/v1/exercises?select=id,name,gif_url,description,muscle_group,equipment_needed,exercise_type,min_sets,max_sets,min_reps,max_reps,rest_time_seconds`, 
       {
         headers: {
           'apikey': SUPABASE_SERVICE_ROLE_KEY,
@@ -108,6 +109,26 @@ serve(async (req) => {
     const createdPlan = await createPlanResponse.json();
     console.log('Plano criado com sucesso:', createdPlan);
 
+    // Filtrar exercícios para recomendar baseado nas preferências do usuário
+    const filteredExercises = exercises.filter(exercise => {
+      // Se o usuário tem preferências de tipo de exercício, filtre por elas
+      if (preferences.preferred_exercise_types && preferences.preferred_exercise_types.length > 0) {
+        return preferences.preferred_exercise_types.includes(exercise.exercise_type);
+      }
+      return true;
+    });
+
+    // Garantir que temos exercícios suficientes
+    const usableExercises = filteredExercises.length > 20 ? filteredExercises : exercises;
+    
+    // Mapeie apenas as informações relevantes para o prompt
+    const exercisesForPrompt = usableExercises.slice(0, 30).map(e => ({
+      id: e.id,
+      name: e.name,
+      muscle_group: e.muscle_group,
+      exercise_type: e.exercise_type
+    }));
+
     // Preparar o prompt para o modelo Llama
     const userPrompt = `
 Crie um plano de treino personalizado com as seguintes características:
@@ -119,7 +140,7 @@ Crie um plano de treino personalizado com as seguintes características:
 - Dias por semana: ${preferences.days_per_week || 3}
 
 O plano deve conter ${preferences.days_per_week || 3} sessões de treino, cada uma com 5-6 exercícios.
-Inclua apenas exercícios dos IDs a seguir (retorne EXATAMENTE esses IDs): ${JSON.stringify(exercises.slice(0, 20).map(e => ({ id: e.id, name: e.name })))}
+Inclua apenas exercícios dos IDs a seguir (retorne EXATAMENTE esses IDs): ${JSON.stringify(exercisesForPrompt)}
 
 Formate a resposta como um JSON válido com esta estrutura:
 {
@@ -203,7 +224,7 @@ Formate a resposta como um JSON válido com esta estrutura:
           },
           body: JSON.stringify({
             id: sessionId,
-            workout_plan_id: planId,
+            plan_id: planId,
             day_number: session.day_number,
             warmup_description: session.warmup_description,
             cooldown_description: session.cooldown_description
@@ -218,9 +239,9 @@ Formate a resposta como um JSON válido com esta estrutura:
         // Adicionar exercícios à sessão
         if (session.exercises && Array.isArray(session.exercises)) {
           for (const exercise of session.exercises) {
-            // Verificar se o exercício existe
-            const exerciseExists = exercises.some(e => e.id === exercise.exercise_id);
-            if (!exerciseExists) {
+            // Verificar se o exercício existe no nosso banco de dados completo
+            const exerciseData = exercises.find(e => e.id === exercise.exercise_id);
+            if (!exerciseData) {
               console.warn(`Exercício com ID ${exercise.exercise_id} não encontrado no banco de dados, pulando...`);
               continue;
             }
@@ -235,10 +256,11 @@ Formate a resposta como um JSON válido com esta estrutura:
               },
               body: JSON.stringify({
                 session_id: sessionId,
-                exercise_id: exercise.exercise_id,
-                sets: exercise.sets,
-                reps: exercise.reps,
-                rest_time_seconds: exercise.rest_time_seconds
+                exercise_id: exerciseData.id,
+                sets: exercise.sets || exerciseData.min_sets || 3,
+                reps: exercise.reps || exerciseData.min_reps || 10,
+                rest_time_seconds: exercise.rest_time_seconds || exerciseData.rest_time_seconds || 60,
+                order_in_session: session.exercises.indexOf(exercise) + 1
               })
             });
             
@@ -252,7 +274,7 @@ Formate a resposta como um JSON válido com esta estrutura:
     
     // Buscar o plano completo com todas as suas associações
     console.log('Buscando plano completo...');
-    const planQueryUrl = `${SUPABASE_URL}/rest/v1/workout_plans?id=eq.${planId}&select=id,user_id,goal,start_date,end_date,workout_sessions(id,day_number,warmup_description,cooldown_description,session_exercises(id,sets,reps,rest_time_seconds,exercise:exercises(id,name,description,gif_url)))`;
+    const planQueryUrl = `${SUPABASE_URL}/rest/v1/workout_plans?id=eq.${planId}&select=id,user_id,goal,start_date,end_date,workout_sessions(id,day_number,warmup_description,cooldown_description,session_exercises(id,sets,reps,rest_time_seconds,exercise:exercises(id,name,description,gif_url,muscle_group,exercise_type)))`;
     
     const planResponse = await fetch(planQueryUrl, {
       headers: {
@@ -276,6 +298,17 @@ Formate a resposta como um JSON válido com esta estrutura:
     
     console.log('Plano completo gerado com sucesso:', finalPlan[0].id);
     console.log('Sessões no plano:', finalPlan[0].workout_sessions?.length || 0);
+
+    // Verifique e registre as URLs de GIF para diagnosticar
+    if (finalPlan[0].workout_sessions) {
+      for (const session of finalPlan[0].workout_sessions) {
+        if (session.session_exercises) {
+          for (const exercise of session.session_exercises) {
+            console.log(`Exercício ${exercise.exercise?.name || 'desconhecido'} - GIF URL: ${exercise.exercise?.gif_url || 'nenhuma'}`);
+          }
+        }
+      }
+    }
     
     return new Response(
       JSON.stringify(finalPlan[0]),

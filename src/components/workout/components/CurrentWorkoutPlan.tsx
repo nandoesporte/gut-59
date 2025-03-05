@@ -5,6 +5,7 @@ import { WorkoutPlan } from "../types/workout-plan";
 import { Calendar, Clock, Dumbbell } from "lucide-react";
 import { formatInTimeZone } from 'date-fns-tz';
 import { useState, useEffect } from "react";
+import { formatImageUrl } from "@/utils/imageUtils";
 
 // Timezone configuration
 const BRAZIL_TIMEZONE = "America/Sao_Paulo";
@@ -19,39 +20,6 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
   if (!plan || !plan.workout_sessions) {
     return null;
   }
-
-  // Improved function to format the URL of the image
-  const formatImageUrl = (url?: string): string => {
-    if (!url) return "/placeholder.svg";
-    
-    // Remove any invalid URL patterns like 'example.com'
-    if (url.includes('example.com')) {
-      console.warn('Invalid example URL detected:', url);
-      return "/placeholder.svg";
-    }
-    
-    // If it's a relative URL starting with a single slash, prepend with origin
-    if (url.startsWith('/') && !url.startsWith('//')) {
-      return `${window.location.origin}${url}`;
-    }
-    
-    // If it's a protocol-relative URL (starts with //), add https:
-    if (url.startsWith('//')) {
-      return `https:${url}`;
-    }
-    
-    // If the URL is from Supabase storage, use it as is
-    if (url.includes('supabase.co/storage/v1/object/public')) {
-      return url;
-    }
-    
-    // For URLs that don't have a protocol and don't start with /
-    if (!url.startsWith('http') && !url.startsWith('//') && !url.startsWith('/')) {
-      return `https://${url}`;
-    }
-    
-    return url;
-  };
 
   // Function to handle errors in loading images
   const handleImageError = (id: string, gifUrl?: string) => {
@@ -149,9 +117,14 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
                 {session.session_exercises?.map((exerciseSession) => {
                   const exerciseId = exerciseSession.id || `${session.day_number}-${exerciseSession.exercise?.id || 'unknown'}`;
                   const imageStatus = initImageStatus(exerciseId);
+                  
+                  // Garantir que estamos usando a URL do GIF do banco de dados
                   const gifUrl = exerciseSession.exercise?.gif_url 
                     ? formatImageUrl(exerciseSession.exercise.gif_url)
                     : "/placeholder.svg";
+                  
+                  // Log para diagnóstico
+                  console.log(`Exercício: ${exerciseSession.exercise?.name}, GIF URL original: ${exerciseSession.exercise?.gif_url}, formatada: ${gifUrl}`);
                   
                   return (
                     <div 
