@@ -2,6 +2,7 @@
 import { Badge } from "@/components/ui/badge";
 import { SessionExercise } from "../types/workout-plan";
 import { useState, useEffect } from "react";
+import { formatImageUrl } from "@/utils/imageUtils";
 
 interface WorkoutExerciseDetailProps {
   exerciseSession: SessionExercise;
@@ -26,39 +27,6 @@ export const WorkoutExerciseDetail = ({ exerciseSession }: WorkoutExerciseDetail
       setIsLoading(false);
     }
   }, [exerciseSession.exercise?.gif_url]);
-
-  // Improved function to format the URL of the image
-  const formatImageUrl = (url?: string): string => {
-    if (!url) return "/placeholder.svg";
-    
-    // Check for invalid example URLs
-    if (url.includes('example.com')) {
-      console.warn('Invalid example URL detected:', url);
-      return "/placeholder.svg";
-    }
-    
-    // Handle supabase storage URLs
-    if (url.includes('supabase.co/storage/v1/object/public')) {
-      return url;
-    }
-    
-    // Handle relative URLs
-    if (url.startsWith('/') && !url.startsWith('//')) {
-      return `${window.location.origin}${url}`;
-    }
-    
-    // Handle protocol-relative URLs
-    if (url.startsWith('//')) {
-      return `https:${url}`;
-    }
-    
-    // Add protocol if missing
-    if (!url.startsWith('http') && !url.startsWith('//') && !url.startsWith('/')) {
-      return `https://${url}`;
-    }
-    
-    return url;
-  };
 
   // Function to handle image load completion
   const handleImageLoad = () => {

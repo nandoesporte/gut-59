@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { formatImageUrl } from "@/utils/imageUtils";
 
 interface ExerciseCardProps {
   exercise: any;
@@ -28,38 +29,6 @@ export const ExerciseCard = ({ exercise, onUpdate }: ExerciseCardProps) => {
       setIsLoading(false);
     }
   }, [exercise.gif_url]);
-
-  const formatImageUrl = (url?: string): string => {
-    if (!url) return "/placeholder.svg";
-    
-    // Check for invalid example URLs
-    if (url.includes('example.com')) {
-      console.warn('Invalid example URL detected:', url);
-      return "/placeholder.svg";
-    }
-    
-    // Handle supabase storage URLs
-    if (url.includes('supabase.co/storage/v1/object/public')) {
-      return url;
-    }
-    
-    // Handle relative URLs
-    if (url.startsWith('/') && !url.startsWith('//')) {
-      return `${window.location.origin}${url}`;
-    }
-    
-    // Handle protocol-relative URLs
-    if (url.startsWith('//')) {
-      return `https:${url}`;
-    }
-    
-    // Add protocol if missing
-    if (!url.startsWith('http') && !url.startsWith('//') && !url.startsWith('/')) {
-      return `https://${url}`;
-    }
-    
-    return url;
-  };
 
   const handleImageLoad = () => {
     setIsLoading(false);
