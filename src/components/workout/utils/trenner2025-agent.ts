@@ -161,15 +161,15 @@ function processWorkoutPlan(workoutPlan: WorkoutPlan, databaseExercises: any[]):
               console.log(`Found database match for exercise "${sessionExercise.exercise.name}"`);
               
               // Replace all exercise data with database data
-              // Only include properties that are defined in the Exercise type
+              // Only include properties that are defined in the Exercise type from workout-plan.ts
               sessionExercise.exercise = {
                 id: dbExercise.id,
                 name: dbExercise.name,
                 description: dbExercise.description,
                 gif_url: dbExercise.gif_url, // Use the correct GIF URL from database
                 muscle_group: dbExercise.muscle_group,
-                exercise_type: dbExercise.exercise_type,
-                difficulty: dbExercise.difficulty
+                exercise_type: dbExercise.exercise_type
+                // Note: We're removing 'difficulty' as it's not in the Exercise type
               };
             } else {
               console.warn(`No database match found for exercise "${sessionExercise.exercise.name}"`);
