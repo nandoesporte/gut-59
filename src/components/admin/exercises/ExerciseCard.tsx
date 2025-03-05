@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,15 +14,63 @@ interface ExerciseCardProps {
 export const ExerciseCard = ({ exercise, onUpdate }: ExerciseCardProps) => {
   const [imgError, setImgError] = useState(false);
   const [imgSrc, setImgSrc] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
+    setIsLoading(true);
+    setImgError(false);
+    
     if (exercise.gif_url) {
       const url = formatImageUrl(exercise.gif_url);
       setImgSrc(url);
     } else {
       setImgSrc("/placeholder.svg");
+      setIsLoading(false);
     }
   }, [exercise.gif_url]);
+
+  const formatImageUrl = (url?: string): string => {
+    if (!url) return "/placeholder.svg";
+    
+    // Check for invalid example URLs
+    if (url.includes('example.com')) {
+      console.warn('Invalid example URL detected:', url);
+      return "/placeholder.svg";
+    }
+    
+    // Handle supabase storage URLs
+    if (url.includes('supabase.co/storage/v1/object/public')) {
+      return url;
+    }
+    
+    // Handle relative URLs
+    if (url.startsWith('/') && !url.startsWith('//')) {
+      return `${window.location.origin}${url}`;
+    }
+    
+    // Handle protocol-relative URLs
+    if (url.startsWith('//')) {
+      return `https:${url}`;
+    }
+    
+    // Add protocol if missing
+    if (!url.startsWith('http') && !url.startsWith('//') && !url.startsWith('/')) {
+      return `https://${url}`;
+    }
+    
+    return url;
+  };
+
+  const handleImageLoad = () => {
+    setIsLoading(false);
+  };
+
+  const handleImageError = () => {
+    console.error("Error loading GIF:", exercise.gif_url);
+    setImgError(true);
+    setImgSrc("/placeholder.svg");
+    setIsLoading(false);
+  };
 
   const handleDelete = async () => {
     if (!confirm('Tem certeza que deseja excluir este exercício?')) return;
@@ -42,39 +91,6 @@ export const ExerciseCard = ({ exercise, onUpdate }: ExerciseCardProps) => {
     }
   };
 
-  const formatImageUrl = (url?: string): string => {
-    if (!url) return "/placeholder.svg";
-    
-    if (url.includes('example.com')) {
-      console.warn('Invalid example URL detected:', url);
-      return "/placeholder.svg";
-    }
-    
-    if (url.startsWith('/') && !url.startsWith('//')) {
-      return `${window.location.origin}${url}`;
-    }
-    
-    if (url.startsWith('//')) {
-      return `https:${url}`;
-    }
-    
-    if (url.includes('supabase.co/storage/v1/object/public')) {
-      return url;
-    }
-    
-    if (!url.startsWith('http') && !url.startsWith('//') && !url.startsWith('/')) {
-      return `https://${url}`;
-    }
-    
-    return url;
-  };
-
-  const handleImageError = () => {
-    console.error("Error loading GIF:", exercise.gif_url);
-    setImgError(true);
-    setImgSrc("/placeholder.svg");
-  };
-
   return (
     <Card>
       <CardHeader className="space-y-1">
@@ -92,6 +108,11 @@ export const ExerciseCard = ({ exercise, onUpdate }: ExerciseCardProps) => {
       </CardHeader>
       <CardContent>
         <div className="mb-4 relative pt-[56.25%] flex items-center justify-center bg-white">
+          {isLoading && (
+            <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center bg-gray-100 rounded-md">
+              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          )}
           {imgError ? (
             <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center bg-gray-100 rounded-md">
               <div className="text-gray-400 text-xs text-center p-2">
@@ -107,6 +128,8 @@ export const ExerciseCard = ({ exercise, onUpdate }: ExerciseCardProps) => {
               alt={exercise.name}
               className="absolute top-0 left-0 w-full h-full object-contain rounded-md"
               onError={handleImageError}
+              onLoad={handleImageLoad}
+              style={{ display: isLoading ? 'none' : 'block' }}
             />
           )}
         </div>

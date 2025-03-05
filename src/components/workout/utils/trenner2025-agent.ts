@@ -380,16 +380,37 @@ export async function saveWorkoutPlan(workoutPlan: WorkoutPlan, userId: string):
             return validMuscleGroups.includes(mg as MuscleGroup) ? mg as MuscleGroup : 'chest' as MuscleGroup;
           })();
 
+          // Ensure exercise_type is one of the valid enum values
+          const exerciseType = (() => {
+            // Convert common variations to valid enum values
+            const rawType = String(sessionExercise.exercise.exercise_type || 'strength').toLowerCase();
+            
+            if (rawType === 'força' || rawType === 'forca' || rawType === 'force') {
+              return 'strength' as ExerciseType;
+            }
+            if (rawType === 'cardio' || rawType === 'cardiovascular' || rawType === 'aerobic') {
+              return 'cardio' as ExerciseType;
+            }
+            if (rawType === 'mobility' || rawType === 'stretching' || rawType === 'flexibility' || rawType === 'mobilidade') {
+              return 'mobility' as ExerciseType;
+            }
+            
+            // Default to strength if not recognized
+            return 'strength' as ExerciseType;
+          })();
+
           // Create exercise with only the fields that are in the database schema
           const exerciseToInsert = {
             name: sessionExercise.exercise.name,
             description: sessionExercise.exercise.description || '',
             gif_url: sessionExercise.exercise.gif_url || '',
             muscle_group: muscleGroup,
-            exercise_type: (sessionExercise.exercise.exercise_type as ExerciseType) || ('strength' as ExerciseType),
+            exercise_type: exerciseType,
             difficulty: 'beginner' as const,
             equipment_needed: ['bodyweight'] as string[],
           };
+          
+          console.log("Inserting exercise with data:", JSON.stringify(exerciseToInsert, null, 2));
           
           // Insert the exercise with all required fields
           const { data: exerciseData, error: exerciseError } = await supabase

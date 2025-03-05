@@ -14,10 +14,14 @@ export const WorkoutExerciseDetail = ({ exerciseSession }: WorkoutExerciseDetail
   
   useEffect(() => {
     setIsLoading(true);
+    setImgError(false);
+    
     if (exerciseSession.exercise?.gif_url) {
       const url = formatImageUrl(exerciseSession.exercise.gif_url);
+      console.log(`Processing exercise GIF URL: ${exerciseSession.exercise.gif_url} → ${url}`);
       setImgSrc(url);
     } else {
+      console.log("No GIF URL provided for exercise:", exerciseSession.exercise?.name);
       setImgSrc("/placeholder.svg");
       setIsLoading(false);
     }
@@ -27,28 +31,28 @@ export const WorkoutExerciseDetail = ({ exerciseSession }: WorkoutExerciseDetail
   const formatImageUrl = (url?: string): string => {
     if (!url) return "/placeholder.svg";
     
-    // Remove any invalid URL patterns like 'example.com'
+    // Check for invalid example URLs
     if (url.includes('example.com')) {
       console.warn('Invalid example URL detected:', url);
       return "/placeholder.svg";
     }
     
-    // If it's a relative URL starting with a single slash, prepend with origin
-    if (url.startsWith('/') && !url.startsWith('//')) {
-      return `${window.location.origin}${url}`;
-    }
-    
-    // If it's a protocol-relative URL (starts with //), add https:
-    if (url.startsWith('//')) {
-      return `https:${url}`;
-    }
-    
-    // If the URL is from Supabase storage, use it as is
+    // Handle supabase storage URLs
     if (url.includes('supabase.co/storage/v1/object/public')) {
       return url;
     }
     
-    // For URLs that don't have a protocol and don't start with /
+    // Handle relative URLs
+    if (url.startsWith('/') && !url.startsWith('//')) {
+      return `${window.location.origin}${url}`;
+    }
+    
+    // Handle protocol-relative URLs
+    if (url.startsWith('//')) {
+      return `https:${url}`;
+    }
+    
+    // Add protocol if missing
     if (!url.startsWith('http') && !url.startsWith('//') && !url.startsWith('/')) {
       return `https://${url}`;
     }
@@ -58,6 +62,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession }: WorkoutExerciseDetail
 
   // Function to handle image load completion
   const handleImageLoad = () => {
+    console.log(`GIF loaded successfully: ${exerciseSession.exercise?.name}`);
     setIsLoading(false);
   };
 
@@ -72,7 +77,12 @@ export const WorkoutExerciseDetail = ({ exerciseSession }: WorkoutExerciseDetail
   return (
     <div className="bg-gray-50 rounded-lg p-4">
       <div className="flex flex-col md:flex-row gap-4">
-        <div className="w-full md:w-48 h-48 rounded overflow-hidden bg-white flex-shrink-0 flex items-center justify-center">
+        <div className="w-full md:w-48 h-48 rounded overflow-hidden bg-white flex-shrink-0 flex items-center justify-center relative">
+          {isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
+              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          )}
           {imgError ? (
             <div className="text-gray-400 text-xs text-center p-2">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 mx-auto mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -81,22 +91,15 @@ export const WorkoutExerciseDetail = ({ exerciseSession }: WorkoutExerciseDetail
               Imagem não disponível
             </div>
           ) : (
-            <>
-              {isLoading && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-                </div>
-              )}
-              <img 
-                src={imgSrc || "/placeholder.svg"}
-                alt={exerciseSession.exercise?.name || "Exercício"}
-                className="w-full h-full object-contain"
-                loading="lazy"
-                onError={handleImageError}
-                onLoad={handleImageLoad}
-                style={{ display: isLoading ? 'none' : 'block' }}
-              />
-            </>
+            <img 
+              src={imgSrc || "/placeholder.svg"}
+              alt={exerciseSession.exercise?.name || "Exercício"}
+              className="w-full h-full object-contain"
+              loading="lazy"
+              onError={handleImageError}
+              onLoad={handleImageLoad}
+              style={{ display: isLoading ? 'none' : 'block' }}
+            />
           )}
         </div>
         
