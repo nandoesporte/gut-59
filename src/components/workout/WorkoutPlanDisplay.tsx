@@ -1,4 +1,4 @@
-
+<lov-codelov-code>
 import { Button } from "@/components/ui/button";
 import { WorkoutPreferences } from "./types";
 import { CurrentWorkoutPlan } from "./components/CurrentWorkoutPlan";
@@ -46,7 +46,7 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
     return <WorkoutLoadingState 
       loadingTime={loadingTime} 
       onRetry={handleRetry}
-      timePassed={loadingTime > 30}
+      timePassed={loadingTime > 30} // Convert number to boolean by comparison
     />;
   }
 
@@ -110,3 +110,4 @@ export const WorkoutPlanDisplay = ({ preferences, onReset }: WorkoutPlanDisplayP
     </div>
   );
 };
+</lov-code>

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { FisioPreferences } from "./types";
@@ -83,7 +84,7 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
     return <WorkoutLoadingState 
       loadingTime={loadingTime} 
       onRetry={() => generatePlan()}
-      timePassed={loadingTime > 30}
+      timePassed={loadingTime > 30} // Convert number to boolean by comparison
     />;
   }
 
