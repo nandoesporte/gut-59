@@ -39,7 +39,11 @@ export async function generateWorkoutPlanWithTrenner2025(
     
     const { data, error } = await supabase.functions.invoke('generate-workout-plan-llama', {
       body: { 
-        preferences, 
+        preferences: {
+          ...preferences,
+          // Ensure we request a full week of workouts (6 days + rest on Sunday)
+          days_per_week: 6
+        }, 
         userId,
         settings: aiSettings,
         requestId: generationRequestId,
@@ -100,9 +104,12 @@ export async function generateWorkoutPlanWithTrenner2025(
     // Process the workout plan to ensure it uses correct exercise data from database
     const processedPlan = processWorkoutPlan(data.workoutPlan, exercises);
     
+    // Ensure the plan follows the weekly structure with named days and Sunday rest
+    const finalPlan = structureWeeklyPlan(processedPlan);
+    
     // Return the processed workout plan
     return { 
-      workoutPlan: processedPlan, 
+      workoutPlan: finalPlan, 
       error: null,
       rawResponse: data
     };
@@ -123,25 +130,94 @@ export async function generateWorkoutPlanWithTrenner2025(
   }
 }
 
+// Function to structure the workout plan into a weekly format with named days
+function structureWeeklyPlan(workoutPlan: WorkoutPlan): WorkoutPlan {
+  if (!workoutPlan.workout_sessions || workoutPlan.workout_sessions.length === 0) {
+    return workoutPlan;
+  }
+  
+  // Define the days of the week
+  const dayNames = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"];
+  
+  // Get existing sessions
+  const existingSessions = [...workoutPlan.workout_sessions];
+  
+  // Create a new array of sessions
+  const structuredSessions = [];
+  
+  // Add sessions for Monday through Saturday (6 days)
+  for (let i = 0; i < 6; i++) {
+    // Use existing session if available, otherwise create a new one
+    if (i < existingSessions.length) {
+      const session = existingSessions[i];
+      // Update day number and add day name
+      session.day_number = i + 1;
+      session.day_name = dayNames[i];
+      structuredSessions.push(session);
+    } else {
+      // If we don't have enough sessions, create a new one by copying format of first session
+      // but with different muscle groups
+      const templateSession = existingSessions[0];
+      structuredSessions.push({
+        ...templateSession,
+        id: `session_${i + 1}`,
+        day_number: i + 1,
+        day_name: dayNames[i],
+        // Adjust session exercises if needed based on day (simplified version)
+        session_exercises: templateSession.session_exercises.map(ex => ({
+          ...ex,
+          id: `exercise_${i + 1}_${ex.exercise.id}`,
+        }))
+      });
+    }
+  }
+  
+  // Add Sunday as a rest day
+  structuredSessions.push({
+    id: "session_7",
+    day_number: 7,
+    day_name: "Domingo (Descanso)",
+    warmup_description: "Dia de descanso. Foque em recuperação e alongamentos leves.",
+    cooldown_description: "Realize atividades de lazer e recuperação.",
+    session_exercises: []
+  });
+  
+  // Return updated workout plan
+  return {
+    ...workoutPlan,
+    workout_sessions: structuredSessions
+  };
+}
+
 function processWorkoutPlan(workoutPlan: WorkoutPlan, databaseExercises: any[]): WorkoutPlan {
   console.log("Processing workout plan to ensure correct exercise data is used...");
   
-  // Create a map of exercise names to database exercises for quick lookup
-  const exerciseMap = new Map();
+  // Create multiple maps for different matching strategies
+  const exactNameMap = new Map();
+  const normalizedNameMap = new Map();
+  const simplifiedNameMap = new Map();
+  
+  // Build maps for various name matching strategies
   databaseExercises.forEach(exercise => {
-    exerciseMap.set(exercise.name.toLowerCase(), exercise);
+    // Exact name matching (case insensitive)
+    exactNameMap.set(exercise.name.toLowerCase(), exercise);
     
-    // Also map alternative names or variations
+    // Normalized name matching (remove accents, special chars)
+    const normalizedName = normalizeExerciseName(exercise.name);
+    normalizedNameMap.set(normalizedName, exercise);
+    
+    // Simplified name matching (remove common words, equipment mentions)
     const simplifiedName = exercise.name.toLowerCase()
       .replace(/\s+/g, ' ')
       .replace(/com\s+halter(es)?/g, '')
       .replace(/com\s+barra/g, '')
       .replace(/com\s+corda/g, '')
       .replace(/na\s+máquina/g, '')
+      .replace(/máquina\s+de/g, '')
       .trim();
     
     if (simplifiedName !== exercise.name.toLowerCase()) {
-      exerciseMap.set(simplifiedName, exercise);
+      simplifiedNameMap.set(simplifiedName, exercise);
     }
   });
   
@@ -151,13 +227,39 @@ function processWorkoutPlan(workoutPlan: WorkoutPlan, databaseExercises: any[]):
       if (session.session_exercises) {
         session.session_exercises.forEach(sessionExercise => {
           if (sessionExercise.exercise) {
-            const exerciseName = sessionExercise.exercise.name.toLowerCase();
+            const exerciseName = sessionExercise.exercise.name;
+            let dbExercise = null;
             
-            // Try to find the exercise in our database
-            const dbExercise = exerciseMap.get(exerciseName);
+            // Try to find the exercise using different matching strategies
+            // 1. Exact match
+            dbExercise = exactNameMap.get(exerciseName.toLowerCase());
+            
+            // 2. Normalized match
+            if (!dbExercise) {
+              const normalizedName = normalizeExerciseName(exerciseName);
+              dbExercise = normalizedNameMap.get(normalizedName);
+            }
+            
+            // 3. Simplified match
+            if (!dbExercise) {
+              const simplifiedName = exerciseName.toLowerCase()
+                .replace(/\s+/g, ' ')
+                .replace(/com\s+halter(es)?/g, '')
+                .replace(/com\s+barra/g, '')
+                .replace(/com\s+corda/g, '')
+                .replace(/na\s+máquina/g, '')
+                .replace(/máquina\s+de/g, '')
+                .trim();
+              dbExercise = simplifiedNameMap.get(simplifiedName);
+            }
+            
+            // 4. Fuzzy match if still not found
+            if (!dbExercise) {
+              dbExercise = findBestMatchingExercise(exerciseName, databaseExercises);
+            }
             
             if (dbExercise) {
-              console.log(`Found database match for exercise "${sessionExercise.exercise.name}"`);
+              console.log(`Found database match for exercise "${sessionExercise.exercise.name}": ${dbExercise.name}`);
               
               // Replace all exercise data with database data
               // Only include properties that are defined in the Exercise type from workout-plan.ts
@@ -168,7 +270,7 @@ function processWorkoutPlan(workoutPlan: WorkoutPlan, databaseExercises: any[]):
                 gif_url: dbExercise.gif_url, // Use the correct GIF URL from database
                 muscle_group: dbExercise.muscle_group,
                 exercise_type: dbExercise.exercise_type
-                // Note: We're removing 'difficulty' as it's not in the Exercise type
+                // Note: 'difficulty' is not included as it's not in the Exercise type
               };
             } else {
               console.warn(`No database match found for exercise "${sessionExercise.exercise.name}"`);
@@ -184,6 +286,62 @@ function processWorkoutPlan(workoutPlan: WorkoutPlan, databaseExercises: any[]):
   
   console.log("Workout plan processing completed");
   return workoutPlan;
+}
+
+// Helper function to normalize exercise names for better matching
+function normalizeExerciseName(name: string): string {
+  return name.toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove accents
+    .replace(/[^\w\s]/gi, '') // Remove special characters
+    .replace(/\s+/g, ' ') // Normalize spaces
+    .trim();
+}
+
+// Helper function to find the best matching exercise using simple similarity
+function findBestMatchingExercise(name: string, exercises: any[]): any | null {
+  const normalizedName = normalizeExerciseName(name);
+  let bestMatch = null;
+  let highestScore = 0;
+  
+  for (const exercise of exercises) {
+    const exerciseName = normalizeExerciseName(exercise.name);
+    const score = calculateSimilarity(normalizedName, exerciseName);
+    
+    if (score > highestScore && score > 0.7) { // Only accept matches with >70% similarity
+      highestScore = score;
+      bestMatch = exercise;
+    }
+  }
+  
+  return bestMatch;
+}
+
+// Simple string similarity function (Dice's coefficient)
+function calculateSimilarity(a: string, b: string): number {
+  if (a === b) return 1.0;
+  if (a.length < 2 || b.length < 2) return 0.0;
+  
+  // Create bigrams
+  const getBigrams = (string: string) => {
+    const bigrams = new Set<string>();
+    for (let i = 0; i < string.length - 1; i++) {
+      bigrams.add(string.substring(i, i + 2));
+    }
+    return bigrams;
+  };
+  
+  const aBigrams = getBigrams(a);
+  const bBigrams = getBigrams(b);
+  
+  // Count matches
+  let matches = 0;
+  for (const bigram of aBigrams) {
+    if (bBigrams.has(bigram)) {
+      matches++;
+    }
+  }
+  
+  return (2.0 * matches) / (aBigrams.size + bBigrams.size);
 }
 
 function filterExercisesByPreferences(exercises: any[], preferences: WorkoutPreferences) {
