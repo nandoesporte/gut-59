@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { WorkoutPreferences } from "../types";
 import { WorkoutPlan } from "../types/workout-plan";
@@ -160,6 +161,7 @@ function processWorkoutPlan(workoutPlan: WorkoutPlan, databaseExercises: any[]):
               console.log(`Found database match for exercise "${sessionExercise.exercise.name}"`);
               
               // Replace all exercise data with database data
+              // Only include properties that are defined in the Exercise type
               sessionExercise.exercise = {
                 id: dbExercise.id,
                 name: dbExercise.name,
@@ -167,7 +169,6 @@ function processWorkoutPlan(workoutPlan: WorkoutPlan, databaseExercises: any[]):
                 gif_url: dbExercise.gif_url, // Use the correct GIF URL from database
                 muscle_group: dbExercise.muscle_group,
                 exercise_type: dbExercise.exercise_type,
-                equipment_needed: dbExercise.equipment_needed,
                 difficulty: dbExercise.difficulty
               };
             } else {
