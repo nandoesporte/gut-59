@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { WorkoutPreferences } from "../types";
 import { WorkoutPlan } from "../types/workout-plan";
@@ -340,7 +341,7 @@ export async function saveWorkoutPlan(workoutPlan: WorkoutPlan, userId: string):
       console.log(`Saving session for day ${session.day_number}...`);
       
       // Remover campos que não existem no banco de dados
-      const sessionData = {
+      const sessionPayload = {
         plan_id: planId,
         day_number: session.day_number,
         focus: session.focus,
@@ -350,9 +351,9 @@ export async function saveWorkoutPlan(workoutPlan: WorkoutPlan, userId: string):
       };
       
       // Insert the session
-      const { data: sessionData, error: sessionError } = await supabase
+      const { data: sessionRecord, error: sessionError } = await supabase
         .from('workout_sessions')
-        .insert(sessionData)
+        .insert(sessionPayload)
         .select()
         .single();
       
@@ -361,7 +362,7 @@ export async function saveWorkoutPlan(workoutPlan: WorkoutPlan, userId: string):
         continue;
       }
       
-      console.log(`Session saved with ID: ${sessionData.id}, now saving exercises...`);
+      console.log(`Session saved with ID: ${sessionRecord.id}, now saving exercises...`);
       
       // Save each exercise for this session
       for (let i = 0; i < session.session_exercises.length; i++) {
@@ -415,7 +416,7 @@ export async function saveWorkoutPlan(workoutPlan: WorkoutPlan, userId: string):
         const { error: sessionExerciseError } = await supabase
           .from('session_exercises')
           .insert({
-            session_id: sessionData.id,
+            session_id: sessionRecord.id,
             exercise_id: exerciseId,
             sets: sessionExercise.sets,
             reps: sessionExercise.reps,
