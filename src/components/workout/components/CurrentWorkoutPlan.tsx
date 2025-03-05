@@ -84,17 +84,21 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
               <div className="space-y-8">
                 {session.session_exercises?.map((exerciseSession) => (
                   <div 
-                    key={exerciseSession.id}
+                    key={exerciseSession.id || `${session.day_number}-${exerciseSession.exercise?.id || 'unknown'}`}
                     className="bg-gray-50 rounded-lg p-6 transition-all hover:shadow-md"
                   >
                     <div className="flex flex-col md:flex-row gap-6">
                       {exerciseSession.exercise?.gif_url && (
-                        <div className="w-full md:w-64 h-64 rounded-lg overflow-hidden bg-white shadow-inner">
+                        <div className="w-full md:w-64 h-64 rounded-lg overflow-hidden bg-white shadow-inner flex items-center justify-center">
                           <img 
                             src={exerciseSession.exercise.gif_url} 
                             alt={exerciseSession.exercise.name}
                             className="w-full h-full object-contain"
                             loading="lazy"
+                            onError={(e) => {
+                              console.error("Error loading GIF:", exerciseSession.exercise?.gif_url);
+                              e.currentTarget.src = "/placeholder.svg";
+                            }}
                           />
                         </div>
                       )}

@@ -48,11 +48,15 @@ export const ExerciseCard = ({ exercise, onUpdate }: ExerciseCardProps) => {
       </CardHeader>
       <CardContent>
         {exercise.gif_url && (
-          <div className="mb-4 relative pt-[56.25%]">
+          <div className="mb-4 relative pt-[56.25%] flex items-center justify-center bg-white">
             <img
               src={exercise.gif_url}
               alt={exercise.name}
-              className="absolute top-0 left-0 w-full h-full object-cover rounded-md"
+              className="absolute top-0 left-0 w-full h-full object-contain rounded-md"
+              onError={(e) => {
+                console.error("Error loading GIF:", exercise.gif_url);
+                e.currentTarget.src = "/placeholder.svg";
+              }}
             />
           </div>
         )}

@@ -11,12 +11,16 @@ export const WorkoutExerciseDetail = ({ exerciseSession }: WorkoutExerciseDetail
     <div className="bg-gray-50 rounded-lg p-4">
       <div className="flex flex-col md:flex-row gap-4">
         {exerciseSession.exercise?.gif_url && (
-          <div className="w-full md:w-48 h-48 rounded overflow-hidden bg-white flex-shrink-0">
+          <div className="w-full md:w-48 h-48 rounded overflow-hidden bg-white flex-shrink-0 flex items-center justify-center">
             <img 
               src={exerciseSession.exercise.gif_url} 
               alt={exerciseSession.exercise.name}
               className="w-full h-full object-contain"
               loading="lazy"
+              onError={(e) => {
+                console.error("Error loading GIF:", exerciseSession.exercise?.gif_url);
+                e.currentTarget.src = "/placeholder.svg";
+              }}
             />
           </div>
         )}
