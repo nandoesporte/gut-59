@@ -108,6 +108,7 @@ export async function generateWorkoutPlanWithTrenner2025(
     
     // Ensure the plan follows the weekly structure with named days and Sunday rest
     // Also enforce minimum 6 exercises per session with proper muscle group distribution
+    // NEW: Ensure NO exercise is used across multiple days 
     const finalPlan = structureWeeklyPlan(processedPlan, exercises);
     
     // Return the processed workout plan
@@ -134,6 +135,7 @@ export async function generateWorkoutPlanWithTrenner2025(
 }
 
 // Function to structure the workout plan into a weekly format with named days and minimum exercises
+// UPDATED: Added global exercise tracking to prevent exercise duplication across different days
 function structureWeeklyPlan(workoutPlan: WorkoutPlan, dbExercises: any[]): WorkoutPlan {
   if (!workoutPlan.workout_sessions || workoutPlan.workout_sessions.length === 0) {
     return workoutPlan;
@@ -168,6 +170,9 @@ function structureWeeklyPlan(workoutPlan: WorkoutPlan, dbExercises: any[]): Work
     'biceps': ['biceps', 'arms']
   };
 
+  // NEW: Track exercises that have been used across all days to prevent repetition
+  const globalUsedExerciseIds = new Set<string>();
+
   // Get existing sessions
   const existingSessions = [...workoutPlan.workout_sessions];
   
@@ -185,7 +190,7 @@ function structureWeeklyPlan(workoutPlan: WorkoutPlan, dbExercises: any[]): Work
   });
 
   // Helper function to find exercises for specific muscle groups
-  const findExercisesForMuscleGroups = (muscleGroups: string[], count: number, existingExerciseIds: Set<string>) => {
+  const findExercisesForMuscleGroups = (muscleGroups: string[], count: number, excludeIds: Set<string>) => {
     const result: any[] = [];
     const allRelevantExercises: any[] = [];
 
@@ -202,12 +207,13 @@ function structureWeeklyPlan(workoutPlan: WorkoutPlan, dbExercises: any[]): Work
     // Shuffle the exercises to get random selection
     const shuffled = [...allRelevantExercises].sort(() => 0.5 - Math.random());
     
-    // Pick exercises that aren't already in the session
+    // Pick exercises that aren't already in the excluded set
     for (const exercise of shuffled) {
       if (result.length >= count) break;
-      if (!existingExerciseIds.has(exercise.id)) {
+      if (!excludeIds.has(exercise.id)) {
         result.push(exercise);
-        existingExerciseIds.add(exercise.id);
+        excludeIds.add(exercise.id); // Mark as used locally
+        globalUsedExerciseIds.add(exercise.id); // NEW: Mark as used globally
       }
     }
     
@@ -243,30 +249,31 @@ function structureWeeklyPlan(workoutPlan: WorkoutPlan, dbExercises: any[]): Work
     session.day_name = dayNames[i];
     session.focus = `${dailyMuscleGroupFocus[i].map(g => g.charAt(0).toUpperCase() + g.slice(1)).join(' + ')}`;
 
-    // Track all exercise IDs used in this session to avoid duplicates
-    const existingExerciseIds = new Set<string>();
+    // Track all exercise IDs that will be used in this day's session
+    const sessionExerciseIds = new Set<string>();
     
-    // If session has exercises, add their IDs to the set
+    // First step: Remove any exercises that are already used in other days 
+    // and create a list of exercises to keep
+    const exercisesToKeep: any[] = [];
     if (session.session_exercises && session.session_exercises.length > 0) {
-      // First, remove any duplicate exercises
-      const uniqueExercises: any[] = [];
-      const seenExerciseIds = new Set<string>();
-      
       session.session_exercises.forEach((ex: any) => {
-        if (ex.exercise && ex.exercise.id && !seenExerciseIds.has(ex.exercise.id)) {
-          seenExerciseIds.add(ex.exercise.id);
-          uniqueExercises.push(ex);
-          existingExerciseIds.add(ex.exercise.id);
+        if (ex.exercise && ex.exercise.id) {
+          // Only keep this exercise if it hasn't been used globally (except in this session)
+          // or if it's already in this current session
+          if (!globalUsedExerciseIds.has(ex.exercise.id)) {
+            exercisesToKeep.push(ex);
+            sessionExerciseIds.add(ex.exercise.id);
+            globalUsedExerciseIds.add(ex.exercise.id); // Mark it as used globally
+          } else {
+            console.log(`Removing duplicate exercise across days: ${ex.exercise.name} (${ex.exercise.id})`);
+          }
         }
       });
-      
-      // Replace the session exercises with unique exercises
-      session.session_exercises = uniqueExercises;
-    } else {
-      // Initialize empty array if no exercises
-      session.session_exercises = [];
     }
-
+    
+    // Replace the session exercises with our filtered list
+    session.session_exercises = exercisesToKeep;
+    
     // Check which muscle groups are currently covered
     const coveredMuscleGroups = new Set<string>();
     
@@ -291,7 +298,7 @@ function structureWeeklyPlan(workoutPlan: WorkoutPlan, dbExercises: any[]): Work
         const additionalExercises = findExercisesForMuscleGroups(
           [muscleGroup], 
           1, 
-          existingExerciseIds
+          sessionExerciseIds
         );
         
         if (additionalExercises.length > 0) {
@@ -313,6 +320,7 @@ function structureWeeklyPlan(workoutPlan: WorkoutPlan, dbExercises: any[]): Work
           
           session.session_exercises.push(newExerciseSession);
           coveredMuscleGroups.add(exercise.muscle_group);
+          sessionExerciseIds.add(exercise.id);
         }
       }
     }
@@ -329,7 +337,7 @@ function structureWeeklyPlan(workoutPlan: WorkoutPlan, dbExercises: any[]): Work
       const additionalExercises = findExercisesForMuscleGroups(
         dailyMuscleGroupFocus[i], 
         needMoreExercises, 
-        existingExerciseIds
+        sessionExerciseIds
       );
 
       // Add these exercises to the session
@@ -350,6 +358,7 @@ function structureWeeklyPlan(workoutPlan: WorkoutPlan, dbExercises: any[]): Work
         };
         
         session.session_exercises.push(newExerciseSession);
+        sessionExerciseIds.add(exercise.id);
       });
     }
     
