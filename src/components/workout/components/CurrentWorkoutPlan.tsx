@@ -118,12 +118,12 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
                   const exerciseId = exerciseSession.id || `${session.day_number}-${exerciseSession.exercise?.id || 'unknown'}`;
                   const imageStatus = initImageStatus(exerciseId);
                   
-                  // Garantir que estamos usando a URL do GIF do banco de dados
+                  // Use the formatImageUrl utility function to get proper URL
                   const gifUrl = exerciseSession.exercise?.gif_url 
                     ? formatImageUrl(exerciseSession.exercise.gif_url)
                     : "/placeholder.svg";
                   
-                  // Log para diagnóstico
+                  // Log for diagnostic
                   console.log(`Exercício: ${exerciseSession.exercise?.name}, GIF URL original: ${exerciseSession.exercise?.gif_url}, formatada: ${gifUrl}`);
                   
                   return (
