@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { WorkoutPlan } from "../types/workout-plan";
 import { Calendar, Clock, Dumbbell } from "lucide-react";
 import { formatInTimeZone } from 'date-fns-tz';
+import { useState } from "react";
 
 // Timezone configuration
 const BRAZIL_TIMEZONE = "America/Sao_Paulo";
@@ -13,9 +14,29 @@ interface CurrentWorkoutPlanProps {
 }
 
 export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+
   if (!plan || !plan.workout_sessions) {
     return null;
   }
+
+  // Função para garantir que a URL esteja correta
+  const getImageUrl = (url?: string) => {
+    if (!url) return "/placeholder.svg";
+    
+    // Se for uma URL relativa sem protocolo, adicione https:
+    if (url.startsWith('//')) {
+      return `https:${url}`;
+    }
+    
+    return url;
+  };
+
+  // Função para tratar erros de carregamento de imagem
+  const handleImageError = (id: string, gifUrl?: string) => {
+    console.error("Error loading GIF:", gifUrl);
+    setImageErrors(prev => ({ ...prev, [id]: true }));
+  };
 
   // Group exercises by muscle group for better visualization
   const getMuscleGroupBadges = (session: any) => {
@@ -82,70 +103,81 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
               </div>
 
               <div className="space-y-8">
-                {session.session_exercises?.map((exerciseSession) => (
-                  <div 
-                    key={exerciseSession.id || `${session.day_number}-${exerciseSession.exercise?.id || 'unknown'}`}
-                    className="bg-gray-50 rounded-lg p-6 transition-all hover:shadow-md"
-                  >
-                    <div className="flex flex-col md:flex-row gap-6">
-                      {exerciseSession.exercise?.gif_url && (
-                        <div className="w-full md:w-64 h-64 rounded-lg overflow-hidden bg-white shadow-inner flex items-center justify-center">
-                          <img 
-                            src={exerciseSession.exercise.gif_url} 
-                            alt={exerciseSession.exercise.name}
-                            className="w-full h-full object-contain"
-                            loading="lazy"
-                            onError={(e) => {
-                              console.error("Error loading GIF:", exerciseSession.exercise?.gif_url);
-                              e.currentTarget.src = "/placeholder.svg";
-                            }}
-                          />
-                        </div>
-                      )}
-                      <div className="flex-grow">
-                        <div className="flex justify-between items-start mb-4">
-                          <h6 className="text-lg font-medium text-gray-900">
-                            {exerciseSession.exercise?.name}
-                          </h6>
-                          {exerciseSession.exercise?.muscle_group && (
-                            <Badge className="bg-primary-100 text-primary-700 border-none">
-                              {exerciseSession.exercise.muscle_group.replace('_', ' ')}
-                            </Badge>
+                {session.session_exercises?.map((exerciseSession) => {
+                  const exerciseId = exerciseSession.id || `${session.day_number}-${exerciseSession.exercise?.id || 'unknown'}`;
+                  const hasError = imageErrors[exerciseId];
+                  
+                  return (
+                    <div 
+                      key={exerciseId}
+                      className="bg-gray-50 rounded-lg p-6 transition-all hover:shadow-md"
+                    >
+                      <div className="flex flex-col md:flex-row gap-6">
+                        {exerciseSession.exercise?.gif_url && (
+                          <div className="w-full md:w-64 h-64 rounded-lg overflow-hidden bg-white shadow-inner flex items-center justify-center">
+                            {hasError ? (
+                              <div className="text-gray-400 text-xs text-center p-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                Imagem do exercício não disponível
+                              </div>
+                            ) : (
+                              <img 
+                                src={getImageUrl(exerciseSession.exercise.gif_url)} 
+                                alt={exerciseSession.exercise.name}
+                                className="w-full h-full object-contain"
+                                loading="lazy"
+                                onError={() => handleImageError(exerciseId, exerciseSession.exercise?.gif_url)}
+                              />
+                            )}
+                          </div>
+                        )}
+                        <div className="flex-grow">
+                          <div className="flex justify-between items-start mb-4">
+                            <h6 className="text-lg font-medium text-gray-900">
+                              {exerciseSession.exercise?.name}
+                            </h6>
+                            {exerciseSession.exercise?.muscle_group && (
+                              <Badge className="bg-primary-100 text-primary-700 border-none">
+                                {exerciseSession.exercise.muscle_group.replace('_', ' ')}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="bg-white p-4 rounded-lg shadow-sm">
+                              <span className="text-sm text-gray-500 block mb-1">Séries</span>
+                              <span className="text-lg font-semibold text-primary-600">
+                                {exerciseSession.sets}
+                              </span>
+                            </div>
+                            <div className="bg-white p-4 rounded-lg shadow-sm">
+                              <span className="text-sm text-gray-500 block mb-1">Repetições</span>
+                              <span className="text-lg font-semibold text-primary-600">
+                                {exerciseSession.reps}
+                              </span>
+                            </div>
+                            <div className="bg-white p-4 rounded-lg shadow-sm">
+                              <span className="text-sm text-gray-500 block mb-1">
+                                <Clock className="w-4 h-4 inline-block mr-1" />
+                                Descanso
+                              </span>
+                              <span className="text-lg font-semibold text-primary-600">
+                                {exerciseSession.rest_time_seconds}s
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {exerciseSession.exercise?.description && (
+                            <p className="text-sm text-gray-500 mt-4">
+                              {exerciseSession.exercise.description}
+                            </p>
                           )}
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div className="bg-white p-4 rounded-lg shadow-sm">
-                            <span className="text-sm text-gray-500 block mb-1">Séries</span>
-                            <span className="text-lg font-semibold text-primary-600">
-                              {exerciseSession.sets}
-                            </span>
-                          </div>
-                          <div className="bg-white p-4 rounded-lg shadow-sm">
-                            <span className="text-sm text-gray-500 block mb-1">Repetições</span>
-                            <span className="text-lg font-semibold text-primary-600">
-                              {exerciseSession.reps}
-                            </span>
-                          </div>
-                          <div className="bg-white p-4 rounded-lg shadow-sm">
-                            <span className="text-sm text-gray-500 block mb-1">
-                              <Clock className="w-4 h-4 inline-block mr-1" />
-                              Descanso
-                            </span>
-                            <span className="text-lg font-semibold text-primary-600">
-                              {exerciseSession.rest_time_seconds}s
-                            </span>
-                          </div>
-                        </div>
-                        
-                        {exerciseSession.exercise?.description && (
-                          <p className="text-sm text-gray-500 mt-4">
-                            {exerciseSession.exercise.description}
-                          </p>
-                        )}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               <div className="bg-primary-50 p-4 rounded-lg mt-6">
