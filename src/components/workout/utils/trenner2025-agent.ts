@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { WorkoutPreferences } from "../types";
 import { WorkoutPlan } from "../types/workout-plan";
@@ -312,16 +311,18 @@ export async function saveWorkoutPlan(workoutPlan: WorkoutPlan, userId: string):
 
     console.log("Saving main workout plan to workout_plans table...");
     
-    // According to the error, we need to structure our insert to match the expected schema
+    // Remove fields that don't exist in the database
+    const planData = {
+      user_id: userId,
+      goal: workoutPlan.goal,
+      start_date: workoutPlan.start_date,
+      end_date: workoutPlan.end_date
+    };
+    
     // Insert the main plan details
     const { data, error } = await supabase
       .from('workout_plans')
-      .insert({
-        user_id: userId,
-        goal: workoutPlan.goal,
-        start_date: workoutPlan.start_date,
-        end_date: workoutPlan.end_date
-      })
+      .insert(planData)
       .select()
       .single();
 
@@ -338,18 +339,20 @@ export async function saveWorkoutPlan(workoutPlan: WorkoutPlan, userId: string):
     for (const session of workoutPlan.workout_sessions) {
       console.log(`Saving session for day ${session.day_number}...`);
       
+      // Remover campos que não existem no banco de dados
+      const sessionData = {
+        plan_id: planId,
+        day_number: session.day_number,
+        focus: session.focus,
+        warmup_description: session.warmup_description,
+        cooldown_description: session.cooldown_description,
+        training_load: session.training_load
+      };
+      
       // Insert the session
       const { data: sessionData, error: sessionError } = await supabase
         .from('workout_sessions')
-        .insert({
-          plan_id: planId,
-          day_number: session.day_number,
-          day_name: session.day_name,
-          focus: session.focus,
-          warmup_description: session.warmup_description,
-          cooldown_description: session.cooldown_description,
-          training_load: session.training_load
-        })
+        .insert(sessionData)
         .select()
         .single();
       

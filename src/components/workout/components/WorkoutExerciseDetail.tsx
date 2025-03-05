@@ -15,7 +15,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession }: WorkoutExerciseDetail
             <img 
               src={exerciseSession.exercise.gif_url} 
               alt={exerciseSession.exercise.name}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
               loading="lazy"
             />
           </div>
