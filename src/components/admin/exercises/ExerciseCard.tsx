@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,21 +42,26 @@ export const ExerciseCard = ({ exercise, onUpdate }: ExerciseCardProps) => {
     }
   };
 
-  // Função para formatar a URL da imagem
   const formatImageUrl = (url?: string): string => {
     if (!url) return "/placeholder.svg";
     
-    // Se for uma URL relativa sem protocolo, adicione https:
+    if (url.includes('example.com')) {
+      console.warn('Invalid example URL detected:', url);
+      return "/placeholder.svg";
+    }
+    
+    if (url.startsWith('/') && !url.startsWith('//')) {
+      return `${window.location.origin}${url}`;
+    }
+    
     if (url.startsWith('//')) {
       return `https:${url}`;
     }
     
-    // Se a URL estiver vindo do Supabase storage
     if (url.includes('supabase.co/storage/v1/object/public')) {
       return url;
     }
     
-    // Para URLs que não têm protocolo e não começam com //
     if (!url.startsWith('http') && !url.startsWith('//') && !url.startsWith('/')) {
       return `https://${url}`;
     }

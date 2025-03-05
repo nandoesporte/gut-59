@@ -10,31 +10,45 @@ interface WorkoutExerciseDetailProps {
 export const WorkoutExerciseDetail = ({ exerciseSession }: WorkoutExerciseDetailProps) => {
   const [imgError, setImgError] = useState(false);
   const [imgSrc, setImgSrc] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
+    setIsLoading(true);
     if (exerciseSession.exercise?.gif_url) {
       const url = formatImageUrl(exerciseSession.exercise.gif_url);
       setImgSrc(url);
     } else {
       setImgSrc("/placeholder.svg");
+      setIsLoading(false);
     }
   }, [exerciseSession.exercise?.gif_url]);
 
-  // Função para formatar a URL da imagem
+  // Improved function to format the URL of the image
   const formatImageUrl = (url?: string): string => {
     if (!url) return "/placeholder.svg";
     
-    // Se for uma URL relativa sem protocolo, adicione https:
+    // Remove any invalid URL patterns like 'example.com'
+    if (url.includes('example.com')) {
+      console.warn('Invalid example URL detected:', url);
+      return "/placeholder.svg";
+    }
+    
+    // If it's a relative URL starting with a single slash, prepend with origin
+    if (url.startsWith('/') && !url.startsWith('//')) {
+      return `${window.location.origin}${url}`;
+    }
+    
+    // If it's a protocol-relative URL (starts with //), add https:
     if (url.startsWith('//')) {
       return `https:${url}`;
     }
     
-    // Se a URL estiver vindo do Supabase storage
+    // If the URL is from Supabase storage, use it as is
     if (url.includes('supabase.co/storage/v1/object/public')) {
       return url;
     }
     
-    // Para URLs que não têm protocolo e não começam com //
+    // For URLs that don't have a protocol and don't start with /
     if (!url.startsWith('http') && !url.startsWith('//') && !url.startsWith('/')) {
       return `https://${url}`;
     }
@@ -42,11 +56,17 @@ export const WorkoutExerciseDetail = ({ exerciseSession }: WorkoutExerciseDetail
     return url;
   };
 
-  // Função para tratar erros de carregamento de imagem
+  // Function to handle image load completion
+  const handleImageLoad = () => {
+    setIsLoading(false);
+  };
+
+  // Function to handle errors in loading the image
   const handleImageError = () => {
     console.error("Error loading GIF:", exerciseSession.exercise?.gif_url);
     setImgError(true);
     setImgSrc("/placeholder.svg");
+    setIsLoading(false);
   };
 
   return (
@@ -61,13 +81,22 @@ export const WorkoutExerciseDetail = ({ exerciseSession }: WorkoutExerciseDetail
               Imagem não disponível
             </div>
           ) : (
-            <img 
-              src={imgSrc || "/placeholder.svg"}
-              alt={exerciseSession.exercise?.name || "Exercício"}
-              className="w-full h-full object-contain"
-              loading="lazy"
-              onError={handleImageError}
-            />
+            <>
+              {isLoading && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              )}
+              <img 
+                src={imgSrc || "/placeholder.svg"}
+                alt={exerciseSession.exercise?.name || "Exercício"}
+                className="w-full h-full object-contain"
+                loading="lazy"
+                onError={handleImageError}
+                onLoad={handleImageLoad}
+                style={{ display: isLoading ? 'none' : 'block' }}
+              />
+            </>
           )}
         </div>
         
