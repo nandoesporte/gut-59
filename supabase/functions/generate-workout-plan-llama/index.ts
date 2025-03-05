@@ -90,7 +90,9 @@ You should design a complete workout plan based on the user's specifications, in
 Each workout session should have between ${minExercisesPerDay} and 8 exercises, with clear sets, reps, and rest periods.
 Provide a comprehensive, structured workout plan for the number of days per week specified by the user.
 Ensure the plan follows proper exercise science principles like progressive overload, adequate recovery, and muscle group balance.
-Create a balanced distribution of exercises covering ALL major muscle groups across each workout session.`;
+Create a balanced distribution of exercises covering ALL major muscle groups across each workout session.
+
+CRITICAL RULE: Every exercise must be used EXACTLY ONCE throughout the entire workout plan. NO EXERCISE can appear in multiple days.`;
 
     // Create user prompt with preferences
     const userPrompt = `Create a personalized workout plan for someone with the following characteristics:
@@ -106,6 +108,12 @@ ${body.preferences.available_equipment ? `- Available equipment: ${body.preferen
 - Days per week: ${body.preferences.days_per_week}
 
 I need a full workout plan with ${body.preferences.days_per_week} different workout sessions. Each day should have AT LEAST ${minExercisesPerDay} different exercises, but no more than 8 exercises. Every workout session must include exercises for each major muscle group (chest, back, legs, shoulders, arms, core) to ensure balanced training.
+
+MOST IMPORTANT RULE:
+- NEVER USE THE SAME EXERCISE MORE THAN ONCE IN THE ENTIRE PLAN
+- Every exercise can only be used in ONE workout day 
+- Verify that NO EXERCISES ARE REPEATED between different days before finalizing the plan
+- Double check the IDs to make sure no ID appears more than once in your entire response
 
 IMPORTANT WORKOUT STRUCTURE RULES: 
 - You MUST use exercises from the following list (use the exact name and ID)
@@ -165,7 +173,8 @@ Ensure:
 - The plan follows proper exercise science for progression and recovery
 - You use ONLY exercises from the provided list (with correct IDs)
 - The JSON structure exactly matches the format provided above
-- YOUR ENTIRE RESPONSE MUST BE VALID JSON - NO TEXT BEFORE OR AFTER THE JSON`;
+- YOUR ENTIRE RESPONSE MUST BE VALID JSON - NO TEXT BEFORE OR AFTER THE JSON
+- VERIFY THAT NO EXERCISE ID APPEARS MORE THAN ONCE IN THE ENTIRE PLAN BEFORE RETURNING THE RESULT`;
 
     console.log(`Request ID: ${requestId} - Calling Groq API`);
     console.log(`System prompt length: ${systemPrompt.length} chars`);
@@ -247,6 +256,43 @@ Ensure:
       workoutPlan = JSON.parse(jsonStr);
       console.log(`Request ID: ${requestId} - Successfully parsed workout plan JSON`);
       
+      // Check for duplicate exercises across all days
+      if (workoutPlan.workout_sessions) {
+        // Create a map to track all exercise IDs used in the plan
+        const usedExerciseIds = new Map();
+        let hasDuplicates = false;
+        
+        workoutPlan.workout_sessions.forEach((session, sessionIndex) => {
+          if (session.session_exercises) {
+            session.session_exercises.forEach((ex, exIndex) => {
+              if (ex.exercise && ex.exercise.id) {
+                const exerciseId = ex.exercise.id;
+                if (usedExerciseIds.has(exerciseId)) {
+                  // This is a duplicate exercise
+                  console.warn(`Duplicate exercise detected: ${ex.exercise.name} (${exerciseId})`);
+                  console.warn(`  First used in day ${usedExerciseIds.get(exerciseId).dayNumber}, now in day ${session.day_number}`);
+                  hasDuplicates = true;
+                } else {
+                  // Record this exercise as used
+                  usedExerciseIds.set(exerciseId, {
+                    dayNumber: session.day_number,
+                    sessionIndex: sessionIndex,
+                    exIndex: exIndex
+                  });
+                }
+              }
+            });
+          }
+        });
+        
+        if (hasDuplicates) {
+          console.warn(`Request ID: ${requestId} - Workout plan contains duplicate exercises across days!`);
+          // We'll let the client-side code handle this by cleaning up duplicates
+        } else {
+          console.log(`Request ID: ${requestId} - All exercises in workout plan are unique across days`);
+        }
+      }
+      
       // Check if we have the minimum number of exercises per day
       if (workoutPlan.workout_sessions) {
         workoutPlan.workout_sessions.forEach((session, index) => {
@@ -309,6 +355,25 @@ Ensure:
     );
   } catch (error) {
     console.error("Error:", error.message);
+    
+    // Add special handling for JSON validation errors from Groq
+    if (error.message && error.message.includes("json_validate_failed")) {
+      console.error("JSON validation failed - likely due to duplicate exercises");
+      // Return a more specific error to the client
+      return new Response(
+        JSON.stringify({
+          error: "Erro na geração do plano de treino: exercícios duplicados foram encontrados. Por favor, tente novamente.",
+          details: error.message
+        }),
+        {
+          status: 400, // Bad request
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json"
+          }
+        }
+      );
+    }
     
     return new Response(
       JSON.stringify({
