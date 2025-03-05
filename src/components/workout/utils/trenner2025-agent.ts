@@ -13,6 +13,10 @@ export async function generateWorkoutPlanWithTrenner2025(
     console.log("Generating workout plan with Trenner2025 agent...");
     console.log("Preferences:", JSON.stringify(preferences, null, 2));
     
+    // Map activity level to appropriate number of training days per week
+    const trainingDaysPerWeek = mapActivityLevelToTrainingDays(preferences.activity_level);
+    console.log(`Activity level: ${preferences.activity_level}, Training days: ${trainingDaysPerWeek}`);
+    
     // Add a unique request ID to prevent duplicate processing
     const generationRequestId = requestId || `${userId}_${Date.now()}`;
     console.log("Using request ID:", generationRequestId);
@@ -41,8 +45,8 @@ export async function generateWorkoutPlanWithTrenner2025(
       body: { 
         preferences: {
           ...preferences,
-          // Ensure we request a full week of workouts (6 days + rest on Sunday)
-          days_per_week: 6,
+          // Use the mapped number of training days based on activity level
+          days_per_week: trainingDaysPerWeek,
           // Add minimum exercises per day parameter
           min_exercises_per_day: 6
         }, 
@@ -109,7 +113,7 @@ export async function generateWorkoutPlanWithTrenner2025(
     // Ensure the plan follows the weekly structure with named days and Sunday rest
     // Also enforce minimum 6 exercises per session with proper muscle group distribution
     // NEW: Ensure NO exercise is used across multiple days 
-    const finalPlan = structureWeeklyPlan(processedPlan, exercises);
+    const finalPlan = structureWeeklyPlan(processedPlan, exercises, trainingDaysPerWeek);
     
     // Return the processed workout plan
     return { 
@@ -134,9 +138,22 @@ export async function generateWorkoutPlanWithTrenner2025(
   }
 }
 
-// Function to structure the workout plan into a weekly format with named days and minimum exercises
-// UPDATED: Added global exercise tracking to prevent exercise duplication across different days
-function structureWeeklyPlan(workoutPlan: WorkoutPlan, dbExercises: any[]): WorkoutPlan {
+function mapActivityLevelToTrainingDays(activityLevel: string): number {
+  switch (activityLevel) {
+    case "sedentary":
+      return 2; // Sedentary: 2 days per week
+    case "light":
+      return 3; // Light: 3 days per week
+    case "moderate":
+      return 5; // Moderate: 3-5 days per week (using upper range)
+    case "intense":
+      return 6; // Intense: 6 days per week
+    default:
+      return 3; // Default to 3 days if activity level is not recognized
+  }
+}
+
+function structureWeeklyPlan(workoutPlan: WorkoutPlan, dbExercises: any[], daysPerWeek: number): WorkoutPlan {
   if (!workoutPlan.workout_sessions || workoutPlan.workout_sessions.length === 0) {
     return workoutPlan;
   }
@@ -220,8 +237,8 @@ function structureWeeklyPlan(workoutPlan: WorkoutPlan, dbExercises: any[]): Work
     return result;
   };
 
-  // Add sessions for Monday through Saturday (6 days)
-  for (let i = 0; i < 6; i++) {
+  // Add active workout sessions for the specified number of days per week
+  for (let i = 0; i < daysPerWeek; i++) {
     // Get or create session
     let session;
     if (i < existingSessions.length) {
@@ -389,16 +406,18 @@ function structureWeeklyPlan(workoutPlan: WorkoutPlan, dbExercises: any[]): Work
     structuredSessions.push(session);
   }
   
-  // Add Sunday as a rest day
-  structuredSessions.push({
-    id: "session_7",
-    day_number: 7,
-    day_name: "Domingo (Descanso)",
-    focus: "Recuperação",
-    warmup_description: "Dia de descanso. Foque em recuperação e alongamentos leves.",
-    cooldown_description: "Realize atividades de lazer e recuperação.",
-    session_exercises: []
-  });
+  // Add rest days for the remaining days of the week
+  for (let i = daysPerWeek; i < 7; i++) {
+    structuredSessions.push({
+      id: `session_${i + 1}`,
+      day_number: i + 1,
+      day_name: `${dayNames[i]} (Descanso)`,
+      focus: "Recuperação",
+      warmup_description: "Dia de descanso. Foque em recuperação e alongamentos leves.",
+      cooldown_description: "Realize atividades de lazer e recuperação.",
+      session_exercises: []
+    });
+  }
   
   // Return updated workout plan
   return {

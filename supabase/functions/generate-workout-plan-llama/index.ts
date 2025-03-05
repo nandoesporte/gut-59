@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { supabaseClient } from "../_shared/supabase-client.ts";
 
@@ -83,12 +82,32 @@ serve(async (req) => {
     // Set the minimum number of exercises per session
     const minExercisesPerDay = body.preferences.min_exercises_per_day || 6;
     
+    // Create activity level-specific guidance
+    let activityLevelGuidance = "";
+    switch(body.preferences.activity_level) {
+      case "sedentary":
+        activityLevelGuidance = "For sedentary individuals, create a gentle 2-day per week program that introduces basic exercises with proper form. Focus on full-body workouts with moderate intensity.";
+        break;
+      case "light":
+        activityLevelGuidance = "For lightly active individuals, design a balanced 3-day per week program that develops foundational strength and conditioning. Include a mix of compound and isolation exercises.";
+        break;
+      case "moderate":
+        activityLevelGuidance = "For moderately active individuals, create a comprehensive 5-day per week program that promotes consistent progress. Follow a structured split targeting different muscle groups on different days.";
+        break;
+      case "intense":
+        activityLevelGuidance = "For highly active individuals, design an advanced 6-day per week program that maximizes training stimulus. Incorporate periodization, supersets, and advanced techniques for optimal results.";
+        break;
+      default:
+        activityLevelGuidance = "Design a balanced program appropriate for the user's activity level.";
+    }
+    
     // Create system prompt
     const systemPrompt = `You are Trenner, a professional fitness trainer and workout plan designer. 
 You create effective, science-based workout plans tailored to individual needs and goals.
 You should design a complete workout plan based on the user's specifications, including their fitness goals, level, available equipment, and any health conditions.
 Each workout session should have between ${minExercisesPerDay} and 8 exercises, with clear sets, reps, and rest periods.
-Provide a comprehensive, structured workout plan for the number of days per week specified by the user.
+Provide a comprehensive, structured workout plan for the number of days per week specified by the user: ${body.preferences.days_per_week} days.
+${activityLevelGuidance}
 Ensure the plan follows proper exercise science principles like progressive overload, adequate recovery, and muscle group balance.
 Create a balanced distribution of exercises covering ALL major muscle groups across each workout session.
 

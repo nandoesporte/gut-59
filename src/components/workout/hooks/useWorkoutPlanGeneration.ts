@@ -21,6 +21,14 @@ const mockProgressData = [
   { day: 7, completion: 0 },
 ];
 
+// Map activity level to a readable description
+const activityLevelDescriptions = {
+  sedentary: "Sedentário (2 dias por semana)",
+  light: "Leve (3 dias por semana)",
+  moderate: "Moderado (5 dias por semana)",
+  intense: "Intenso (6 dias por semana)"
+};
+
 export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
   const [loading, setLoading] = useState(false);
   const [workoutPlan, setWorkoutPlan] = useState<WorkoutPlan | null>(null);
@@ -79,6 +87,13 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
         throw new Error("Usuário não autenticado");
       }
       
+      // Get activity level description for toast
+      const activityDesc = activityLevelDescriptions[preferences.activity_level as keyof typeof activityLevelDescriptions] || 
+                           "Personalizado";
+      
+      // Show toast with activity level
+      toast.info(`Gerando plano de treino ${activityDesc}...`);
+      
       // Fetch AI model settings
       const { data: aiSettings, error: aiSettingsError } = await supabase
         .from('ai_model_settings')
@@ -91,6 +106,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       }
       
       console.log("Starting generation of workout plan with Trenner2025...");
+      console.log(`Activity level: ${preferences.activity_level}`);
       
       // Generate a unique request ID to prevent duplicate processing
       const requestId = `${user.id}_${Date.now()}`;
@@ -145,7 +161,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       // Update user's plan generation count
       await updatePlanGenerationCount(user.id);
       
-      toast.success("Plano de treino gerado com sucesso pelo Trenner2025!");
+      toast.success(`Plano de treino ${activityDesc} gerado com sucesso!`);
       console.log("Workout plan generation and saving completed successfully");
       
       // Reset retry counter and loading time on successful generation
