@@ -116,6 +116,7 @@ For each workout day, provide:
 3. Main exercises with exact sets, reps, and rest periods
 4. A brief cooldown
 
+YOUR RESPONSE MUST BE VALID JSON. Don't include any text before or after the JSON.
 Format the response as a valid JSON object with this exact structure:
 {
   "workout_sessions": [
@@ -151,7 +152,8 @@ Ensure:
 - Each workout day has AT LEAST ${minExercisesPerDay} exercises, but no more than 8
 - The plan follows proper exercise science for progression and recovery
 - You use ONLY exercises from the provided list (with correct IDs)
-- The JSON structure exactly matches the format provided above`;
+- The JSON structure exactly matches the format provided above
+- YOUR ENTIRE RESPONSE MUST BE VALID JSON - NO TEXT BEFORE OR AFTER THE JSON`;
 
     console.log(`Request ID: ${requestId} - Calling Groq API`);
     console.log(`System prompt length: ${systemPrompt.length} chars`);
@@ -171,7 +173,8 @@ Ensure:
           { role: "user", content: userPrompt }
         ],
         temperature: 0.7,
-        max_tokens: 4000
+        max_tokens: 4000,
+        response_format: { type: "json_object" } // Explicitly request JSON format
       })
     });
 
@@ -190,13 +193,45 @@ Ensure:
     // Parse the JSON from the Llama response
     let workoutPlan;
     try {
-      // Look for JSON in the response
-      const jsonMatch = assistantMessage.match(/```json\n([\s\S]*?)\n```/) || 
-                         assistantMessage.match(/```([\s\S]*?)```/) ||
-                         [null, assistantMessage];
-                         
-      const jsonStr = jsonMatch[1] || assistantMessage;
+      // Improved JSON extraction logic
+      let jsonStr = assistantMessage;
       
+      // Check if the response is wrapped in markdown code blocks
+      const jsonMatch = assistantMessage.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (jsonMatch) {
+        jsonStr = jsonMatch[1].trim();
+        console.log(`Request ID: ${requestId} - Extracted JSON from markdown code block`);
+      }
+      
+      // Check if the string starts with text that's not JSON
+      if (jsonStr.trim().startsWith('{') === false) {
+        console.log(`Request ID: ${requestId} - Response doesn't start with JSON object, attempting to extract`);
+        const startOfJson = jsonStr.indexOf('{');
+        if (startOfJson >= 0) {
+          jsonStr = jsonStr.substring(startOfJson);
+          // Find the matching closing brace
+          let braceCount = 0;
+          let endIndex = -1;
+          
+          for (let i = 0; i < jsonStr.length; i++) {
+            if (jsonStr[i] === '{') braceCount++;
+            if (jsonStr[i] === '}') {
+              braceCount--;
+              if (braceCount === 0) {
+                endIndex = i + 1;
+                break;
+              }
+            }
+          }
+          
+          if (endIndex > 0) {
+            jsonStr = jsonStr.substring(0, endIndex);
+          }
+        }
+      }
+      
+      // Try parsing the JSON
+      console.log(`Request ID: ${requestId} - Attempting to parse JSON:`, jsonStr.substring(0, 100) + "...");
       workoutPlan = JSON.parse(jsonStr);
       console.log(`Request ID: ${requestId} - Successfully parsed workout plan JSON`);
       
@@ -213,8 +248,8 @@ Ensure:
       }
     } catch (error) {
       console.error(`Request ID: ${requestId} - Error parsing workout plan JSON:`, error);
-      console.log("Raw response:", assistantMessage);
-      throw new Error("Failed to parse workout plan from Llama response");
+      console.log("Raw response first 500 chars:", assistantMessage.substring(0, 500));
+      throw new Error(`Failed to parse workout plan from AI response: ${error.message}`);
     }
 
     // Return the workout plan
