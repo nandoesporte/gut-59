@@ -107,7 +107,12 @@ ${body.preferences.available_equipment ? `- Available equipment: ${body.preferen
 
 I need a full workout plan with ${body.preferences.days_per_week} different workout sessions. Each day should have AT LEAST ${minExercisesPerDay} different exercises, but no more than 8 exercises.
 
-IMPORTANT: You MUST use exercises from the following list (use the exact name and ID):
+IMPORTANT: 
+- You MUST use exercises from the following list (use the exact name and ID)
+- DO NOT REPEAT THE SAME EXERCISE WITHIN A SINGLE WORKOUT SESSION
+- Each exercise should appear at most ONCE in each session
+
+Here are the exercises you can use:
 ${exercises.slice(0, 50).map(e => `- ${e.name} (ID: ${e.id}, Muscle Group: ${e.muscle_group})`).join("\n")}
 
 For each workout day, provide:
@@ -149,7 +154,8 @@ Format the response as a valid JSON object with this exact structure:
 
 Ensure:
 - The workout plan targets ALL major muscle groups appropriately throughout the week
-- Each workout day has AT LEAST ${minExercisesPerDay} exercises, but no more than 8
+- Each workout day has AT LEAST ${minExercisesPerDay} UNIQUE exercises, but no more than 8
+- NO DUPLICATE EXERCISES within the same workout session
 - The plan follows proper exercise science for progression and recovery
 - You use ONLY exercises from the provided list (with correct IDs)
 - The JSON structure exactly matches the format provided above
@@ -243,6 +249,21 @@ Ensure:
           // Ensure each session has the minimum number of exercises
           if (!session.session_exercises || session.session_exercises.length < minExercisesPerDay) {
             console.warn(`Session ${index + 1} has fewer than ${minExercisesPerDay} exercises, client will add more.`);
+          }
+          
+          // Check for duplicate exercises
+          if (session.session_exercises) {
+            const exerciseIds = new Set();
+            const duplicatesFound = session.session_exercises.some(ex => {
+              if (!ex.exercise || !ex.exercise.id) return false;
+              if (exerciseIds.has(ex.exercise.id)) return true;
+              exerciseIds.add(ex.exercise.id);
+              return false;
+            });
+            
+            if (duplicatesFound) {
+              console.warn(`Session ${index + 1} contains duplicate exercises, client will filter them.`);
+            }
           }
         });
       }

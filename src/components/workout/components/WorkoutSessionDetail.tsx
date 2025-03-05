@@ -1,4 +1,3 @@
-
 import { AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { WorkoutSession } from "../types/workout-plan";
@@ -11,18 +10,27 @@ interface WorkoutSessionDetailProps {
 }
 
 export const WorkoutSessionDetail = ({ session, getDayName }: WorkoutSessionDetailProps) => {
-  // Função para filtrar exercícios únicos
+  // Improved function for filtering unique exercises
   const getUniqueExercises = () => {
     if (!session.session_exercises) return [];
     
-    const uniqueExercises = new Map();
+    const uniqueExercisesMap = new Map();
+    
+    // First pass to collect only unique exercises by ID
     return session.session_exercises.filter(ex => {
-      const exerciseId = ex.exercise?.id;
-      if (!exerciseId || uniqueExercises.has(exerciseId)) {
-        return false;
+      // Skip if exercise or exercise.id is undefined
+      if (!ex.exercise || !ex.exercise.id) return false;
+      
+      const exerciseId = ex.exercise.id;
+      
+      // If we haven't seen this ID before, keep it and mark as seen
+      if (!uniqueExercisesMap.has(exerciseId)) {
+        uniqueExercisesMap.set(exerciseId, true);
+        return true;
       }
-      uniqueExercises.set(exerciseId, true);
-      return true;
+      
+      // Otherwise, it's a duplicate, so filter it out
+      return false;
     });
   };
 
@@ -52,7 +60,7 @@ export const WorkoutSessionDetail = ({ session, getDayName }: WorkoutSessionDeta
           
           {/* Exercises */}
           <div>
-            <h4 className="font-medium text-primary mb-3">Exercícios</h4>
+            <h4 className="font-medium text-primary mb-3">Exercícios ({uniqueExercises.length})</h4>
             <div className="space-y-4">
               {uniqueExercises.map((exerciseSession, index) => (
                 <WorkoutExerciseDetail 
