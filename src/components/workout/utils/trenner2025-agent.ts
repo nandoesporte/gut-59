@@ -107,7 +107,7 @@ export async function generateWorkoutPlanWithTrenner2025(
     const processedPlan = processWorkoutPlan(data.workoutPlan, exercises);
     
     // Ensure the plan follows the weekly structure with named days and Sunday rest
-    // Also enforce minimum 6 exercises per session
+    // Also enforce minimum 6 exercises per session with proper muscle group distribution
     const finalPlan = structureWeeklyPlan(processedPlan, exercises);
     
     // Return the processed workout plan
@@ -142,15 +142,18 @@ function structureWeeklyPlan(workoutPlan: WorkoutPlan, dbExercises: any[]): Work
   // Define the days of the week
   const dayNames = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"];
   
-  // Define muscle group focus for each day to ensure variety if we need to add exercises
+  // Define primary muscle groups we want to ensure are included in each workout
+  const primaryMuscleGroups = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'];
+  
+  // Define muscle group focus for each day based on exercise science for optimal recovery
   const dailyMuscleGroupFocus = [
-    ['chest', 'triceps'], // Monday
-    ['back', 'biceps'],   // Tuesday
-    ['legs', 'core'],     // Wednesday
-    ['shoulders', 'arms'], // Thursday
-    ['back', 'chest'],    // Friday
-    ['legs', 'core'],     // Saturday
-    []                    // Sunday (rest day)
+    ['chest', 'triceps', 'shoulders'], // Monday - Push
+    ['back', 'biceps', 'core'],       // Tuesday - Pull
+    ['legs', 'core', 'shoulders'],    // Wednesday - Legs
+    ['chest', 'triceps', 'shoulders'], // Thursday - Push
+    ['back', 'biceps', 'core'],       // Friday - Pull
+    ['legs', 'core', 'arms'],         // Saturday - Legs
+    []                                // Sunday (rest day)
   ];
 
   // Mapping of muscle groups for finding relevant exercises
@@ -228,32 +231,93 @@ function structureWeeklyPlan(workoutPlan: WorkoutPlan, dbExercises: any[]): Work
         id: `session_${i + 1}`,
         day_number: i + 1,
         day_name: dayNames[i],
+        focus: `${dailyMuscleGroupFocus[i].map(g => g.charAt(0).toUpperCase() + g.slice(1)).join(' + ')}`,
         warmup_description: "Aquecimento geral de 5-10 minutos com exercícios leves e alongamentos dinâmicos.",
         cooldown_description: "Alongamentos estáticos para os músculos trabalhados, 15-30 segundos cada.",
         session_exercises: []
       };
     }
 
-    // Update day number and name
+    // Update day number, name and focus
     session.day_number = i + 1;
     session.day_name = dayNames[i];
+    session.focus = `${dailyMuscleGroupFocus[i].map(g => g.charAt(0).toUpperCase() + g.slice(1)).join(' + ')}`;
 
-    // Check if we need to add more exercises to reach minimum of 6
+    // Track all exercise IDs used in this session to avoid duplicates
     const existingExerciseIds = new Set<string>();
     
     // If session has exercises, add their IDs to the set
     if (session.session_exercises && session.session_exercises.length > 0) {
+      // First, remove any duplicate exercises
+      const uniqueExercises: any[] = [];
+      const seenExerciseIds = new Set<string>();
+      
       session.session_exercises.forEach((ex: any) => {
-        if (ex.exercise && ex.exercise.id) {
+        if (ex.exercise && ex.exercise.id && !seenExerciseIds.has(ex.exercise.id)) {
+          seenExerciseIds.add(ex.exercise.id);
+          uniqueExercises.push(ex);
           existingExerciseIds.add(ex.exercise.id);
         }
       });
+      
+      // Replace the session exercises with unique exercises
+      session.session_exercises = uniqueExercises;
     } else {
       // Initialize empty array if no exercises
       session.session_exercises = [];
     }
 
-    // Determine how many more exercises we need
+    // Check which muscle groups are currently covered
+    const coveredMuscleGroups = new Set<string>();
+    
+    session.session_exercises.forEach((ex: any) => {
+      if (ex.exercise && ex.exercise.muscle_group) {
+        coveredMuscleGroups.add(ex.exercise.muscle_group);
+      }
+    });
+    
+    // For each primary muscle group that's missing, add one exercise
+    for (const muscleGroup of primaryMuscleGroups) {
+      // Check if we have any variations of this muscle group
+      const isCovered = [...coveredMuscleGroups].some(mg => 
+        muscleGroupMappings[muscleGroup]?.includes(mg) || 
+        muscleGroupMappings[mg]?.includes(muscleGroup)
+      );
+      
+      if (!isCovered) {
+        console.log(`Adding exercise for uncovered muscle group: ${muscleGroup} to day ${i + 1}`);
+        
+        // Find an exercise for this muscle group
+        const additionalExercises = findExercisesForMuscleGroups(
+          [muscleGroup], 
+          1, 
+          existingExerciseIds
+        );
+        
+        if (additionalExercises.length > 0) {
+          const exercise = additionalExercises[0];
+          const newExerciseSession = {
+            id: `exercise_${i + 1}_${exercise.id}`,
+            exercise: {
+              id: exercise.id,
+              name: exercise.name,
+              description: exercise.description,
+              gif_url: exercise.gif_url,
+              muscle_group: exercise.muscle_group,
+              exercise_type: exercise.exercise_type
+            },
+            sets: Math.floor(Math.random() * 2) + 3, // 3-4 sets
+            reps: Math.floor(Math.random() * 5) + 8, // 8-12 reps
+            rest_time_seconds: (Math.floor(Math.random() * 3) + 1) * 30 // 30, 60, or 90 seconds
+          };
+          
+          session.session_exercises.push(newExerciseSession);
+          coveredMuscleGroups.add(exercise.muscle_group);
+        }
+      }
+    }
+
+    // Add more exercises if we still don't have enough
     const targetExerciseCount = 6;
     const currentCount = session.session_exercises.length;
     const needMoreExercises = targetExerciseCount - currentCount;
@@ -288,6 +352,30 @@ function structureWeeklyPlan(workoutPlan: WorkoutPlan, dbExercises: any[]): Work
         session.session_exercises.push(newExerciseSession);
       });
     }
+    
+    // Properly organize exercises based on optimal training sequence
+    session.session_exercises.sort((a: any, b: any) => {
+      // Define the order of muscle groups for optimal training
+      const muscleGroupOrder = {
+        'chest': 1,
+        'back': 2,
+        'shoulders': 3,
+        'legs': 4,
+        'arms': 5,
+        'triceps': 6,
+        'biceps': 7,
+        'core': 8,
+        'full_body': 9
+      };
+      
+      const getMuscleGroupPriority = (ex: any) => {
+        if (!ex.exercise || !ex.exercise.muscle_group) return 999;
+        return muscleGroupOrder[ex.exercise.muscle_group] || 999;
+      };
+      
+      // Sort by muscle group priority
+      return getMuscleGroupPriority(a) - getMuscleGroupPriority(b);
+    });
 
     structuredSessions.push(session);
   }
@@ -297,6 +385,7 @@ function structureWeeklyPlan(workoutPlan: WorkoutPlan, dbExercises: any[]): Work
     id: "session_7",
     day_number: 7,
     day_name: "Domingo (Descanso)",
+    focus: "Recuperação",
     warmup_description: "Dia de descanso. Foque em recuperação e alongamentos leves.",
     cooldown_description: "Realize atividades de lazer e recuperação.",
     session_exercises: []

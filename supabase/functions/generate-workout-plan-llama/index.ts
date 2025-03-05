@@ -90,7 +90,8 @@ You create effective, science-based workout plans tailored to individual needs a
 You should design a complete workout plan based on the user's specifications, including their fitness goals, level, available equipment, and any health conditions.
 Each workout session should have between ${minExercisesPerDay} and 8 exercises, with clear sets, reps, and rest periods.
 Provide a comprehensive, structured workout plan for the number of days per week specified by the user.
-Ensure the plan follows proper exercise science principles like progressive overload, adequate recovery, and muscle group balance.`;
+Ensure the plan follows proper exercise science principles like progressive overload, adequate recovery, and muscle group balance.
+Create a balanced distribution of exercises covering ALL major muscle groups across each workout session.`;
 
     // Create user prompt with preferences
     const userPrompt = `Create a personalized workout plan for someone with the following characteristics:
@@ -105,12 +106,15 @@ ${body.preferences.preferred_exercise_types ? `- Preferred exercise types: ${bod
 ${body.preferences.available_equipment ? `- Available equipment: ${body.preferences.available_equipment.join(", ")}` : ""}
 - Days per week: ${body.preferences.days_per_week}
 
-I need a full workout plan with ${body.preferences.days_per_week} different workout sessions. Each day should have AT LEAST ${minExercisesPerDay} different exercises, but no more than 8 exercises.
+I need a full workout plan with ${body.preferences.days_per_week} different workout sessions. Each day should have AT LEAST ${minExercisesPerDay} different exercises, but no more than 8 exercises. Every workout session must include exercises for each major muscle group (chest, back, legs, shoulders, arms, core) to ensure balanced training.
 
-IMPORTANT: 
+IMPORTANT WORKOUT STRUCTURE RULES: 
 - You MUST use exercises from the following list (use the exact name and ID)
 - DO NOT REPEAT THE SAME EXERCISE WITHIN A SINGLE WORKOUT SESSION
 - Each exercise should appear at most ONCE in each session
+- EACH WORKOUT SESSION MUST INCLUDE AT LEAST ONE EXERCISE FOR EACH MAJOR MUSCLE GROUP 
+- Follow a scientifically-backed training split (Push/Pull/Legs or similar approach)
+- Organize exercises in each session based on optimal training order (compound movements first)
 
 Here are the exercises you can use:
 ${exercises.slice(0, 50).map(e => `- ${e.name} (ID: ${e.id}, Muscle Group: ${e.muscle_group})`).join("\n")}
@@ -156,6 +160,7 @@ Ensure:
 - The workout plan targets ALL major muscle groups appropriately throughout the week
 - Each workout day has AT LEAST ${minExercisesPerDay} UNIQUE exercises, but no more than 8
 - NO DUPLICATE EXERCISES within the same workout session
+- EVERY SESSION includes at least one exercise for each major muscle group
 - The plan follows proper exercise science for progression and recovery
 - You use ONLY exercises from the provided list (with correct IDs)
 - The JSON structure exactly matches the format provided above
@@ -263,6 +268,20 @@ Ensure:
             
             if (duplicatesFound) {
               console.warn(`Session ${index + 1} contains duplicate exercises, client will filter them.`);
+            }
+          }
+          
+          // Check if all major muscle groups are covered
+          if (session.session_exercises) {
+            const muscleGroups = new Set(session.session_exercises.map(ex => 
+              ex.exercise?.muscle_group || 'unknown'
+            ));
+            
+            const majorMuscleGroups = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'];
+            const missingGroups = majorMuscleGroups.filter(group => !muscleGroups.has(group));
+            
+            if (missingGroups.length > 0) {
+              console.warn(`Session ${index + 1} is missing exercises for: ${missingGroups.join(', ')}. Client will add exercises.`);
             }
           }
         });

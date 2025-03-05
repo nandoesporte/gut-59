@@ -1,3 +1,4 @@
+
 import { AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { WorkoutSession } from "../types/workout-plan";
@@ -35,6 +36,19 @@ export const WorkoutSessionDetail = ({ session, getDayName }: WorkoutSessionDeta
   };
 
   const uniqueExercises = getUniqueExercises();
+  
+  // Group exercises by muscle group
+  const exercisesByMuscleGroup: Record<string, any[]> = {};
+  uniqueExercises.forEach((ex) => {
+    const muscleGroup = ex.exercise.muscle_group || 'other';
+    if (!exercisesByMuscleGroup[muscleGroup]) {
+      exercisesByMuscleGroup[muscleGroup] = [];
+    }
+    exercisesByMuscleGroup[muscleGroup].push(ex);
+  });
+
+  // Get all muscle groups present in the workout
+  const muscleGroups = Object.keys(exercisesByMuscleGroup).sort();
 
   return (
     <AccordionItem key={session.day_number} value={`day-${session.day_number}`}>
@@ -58,15 +72,28 @@ export const WorkoutSessionDetail = ({ session, getDayName }: WorkoutSessionDeta
             <p className="mt-1 text-gray-700">{session.warmup_description}</p>
           </div>
           
-          {/* Exercises */}
+          {/* Exercises by Muscle Group */}
           <div>
-            <h4 className="font-medium text-primary mb-3">Exercícios ({uniqueExercises.length})</h4>
-            <div className="space-y-4">
-              {uniqueExercises.map((exerciseSession, index) => (
-                <WorkoutExerciseDetail 
-                  key={exerciseSession.id || `${session.day_number}-${exerciseSession.exercise.id}-${index}`}
-                  exerciseSession={exerciseSession}
-                />
+            <h4 className="font-medium text-primary mb-3">
+              Exercícios ({uniqueExercises.length})
+            </h4>
+            
+            {/* Display exercises grouped by muscle group */}
+            <div className="space-y-6">
+              {muscleGroups.map((muscleGroup) => (
+                <div key={muscleGroup} className="space-y-4">
+                  <h5 className="font-medium text-sm text-gray-700 uppercase border-b pb-1">
+                    {muscleGroup.charAt(0).toUpperCase() + muscleGroup.slice(1)}
+                  </h5>
+                  <div className="space-y-4 pl-2">
+                    {exercisesByMuscleGroup[muscleGroup].map((exerciseSession, index) => (
+                      <WorkoutExerciseDetail 
+                        key={exerciseSession.id || `${session.day_number}-${exerciseSession.exercise.id}-${index}`}
+                        exerciseSession={exerciseSession}
+                      />
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           </div>
