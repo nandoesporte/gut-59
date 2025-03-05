@@ -1,5 +1,4 @@
 
-// Edge function to generate workout plans using Llama
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { supabaseClient } from "../_shared/supabase-client.ts";
 
@@ -111,7 +110,8 @@ I need a full workout plan with ${body.preferences.days_per_week} different work
 IMPORTANT WORKOUT STRUCTURE RULES: 
 - You MUST use exercises from the following list (use the exact name and ID)
 - DO NOT REPEAT THE SAME EXERCISE WITHIN A SINGLE WORKOUT SESSION
-- Each exercise should appear at most ONCE in each session
+- DO NOT REPEAT EXERCISES ACROSS DIFFERENT WORKOUT DAYS - each exercise should be used only ONCE in the entire plan
+- Each exercise should appear at most ONCE in the entire workout plan
 - EACH WORKOUT SESSION MUST INCLUDE AT LEAST ONE EXERCISE FOR EACH MAJOR MUSCLE GROUP 
 - Follow a scientifically-backed training split (Push/Pull/Legs or similar approach)
 - Organize exercises in each session based on optimal training order (compound movements first)
@@ -160,6 +160,7 @@ Ensure:
 - The workout plan targets ALL major muscle groups appropriately throughout the week
 - Each workout day has AT LEAST ${minExercisesPerDay} UNIQUE exercises, but no more than 8
 - NO DUPLICATE EXERCISES within the same workout session
+- NO DUPLICATE EXERCISES across different workout days - EVERY exercise should be used exactly ONCE in the entire plan
 - EVERY SESSION includes at least one exercise for each major muscle group
 - The plan follows proper exercise science for progression and recovery
 - You use ONLY exercises from the provided list (with correct IDs)

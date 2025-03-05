@@ -1,115 +1,76 @@
 
+import React from 'react';
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { SessionExercise } from "../types/workout-plan";
-import { useState, useEffect } from "react";
-import { formatImageUrl } from "@/utils/imageUtils";
+import { formatImageUrl } from '@/utils/imageUtils';
 
 interface WorkoutExerciseDetailProps {
-  exerciseSession: SessionExercise;
+  exerciseSession: any;
+  showDetails?: boolean;
 }
 
-export const WorkoutExerciseDetail = ({ exerciseSession }: WorkoutExerciseDetailProps) => {
-  const [imgError, setImgError] = useState(false);
-  const [imgSrc, setImgSrc] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: WorkoutExerciseDetailProps) => {
+  const exercise = exerciseSession.exercise;
   
-  useEffect(() => {
-    setIsLoading(true);
-    setImgError(false);
-    
-    if (exerciseSession.exercise?.gif_url) {
-      const url = formatImageUrl(exerciseSession.exercise.gif_url);
-      console.log(`Processing exercise GIF URL: ${exerciseSession.exercise.gif_url} → ${url}`);
-      setImgSrc(url);
-    } else {
-      console.log("No GIF URL provided for exercise:", exerciseSession.exercise?.name);
-      setImgSrc("/placeholder.svg");
-      setIsLoading(false);
-    }
-  }, [exerciseSession.exercise?.gif_url]);
-
-  // Function to handle image load completion
-  const handleImageLoad = () => {
-    console.log(`GIF loaded successfully: ${exerciseSession.exercise?.name}`);
-    setIsLoading(false);
-  };
-
-  // Function to handle errors in loading the image
-  const handleImageError = () => {
-    console.error("Error loading GIF:", exerciseSession.exercise?.gif_url);
-    setImgError(true);
-    setImgSrc("/placeholder.svg");
-    setIsLoading(false);
-  };
-
+  if (!exercise) return null;
+  
+  // Format the exercise name and add badge for exercise type
   return (
-    <div className="bg-gray-50 rounded-lg p-4">
-      <div className="flex flex-col md:flex-row gap-4">
-        <div className="w-full md:w-48 h-48 rounded overflow-hidden bg-white flex-shrink-0 flex items-center justify-center relative">
-          {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
-              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-            </div>
-          )}
-          {imgError ? (
-            <div className="text-gray-400 text-xs text-center p-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 mx-auto mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              Imagem não disponível
-            </div>
-          ) : (
+    <Card className="overflow-hidden border-none shadow-sm">
+      <CardContent className="p-0">
+        <div className="flex flex-col md:flex-row gap-3">
+          {/* Exercise GIF/Image */}
+          <div className="w-full md:w-1/4 bg-gray-100 overflow-hidden flex items-center justify-center">
             <img 
-              src={imgSrc || "/placeholder.svg"}
-              alt={exerciseSession.exercise?.name || "Exercício"}
-              className="w-full h-full object-contain"
-              loading="lazy"
-              onError={handleImageError}
-              onLoad={handleImageLoad}
-              style={{ display: isLoading ? 'none' : 'block' }}
+              src={formatImageUrl(exercise.gif_url)} 
+              alt={exercise.name}
+              className="h-36 object-cover"
             />
-          )}
-        </div>
-        
-        <div className="flex-grow">
-          <div className="flex justify-between items-start mb-2">
-            <h5 className="font-medium text-gray-900">
-              {exerciseSession.exercise?.name}
-            </h5>
-            {exerciseSession.exercise?.muscle_group && (
-              <Badge variant="outline">
-                {exerciseSession.exercise.muscle_group.replace('_', ' ')}
-              </Badge>
-            )}
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
-            <div className="bg-white p-2 rounded">
-              <span className="text-xs text-gray-500">Séries</span>
-              <p className="font-medium">{exerciseSession.sets}</p>
-            </div>
-            <div className="bg-white p-2 rounded">
-              <span className="text-xs text-gray-500">Repetições</span>
-              <p className="font-medium">{exerciseSession.reps}</p>
-            </div>
-            <div className="bg-white p-2 rounded">
-              <span className="text-xs text-gray-500">Descanso</span>
-              <p className="font-medium">{exerciseSession.rest_time_seconds}s</p>
-            </div>
-            {exerciseSession.intensity && (
-              <div className="bg-white p-2 rounded">
-                <span className="text-xs text-gray-500">Intensidade</span>
-                <p className="font-medium">{exerciseSession.intensity}</p>
-              </div>
-            )}
           </div>
           
-          {exerciseSession.exercise?.description && (
-            <p className="text-sm text-gray-700 mt-2">
-              {exerciseSession.exercise.description}
-            </p>
-          )}
+          {/* Exercise Details */}
+          <div className="flex-1 p-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-2">
+              <h4 className="font-medium text-md">{exercise.name}</h4>
+              <div className="flex flex-wrap gap-2">
+                {exercise.muscle_group && (
+                  <Badge variant="outline" className="bg-muted/50">
+                    {exercise.muscle_group.charAt(0).toUpperCase() + exercise.muscle_group.slice(1)}
+                  </Badge>
+                )}
+                {exercise.exercise_type && (
+                  <Badge variant="outline" className="bg-primary/10 text-primary">
+                    {exercise.exercise_type === 'strength' ? 'Força' : 
+                     exercise.exercise_type === 'cardio' ? 'Cardio' : 
+                     exercise.exercise_type === 'mobility' ? 'Mobilidade' : 
+                     exercise.exercise_type}
+                  </Badge>
+                )}
+              </div>
+            </div>
+            
+            {showDetails && (
+              <>
+                <div className="flex flex-wrap gap-3 my-2 text-sm">
+                  <span className="bg-muted px-2 py-1 rounded-md">
+                    {exerciseSession.sets} séries
+                  </span>
+                  <span className="bg-muted px-2 py-1 rounded-md">
+                    {exerciseSession.reps} repetições
+                  </span>
+                  <span className="bg-muted px-2 py-1 rounded-md">
+                    {Math.floor(exerciseSession.rest_time_seconds / 60)}:{(exerciseSession.rest_time_seconds % 60).toString().padStart(2, '0')} descanso
+                  </span>
+                </div>
+                
+                {exercise.description && (
+                  <p className="text-sm text-muted-foreground mt-2">{exercise.description}</p>
+                )}
+              </>
+            )}
+          </div>
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 };
