@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { WorkoutPlan } from "../types/workout-plan";
 import { Calendar, Clock, Dumbbell } from "lucide-react";
 import { formatInTimeZone } from 'date-fns-tz';
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 // Timezone configuration
 const BRAZIL_TIMEZONE = "America/Sao_Paulo";
@@ -14,19 +14,29 @@ interface CurrentWorkoutPlanProps {
 }
 
 export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
-  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+  const [imageStatuses, setImageStatuses] = useState<Record<string, { loading: boolean, error: boolean }>>({}); 
 
   if (!plan || !plan.workout_sessions) {
     return null;
   }
 
-  // Função para garantir que a URL esteja correta
-  const getImageUrl = (url?: string) => {
+  // Função para formatar a URL da imagem
+  const formatImageUrl = (url?: string): string => {
     if (!url) return "/placeholder.svg";
     
     // Se for uma URL relativa sem protocolo, adicione https:
     if (url.startsWith('//')) {
       return `https:${url}`;
+    }
+    
+    // Se a URL estiver vindo do Supabase storage
+    if (url.includes('supabase.co/storage/v1/object/public')) {
+      return url;
+    }
+    
+    // Para URLs que não têm protocolo e não começam com //
+    if (!url.startsWith('http') && !url.startsWith('//') && !url.startsWith('/')) {
+      return `https://${url}`;
     }
     
     return url;
@@ -35,7 +45,29 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
   // Função para tratar erros de carregamento de imagem
   const handleImageError = (id: string, gifUrl?: string) => {
     console.error("Error loading GIF:", gifUrl);
-    setImageErrors(prev => ({ ...prev, [id]: true }));
+    setImageStatuses(prev => ({
+      ...prev,
+      [id]: { loading: false, error: true }
+    }));
+  };
+  
+  // Função para iniciar o carregamento da imagem
+  const handleImageLoad = (id: string) => {
+    setImageStatuses(prev => ({
+      ...prev,
+      [id]: { loading: false, error: false }
+    }));
+  };
+
+  // Inicializar o estado da imagem
+  const initImageStatus = (id: string) => {
+    if (!imageStatuses[id]) {
+      setImageStatuses(prev => ({
+        ...prev,
+        [id]: { loading: true, error: false }
+      }));
+    }
+    return imageStatuses[id] || { loading: true, error: false };
   };
 
   // Group exercises by muscle group for better visualization
@@ -88,7 +120,7 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
             <div className="flex justify-between items-center">
               <h4 className="text-xl font-semibold text-white flex items-center gap-2">
                 <Dumbbell className="w-5 h-5" />
-                Dia {session.day_number}
+                {session.day_name || `Dia ${session.day_number}`}
               </h4>
               <div className="flex flex-wrap gap-1">
                 {getMuscleGroupBadges(session)}
@@ -105,7 +137,10 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
               <div className="space-y-8">
                 {session.session_exercises?.map((exerciseSession) => {
                   const exerciseId = exerciseSession.id || `${session.day_number}-${exerciseSession.exercise?.id || 'unknown'}`;
-                  const hasError = imageErrors[exerciseId];
+                  const imageStatus = initImageStatus(exerciseId);
+                  const gifUrl = exerciseSession.exercise?.gif_url 
+                    ? formatImageUrl(exerciseSession.exercise.gif_url)
+                    : "/placeholder.svg";
                   
                   return (
                     <div 
@@ -113,26 +148,25 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
                       className="bg-gray-50 rounded-lg p-6 transition-all hover:shadow-md"
                     >
                       <div className="flex flex-col md:flex-row gap-6">
-                        {exerciseSession.exercise?.gif_url && (
-                          <div className="w-full md:w-64 h-64 rounded-lg overflow-hidden bg-white shadow-inner flex items-center justify-center">
-                            {hasError ? (
-                              <div className="text-gray-400 text-xs text-center p-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                                Imagem do exercício não disponível
-                              </div>
-                            ) : (
-                              <img 
-                                src={getImageUrl(exerciseSession.exercise.gif_url)} 
-                                alt={exerciseSession.exercise.name}
-                                className="w-full h-full object-contain"
-                                loading="lazy"
-                                onError={() => handleImageError(exerciseId, exerciseSession.exercise?.gif_url)}
-                              />
-                            )}
-                          </div>
-                        )}
+                        <div className="w-full md:w-64 h-64 rounded-lg overflow-hidden bg-white shadow-inner flex items-center justify-center">
+                          {imageStatus.error ? (
+                            <div className="text-gray-400 text-xs text-center p-2">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                              Imagem do exercício não disponível
+                            </div>
+                          ) : (
+                            <img 
+                              src={gifUrl}
+                              alt={exerciseSession.exercise?.name || "Exercício"}
+                              className="w-full h-full object-contain"
+                              loading="lazy"
+                              onError={() => handleImageError(exerciseId, exerciseSession.exercise?.gif_url)}
+                              onLoad={() => handleImageLoad(exerciseId)}
+                            />
+                          )}
+                        </div>
                         <div className="flex-grow">
                           <div className="flex justify-between items-start mb-4">
                             <h6 className="text-lg font-medium text-gray-900">

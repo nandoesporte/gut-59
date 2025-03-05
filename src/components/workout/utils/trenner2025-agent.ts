@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { WorkoutPreferences } from "../types";
 import { WorkoutPlan } from "../types/workout-plan";
@@ -321,7 +320,7 @@ export async function saveWorkoutPlan(workoutPlan: WorkoutPlan, userId: string):
     };
     
     // Insert the main plan details
-    const { data, error } = await supabase
+    const { data: planRecord, error } = await supabase
       .from('workout_plans')
       .insert(planData)
       .select()
@@ -333,21 +332,19 @@ export async function saveWorkoutPlan(workoutPlan: WorkoutPlan, userId: string):
     }
 
     // Now that we have the plan ID, we need to save the sessions
-    const planId = data.id;
+    const planId = planRecord.id;
     console.log(`Workout plan saved with ID: ${planId}, now saving sessions...`);
     
     // Save each workout session
     for (const session of workoutPlan.workout_sessions) {
       console.log(`Saving session for day ${session.day_number}...`);
       
-      // Remover campos que não existem no banco de dados
+      // Remover campos que não existem no banco de dados ou são incompatíveis
       const sessionPayload = {
         plan_id: planId,
         day_number: session.day_number,
-        focus: session.focus,
-        warmup_description: session.warmup_description,
-        cooldown_description: session.cooldown_description,
-        training_load: session.training_load
+        warmup_description: session.warmup_description || "",
+        cooldown_description: session.cooldown_description || ""
       };
       
       // Insert the session
@@ -372,7 +369,7 @@ export async function saveWorkoutPlan(workoutPlan: WorkoutPlan, userId: string):
         let exerciseId = sessionExercise.exercise.id;
         
         // If the exercise isn't already in the database, add it
-        if (!exerciseId.startsWith('exercise_')) {
+        if (!exerciseId || !exerciseId.startsWith('exercise_')) {
           console.log(`Exercise ${sessionExercise.exercise.name} not in database, creating...`);
           
           // Get the muscle group and properly cast it to the expected enum type
@@ -421,7 +418,6 @@ export async function saveWorkoutPlan(workoutPlan: WorkoutPlan, userId: string):
             sets: sessionExercise.sets,
             reps: sessionExercise.reps,
             rest_time_seconds: sessionExercise.rest_time_seconds,
-            intensity: sessionExercise.intensity || 'moderate',
             order_in_session: i + 1 // Add the required order_in_session field
           });
         
