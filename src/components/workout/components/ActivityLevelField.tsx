@@ -31,6 +31,7 @@ export const ActivityLevelField = ({ form }: ActivityLevelFieldProps) => {
                 <span className="text-lg">Sedentário</span>
                 <p className="text-sm text-muted-foreground">Pouco ou nenhum exercício</p>
                 <p className="text-sm font-medium text-primary">2 dias por semana</p>
+                <p className="text-xs text-muted-foreground">Terça e Quinta</p>
               </div>
             </SelectCard>
             <SelectCard
@@ -41,6 +42,7 @@ export const ActivityLevelField = ({ form }: ActivityLevelFieldProps) => {
                 <span className="text-lg">Leve</span>
                 <p className="text-sm text-muted-foreground">1-3 dias por semana</p>
                 <p className="text-sm font-medium text-primary">3 dias por semana</p>
+                <p className="text-xs text-muted-foreground">Segunda, Quarta e Sexta</p>
               </div>
             </SelectCard>
             <SelectCard
@@ -51,6 +53,7 @@ export const ActivityLevelField = ({ form }: ActivityLevelFieldProps) => {
                 <span className="text-lg">Moderado</span>
                 <p className="text-sm text-muted-foreground">3-5 dias por semana</p>
                 <p className="text-sm font-medium text-primary">5 dias por semana</p>
+                <p className="text-xs text-muted-foreground">Segunda a Sexta</p>
               </div>
             </SelectCard>
             <SelectCard
@@ -61,6 +64,7 @@ export const ActivityLevelField = ({ form }: ActivityLevelFieldProps) => {
                 <span className="text-lg">Intenso</span>
                 <p className="text-sm text-muted-foreground">6-7 dias por semana</p>
                 <p className="text-sm font-medium text-primary">6 dias por semana</p>
+                <p className="text-xs text-muted-foreground">Segunda a Sábado</p>
               </div>
             </SelectCard>
           </div>

@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { WorkoutPreferences } from "../types";
 import { toast } from "sonner";
@@ -10,7 +9,6 @@ import {
   updatePlanGenerationCount 
 } from "../utils/trenner2025-agent";
 
-// Mock progress data for now
 const mockProgressData = [
   { day: 1, completion: 0 },
   { day: 2, completion: 0 },
@@ -21,12 +19,11 @@ const mockProgressData = [
   { day: 7, completion: 0 },
 ];
 
-// Map activity level to a readable description
 const activityLevelDescriptions = {
-  sedentary: "Sedentário (2 dias por semana)",
-  light: "Leve (3 dias por semana)",
-  moderate: "Moderado (5 dias por semana)",
-  intense: "Intenso (6 dias por semana)"
+  sedentary: "Sedentário (Terça e Quinta)",
+  light: "Leve (Segunda, Quarta e Sexta)",
+  moderate: "Moderado (Segunda a Sexta)",
+  intense: "Intenso (Segunda a Sábado)"
 };
 
 export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
@@ -43,7 +40,6 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
   const edgeFunctionStarted = useRef(false);
   const loadingTimer = useRef<NodeJS.Timeout | null>(null);
 
-  // Update loading time while loading
   useEffect(() => {
     if (loading) {
       loadingTimer.current = setInterval(() => {
@@ -65,7 +61,6 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
   }, [loading]);
 
   const generatePlan = async () => {
-    // Prevent concurrent generations
     if (generationInProgress.current) {
       console.log("Workout plan generation already in progress, skipping...");
       return;
@@ -78,23 +73,19 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
     setRawResponse(null);
     setLoadingTime(0);
     edgeFunctionStarted.current = false;
-    
+
     try {
-      // Get the current user
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
         throw new Error("Usuário não autenticado");
       }
       
-      // Get activity level description for toast
       const activityDesc = activityLevelDescriptions[preferences.activity_level as keyof typeof activityLevelDescriptions] || 
                            "Personalizado";
       
-      // Show toast with activity level
       toast.info(`Gerando plano de treino ${activityDesc}...`);
       
-      // Fetch AI model settings
       const { data: aiSettings, error: aiSettingsError } = await supabase
         .from('ai_model_settings')
         .select('*')
@@ -108,27 +99,22 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       console.log("Starting generation of workout plan with Trenner2025...");
       console.log(`Activity level: ${preferences.activity_level}`);
       
-      // Generate a unique request ID to prevent duplicate processing
       const requestId = `${user.id}_${Date.now()}`;
       
-      // Add a timeout to detect if the edge function gets stuck
       const edgeFunctionTimeoutId = setTimeout(() => {
         if (!edgeFunctionStarted.current) {
           console.error("Edge function init timeout - function may be stuck at booted stage");
           throw new Error("Timeout ao iniciar função de geração do plano. A função parece estar presa no estágio inicial.");
         }
-      }, 5000); // 5 second timeout to detect initialization issues
+      }, 5000);
       
-      // Generate the workout plan using Trenner2025 agent
       console.log("Calling generateWorkoutPlanWithTrenner2025...");
       const { workoutPlan: generatedPlan, error: generationError, rawResponse: rawResponseData } = 
         await generateWorkoutPlanWithTrenner2025(preferences, user.id, aiSettings || undefined, requestId);
       
-      // Clear the timeout as the function has responded
       clearTimeout(edgeFunctionTimeoutId);
       edgeFunctionStarted.current = true;
       
-      // Store the raw response
       if (rawResponseData) {
         console.log("RAW RESPONSE FROM EDGE FUNCTION:", JSON.stringify(rawResponseData, null, 2));
         setRawResponse(rawResponseData);
@@ -149,7 +135,6 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       console.log("Workout plan successfully generated, saving to database...");
       console.log("COMPLETE GENERATED PLAN:", JSON.stringify(generatedPlan, null, 2));
       
-      // Save the workout plan to the database exactly as received from the AI
       const savedPlan = await saveWorkoutPlan(generatedPlan, user.id);
       
       if (!savedPlan) {
@@ -158,19 +143,16 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       
       setWorkoutPlan(savedPlan);
       
-      // Update user's plan generation count
       await updatePlanGenerationCount(user.id);
       
       toast.success(`Plano de treino ${activityDesc} gerado com sucesso!`);
       console.log("Workout plan generation and saving completed successfully");
       
-      // Reset retry counter and loading time on successful generation
       retryCount.current = 0;
       setLoadingTime(0);
     } catch (err: any) {
       console.error("Erro na geração do plano de treino:", err);
       
-      // Check if this is a network or edge function connection error
       const isNetworkError = err.message && (
         err.message.includes("Failed to send a request to the Edge Function") ||
         err.message.includes("Failed to fetch") ||
@@ -192,12 +174,10 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       );
       
       if ((isNetworkError || isInitializationError) && retryCount.current < MAX_RETRIES) {
-        // Attempt automatic retry for network errors
         retryCount.current += 1;
         toast.warning(`Problema de conexão. Tentando novamente (${retryCount.current}/${MAX_RETRIES})...`);
         
-        // Wait a bit before retrying with exponential backoff
-        const backoffTime = 2000 * Math.pow(2, retryCount.current - 1); // 2s, 4s, 8s
+        const backoffTime = 2000 * Math.pow(2, retryCount.current - 1);
         console.log(`Retrying in ${backoffTime}ms...`);
         
         setTimeout(() => {
@@ -207,7 +187,6 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
         return;
       }
       
-      // Format specialized error messages for different error conditions
       if (err.message) {
         if (err.message.includes("Invalid API Key") || 
             err.message.includes("invalid_api_key") ||
@@ -218,12 +197,10 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
           setError(err.message);
           toast.error(err.message);
         } else if (isInitializationError) {
-          // Specific error message for initialization problems
           const initErrorMsg = "Erro de inicialização da função de geração de plano. A função não conseguiu iniciar corretamente. Por favor, tente novamente ou contate o suporte.";
           setError(initErrorMsg);
           toast.error("Erro de inicialização. Tente novamente.");
         } else if (isNetworkError) {
-          // Format network error message for better user experience
           const networkErrorMsg = "Erro de conexão com o serviço de geração de plano. Por favor, verifique sua conexão e tente novamente.";
           setError(networkErrorMsg);
           toast.error("Erro de conexão. Tente novamente mais tarde.");
@@ -241,9 +218,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
     }
   };
 
-  // Generate the plan when the component mounts, but only once
   useEffect(() => {
-    // Only generate if we don't have a plan already and haven't attempted generation
     if (!workoutPlan && !loading && !error && !generationInProgress.current && !generationAttempted.current) {
       console.log("Initial workout plan generation starting...");
       generatePlan();
