@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { WorkoutPreferences } from "../types";
 import { WorkoutPlan } from "../types/workout-plan";
@@ -446,7 +445,7 @@ export async function saveWorkoutPlan(workoutPlan: WorkoutPlan, userId: string):
             const validMuscleGroups: MuscleGroup[] = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core', 'full_body', 'cardio', 'mobility', 'weight_training', 'stretching', 'ball_exercises', 'resistance_band'];
             return validMuscleGroups.includes(mg as MuscleGroup) ? mg as MuscleGroup : 'chest' as MuscleGroup;
           })();
-
+          
           // Ensure exercise_type is one of the valid enum values
           const exerciseType = (() => {
             // Convert common variations to valid enum values
@@ -465,7 +464,7 @@ export async function saveWorkoutPlan(workoutPlan: WorkoutPlan, userId: string):
             // Default to strength if not recognized
             return 'strength' as ExerciseType;
           })();
-
+          
           // Create exercise with only the fields that are in the database schema
           const exerciseToInsert = {
             name: sessionExercise.exercise.name,
