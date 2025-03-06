@@ -70,6 +70,17 @@ export interface ProtocolFood {
   phase_id: number | null;
   food_group_id: number | null;
   created_at: string | null;
+  calories: number;
+  protein: number | null;
+  carbs: number | null;
+  fats: number | null;
+  portion_size: number | null;
+  portion_unit: string | null;
+  pre_workout_compatible: boolean | null;
+  post_workout_compatible: boolean | null;
+  protein_per_100g: number | null;
+  carbs_per_100g: number | null;
+  fats_per_100g: number | null;
 }
 
 export interface PhaseFormValues {

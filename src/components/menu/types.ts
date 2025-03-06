@@ -1,12 +1,11 @@
-
 export interface ProtocolFood {
   id: string;
   name: string;
   calories: number;
-  protein: number;
-  carbs: number;
-  fats: number;
-  food_group_id: number;
+  protein: number | null;
+  carbs: number | null;
+  fats: number | null;
+  food_group_id: number | null;
   portion?: number;
   portionUnit?: string;
   fiber?: number;
@@ -26,6 +25,14 @@ export interface ProtocolFood {
     serving_qty: number;
     serving_weight_grams: number;
   };
+  phase?: number | null;
+  portion_size?: number | null;
+  portion_unit?: string | null;
+  pre_workout_compatible?: boolean | null;
+  post_workout_compatible?: boolean | null;
+  protein_per_100g?: number | null;
+  carbs_per_100g?: number | null;
+  fats_per_100g?: number | null;
 }
 
 export interface MealFood {

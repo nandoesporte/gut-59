@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FoodForm } from "./FoodForm";
 import { Loader2, Plus, Pencil, Trash2, Search } from "lucide-react";
-import type { ProtocolFood } from "@/components/menu/types";
+import type { ProtocolFood } from "@/components/admin/types";
 
 export const FoodPreferencesTab = () => {
   const [foods, setFoods] = useState<ProtocolFood[]>([]);

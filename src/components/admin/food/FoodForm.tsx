@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2 } from "lucide-react";
-import type { ProtocolFood } from "@/components/menu/types";
+import type { ProtocolFood } from "@/components/admin/types";
 
 interface FoodFormProps {
   food: ProtocolFood | null;
@@ -23,7 +23,7 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
     name: "",
     phase: null,
     food_group_id: null,
-    calories: null,
+    calories: 0,
     protein: null,
     carbs: null,
     fats: null,
@@ -76,6 +76,11 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
       return;
     }
 
+    if (formData.calories === null || formData.calories === undefined) {
+      toast.error('Calorias são obrigatórias');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
 
@@ -104,10 +109,16 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
         if (error) throw error;
         toast.success('Alimento atualizado com sucesso');
       } else {
+        // Ensure calories is not null as it's required by the database
+        const dataToSubmit = {
+          ...updatedData,
+          calories: updatedData.calories || 0
+        };
+        
         // Create new food
         const { error } = await supabase
           .from('protocol_foods')
-          .insert(updatedData);
+          .insert(dataToSubmit);
 
         if (error) throw error;
         toast.success('Alimento adicionado com sucesso');
@@ -175,13 +186,14 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="calories">Calorias</Label>
+          <Label htmlFor="calories">Calorias *</Label>
           <Input
             id="calories"
             name="calories"
             type="number"
             value={formData.calories === null ? '' : formData.calories}
             onChange={handleChange}
+            required
           />
         </div>
 
