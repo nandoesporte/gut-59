@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Coffee, Utensils, Apple, Moon, AlertTriangle, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -8,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ProtocolFood } from "./types";
+import { FOOD_GROUP_MAP } from "./hooks/useProtocolFoods";
 
 interface FoodSelectorProps {
   protocolFoods: ProtocolFood[];
@@ -117,7 +117,6 @@ export const FoodSelector = ({
   }, []);
 
   useEffect(() => {
-    // Debug logs to help identify issues
     console.log("FoodSelector rendered with:", {
       foodsCount: protocolFoods.length,
       selectedFoodsCount: selectedFoods.length,
@@ -181,22 +180,23 @@ export const FoodSelector = ({
     }
   };
 
-  // Filter foods by meal type
   const breakfastFoods = protocolFoods.filter(food => food.food_group_id === 1);
-  const lunchFoods = protocolFoods.filter(food => food.food_group_id === 2);
-  const snackFoods = protocolFoods.filter(food => food.food_group_id === 3);
-  const dinnerFoods = protocolFoods.filter(food => food.food_group_id === 4);
+  const morningSnackFoods = protocolFoods.filter(food => food.food_group_id === 2);
+  const lunchFoods = protocolFoods.filter(food => food.food_group_id === 3);
+  const afternoonSnackFoods = protocolFoods.filter(food => food.food_group_id === 4);
+  const dinnerFoods = protocolFoods.filter(food => food.food_group_id === 5);
+  
+  const uncategorizedFoods = protocolFoods.filter(food => food.food_group_id === null);
 
-  // Check if there are foods in each category
   const hasBreakfastFoods = breakfastFoods.length > 0;
+  const hasMorningSnackFoods = morningSnackFoods.length > 0;
   const hasLunchFoods = lunchFoods.length > 0;
-  const hasSnackFoods = snackFoods.length > 0;
+  const hasAfternoonSnackFoods = afternoonSnackFoods.length > 0;
   const hasDinnerFoods = dinnerFoods.length > 0;
+  const hasUncategorizedFoods = uncategorizedFoods.length > 0;
 
-  // Check if there are foods in general
   const hasFoods = protocolFoods.length > 0;
 
-  // Display a loading state first
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center p-8 space-y-4">
@@ -279,9 +279,9 @@ export const FoodSelector = ({
       )}
 
       <div className="space-y-6">
-        {breakfastFoods.length > 0 && (
+        {hasBreakfastFoods && (
           <MealSection
-            title="Café da manhã"
+            title="Café da Manhã"
             icon={<Coffee className="h-6 w-6 text-green-600" />}
             foods={breakfastFoods}
             selectedFoods={selectedFoods}
@@ -289,7 +289,17 @@ export const FoodSelector = ({
           />
         )}
 
-        {lunchFoods.length > 0 && (
+        {hasMorningSnackFoods && (
+          <MealSection
+            title="Lanche da Manhã"
+            icon={<Apple className="h-6 w-6 text-green-600" />}
+            foods={morningSnackFoods}
+            selectedFoods={selectedFoods}
+            onFoodSelection={onFoodSelection}
+          />
+        )}
+
+        {hasLunchFoods && (
           <MealSection
             title="Almoço"
             icon={<Utensils className="h-6 w-6 text-green-600" />}
@@ -299,17 +309,17 @@ export const FoodSelector = ({
           />
         )}
 
-        {snackFoods.length > 0 && (
+        {hasAfternoonSnackFoods && (
           <MealSection
-            title="Lanche da Manhã e Tarde"
+            title="Lanche da Tarde"
             icon={<Apple className="h-6 w-6 text-green-600" />}
-            foods={snackFoods}
+            foods={afternoonSnackFoods}
             selectedFoods={selectedFoods}
             onFoodSelection={onFoodSelection}
           />
         )}
 
-        {dinnerFoods.length > 0 && (
+        {hasDinnerFoods && (
           <MealSection
             title="Jantar"
             icon={<Moon className="h-6 w-6 text-green-600" />}
@@ -318,16 +328,26 @@ export const FoodSelector = ({
             onFoodSelection={onFoodSelection}
           />
         )}
+
+        {hasUncategorizedFoods && (
+          <MealSection
+            title="Outros Alimentos"
+            icon={<Utensils className="h-6 w-6 text-gray-600" />}
+            foods={uncategorizedFoods}
+            selectedFoods={selectedFoods}
+            onFoodSelection={onFoodSelection}
+          />
+        )}
       </div>
 
-      {/* Empty state when no matching foods found but protocolFoods is not empty */}
-      {hasFoods && !hasBreakfastFoods && !hasLunchFoods && !hasSnackFoods && !hasDinnerFoods && (
+      {hasFoods && !hasBreakfastFoods && !hasMorningSnackFoods && !hasLunchFoods && 
+       !hasAfternoonSnackFoods && !hasDinnerFoods && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
           <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
           <h3 className="text-lg font-medium mb-2">Nenhum alimento categorizado encontrado</h3>
           <p className="text-gray-600">
             Existem alimentos no banco de dados, mas eles não estão categorizados por tipo de refeição.
-            Entre em contato com o administrador para resolver este problema.
+            Acesse o painel administrativo para categorizar os alimentos.
           </p>
         </div>
       )}

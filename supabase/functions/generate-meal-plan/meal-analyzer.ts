@@ -101,9 +101,23 @@ export function analyzeMeal(
   meetsGuidelines: boolean;
   suggestions?: string[];
 } {
-  // Filter foods suitable for the meal type
+  // Mapear tipos de refeição para food_group_id (usado no banco de dados)
+  const mealTypeToFoodGroupMap: Record<string, number> = {
+    'breakfast': 1,      // Café da Manhã
+    'morning_snack': 2,  // Lanche da Manhã
+    'lunch': 3,          // Almoço
+    'afternoon_snack': 4, // Lanche da Tarde
+    'dinner': 5          // Jantar
+  };
+  
+  // Filtrar alimentos adequados para o tipo de refeição usando food_group_id
+  const foodGroupId = mealTypeToFoodGroupMap[mealType];
+  
+  // Filter foods suitable for the meal type based on food_group_id
+  // Primeiro verificamos pelo food_group_id e depois pelo meal_type (para compatibilidade)
   const suitableFoods = availableFoods.filter(food => 
-    food.meal_type?.includes(mealType) || food.meal_type?.includes('any')
+    (food.food_group_id === foodGroupId) || 
+    (food.meal_type?.includes(mealType) || food.meal_type?.includes('any'))
   );
 
   // Calculate target calories for the meal based on meal type

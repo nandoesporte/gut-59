@@ -4,6 +4,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { ProtocolFood } from "../types";
 import { toast } from "sonner";
 
+// Definir o mapeamento de food_group_id para descrições legíveis
+export const FOOD_GROUP_MAP = {
+  1: 'Café da Manhã',
+  2: 'Lanche da Manhã',
+  3: 'Almoço',
+  4: 'Lanche da Tarde',
+  5: 'Jantar'
+};
+
 export const useProtocolFoods = () => {
   const [protocolFoods, setProtocolFoods] = useState<ProtocolFood[]>([]);
   const [loading, setLoading] = useState(true);
@@ -15,6 +24,7 @@ export const useProtocolFoods = () => {
         setLoading(true);
         console.log("Fetching protocol foods from database...");
         
+        // Buscar alimentos e dados de food_groups (para obter os nomes das categorias)
         const { data, error } = await supabase
           .from('protocol_foods')
           .select('*')
@@ -31,26 +41,42 @@ export const useProtocolFoods = () => {
           toast.warning("Nenhum alimento encontrado no banco de dados. Adicione alimentos no painel administrativo.");
         }
         
-        // Now let's assign default food_group_id for items with NULL
+        // Processar os dados para garantir que todos os alimentos tenham food_group_id válido
         const processedData = data?.map(food => {
-          // For items that have NULL food_group_id, let's try to categorize them based on name
+          // Garantir que os alimentos tenham categorias apropriadas
           if (food.food_group_id === null) {
+            // Estratégia de categorização por nome de alimento
             const name = food.name.toLowerCase();
+            
+            // Café da manhã: alimentos típicos de café da manhã
             if (name.includes('café') || name.includes('pão') || name.includes('tapioca') || 
-                name.includes('crepioca') || name.includes('cuscuz')) {
+                name.includes('crepioca') || name.includes('cuscuz') || name.includes('leite') ||
+                name.includes('queijo') || name.includes('iogurte') || name.includes('aveia')) {
               food.food_group_id = 1; // Café da Manhã
-            } else if (name.includes('fruta') || name.includes('iogurte')) {
+            } 
+            // Lanches: frutas e lanches leves
+            else if (name.includes('fruta') || name.includes('maçã') || name.includes('banana') ||
+                     name.includes('snack') || name.includes('castanha') || name.includes('nozes')) {
               food.food_group_id = 2; // Lanche da Manhã
             }
+            // Almoço/Jantar: proteínas e pratos principais
+            else if (name.includes('arroz') || name.includes('feijão') || name.includes('carne') ||
+                    name.includes('frango') || name.includes('peixe') || name.includes('legume') ||
+                    name.includes('batata') || name.includes('massa')) {
+              food.food_group_id = 3; // Almoço
+            }
           }
+          
           return food;
         });
         
-        // Log the meal types distribution for debugging
+        // Adicionar log para verificar a distribuição de alimentos por categoria
         if (processedData && processedData.length > 0) {
           const mealTypeCounts = processedData.reduce((acc: Record<string, number>, food) => {
-            const group = food.food_group_id?.toString() || 'uncategorized';
-            acc[group] = (acc[group] || 0) + 1;
+            const groupId = food.food_group_id?.toString() || 'uncategorized';
+            const groupName = FOOD_GROUP_MAP[groupId as keyof typeof FOOD_GROUP_MAP] || 'Não categorizado';
+            
+            acc[groupName] = (acc[groupName] || 0) + 1;
             return acc;
           }, {});
           

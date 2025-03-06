@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2 } from "lucide-react";
 import type { ProtocolFood } from "@/components/menu/types";
+import { FOOD_GROUP_MAP } from "@/components/menu/hooks/useProtocolFoods";
 
 interface FoodFormProps {
   food: ProtocolFood | null;
@@ -152,6 +153,7 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
     }
   };
 
+  // Tipos de refeição disponíveis
   const mealTypeOptions = [
     { id: 1, name: "Café da Manhã" },
     { id: 2, name: "Lanche da Manhã" },
@@ -192,7 +194,7 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="food_group_id">Tipo de Refeição</Label>
+          <Label htmlFor="food_group_id">Tipo de Refeição *</Label>
           <Select
             value={formData.food_group_id?.toString() || ''}
             onValueChange={(value) => handleSelectChange('food_group_id', value)}
@@ -208,6 +210,9 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
               ))}
             </SelectContent>
           </Select>
+          <p className="text-xs text-gray-500 mt-1">
+            Esta informação determinará em qual categoria o alimento aparecerá no menu do cliente.
+          </p>
         </div>
 
         <div className="space-y-2">

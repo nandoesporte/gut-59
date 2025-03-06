@@ -1,14 +1,15 @@
 
 import { useState, useCallback } from 'react';
 import { ProtocolFood } from '../types';
+import { FOOD_GROUP_MAP } from './useProtocolFoods';
 
 // Define os mapeamentos de food_group_id para refeições
 const FOOD_GROUP_TO_MEAL_TYPE = {
-  1: 'breakfast',    // Café da Manhã
-  2: 'morning_snack', // Lanche da Manhã
-  3: 'lunch',        // Almoço
+  1: 'breakfast',      // Café da Manhã
+  2: 'morning_snack',  // Lanche da Manhã
+  3: 'lunch',          // Almoço
   4: 'afternoon_snack', // Lanche da Tarde
-  5: 'dinner'        // Jantar
+  5: 'dinner'          // Jantar
 };
 
 export const useFoodSelection = () => {
@@ -22,7 +23,7 @@ export const useFoodSelection = () => {
     lunch: [],
     afternoon_snack: [],
     dinner: [],
-    uncategorized: [] // Added uncategorized section for foods without group_id
+    uncategorized: [] // Alimentos sem grupo definido
   });
 
   const handleFoodSelection = useCallback((foodId: string, food?: ProtocolFood) => {
