@@ -39,21 +39,27 @@ const MealSection = ({
       <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
     </div>
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      {foods.map((food) => (
-        <Button
-          key={food.id}
-          variant={selectedFoods.includes(food.id) ? "default" : "outline"}
-          onClick={() => onFoodSelection(food.id, food)}
-          className={`
-            h-auto py-3 px-4 w-full text-left justify-start
-            ${selectedFoods.includes(food.id)
-              ? 'bg-green-100 border-green-500 text-green-700 hover:bg-green-200 hover:text-green-800'
-              : 'hover:bg-green-50 hover:border-green-200'}
-          `}
-        >
-          <span className="truncate">{food.name}</span>
-        </Button>
-      ))}
+      {foods.length > 0 ? (
+        foods.map((food) => (
+          <Button
+            key={food.id}
+            variant={selectedFoods.includes(food.id) ? "default" : "outline"}
+            onClick={() => onFoodSelection(food.id, food)}
+            className={`
+              h-auto py-3 px-4 w-full text-left justify-start
+              ${selectedFoods.includes(food.id)
+                ? 'bg-green-100 border-green-500 text-green-700 hover:bg-green-200 hover:text-green-800'
+                : 'hover:bg-green-50 hover:border-green-200'}
+            `}
+          >
+            <span className="truncate">{food.name}</span>
+          </Button>
+        ))
+      ) : (
+        <div className="text-gray-500 text-center p-4 col-span-2">
+          Nenhum alimento encontrado para esta categoria
+        </div>
+      )}
     </div>
   </Card>
 );
@@ -70,6 +76,7 @@ export const FoodSelector = ({
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [paymentRequired, setPaymentRequired] = useState(true);
   const [isConfirming, setIsConfirming] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const checkPaymentRequirement = async () => {
@@ -108,6 +115,18 @@ export const FoodSelector = ({
 
     checkPaymentRequirement();
   }, []);
+
+  useEffect(() => {
+    // Debug logs to help identify issues
+    console.log("FoodSelector rendered with:", {
+      foodsCount: protocolFoods.length,
+      selectedFoodsCount: selectedFoods.length,
+      breakfastFoods: protocolFoods.filter(f => f.food_group_id === 1).length,
+      lunchFoods: protocolFoods.filter(f => f.food_group_id === 2).length,
+      snackFoods: protocolFoods.filter(f => f.food_group_id === 3).length,
+      dinnerFoods: protocolFoods.filter(f => f.food_group_id === 4).length
+    });
+  }, [protocolFoods, selectedFoods]);
 
   const handleConfirm = async () => {
     console.log("Botão Confirmar Seleção clicado");
@@ -162,19 +181,30 @@ export const FoodSelector = ({
     }
   };
 
+  // Filter foods by meal type
   const breakfastFoods = protocolFoods.filter(food => food.food_group_id === 1);
   const lunchFoods = protocolFoods.filter(food => food.food_group_id === 2);
   const snackFoods = protocolFoods.filter(food => food.food_group_id === 3);
   const dinnerFoods = protocolFoods.filter(food => food.food_group_id === 4);
 
-  // Verifica se há alimentos em cada categoria
+  // Check if there are foods in each category
   const hasBreakfastFoods = breakfastFoods.length > 0;
   const hasLunchFoods = lunchFoods.length > 0;
   const hasSnackFoods = snackFoods.length > 0;
   const hasDinnerFoods = dinnerFoods.length > 0;
 
-  // Verifica se há alimentos em geral
+  // Check if there are foods in general
   const hasFoods = protocolFoods.length > 0;
+
+  // Display a loading state first
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 space-y-4">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <p className="text-gray-600">Carregando opções de alimentos...</p>
+      </div>
+    );
+  }
 
   if (!hasFoods) {
     return (
@@ -249,7 +279,7 @@ export const FoodSelector = ({
       )}
 
       <div className="space-y-6">
-        {hasBreakfastFoods && (
+        {breakfastFoods.length > 0 && (
           <MealSection
             title="Café da manhã"
             icon={<Coffee className="h-6 w-6 text-green-600" />}
@@ -259,7 +289,7 @@ export const FoodSelector = ({
           />
         )}
 
-        {hasLunchFoods && (
+        {lunchFoods.length > 0 && (
           <MealSection
             title="Almoço"
             icon={<Utensils className="h-6 w-6 text-green-600" />}
@@ -269,7 +299,7 @@ export const FoodSelector = ({
           />
         )}
 
-        {hasSnackFoods && (
+        {snackFoods.length > 0 && (
           <MealSection
             title="Lanche da Manhã e Tarde"
             icon={<Apple className="h-6 w-6 text-green-600" />}
@@ -279,7 +309,7 @@ export const FoodSelector = ({
           />
         )}
 
-        {hasDinnerFoods && (
+        {dinnerFoods.length > 0 && (
           <MealSection
             title="Jantar"
             icon={<Moon className="h-6 w-6 text-green-600" />}
@@ -289,6 +319,18 @@ export const FoodSelector = ({
           />
         )}
       </div>
+
+      {/* Empty state when no matching foods found but protocolFoods is not empty */}
+      {hasFoods && !hasBreakfastFoods && !hasLunchFoods && !hasSnackFoods && !hasDinnerFoods && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+          <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+          <h3 className="text-lg font-medium mb-2">Nenhum alimento categorizado encontrado</h3>
+          <p className="text-gray-600">
+            Existem alimentos no banco de dados, mas eles não estão categorizados por tipo de refeição.
+            Entre em contato com o administrador para resolver este problema.
+          </p>
+        </div>
+      )}
 
       <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4 text-center">
         <p className="text-sm text-green-700 mb-3">

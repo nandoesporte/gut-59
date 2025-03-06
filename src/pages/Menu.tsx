@@ -11,7 +11,6 @@ import { useMenuController } from "@/components/menu/MenuController";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useRef } from "react";
-import type { DietaryPreferences } from "@/components/menu/types";
 
 const Menu = () => {
   const mealPlanRef = useRef<HTMLDivElement>(null);
@@ -56,15 +55,24 @@ const Menu = () => {
   }, [currentStep]);
 
   useEffect(() => {
-    console.log("Etapa atual:", currentStep);
-    console.log("Plano de refeição disponível:", !!mealPlan);
+    console.log("Current step:", currentStep);
+    console.log("Protocol foods count:", protocolFoods.length);
+    console.log("Selected foods count:", selectedFoods.length);
+    
+    if (currentStep === 2) {
+      console.log("Step 2 (food selection) is active");
+      if (protocolFoods.length === 0) {
+        console.log("Warning: No foods available for selection");
+      }
+    }
+    
     if (mealPlan) {
-      console.log("Detalhes do plano:", {
-        temPlanoSemanal: !!mealPlan.weeklyPlan,
-        diasDisponiveis: mealPlan.weeklyPlan ? Object.keys(mealPlan.weeklyPlan) : []
+      console.log("Meal plan available:", {
+        hasWeeklyPlan: !!mealPlan.weeklyPlan,
+        availableDays: mealPlan.weeklyPlan ? Object.keys(mealPlan.weeklyPlan) : []
       });
     }
-  }, [currentStep, mealPlan]);
+  }, [currentStep, protocolFoods, selectedFoods, mealPlan]);
 
   const handleRefreshMealPlan = async () => {
     try {
@@ -138,12 +146,26 @@ const Menu = () => {
               </h2>
               {currentStep === 2 && (
                 <>
-                  {foodsError || protocolFoods.length === 0 ? (
+                  {foodsError ? (
+                    <div className="p-6 text-center">
+                      <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+                      <h3 className="text-lg font-medium mb-2">Erro ao carregar alimentos</h3>
+                      <p className="text-gray-600 mb-4">
+                        {foodsError instanceof Error ? foodsError.message : 'Não foi possível carregar a lista de alimentos do banco de dados.'}
+                      </p>
+                      <button 
+                        onClick={() => window.location.reload()} 
+                        className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+                      >
+                        Tentar Novamente
+                      </button>
+                    </div>
+                  ) : protocolFoods.length === 0 ? (
                     <div className="p-6 text-center">
                       <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
                       <h3 className="text-lg font-medium mb-2">Sem dados de alimentos</h3>
                       <p className="text-gray-600 mb-4">
-                        Não foi possível carregar a lista de alimentos do banco de dados. Por favor, tente novamente ou entre em contato com o suporte.
+                        Não foi possível carregar a lista de alimentos do banco de dados. Por favor, verifique se existem alimentos cadastrados no painel administrativo.
                       </p>
                       <button 
                         onClick={() => window.location.reload()} 

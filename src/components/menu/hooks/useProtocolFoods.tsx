@@ -1,50 +1,39 @@
 
 import { useState, useEffect } from "react";
-import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import type { ProtocolFood } from "../types";
+import { ProtocolFood } from "../types";
 
 export const useProtocolFoods = () => {
   const [protocolFoods, setProtocolFoods] = useState<ProtocolFood[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    const fetchProtocolFoods = async () => {
-      setLoading(true);
+    const fetchFoods = async () => {
       try {
-        console.log("Iniciando busca de alimentos do protocolo...");
+        setLoading(true);
+        console.log("Fetching protocol foods from database...");
         
         const { data, error } = await supabase
           .from('protocol_foods')
-          .select('*');
+          .select('*')
+          .order('name');
 
         if (error) {
-          console.error('Erro ao buscar alimentos:', error);
-          setError(error.message);
-          toast.error("Erro ao carregar lista de alimentos");
-          return;
+          throw new Error(`Error fetching foods: ${error.message}`);
         }
 
-        console.log(`Dados recebidos: ${data?.length || 0} alimentos encontrados`);
-        if (data && data.length > 0) {
-          console.log("Exemplo de primeiro alimento:", data[0]);
-        } else {
-          console.log("Nenhum alimento encontrado na tabela protocol_foods");
-        }
-        
+        console.log(`Fetched ${data?.length || 0} protocol foods`, data);
         setProtocolFoods(data || []);
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
-        console.error('Erro inesperado ao buscar alimentos:', err);
-        setError(errorMessage);
-        toast.error("Erro ao carregar alimentos");
+        console.error('Error in useProtocolFoods:', err);
+        setError(err instanceof Error ? err : new Error(String(err)));
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProtocolFoods();
+    fetchFoods();
   }, []);
 
   return { protocolFoods, loading, error };
