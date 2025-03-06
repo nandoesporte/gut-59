@@ -251,12 +251,14 @@ export const FoodPreferencesTab = () => {
               {selectedFood ? 'Editar Alimento' : 'Adicionar Novo Alimento'}
             </DialogTitle>
           </DialogHeader>
-          <FoodForm
-            food={selectedFood}
-            foodGroups={foodGroups}
-            onSubmit={handleFormSubmit}
-            onCancel={() => setIsDialogOpen(false)}
-          />
+          {isDialogOpen && (
+            <FoodForm
+              food={selectedFood}
+              foodGroups={foodGroups}
+              onSubmit={handleFormSubmit}
+              onCancel={() => setIsDialogOpen(false)}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>

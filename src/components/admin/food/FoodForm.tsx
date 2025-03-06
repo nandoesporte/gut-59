@@ -183,7 +183,6 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
               <SelectValue placeholder="Selecione a fase" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Sem fase</SelectItem>
               <SelectItem value="1">Fase 1</SelectItem>
               <SelectItem value="2">Fase 2</SelectItem>
               <SelectItem value="3">Fase 3</SelectItem>
@@ -201,7 +200,7 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
               <SelectValue placeholder="Selecione o tipo de refeição" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Sem grupo</SelectItem>
+              {/* Fix: Remove SelectItem with empty value */}
               {foodGroups.map(group => (
                 <SelectItem key={group.id} value={group.id.toString()}>
                   {group.name}
