@@ -86,7 +86,7 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
       setIsSubmitting(true);
 
       // Create a properly typed object for Supabase
-      const foodData = {
+      const foodData: Record<string, any> = {
         name: formData.name,
         calories: formData.calories as number,
         phase: formData.phase,
