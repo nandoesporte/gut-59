@@ -57,10 +57,10 @@ const Menu = () => {
   useEffect(() => {
     console.log("Current step:", currentStep);
     console.log("Calorie needs:", calorieNeeds);
-    console.log("Protocol foods count:", protocolFoods.length);
+    console.log("Protocol foods count:", protocolFoods?.length || 0);
     console.log("Selected foods count:", selectedFoods.length);
     console.log("Meal plan available:", !!mealPlan);
-  }, [currentStep, calorieNeeds, protocolFoods.length, selectedFoods.length, mealPlan]);
+  }, [currentStep, calorieNeeds, protocolFoods, selectedFoods.length, mealPlan]);
 
   const handleRefreshMealPlan = async () => {
     try {
@@ -132,7 +132,7 @@ const Menu = () => {
                 <span className={`bg-${currentStep >= 2 ? 'green' : 'gray'}-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2`}>2</span>
                 Preferências Alimentares
               </h2>
-              {currentStep === 2 && protocolFoods.length > 0 && (
+              {currentStep === 2 && protocolFoods && protocolFoods.length > 0 && (
                 <FoodSelector
                   protocolFoods={protocolFoods}
                   selectedFoods={selectedFoods}
@@ -142,7 +142,7 @@ const Menu = () => {
                   onConfirm={handleConfirmFoodSelection}
                 />
               )}
-              {currentStep === 2 && protocolFoods.length === 0 && (
+              {currentStep === 2 && (!protocolFoods || protocolFoods.length === 0) && (
                 <div className="text-center py-8">
                   <p className="text-yellow-600">Carregando opções de alimentos...</p>
                   <div className="mt-4">

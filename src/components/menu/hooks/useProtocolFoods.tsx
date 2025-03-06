@@ -35,8 +35,11 @@ export const useProtocolFoods = () => {
         
         // Transform data to match ProtocolFood type and format image URLs
         const formattedFoods = data.map(food => {
-          // Check if food has an image_url property before trying to format it
-          const imageUrl = food.image_url ? formatImageUrl(food.image_url) : '/placeholder.svg';
+          // Check if food has an image_url property and provide fallback
+          let imageUrl = '/placeholder.svg';
+          if ('image_url' in food && food.image_url) {
+            imageUrl = formatImageUrl(food.image_url);
+          }
           
           return {
             ...food,

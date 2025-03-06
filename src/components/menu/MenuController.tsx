@@ -45,7 +45,7 @@ export const useMenuController = () => {
     goal: undefined,
   });
 
-  const protocolFoods = useProtocolFoods();
+  const { protocolFoods, loading: protocolFoodsLoading } = useProtocolFoods();
   const { calorieNeeds, calculateCalories } = useCalorieCalculator();
   const { selectedFoods, foodsByMealType, totalCalories, handleFoodSelection, calculateTotalCalories, categorizeFoodsByMealType } = useFoodSelection();
   const wallet = useWallet();
@@ -757,7 +757,7 @@ export const useMenuController = () => {
     totalCalories,
     mealPlan,
     formData,
-    loading,
+    loading: loading || protocolFoodsLoading,
     handleCalculateCalories,
     handleFoodSelection,
     handleConfirmFoodSelection,
