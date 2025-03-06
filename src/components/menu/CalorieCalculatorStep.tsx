@@ -17,8 +17,9 @@ export const CalorieCalculatorStep = ({
   onCalculate,
   calorieNeeds,
 }: CalorieCalculatorStepProps) => {
-  const handleCalculate = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Changed to ensure handleCalculate doesn't expect parameters
+  const handleCalculate = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     console.log("Calculating calories for step 1...");
     onCalculate();
   };

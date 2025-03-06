@@ -34,11 +34,16 @@ export const useProtocolFoods = () => {
         console.log(`Loaded ${data.length} protocol foods`);
         
         // Transform data to match ProtocolFood type and format image URLs
-        const formattedFoods = data.map(food => ({
-          ...food,
-          image_url: formatImageUrl(food.image_url),
-          id: food.id.toString(), // Ensure ID is a string for consistency
-        })) as ProtocolFood[];
+        const formattedFoods = data.map(food => {
+          // Check if food has an image_url property before trying to format it
+          const imageUrl = food.image_url ? formatImageUrl(food.image_url) : '/placeholder.svg';
+          
+          return {
+            ...food,
+            image_url: imageUrl,
+            id: food.id.toString(), // Ensure ID is a string for consistency
+          };
+        }) as ProtocolFood[];
         
         setProtocolFoods(formattedFoods);
         
@@ -60,5 +65,5 @@ export const useProtocolFoods = () => {
     fetchProtocolFoods();
   }, []);
 
-  return protocolFoods;
+  return { protocolFoods, loading };
 };
