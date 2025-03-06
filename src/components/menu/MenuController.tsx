@@ -214,10 +214,11 @@ export const useMenuController = () => {
   const handleConfirmFoodSelection = async () => {
     console.log("Iniciando confirmação de seleção de alimentos");
     
-    if (selectedFoods.length === 0) {
-      console.warn("Nenhum alimento selecionado!");
-      toast.error("Por favor, selecione pelo menos um alimento antes de prosseguir");
-      return false;
+    if (protocolFoods.length === 0 || selectedFoods.length === 0) {
+      console.log("Sem alimentos selecionados, mas avançando mesmo assim devido à falta de opções");
+      setCurrentStep(3);
+      toast.info("Avançando para preferências dietéticas");
+      return true;
     }
     
     try {
@@ -341,7 +342,7 @@ export const useMenuController = () => {
       return false;
     }
 
-    if (!selectedFoods || selectedFoods.length === 0) {
+    if (protocolFoods.length > 0 && selectedFoods.length === 0) {
       toast.error("Selecione pelo menos um alimento");
       return false;
     }
@@ -405,7 +406,6 @@ export const useMenuController = () => {
       } else {
         console.log("Usuário não autenticado. Criando plano básico.");
         
-        // Create a basic meal plan for unauthenticated users with the correct structure
         const basicMealPlan: MealPlan = {
           userCalories: calorieNeeds,
           weeklyPlan: {

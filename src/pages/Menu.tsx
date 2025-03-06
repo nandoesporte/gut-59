@@ -1,3 +1,4 @@
+
 import { Card } from "@/components/ui/card";
 import { InitialMenuContent } from "@/components/menu/InitialMenuContent";
 import { CalorieCalculatorStep } from "@/components/menu/CalorieCalculatorStep";
@@ -143,12 +144,27 @@ const Menu = () => {
               )}
               {currentStep === 2 && (!protocolFoods || protocolFoods.length === 0) && (
                 <div className="text-center py-8">
-                  <p className="text-yellow-600">Não há alimentos disponíveis no momento. Por favor, contate o administrador.</p>
+                  <p className="text-yellow-600 mb-4">Não há alimentos disponíveis no momento. Por favor, contate o administrador.</p>
+                  <p className="text-gray-600 mb-6">Você ainda pode continuar para criar um plano alimentar básico.</p>
+                  <div className="flex justify-center gap-4">
+                    <button 
+                      onClick={() => setCurrentStep(1)} 
+                      className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                    >
+                      Voltar
+                    </button>
+                    <button 
+                      onClick={handleConfirmFoodSelection} 
+                      className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                    >
+                      Continuar mesmo assim
+                    </button>
+                  </div>
                 </div>
               )}
               {currentStep > 2 && (
                 <div className="text-center py-2">
-                  <p className="text-green-600 font-medium">✓ {selectedFoods.length} alimentos selecionados</p>
+                  <p className="text-green-600 font-medium">✓ {protocolFoods && protocolFoods.length > 0 ? `${selectedFoods.length} alimentos selecionados` : 'Etapa concluída'}</p>
                   <button 
                     onClick={() => setCurrentStep(2)} 
                     className="text-sm text-gray-500 underline mt-2"

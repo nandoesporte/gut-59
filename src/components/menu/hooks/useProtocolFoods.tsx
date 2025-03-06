@@ -31,7 +31,7 @@ export const useProtocolFoods = () => {
         
         if (!data || data.length === 0) {
           console.warn('Nenhum alimento encontrado');
-          // Ainda definimos um array vazio, mas pelo menos saímos do estado de loading
+          // Definimos foods como array vazio e atualizamos loading
           setProtocolFoods([]);
           setLoading(false);
           return;

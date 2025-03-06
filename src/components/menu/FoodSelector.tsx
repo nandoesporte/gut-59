@@ -130,6 +130,22 @@ export const FoodSelector = ({
       return;
     }
     
+    if (protocolFoods.length === 0) {
+      console.log("Não há alimentos disponíveis, mas avançando mesmo assim");
+      try {
+        setIsConfirming(true);
+        toast.loading("Processando...");
+        await onConfirm();
+        toast.success("Avançando para a próxima etapa!");
+      } catch (error) {
+        console.error("Erro ao avançar:", error);
+        toast.error("Erro ao processar. Tente novamente.");
+      } finally {
+        setIsConfirming(false);
+      }
+      return;
+    }
+    
     if (selectedFoods.length === 0) {
       toast.error("Selecione pelo menos um alimento");
       return;
@@ -209,7 +225,7 @@ export const FoodSelector = ({
         </p>
         <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 max-w-xl mx-auto">
           <p className="text-sm text-yellow-700">
-            <strong>Dica:</strong> Após selecionar seus alimentos preferidos, clique no botão "Confirmar Seleç��o" 
+            <strong>Dica:</strong> Após selecionar seus alimentos preferidos, clique no botão "Confirmar Seleção" 
             no final da página ou na barra inferior para avançar para a próxima etapa.
           </p>
         </div>
