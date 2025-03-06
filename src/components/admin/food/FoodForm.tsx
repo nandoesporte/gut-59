@@ -22,7 +22,7 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
     name: "",
     phase: null,
     food_group_id: null,
-    calories: 0,
+    calories: 0, // Ensure calories has a default value
     protein: null,
     carbs: null,
     fats: null,
@@ -84,7 +84,10 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
       setIsSubmitting(true);
 
       // Calculate per 100g values if needed
-      const updatedData = { ...formData };
+      const updatedData = { 
+        ...formData,
+        calories: formData.calories as number, // Ensure calories is treated as a number
+      };
       
       if (formData.protein && formData.portion_size && formData.portion_size !== 100) {
         updatedData.protein_per_100g = (formData.protein / formData.portion_size) * 100;
