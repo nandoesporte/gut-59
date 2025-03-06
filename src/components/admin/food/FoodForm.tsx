@@ -85,10 +85,10 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
     try {
       setIsSubmitting(true);
 
-      // Create a properly typed object for Supabase
-      const foodData: Record<string, any> = {
+      // Type-safe object for Supabase with required fields explicitly set
+      const foodData = {
         name: formData.name,
-        calories: formData.calories as number,
+        calories: Number(formData.calories),
         phase: formData.phase,
         food_group_id: formData.food_group_id,
         protein: formData.protein,
@@ -100,17 +100,17 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
         portion_unit: formData.portion_unit
       };
       
-      // Calculate per 100g values if needed
-      if (formData.protein && formData.portion_size && formData.portion_size !== 100) {
-        foodData.protein_per_100g = (formData.protein / formData.portion_size) * 100;
+      // Calculate and add per 100g values conditionally
+      if (formData.protein !== null && formData.portion_size && formData.portion_size !== 100) {
+        foodData.protein_per_100g = (Number(formData.protein) / Number(formData.portion_size)) * 100;
       }
       
-      if (formData.carbs && formData.portion_size && formData.portion_size !== 100) {
-        foodData.carbs_per_100g = (formData.carbs / formData.portion_size) * 100;
+      if (formData.carbs !== null && formData.portion_size && formData.portion_size !== 100) {
+        foodData.carbs_per_100g = (Number(formData.carbs) / Number(formData.portion_size)) * 100;
       }
       
-      if (formData.fats && formData.portion_size && formData.portion_size !== 100) {
-        foodData.fats_per_100g = (formData.fats / formData.portion_size) * 100;
+      if (formData.fats !== null && formData.portion_size && formData.portion_size !== 100) {
+        foodData.fats_per_100g = (Number(formData.fats) / Number(formData.portion_size)) * 100;
       }
 
       if (food) {
