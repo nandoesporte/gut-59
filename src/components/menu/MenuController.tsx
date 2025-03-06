@@ -135,7 +135,7 @@ export const useMenuController = () => {
       }
       
       console.log("Advancing to step 2 (food selection)");
-      setCurrentStep(2);
+      setCurrentStep(2); // This is crucial for moving to food selection
       return true;
     } catch (error) {
       console.error('Error in handleCalculateCalories:', error);

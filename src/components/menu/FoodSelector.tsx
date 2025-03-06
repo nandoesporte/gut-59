@@ -29,33 +29,40 @@ const MealSection = ({
   foods: ProtocolFood[];
   selectedFoods: string[];
   onFoodSelection: (foodId: string, food?: ProtocolFood) => void;
-}) => (
-  <Card className="p-6 space-y-4 shadow-lg hover:shadow-xl transition-shadow">
-    <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
-      <div className="bg-green-50 p-2 rounded-lg">
-        {icon}
+}) => {
+  console.log(`Rendering ${title} section with ${foods.length} foods`);
+  return (
+    <Card className="p-6 space-y-4 shadow-lg hover:shadow-xl transition-shadow">
+      <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
+        <div className="bg-green-50 p-2 rounded-lg">
+          {icon}
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
       </div>
-      <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-    </div>
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      {foods.map((food) => (
-        <Button
-          key={food.id}
-          variant={selectedFoods.includes(food.id) ? "default" : "outline"}
-          onClick={() => onFoodSelection(food.id, food)}
-          className={`
-            h-auto py-3 px-4 w-full text-left justify-start
-            ${selectedFoods.includes(food.id)
-              ? 'bg-green-100 border-green-500 text-green-700 hover:bg-green-200 hover:text-green-800'
-              : 'hover:bg-green-50 hover:border-green-200'}
-          `}
-        >
-          <span className="truncate">{food.name}</span>
-        </Button>
-      ))}
-    </div>
-  </Card>
-);
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {foods.length > 0 ? (
+          foods.map((food) => (
+            <Button
+              key={food.id}
+              variant={selectedFoods.includes(food.id) ? "default" : "outline"}
+              onClick={() => onFoodSelection(food.id, food)}
+              className={`
+                h-auto py-3 px-4 w-full text-left justify-start
+                ${selectedFoods.includes(food.id)
+                  ? 'bg-green-100 border-green-500 text-green-700 hover:bg-green-200 hover:text-green-800'
+                  : 'hover:bg-green-50 hover:border-green-200'}
+              `}
+            >
+              <span className="truncate">{food.name}</span>
+            </Button>
+          ))
+        ) : (
+          <p className="text-gray-500 col-span-2 text-center py-2">Nenhum alimento disponível nesta categoria</p>
+        )}
+      </div>
+    </Card>
+  );
+};
 
 export const FoodSelector = ({
   protocolFoods,
@@ -69,6 +76,13 @@ export const FoodSelector = ({
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [paymentRequired, setPaymentRequired] = useState(true);
   const [isConfirming, setIsConfirming] = useState(false);
+
+  console.log("FoodSelector rendered with", protocolFoods.length, "protocol foods");
+  
+  useEffect(() => {
+    console.log("FoodSelector mounted with", protocolFoods.length, "protocol foods");
+    console.log("Food groups:", [...new Set(protocolFoods.map(f => f.food_group_id))]);
+  }, [protocolFoods]);
 
   useEffect(() => {
     const checkPaymentRequirement = async () => {
@@ -165,6 +179,22 @@ export const FoodSelector = ({
   const lunchFoods = protocolFoods.filter(food => food.food_group_id === 2);
   const snackFoods = protocolFoods.filter(food => food.food_group_id === 3);
   const dinnerFoods = protocolFoods.filter(food => food.food_group_id === 4);
+
+  console.log("Breakfast foods:", breakfastFoods.length);
+  console.log("Lunch foods:", lunchFoods.length);
+  console.log("Snack foods:", snackFoods.length);
+  console.log("Dinner foods:", dinnerFoods.length);
+
+  if (protocolFoods.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <h3 className="text-xl font-semibold mb-4">Carregando opções de alimentos...</h3>
+        <div className="flex justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 w-full pb-24">
