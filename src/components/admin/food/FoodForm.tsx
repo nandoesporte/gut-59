@@ -17,6 +17,24 @@ interface FoodFormProps {
   onCancel: () => void;
 }
 
+// Create an interface for the food data that includes all fields we need
+interface FoodDataType {
+  name: string;
+  calories: number;
+  phase: number | null;
+  food_group_id: number | null;
+  protein: number | null;
+  carbs: number | null;
+  fats: number | null;
+  pre_workout_compatible: boolean;
+  post_workout_compatible: boolean;
+  portion_size: number | null;
+  portion_unit: string | null;
+  protein_per_100g?: number | null;
+  carbs_per_100g?: number | null;
+  fats_per_100g?: number | null;
+}
+
 export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps) => {
   const [formData, setFormData] = useState<Partial<ProtocolFood>>({
     name: "",
@@ -86,7 +104,7 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
       setIsSubmitting(true);
 
       // Type-safe object for Supabase with required fields explicitly set
-      const foodData = {
+      const foodData: FoodDataType = {
         name: formData.name,
         calories: Number(formData.calories),
         phase: formData.phase,
@@ -94,8 +112,8 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
         protein: formData.protein,
         carbs: formData.carbs,
         fats: formData.fats,
-        pre_workout_compatible: formData.pre_workout_compatible,
-        post_workout_compatible: formData.post_workout_compatible,
+        pre_workout_compatible: formData.pre_workout_compatible || false,
+        post_workout_compatible: formData.post_workout_compatible || false,
         portion_size: formData.portion_size,
         portion_unit: formData.portion_unit
       };
