@@ -1,3 +1,4 @@
+
 import { Card } from "@/components/ui/card";
 import { InitialMenuContent } from "@/components/menu/InitialMenuContent";
 import { CalorieCalculatorStep } from "@/components/menu/CalorieCalculatorStep";
@@ -7,7 +8,7 @@ import { MealPlanDisplay } from "@/components/menu/MealPlanDisplay";
 import { MealPlanHistory } from "@/components/menu/MealPlanHistory";
 import { MenuHeader } from "@/components/menu/MenuHeader";
 import { useMenuController } from "@/components/menu/MenuController";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useRef } from "react";
 import type { DietaryPreferences } from "@/components/menu/types";
@@ -135,14 +136,32 @@ const Menu = () => {
                 Preferências Alimentares
               </h2>
               {currentStep === 2 && (
-                <FoodSelector
-                  protocolFoods={protocolFoods}
-                  selectedFoods={selectedFoods}
-                  onFoodSelection={handleFoodSelection}
-                  totalCalories={totalCalories}
-                  onBack={() => setCurrentStep(1)}
-                  onConfirm={handleConfirmFoodSelection}
-                />
+                <>
+                  {protocolFoods.length === 0 ? (
+                    <div className="p-6 text-center">
+                      <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+                      <h3 className="text-lg font-medium mb-2">Sem dados de alimentos</h3>
+                      <p className="text-gray-600 mb-4">
+                        Não foi possível carregar a lista de alimentos do banco de dados. Por favor, tente novamente ou entre em contato com o suporte.
+                      </p>
+                      <button 
+                        onClick={() => window.location.reload()} 
+                        className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+                      >
+                        Tentar Novamente
+                      </button>
+                    </div>
+                  ) : (
+                    <FoodSelector
+                      protocolFoods={protocolFoods}
+                      selectedFoods={selectedFoods}
+                      onFoodSelection={handleFoodSelection}
+                      totalCalories={totalCalories}
+                      onBack={() => setCurrentStep(1)}
+                      onConfirm={handleConfirmFoodSelection}
+                    />
+                  )}
+                </>
               )}
               {currentStep > 2 && (
                 <div className="text-center py-2">
