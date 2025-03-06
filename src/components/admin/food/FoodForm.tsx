@@ -37,6 +37,7 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
     if (food) {
       setFormData({
         ...food,
+        calories: food.calories || 0, // Ensure calories is never null/undefined
       });
     }
   }, [food]);
@@ -84,45 +85,39 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
     try {
       setIsSubmitting(true);
 
-      // Calculate per 100g values if needed
-      const updatedData = { 
-        ...formData,
-        name: formData.name, // Ensure name is included
-        calories: formData.calories as number, // Ensure calories is treated as a number
+      // Create a properly typed object for Supabase
+      const foodData = {
+        name: formData.name,
+        calories: formData.calories as number,
+        phase: formData.phase,
+        food_group_id: formData.food_group_id,
+        protein: formData.protein,
+        carbs: formData.carbs,
+        fats: formData.fats,
+        pre_workout_compatible: formData.pre_workout_compatible,
+        post_workout_compatible: formData.post_workout_compatible,
+        portion_size: formData.portion_size,
+        portion_unit: formData.portion_unit
       };
       
+      // Calculate per 100g values if needed
       if (formData.protein && formData.portion_size && formData.portion_size !== 100) {
-        updatedData.protein_per_100g = (formData.protein / formData.portion_size) * 100;
+        foodData.protein_per_100g = (formData.protein / formData.portion_size) * 100;
       }
       
       if (formData.carbs && formData.portion_size && formData.portion_size !== 100) {
-        updatedData.carbs_per_100g = (formData.carbs / formData.portion_size) * 100;
+        foodData.carbs_per_100g = (formData.carbs / formData.portion_size) * 100;
       }
       
       if (formData.fats && formData.portion_size && formData.portion_size !== 100) {
-        updatedData.fats_per_100g = (formData.fats / formData.portion_size) * 100;
+        foodData.fats_per_100g = (formData.fats / formData.portion_size) * 100;
       }
 
       if (food) {
         // Update existing food
         const { error } = await supabase
           .from('protocol_foods')
-          .update({
-            name: updatedData.name,
-            calories: updatedData.calories,
-            phase: updatedData.phase,
-            food_group_id: updatedData.food_group_id,
-            protein: updatedData.protein,
-            carbs: updatedData.carbs,
-            fats: updatedData.fats,
-            protein_per_100g: updatedData.protein_per_100g,
-            carbs_per_100g: updatedData.carbs_per_100g,
-            fats_per_100g: updatedData.fats_per_100g,
-            pre_workout_compatible: updatedData.pre_workout_compatible,
-            post_workout_compatible: updatedData.post_workout_compatible,
-            portion_size: updatedData.portion_size,
-            portion_unit: updatedData.portion_unit
-          })
+          .update(foodData)
           .eq('id', food.id);
 
         if (error) throw error;
@@ -131,22 +126,7 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
         // Create new food
         const { error } = await supabase
           .from('protocol_foods')
-          .insert({
-            name: updatedData.name,
-            calories: updatedData.calories,
-            phase: updatedData.phase,
-            food_group_id: updatedData.food_group_id,
-            protein: updatedData.protein,
-            carbs: updatedData.carbs,
-            fats: updatedData.fats,
-            protein_per_100g: updatedData.protein_per_100g,
-            carbs_per_100g: updatedData.carbs_per_100g,
-            fats_per_100g: updatedData.fats_per_100g,
-            pre_workout_compatible: updatedData.pre_workout_compatible,
-            post_workout_compatible: updatedData.post_workout_compatible,
-            portion_size: updatedData.portion_size,
-            portion_unit: updatedData.portion_unit
-          });
+          .insert(foodData);
 
         if (error) throw error;
         toast.success('Alimento adicionado com sucesso');
