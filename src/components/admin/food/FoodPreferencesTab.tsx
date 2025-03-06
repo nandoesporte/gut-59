@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Loader2, Plus, Trash2, Pencil } from "lucide-react";
+import { Loader2, Plus, Trash2, Pencil, Coffee, Utensils, Apple, Moon } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -17,6 +17,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FoodForm } from "./FoodForm";
 import type { ProtocolFood } from "@/components/menu/types";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const FoodPreferencesTab = () => {
   const [foods, setFoods] = useState<ProtocolFood[]>([]);
@@ -27,6 +28,7 @@ export const FoodPreferencesTab = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("all");
 
   useEffect(() => {
     fetchFoods();
@@ -116,9 +118,32 @@ export const FoodPreferencesTab = () => {
     fetchFoods();
   };
 
-  const filteredFoods = foods.filter(food => 
-    food.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter foods by search term and selected tab
+  const filterFoods = () => {
+    let filtered = foods.filter(food => 
+      food.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    
+    if (activeTab !== "all") {
+      const groupId = parseInt(activeTab);
+      filtered = filtered.filter(food => food.food_group_id === groupId);
+    }
+    
+    return filtered;
+  };
+
+  const filteredFoods = filterFoods();
+
+  // Get meal type icon based on food group id
+  const getMealIcon = (groupId: number | null) => {
+    switch(groupId) {
+      case 1: return <Coffee className="h-5 w-5 text-blue-500" />;
+      case 2: return <Utensils className="h-5 w-5 text-green-500" />;
+      case 3: return <Apple className="h-5 w-5 text-orange-500" />;
+      case 4: return <Moon className="h-5 w-5 text-indigo-500" />;
+      default: return null;
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -131,13 +156,25 @@ export const FoodPreferencesTab = () => {
           </Button>
         </div>
 
-        <div className="mb-4">
+        <div className="mb-4 flex flex-wrap gap-4 items-center">
           <Input
             placeholder="Buscar alimentos..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="max-w-md"
           />
+          
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
+            <TabsList className="grid grid-cols-5">
+              <TabsTrigger value="all">Todos</TabsTrigger>
+              {foodGroups.map(group => (
+                <TabsTrigger key={group.id} value={group.id.toString()} className="flex items-center gap-2">
+                  {getMealIcon(group.id)}
+                  {group.name}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
         </div>
 
         {loading ? (
@@ -153,6 +190,7 @@ export const FoodPreferencesTab = () => {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Tipo</TableHead>
                   <TableHead>Nome</TableHead>
                   <TableHead>Calorias</TableHead>
                   <TableHead>Proteínas (g)</TableHead>
@@ -167,6 +205,7 @@ export const FoodPreferencesTab = () => {
                   const foodGroup = foodGroups.find(group => group.id === food.food_group_id);
                   return (
                     <TableRow key={food.id}>
+                      <TableCell>{getMealIcon(food.food_group_id)}</TableCell>
                       <TableCell className="font-medium">{food.name}</TableCell>
                       <TableCell>{food.calories}</TableCell>
                       <TableCell>{food.protein ?? '-'}</TableCell>

@@ -192,13 +192,13 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="food_group_id">Grupo de Alimentos</Label>
+          <Label htmlFor="food_group_id">Tipo de Refeição</Label>
           <Select
             value={formData.food_group_id?.toString() || ''}
             onValueChange={(value) => handleSelectChange('food_group_id', value)}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Selecione o grupo" />
+              <SelectValue placeholder="Selecione o tipo de refeição" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="">Sem grupo</SelectItem>
