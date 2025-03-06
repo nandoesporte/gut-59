@@ -16,37 +16,45 @@ export const useProtocolFoods = () => {
         console.log("Fetching protocol foods...");
         setLoading(true);
         
-        const { data, error } = await supabase
+        // Log Supabase URL para diagnóstico
+        console.log("Supabase URL:", supabase.supabaseUrl);
+        
+        const { data, error, status } = await supabase
           .from('protocol_foods')
           .select('*')
           .order('name');
         
+        // Log informações de status e resposta para diagnóstico
+        console.log("Query status:", status);
+        
         if (error) {
           console.error('Erro ao buscar alimentos do protocolo:', error);
-          toast.error("Erro ao carregar opções de alimentos");
+          toast.error(`Erro ao carregar opções de alimentos: ${error.message}`);
           setError(error.message);
           setLoading(false);
           return;
         }
         
         if (!data || data.length === 0) {
-          console.warn('Nenhum alimento encontrado');
-          // Definimos foods como array vazio e atualizamos loading
+          console.warn('Nenhum alimento encontrado no banco de dados');
+          // Define foods como um array vazio e finaliza loading
           setProtocolFoods([]);
           setLoading(false);
           return;
         }
         
-        console.log(`Loaded ${data.length} protocol foods`);
+        console.log(`Loaded ${data.length} protocol foods from database`);
+        console.log("Sample food data:", data[0]);
         
         // Transform data to match ProtocolFood type and format image URLs
         const formattedFoods = data.map(food => {
           // Check if food has an image_url property and provide fallback
           let imageUrl = '/placeholder.svg';
-          if (food && typeof food === 'object' && 'image_url' in food) {
-            const imgUrl = food.image_url as string | null;
-            if (imgUrl) {
-              imageUrl = formatImageUrl(imgUrl);
+          
+          if (food && typeof food === 'object') {
+            // Verifica se a propriedade image_url existe no objeto
+            if ('image_url' in food && food.image_url) {
+              imageUrl = formatImageUrl(food.image_url as string);
             }
           }
           

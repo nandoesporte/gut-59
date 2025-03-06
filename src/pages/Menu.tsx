@@ -1,4 +1,3 @@
-
 import { Card } from "@/components/ui/card";
 import { InitialMenuContent } from "@/components/menu/InitialMenuContent";
 import { CalorieCalculatorStep } from "@/components/menu/CalorieCalculatorStep";
@@ -11,6 +10,7 @@ import { useMenuController } from "@/components/menu/MenuController";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useRef } from "react";
+import { FoodDatabaseDebugger } from "@/components/menu/FoodDatabaseDebugger";
 import type { DietaryPreferences } from "@/components/menu/types";
 
 const Menu = () => {
@@ -99,6 +99,8 @@ const Menu = () => {
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Monte sua Dieta Personalizada</h1>
             <p className="text-gray-600 text-sm sm:text-base">Siga as etapas abaixo para criar seu plano alimentar com o Nutri+</p>
           </div>
+
+          <FoodDatabaseDebugger />
 
           <div className="space-y-6 sm:space-y-8">
             <Card className="p-4 sm:p-6">
