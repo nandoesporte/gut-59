@@ -74,11 +74,16 @@ export const useProtocolFoods = () => {
         if (processedData && processedData.length > 0) {
           const mealTypeCounts = processedData.reduce((acc: Record<string, number>, food) => {
             const groupId = food.food_group_id?.toString() || 'uncategorized';
-            // Fix the type issue by ensuring groupId is a valid key for FOOD_GROUP_MAP
-            // or defaulting to 'Não categorizado' if it's not
-            const groupName = (groupId in FOOD_GROUP_MAP) 
-              ? FOOD_GROUP_MAP[groupId as keyof typeof FOOD_GROUP_MAP] 
-              : 'Não categorizado';
+            
+            // Fix: Using a type guard to safely access FOOD_GROUP_MAP
+            // Convert groupId to a number and check if it's a valid key
+            let groupName = 'Não categorizado';
+            const numericGroupId = Number(groupId);
+            
+            // Check if the numericGroupId is a valid key in FOOD_GROUP_MAP (keys are 1-5)
+            if (!isNaN(numericGroupId) && numericGroupId >= 1 && numericGroupId <= 5) {
+              groupName = FOOD_GROUP_MAP[numericGroupId as keyof typeof FOOD_GROUP_MAP];
+            }
             
             acc[groupName] = (acc[groupName] || 0) + 1;
             return acc;
