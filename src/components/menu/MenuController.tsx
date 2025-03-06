@@ -98,7 +98,7 @@ export const useMenuController = () => {
       }
     };
 
-    if (protocolFoods.length > 0) {
+    if (protocolFoods && protocolFoods.length > 0) {
       loadSavedPreferences();
     }
   }, [protocolFoods, selectedFoods, handleFoodSelection, categorizeFoodsByMealType]);
