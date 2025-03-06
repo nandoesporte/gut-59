@@ -16,9 +16,9 @@ export const useProtocolFoods = () => {
         console.log("Fetching protocol foods...");
         setLoading(true);
         
-        // Log Supabase connection info for diagnostic
+        // Log Supabase connection info for diagnostic without using getUrl
         console.log("Supabase Connection Info:", { 
-          url: supabase.getUrl(),
+          url: SUPABASE_URL, // Using the constant from client.ts
           authStatus: !!supabase.auth.getSession()
         });
         
