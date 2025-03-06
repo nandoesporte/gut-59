@@ -1,3 +1,4 @@
+
 import Profile from "@/components/Profile";
 import Messages from "@/components/Messages";
 import MessagesPersonal from "@/components/MessagesPersonal";
@@ -12,6 +13,7 @@ import { WaterTracker } from "@/components/food-diary/WaterTracker";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { GraduationCap } from "lucide-react";
+import { NutriDisplay } from "@/components/menu/NutriDisplay";
 
 const Index = () => {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -83,6 +85,9 @@ const Index = () => {
             </Button>
           </div>
         </Card>
+      </div>
+      <div className="w-full">
+        <NutriDisplay />
       </div>
       <div className="w-full">
         <StepCounter />
