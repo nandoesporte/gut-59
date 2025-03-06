@@ -114,11 +114,20 @@ export function analyzeMeal(
   const foodGroupId = mealTypeToFoodGroupMap[mealType];
   
   // Filter foods suitable for the meal type based on food_group_id
-  // Primeiro verificamos pelo food_group_id e depois pelo meal_type (para compatibilidade)
-  const suitableFoods = availableFoods.filter(food => 
-    (food.food_group_id === foodGroupId) || 
-    (food.meal_type?.includes(mealType) || food.meal_type?.includes('any'))
-  );
+  // We first check by food_group_id (numeric) and then by meal_type (for compatibility)
+  const suitableFoods = availableFoods.filter(food => {
+    // Check if food_group_id is valid and matches the meal type
+    if (typeof food.food_group_id === 'number' && food.food_group_id === foodGroupId) {
+      return true;
+    }
+    
+    // Fallback to meal_type string array check
+    if (food.meal_type) {
+      return food.meal_type.includes(mealType) || food.meal_type.includes('any');
+    }
+    
+    return false;
+  });
 
   // Calculate target calories for the meal based on meal type
   const mealCaloriesDistribution: Record<string, number> = {

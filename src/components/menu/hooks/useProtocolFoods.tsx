@@ -5,7 +5,7 @@ import { ProtocolFood } from "../types";
 import { toast } from "sonner";
 
 // Definir o mapeamento de food_group_id para descrições legíveis
-export const FOOD_GROUP_MAP = {
+export const FOOD_GROUP_MAP: Record<number, string> = {
   1: 'Café da Manhã',
   2: 'Lanche da Manhã',
   3: 'Almoço',

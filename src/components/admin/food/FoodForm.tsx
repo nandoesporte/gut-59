@@ -211,7 +211,8 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
             </SelectContent>
           </Select>
           <p className="text-xs text-gray-500 mt-1">
-            Esta informação determinará em qual categoria o alimento aparecerá no menu do cliente.
+            Esta informação é crucial e determinará em qual categoria o alimento aparecerá no cardápio do cliente.
+            Por favor, selecione corretamente para que o alimento seja exibido na refeição adequada.
           </p>
         </div>
 

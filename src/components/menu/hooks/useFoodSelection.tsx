@@ -34,9 +34,16 @@ export const useFoodSelection = () => {
       
       // Se temos o objeto de alimento completo, vamos categorizá-lo por refeição
       if (food) {
-        const mealType = food.food_group_id 
-          ? FOOD_GROUP_TO_MEAL_TYPE[food.food_group_id as keyof typeof FOOD_GROUP_TO_MEAL_TYPE] 
-          : 'uncategorized';
+        let mealType = 'uncategorized';
+        
+        // Verifica se há um food_group_id válido
+        if (food.food_group_id !== null && food.food_group_id !== undefined) {
+          // Certifica-se de que o food_group_id é um número entre 1 e 5
+          const groupId = Number(food.food_group_id);
+          if (!isNaN(groupId) && groupId >= 1 && groupId <= 5) {
+            mealType = FOOD_GROUP_TO_MEAL_TYPE[groupId as keyof typeof FOOD_GROUP_TO_MEAL_TYPE] || 'uncategorized';
+          }
+        }
         
         setFoodsByMealType(prev => {
           const updatedMeals = { ...prev };
@@ -79,9 +86,17 @@ export const useFoodSelection = () => {
     selectedFoods.forEach(foodId => {
       const food = foods.find(f => f.id === foodId);
       if (food) {
-        const mealType = food.food_group_id 
-          ? FOOD_GROUP_TO_MEAL_TYPE[food.food_group_id as keyof typeof FOOD_GROUP_TO_MEAL_TYPE] 
-          : 'uncategorized';
+        let mealType = 'uncategorized';
+        
+        // Verifica se há um food_group_id válido
+        if (food.food_group_id !== null && food.food_group_id !== undefined) {
+          // Certifica-se de que o food_group_id é um número entre 1 e 5
+          const groupId = Number(food.food_group_id);
+          if (!isNaN(groupId) && groupId >= 1 && groupId <= 5) {
+            mealType = FOOD_GROUP_TO_MEAL_TYPE[groupId as keyof typeof FOOD_GROUP_TO_MEAL_TYPE] || 'uncategorized';
+          }
+        }
+
         mealTypeMap[mealType].push(foodId);
       }
     });
