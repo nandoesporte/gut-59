@@ -21,7 +21,8 @@ export const useFoodSelection = () => {
     morning_snack: [],
     lunch: [],
     afternoon_snack: [],
-    dinner: []
+    dinner: [],
+    uncategorized: [] // Added uncategorized section for foods without group_id
   });
 
   const handleFoodSelection = useCallback((foodId: string, food?: ProtocolFood) => {
@@ -32,7 +33,9 @@ export const useFoodSelection = () => {
       
       // Se temos o objeto de alimento completo, vamos categorizá-lo por refeição
       if (food) {
-        const mealType = FOOD_GROUP_TO_MEAL_TYPE[food.food_group_id as keyof typeof FOOD_GROUP_TO_MEAL_TYPE] || 'lunch';
+        const mealType = food.food_group_id 
+          ? FOOD_GROUP_TO_MEAL_TYPE[food.food_group_id as keyof typeof FOOD_GROUP_TO_MEAL_TYPE] 
+          : 'uncategorized';
         
         setFoodsByMealType(prev => {
           const updatedMeals = { ...prev };
@@ -65,15 +68,19 @@ export const useFoodSelection = () => {
   const categorizeFoodsByMealType = useCallback((foods: ProtocolFood[]) => {
     const mealTypeMap: Record<string, string[]> = {
       breakfast: [],
+      morning_snack: [],
       lunch: [],
-      snack: [],
-      dinner: []
+      afternoon_snack: [],
+      dinner: [],
+      uncategorized: []
     };
     
     selectedFoods.forEach(foodId => {
       const food = foods.find(f => f.id === foodId);
       if (food) {
-        const mealType = FOOD_GROUP_TO_MEAL_TYPE[food.food_group_id as keyof typeof FOOD_GROUP_TO_MEAL_TYPE] || 'snack';
+        const mealType = food.food_group_id 
+          ? FOOD_GROUP_TO_MEAL_TYPE[food.food_group_id as keyof typeof FOOD_GROUP_TO_MEAL_TYPE] 
+          : 'uncategorized';
         mealTypeMap[mealType].push(foodId);
       }
     });
