@@ -56,7 +56,7 @@ export const NutriDisplay = () => {
             'gain_mass': 'Ganhar Massa'
           };
 
-          setCalorieNeeds(nutritionPrefs.daily_calories || 0);
+          setCalorieNeeds(nutritionPrefs.calories_needed || 0);
           setGoal(goalMap[nutritionPrefs.goal] || 'Não definido');
         }
 
