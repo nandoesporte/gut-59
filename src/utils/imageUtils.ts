@@ -19,8 +19,20 @@ export const formatImageUrl = (url: string | null | undefined): string => {
     return '/placeholder.svg';
   }
 
+  // Handle URLs with invalid placeholders or test URLs
+  if (cleanUrl === 'example.com' || 
+      cleanUrl.includes('example.com') || 
+      cleanUrl === 'example.gif' ||
+      cleanUrl === 'placeholder.gif') {
+    return '/placeholder.svg';
+  }
+
   // If URL is already a valid HTTP or HTTPS URL, return it as is
   if (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://')) {
+    // But check if it's a placeholder URL
+    if (cleanUrl.includes('example.com') || cleanUrl.includes('example.org')) {
+      return '/placeholder.svg';
+    }
     return cleanUrl;
   }
 

@@ -35,6 +35,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
   const [rawResponse, setRawResponse] = useState<any>(null);
   const [loadingTime, setLoadingTime] = useState(0);
   const [loadingPhase, setLoadingPhase] = useState<string>("preparing");
+  const [planGenerationCount, setPlanGenerationCount] = useState(0);
   
   const generationInProgress = useRef(false);
   const generationAttempted = useRef(false);
@@ -133,7 +134,9 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       console.log("Starting generation of workout plan with Trenner2025...");
       console.log(`Activity level: ${preferences.activity_level}`);
       
-      const requestId = `${user.id}_${Date.now()}`;
+      // Add timestamp to make each request unique
+      const timestamp = Date.now();
+      const requestId = `${user.id}_${timestamp}`;
       
       const edgeFunctionTimeoutId = setTimeout(() => {
         if (!edgeFunctionStarted.current) {
@@ -143,6 +146,8 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       }, 5000);
       
       console.log("Calling generateWorkoutPlanWithTrenner2025...");
+      console.log(`Using unique timestamp for variation: ${timestamp}`);
+      
       const { workoutPlan: generatedPlan, error: generationError, rawResponse: rawResponseData } = 
         await generateWorkoutPlanWithTrenner2025(preferences, user.id, aiSettings || undefined, requestId);
       
@@ -177,7 +182,20 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       
       setWorkoutPlan(savedPlan);
       
+      // Update plan generation count in database and local state
       await updatePlanGenerationCount(user.id);
+      setPlanGenerationCount(prev => prev + 1);
+      
+      // Fetch current count from database
+      const { data: countData } = await supabase
+        .from('plan_generation_counts')
+        .select('workout_count')
+        .eq('user_id', user.id)
+        .maybeSingle();
+        
+      if (countData) {
+        setPlanGenerationCount(countData.workout_count);
+      }
       
       toast.success(`Plano de treino ${activityDesc} gerado com sucesso!`);
       console.log("Workout plan generation and saving completed successfully");
@@ -257,6 +275,28 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       console.log("Initial workout plan generation starting...");
       generatePlan();
     }
+    
+    // Fetch the current plan generation count when component mounts
+    const fetchGenerationCount = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data } = await supabase
+            .from('plan_generation_counts')
+            .select('workout_count')
+            .eq('user_id', user.id)
+            .maybeSingle();
+            
+          if (data) {
+            setPlanGenerationCount(data.workout_count);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching plan generation count:", err);
+      }
+    };
+    
+    fetchGenerationCount();
   }, []);
 
   return { 
@@ -268,6 +308,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
     rawResponse,
     loadingTime,
     loadingPhase,
-    loadingMessage: getLoadingMessage()
+    loadingMessage: getLoadingMessage(),
+    planGenerationCount
   };
 };

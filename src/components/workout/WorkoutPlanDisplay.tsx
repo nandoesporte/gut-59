@@ -1,7 +1,7 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Dumbbell, RotateCcw } from "lucide-react";
+import { Dumbbell, RotateCcw, RefreshCw } from "lucide-react";
 import { WorkoutPreferences } from "./types";
 import { WorkoutLoadingState } from "./components/WorkoutLoadingState";
 import { useWorkoutPlanGeneration } from "./hooks/useWorkoutPlanGeneration";
@@ -23,7 +23,8 @@ export const WorkoutPlanDisplay = ({
     generatePlan,
     loadingTime,
     loadingPhase,
-    loadingMessage
+    loadingMessage,
+    planGenerationCount,
   } = useWorkoutPlanGeneration(preferences);
 
   if (loading) {
@@ -92,12 +93,22 @@ export const WorkoutPlanDisplay = ({
     <div className="space-y-6">
       <CurrentWorkoutPlan plan={workoutPlan} />
       
-      <div className="flex justify-center mt-8">
+      <div className="flex justify-center gap-4 mt-8">
+        <Button onClick={generatePlan} variant="default" className="flex items-center gap-2">
+          <RefreshCw className="w-4 h-4" />
+          Novo Plano com Diferentes Exercícios
+        </Button>
         <Button onClick={onReset} variant="outline" className="flex items-center gap-2">
           <RotateCcw className="w-4 h-4" />
-          Criar Novo Plano
+          Alterar Preferências
         </Button>
       </div>
+      
+      {planGenerationCount > 1 && (
+        <p className="text-xs text-center text-muted-foreground">
+          Você já gerou {planGenerationCount} planos de treino. Cada plano contém exercícios diferentes para variar seus treinos.
+        </p>
+      )}
     </div>
   );
 };

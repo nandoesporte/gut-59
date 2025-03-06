@@ -177,7 +177,8 @@ function structureWeeklyPlan(workoutPlan: WorkoutPlan, dbExercises: any[], daysP
   const primaryMuscleGroups = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'];
   
   // Define muscle group focus for each day based on exercise science for optimal recovery
-  const dailyMuscleGroupFocus = [
+  // Add slight variations to prevent always using the same muscle groups on the same days
+  const baseMuscleGroupFocus = [
     ['chest', 'triceps', 'shoulders'], // Monday - Push
     ['back', 'biceps', 'core'],       // Tuesday - Pull
     ['legs', 'core', 'shoulders'],    // Wednesday - Legs
@@ -186,6 +187,28 @@ function structureWeeklyPlan(workoutPlan: WorkoutPlan, dbExercises: any[], daysP
     ['legs', 'core', 'arms'],         // Saturday - Legs
     []                                // Sunday (rest day)
   ];
+  
+  // Create variations of the muscle group focus for more variety
+  const variations = [
+    [['chest', 'triceps', 'core'], ['back', 'shoulders', 'biceps'], ['legs', 'core', 'arms']],
+    [['chest', 'shoulders', 'core'], ['back', 'arms', 'core'], ['legs', 'shoulders', 'core']],
+    [['shoulders', 'chest', 'triceps'], ['back', 'biceps', 'core'], ['legs', 'core', 'arms']]
+  ];
+  
+  // Choose a variation based on a random seed (user ID hash or timestamp)
+  const timestamp = Date.now();
+  const variationIndex = timestamp % variations.length;
+  const selectedVariation = variations[variationIndex];
+  
+  // Apply the selected variation to the first three active days
+  const dailyMuscleGroupFocus = [...baseMuscleGroupFocus];
+  activeIndices.slice(0, 3).forEach((dayIndex, i) => {
+    if (i < selectedVariation.length) {
+      dailyMuscleGroupFocus[dayIndex] = selectedVariation[i];
+    }
+  });
+  
+  console.log(`Using muscle group variation ${variationIndex + 1} for more exercise variety`);
 
   // Mapping of muscle groups for finding relevant exercises
   const muscleGroupMappings: Record<string, string[]> = {
@@ -224,6 +247,14 @@ function structureWeeklyPlan(workoutPlan: WorkoutPlan, dbExercises: any[], daysP
     console.log(`${group}: ${exercisesByMuscleGroup[group]?.length || 0} exercises`);
   });
 
+  // Add random shuffle to each muscle group's exercises for more variety
+  Object.keys(exercisesByMuscleGroup).forEach(group => {
+    // Generate a random seed based on timestamp
+    const shuffleSeed = Date.now() % 1000;
+    exercisesByMuscleGroup[group].sort(() => 0.5 - Math.random());
+    console.log(`Shuffled ${exercisesByMuscleGroup[group].length} exercises for ${group} group (seed: ${shuffleSeed})`);
+  });
+
   // Helper function to find exercises for specific muscle groups
   const findExercisesForMuscleGroups = (muscleGroups: string[], count: number, excludeIds: Set<string>) => {
     const result: any[] = [];
@@ -249,7 +280,9 @@ function structureWeeklyPlan(workoutPlan: WorkoutPlan, dbExercises: any[], daysP
     const exercisesWithoutGif = uniqueExercises.filter(ex => !ex.gif_url || ex.gif_url.trim() === '');
     
     // Shuffle the exercises to get random selection
-    const shuffled = [...exercisesWithGif, ...exercisesWithoutGif].sort(() => 0.5 - Math.random());
+    // Use a different random method each time to increase variety
+    const shuffled = [...exercisesWithGif, ...exercisesWithoutGif]
+      .sort(() => 0.5 - Math.random());
     
     // Pick exercises that aren't already in the excluded set
     for (const exercise of shuffled) {
