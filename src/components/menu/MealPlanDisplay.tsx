@@ -1,7 +1,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { FileDown, RefreshCcw, TableIcon, CalendarIcon } from "lucide-react";
+import { FileDown, RefreshCcw } from "lucide-react";
 import { generateMealPlanPDF } from "./utils/pdf-generator";
 import { DailyTotals } from "./components/DailyTotals";
 import { MealSection } from "./components/MealSection";
@@ -11,7 +11,6 @@ import type { MealPlan } from "./types";
 import { useRef, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { MealPlanTable } from "./MealPlanTable";
 
 interface MealPlanDisplayProps {
   mealPlan: MealPlan;
@@ -31,7 +30,6 @@ const dayNameMap: Record<string, string> = {
 export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) => {
   const planRef = useRef<HTMLDivElement>(null);
   const [selectedDay, setSelectedDay] = useState<string>("monday");
-  const [viewMode, setViewMode] = useState<"calendar" | "table">("calendar");
 
   const handleDownloadPDF = async () => {
     if (!mealPlan) return;
@@ -124,57 +122,32 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
         </div>
       </div>
 
-      <div className="flex gap-2 justify-end">
-        <Button 
-          variant={viewMode === "calendar" ? "default" : "outline"} 
-          size="sm"
-          onClick={() => setViewMode("calendar")}
-        >
-          <CalendarIcon className="w-4 h-4 mr-2" />
-          Visualização Diária
-        </Button>
-        <Button 
-          variant={viewMode === "table" ? "default" : "outline"} 
-          size="sm"
-          onClick={() => setViewMode("table")}
-        >
-          <TableIcon className="w-4 h-4 mr-2" />
-          Visualização em Tabela
-        </Button>
-      </div>
-
       <div ref={planRef} className="space-y-6 bg-white p-4 sm:p-8 rounded-lg">
         <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-700">
           <p className="font-medium">✨ Plano gerado por Nutri+ (powered by Llama 3)</p>
           <p className="mt-1">Este plano foi personalizado com base em suas preferências e necessidades nutricionais.</p>
         </div>
 
-        {viewMode === "table" ? (
-          <Card className="p-4">
-            <MealPlanTable mealPlan={mealPlan} />
-          </Card>
-        ) : (
-          <Tabs value={selectedDay} onValueChange={setSelectedDay} className="w-full">
-            <TabsList className="mb-6 w-full flex flex-nowrap overflow-x-auto pb-2 justify-start sm:justify-center gap-1 sm:gap-2">
-              {Object.entries(dayNameMap).map(([day, dayName]) => (
-                <TabsTrigger 
-                  key={day} 
-                  value={day}
-                  className="whitespace-nowrap text-sm sm:text-base px-2 sm:px-4"
-                >
-                  <span className="hidden sm:inline">{dayName}</span>
-                  <span className="sm:hidden">{dayName.split('-')[0]}</span>
-                </TabsTrigger>
-              ))}
-            </TabsList>
-
-            {Object.keys(dayNameMap).map(day => (
-              <TabsContent key={day} value={day}>
-                {renderDayPlan(day)}
-              </TabsContent>
+        <Tabs value={selectedDay} onValueChange={setSelectedDay} className="w-full">
+          <TabsList className="mb-6 w-full flex flex-nowrap overflow-x-auto pb-2 justify-start sm:justify-center gap-1 sm:gap-2">
+            {Object.entries(dayNameMap).map(([day, dayName]) => (
+              <TabsTrigger 
+                key={day} 
+                value={day}
+                className="whitespace-nowrap text-sm sm:text-base px-2 sm:px-4"
+              >
+                <span className="hidden sm:inline">{dayName}</span>
+                <span className="sm:hidden">{dayName.split('-')[0]}</span>
+              </TabsTrigger>
             ))}
-          </Tabs>
-        )}
+          </TabsList>
+
+          {Object.keys(dayNameMap).map(day => (
+            <TabsContent key={day} value={day}>
+              {renderDayPlan(day)}
+            </TabsContent>
+          ))}
+        </Tabs>
 
         {mealPlan.weeklyTotals && (
           <Card className="p-4 sm:p-6 mt-8 bg-primary/5">
