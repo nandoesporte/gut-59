@@ -27,6 +27,7 @@ const Menu = () => {
     mealPlan,
     formData,
     loading,
+    foodsError,
     handleCalculateCalories,
     handleFoodSelection,
     handleConfirmFoodSelection,
@@ -137,7 +138,7 @@ const Menu = () => {
               </h2>
               {currentStep === 2 && (
                 <>
-                  {protocolFoods.length === 0 ? (
+                  {foodsError || protocolFoods.length === 0 ? (
                     <div className="p-6 text-center">
                       <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
                       <h3 className="text-lg font-medium mb-2">Sem dados de alimentos</h3>

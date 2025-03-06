@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -45,7 +44,7 @@ export const useMenuController = () => {
     goal: undefined,
   });
 
-  const protocolFoods = useProtocolFoods();
+  const { protocolFoods, loading: foodsLoading, error: foodsError } = useProtocolFoods();
   const { calorieNeeds, calculateCalories } = useCalorieCalculator();
   const { selectedFoods, foodsByMealType, totalCalories, handleFoodSelection, calculateTotalCalories, categorizeFoodsByMealType } = useFoodSelection();
   const wallet = useWallet();
@@ -406,7 +405,6 @@ export const useMenuController = () => {
       } else {
         console.log("Usuário não autenticado. Criando plano básico.");
         
-        // Create a basic meal plan for unauthenticated users with the correct structure
         const basicMealPlan: MealPlan = {
           userCalories: calorieNeeds,
           weeklyPlan: {
@@ -757,7 +755,8 @@ export const useMenuController = () => {
     totalCalories,
     mealPlan,
     formData,
-    loading,
+    loading: loading || foodsLoading,
+    foodsError,
     handleCalculateCalories,
     handleFoodSelection,
     handleConfirmFoodSelection,
