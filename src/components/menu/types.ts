@@ -35,6 +35,9 @@ export interface ProtocolFood {
   fats_per_100g?: number | null;
   food_group?: string | null;
   phase_id?: number | null;
+  common_allergens?: string[];
+  dietary_flags?: string[];
+  fiber_per_100g?: number;
 }
 
 export interface MealFood {

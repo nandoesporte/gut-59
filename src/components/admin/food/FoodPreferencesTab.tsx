@@ -40,7 +40,8 @@ export const FoodPreferencesTab = () => {
         throw error;
       }
 
-      setFoods(data as ProtocolFood[] || []);
+      // First cast to unknown, then to ProtocolFood[] to satisfy TypeScript
+      setFoods((data as unknown) as ProtocolFood[] || []);
     } catch (error) {
       console.error('Error fetching foods:', error);
       toast.error('Erro ao carregar alimentos');
