@@ -188,10 +188,14 @@ export const FoodSelector = ({
   if (protocolFoods.length === 0) {
     return (
       <div className="text-center py-8">
-        <h3 className="text-xl font-semibold mb-4">Carregando opções de alimentos...</h3>
-        <div className="flex justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
-        </div>
+        <h3 className="text-xl font-semibold mb-4">Nenhum alimento disponível</h3>
+        <p className="text-gray-600 mb-4">
+          Não foi possível encontrar alimentos no nosso banco de dados. 
+          Por favor, entre em contato com o suporte ou tente novamente mais tarde.
+        </p>
+        <Button variant="outline" onClick={onBack}>
+          Voltar
+        </Button>
       </div>
     );
   }
@@ -205,7 +209,7 @@ export const FoodSelector = ({
         </p>
         <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 max-w-xl mx-auto">
           <p className="text-sm text-yellow-700">
-            <strong>Dica:</strong> Após selecionar seus alimentos preferidos, clique no botão "Confirmar Seleção" 
+            <strong>Dica:</strong> Após selecionar seus alimentos preferidos, clique no botão "Confirmar Seleç��o" 
             no final da página ou na barra inferior para avançar para a próxima etapa.
           </p>
         </div>

@@ -1,4 +1,3 @@
-
 import { Card } from "@/components/ui/card";
 import { InitialMenuContent } from "@/components/menu/InitialMenuContent";
 import { CalorieCalculatorStep } from "@/components/menu/CalorieCalculatorStep";
@@ -144,10 +143,7 @@ const Menu = () => {
               )}
               {currentStep === 2 && (!protocolFoods || protocolFoods.length === 0) && (
                 <div className="text-center py-8">
-                  <p className="text-yellow-600">Carregando opções de alimentos...</p>
-                  <div className="mt-4">
-                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
-                  </div>
+                  <p className="text-yellow-600">Não há alimentos disponíveis no momento. Por favor, contate o administrador.</p>
                 </div>
               )}
               {currentStep > 2 && (

@@ -8,6 +8,7 @@ import { formatImageUrl } from "@/utils/imageUtils";
 export const useProtocolFoods = () => {
   const [protocolFoods, setProtocolFoods] = useState<ProtocolFood[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchProtocolFoods = async () => {
@@ -23,11 +24,16 @@ export const useProtocolFoods = () => {
         if (error) {
           console.error('Erro ao buscar alimentos do protocolo:', error);
           toast.error("Erro ao carregar opções de alimentos");
+          setError(error.message);
+          setLoading(false);
           return;
         }
         
         if (!data || data.length === 0) {
           console.warn('Nenhum alimento encontrado');
+          // Ainda definimos um array vazio, mas pelo menos saímos do estado de loading
+          setProtocolFoods([]);
+          setLoading(false);
           return;
         }
         
@@ -63,6 +69,7 @@ export const useProtocolFoods = () => {
       } catch (error) {
         console.error('Erro ao processar alimentos do protocolo:', error);
         toast.error("Erro ao processar opções de alimentos");
+        setError(error instanceof Error ? error.message : 'Erro desconhecido');
       } finally {
         setLoading(false);
       }
@@ -71,5 +78,5 @@ export const useProtocolFoods = () => {
     fetchProtocolFoods();
   }, []);
 
-  return { protocolFoods, loading };
+  return { protocolFoods, loading, error };
 };

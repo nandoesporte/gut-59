@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -45,7 +44,7 @@ export const useMenuController = () => {
     goal: undefined,
   });
 
-  const { protocolFoods, loading: protocolFoodsLoading } = useProtocolFoods();
+  const { protocolFoods, loading: protocolFoodsLoading, error: protocolFoodsError } = useProtocolFoods();
   const { calorieNeeds, calculateCalories } = useCalorieCalculator();
   const { selectedFoods, foodsByMealType, totalCalories, handleFoodSelection, calculateTotalCalories, categorizeFoodsByMealType } = useFoodSelection();
   const wallet = useWallet();
