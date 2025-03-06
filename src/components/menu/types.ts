@@ -38,6 +38,7 @@ export interface ProtocolFood {
   common_allergens?: string[];
   dietary_flags?: string[];
   fiber_per_100g?: number;
+  created_at?: string | null;
 }
 
 export interface MealFood {
