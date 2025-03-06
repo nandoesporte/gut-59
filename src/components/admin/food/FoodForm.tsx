@@ -6,10 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2 } from "lucide-react";
-import type { ProtocolFood } from "@/components/admin/types";
+import type { ProtocolFood } from "@/components/menu/types";
 
 interface FoodFormProps {
   food: ProtocolFood | null;
@@ -19,7 +18,6 @@ interface FoodFormProps {
 }
 
 export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps) => {
-  // Initialize form data with all the necessary fields from ProtocolFood
   const [formData, setFormData] = useState<Partial<ProtocolFood>>({
     name: "",
     phase: null,
@@ -101,58 +99,28 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
       }
 
       if (food) {
-        // Update existing food with specific fields to match database schema
+        // Update existing food
         const { error } = await supabase
           .from('protocol_foods')
-          .update({
-            name: updatedData.name,
-            phase: updatedData.phase,
-            food_group_id: updatedData.food_group_id,
-            calories: updatedData.calories || 0,
-            protein: updatedData.protein,
-            carbs: updatedData.carbs,
-            fats: updatedData.fats,
-            portion_size: updatedData.portion_size,
-            portion_unit: updatedData.portion_unit,
-            pre_workout_compatible: updatedData.pre_workout_compatible,
-            post_workout_compatible: updatedData.post_workout_compatible,
-            protein_per_100g: updatedData.protein_per_100g,
-            carbs_per_100g: updatedData.carbs_per_100g,
-            fats_per_100g: updatedData.fats_per_100g
-          })
+          .update(updatedData)
           .eq('id', food.id);
 
         if (error) throw error;
         toast.success('Alimento atualizado com sucesso');
       } else {
-        // Create new food with required fields matching database schema
+        // Create new food
         const { error } = await supabase
           .from('protocol_foods')
-          .insert({
-            name: updatedData.name!,
-            calories: updatedData.calories || 0,
-            phase: updatedData.phase,
-            food_group_id: updatedData.food_group_id,
-            protein: updatedData.protein,
-            carbs: updatedData.carbs,
-            fats: updatedData.fats,
-            portion_size: updatedData.portion_size,
-            portion_unit: updatedData.portion_unit,
-            pre_workout_compatible: updatedData.pre_workout_compatible,
-            post_workout_compatible: updatedData.post_workout_compatible,
-            protein_per_100g: updatedData.protein_per_100g,
-            carbs_per_100g: updatedData.carbs_per_100g,
-            fats_per_100g: updatedData.fats_per_100g
-          });
+          .insert(updatedData);
 
         if (error) throw error;
         toast.success('Alimento adicionado com sucesso');
       }
 
       onSubmit();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error saving food:', error);
-      toast.error(`Erro ao salvar alimento: ${error.message}`);
+      toast.error('Erro ao salvar alimento');
     } finally {
       setIsSubmitting(false);
     }

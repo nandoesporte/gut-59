@@ -5,13 +5,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FoodForm } from "./FoodForm";
 import { Loader2, Plus, Pencil, Trash2, Search } from "lucide-react";
-import type { ProtocolFood } from "@/components/admin/types";
+import type { ProtocolFood } from "@/components/menu/types";
 
 export const FoodPreferencesTab = () => {
   const [foods, setFoods] = useState<ProtocolFood[]>([]);
@@ -36,11 +34,8 @@ export const FoodPreferencesTab = () => {
         .select('*')
         .order('name');
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
-      // Use proper type casting to satisfy TypeScript
       setFoods(data as unknown as ProtocolFood[] || []);
     } catch (error) {
       console.error('Error fetching foods:', error);
@@ -57,9 +52,7 @@ export const FoodPreferencesTab = () => {
         .select('*')
         .order('name');
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       setFoodGroups(data || []);
     } catch (error) {
@@ -82,9 +75,7 @@ export const FoodPreferencesTab = () => {
         .delete()
         .eq('id', currentFood.id);
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       toast.success('Alimento excluído com sucesso');
       fetchFoods();
@@ -149,16 +140,60 @@ export const FoodPreferencesTab = () => {
           </div>
 
           <TabsContent value="all" className="mt-0">
-            {renderFoodsTable(filteredFoods)}
-          </TabsContent>
-          <TabsContent value="phase1" className="mt-0">
-            {renderFoodsTable(filteredFoods)}
-          </TabsContent>
-          <TabsContent value="phase2" className="mt-0">
-            {renderFoodsTable(filteredFoods)}
-          </TabsContent>
-          <TabsContent value="phase3" className="mt-0">
-            {renderFoodsTable(filteredFoods)}
+            {isLoading ? (
+              <div className="flex justify-center items-center py-10">
+                <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+                <span className="ml-2 text-gray-500">Carregando alimentos...</span>
+              </div>
+            ) : filteredFoods.length === 0 ? (
+              <div className="text-center py-10 text-gray-500">
+                {searchTerm || phaseFilter ? "Nenhum alimento encontrado para os filtros aplicados." : "Nenhum alimento cadastrado."}
+              </div>
+            ) : (
+              <div className="border rounded-md">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>Fase</TableHead>
+                      <TableHead>Grupo</TableHead>
+                      <TableHead>Calorias</TableHead>
+                      <TableHead>Proteína</TableHead>
+                      <TableHead>Carb.</TableHead>
+                      <TableHead>Gordura</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredFoods.map((food) => (
+                      <TableRow key={food.id}>
+                        <TableCell className="font-medium">{food.name}</TableCell>
+                        <TableCell>{food.phase || '-'}</TableCell>
+                        <TableCell>
+                          {food.food_group_id 
+                            ? foodGroups.find(g => g.id === food.food_group_id)?.name || '-' 
+                            : '-'}
+                        </TableCell>
+                        <TableCell>{food.calories || '-'}</TableCell>
+                        <TableCell>{food.protein || '-'}</TableCell>
+                        <TableCell>{food.carbs || '-'}</TableCell>
+                        <TableCell>{food.fats || '-'}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button variant="ghost" size="icon" onClick={() => handleEditFood(food)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => confirmDelete(food)}>
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>
@@ -193,69 +228,4 @@ export const FoodPreferencesTab = () => {
       </Dialog>
     </div>
   );
-
-  function renderFoodsTable(foodsList: ProtocolFood[]) {
-    if (isLoading) {
-      return (
-        <div className="flex justify-center items-center py-10">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-          <span className="ml-2 text-gray-500">Carregando alimentos...</span>
-        </div>
-      );
-    }
-
-    if (foodsList.length === 0) {
-      return (
-        <div className="text-center py-10 text-gray-500">
-          {searchTerm || phaseFilter ? "Nenhum alimento encontrado para os filtros aplicados." : "Nenhum alimento cadastrado."}
-        </div>
-      );
-    }
-
-    return (
-      <div className="border rounded-md overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nome</TableHead>
-              <TableHead>Fase</TableHead>
-              <TableHead>Grupo</TableHead>
-              <TableHead>Calorias</TableHead>
-              <TableHead>Proteína</TableHead>
-              <TableHead>Carb.</TableHead>
-              <TableHead>Gordura</TableHead>
-              <TableHead className="text-right">Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {foodsList.map((food) => (
-              <TableRow key={food.id}>
-                <TableCell className="font-medium">{food.name}</TableCell>
-                <TableCell>{food.phase || '-'}</TableCell>
-                <TableCell>
-                  {food.food_group_id 
-                    ? foodGroups.find(g => g.id === food.food_group_id)?.name || '-' 
-                    : '-'}
-                </TableCell>
-                <TableCell>{food.calories || '-'}</TableCell>
-                <TableCell>{food.protein || '-'}</TableCell>
-                <TableCell>{food.carbs || '-'}</TableCell>
-                <TableCell>{food.fats || '-'}</TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
-                    <Button variant="ghost" size="icon" onClick={() => handleEditFood(food)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => confirmDelete(food)}>
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-    );
-  }
 };
