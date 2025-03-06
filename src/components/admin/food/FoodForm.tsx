@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,7 +39,7 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
     name: "",
     phase: null,
     food_group_id: null,
-    calories: 0, // Ensure calories has a default value
+    calories: 0,
     protein: null,
     carbs: null,
     fats: null,
@@ -55,7 +54,7 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
     if (food) {
       setFormData({
         ...food,
-        calories: food.calories || 0, // Ensure calories is never null/undefined
+        calories: food.calories || 0,
       });
     }
   }, [food]);
@@ -94,7 +93,6 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
       return;
     }
 
-    // Ensure calories is a number and not null/undefined
     if (formData.calories === null || formData.calories === undefined) {
       toast.error('Calorias são obrigatórias');
       return;
@@ -103,7 +101,6 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
     try {
       setIsSubmitting(true);
 
-      // Type-safe object for Supabase with required fields explicitly set
       const foodData: FoodDataType = {
         name: formData.name,
         calories: Number(formData.calories),
@@ -118,7 +115,6 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
         portion_unit: formData.portion_unit
       };
       
-      // Calculate and add per 100g values conditionally
       if (formData.protein !== null && formData.portion_size && formData.portion_size !== 100) {
         foodData.protein_per_100g = (Number(formData.protein) / Number(formData.portion_size)) * 100;
       }
@@ -132,7 +128,6 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
       }
 
       if (food) {
-        // Update existing food
         const { error } = await supabase
           .from('protocol_foods')
           .update(foodData)
@@ -141,7 +136,6 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
         if (error) throw error;
         toast.success('Alimento atualizado com sucesso');
       } else {
-        // Create new food
         const { error } = await supabase
           .from('protocol_foods')
           .insert(foodData);
@@ -158,6 +152,14 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
       setIsSubmitting(false);
     }
   };
+
+  const mealTypeOptions = [
+    { id: 1, name: "Café da Manhã" },
+    { id: 2, name: "Lanche da Manhã" },
+    { id: 3, name: "Almoço" },
+    { id: 4, name: "Lanche da Tarde" },
+    { id: 5, name: "Jantar" }
+  ];
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -199,11 +201,10 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
             <SelectTrigger>
               <SelectValue placeholder="Selecione o tipo de refeição" />
             </SelectTrigger>
-            <SelectContent>
-              {/* Fix: Remove SelectItem with empty value */}
-              {foodGroups.map(group => (
-                <SelectItem key={group.id} value={group.id.toString()}>
-                  {group.name}
+            <SelectContent className="bg-white">
+              {mealTypeOptions.map(option => (
+                <SelectItem key={option.id} value={option.id.toString()}>
+                  {option.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -240,7 +241,7 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
               <SelectTrigger className="w-24">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white">
                 <SelectItem value="g">g</SelectItem>
                 <SelectItem value="ml">ml</SelectItem>
                 <SelectItem value="unidade">unidade</SelectItem>

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -30,9 +29,17 @@ export const FoodPreferencesTab = () => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("all");
 
+  const mealTypeOptions = [
+    { id: 1, name: "Café da Manhã" },
+    { id: 2, name: "Lanche da Manhã" },
+    { id: 3, name: "Almoço" },
+    { id: 4, name: "Lanche da Tarde" },
+    { id: 5, name: "Jantar" }
+  ];
+
   useEffect(() => {
     fetchFoods();
-    fetchFoodGroups();
+    setFoodGroups(mealTypeOptions);
   }, []);
 
   const fetchFoods = async () => {
@@ -53,24 +60,6 @@ export const FoodPreferencesTab = () => {
       toast.error('Erro ao carregar alimentos');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchFoodGroups = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('food_groups')
-        .select('*')
-        .order('name');
-
-      if (error) {
-        throw error;
-      }
-
-      setFoodGroups(data || []);
-    } catch (error) {
-      console.error('Error fetching food groups:', error);
-      toast.error('Erro ao carregar grupos de alimentos');
     }
   };
 
@@ -118,7 +107,6 @@ export const FoodPreferencesTab = () => {
     fetchFoods();
   };
 
-  // Filter foods by search term and selected tab
   const filterFoods = () => {
     let filtered = foods.filter(food => 
       food.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -134,13 +122,13 @@ export const FoodPreferencesTab = () => {
 
   const filteredFoods = filterFoods();
 
-  // Get meal type icon based on food group id
   const getMealIcon = (groupId: number | null) => {
     switch(groupId) {
       case 1: return <Coffee className="h-5 w-5 text-blue-500" />;
-      case 2: return <Utensils className="h-5 w-5 text-green-500" />;
-      case 3: return <Apple className="h-5 w-5 text-orange-500" />;
-      case 4: return <Moon className="h-5 w-5 text-indigo-500" />;
+      case 2: return <Apple className="h-5 w-5 text-orange-500" />;
+      case 3: return <Utensils className="h-5 w-5 text-green-500" />;
+      case 4: return <Apple className="h-5 w-5 text-purple-500" />;
+      case 5: return <Moon className="h-5 w-5 text-indigo-500" />;
       default: return null;
     }
   };
@@ -150,7 +138,7 @@ export const FoodPreferencesTab = () => {
       <Card className="p-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-semibold">Gerenciar Alimentos</h2>
-          <Button onClick={handleAddNew} className="flex items-center gap-2">
+          <Button onClick={() => setIsDialogOpen(true)} className="flex items-center gap-2">
             <Plus size={16} />
             Adicionar Alimento
           </Button>
@@ -165,9 +153,9 @@ export const FoodPreferencesTab = () => {
           />
           
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
-            <TabsList className="grid grid-cols-5">
+            <TabsList className="grid grid-cols-6">
               <TabsTrigger value="all">Todos</TabsTrigger>
-              {foodGroups.map(group => (
+              {mealTypeOptions.map(group => (
                 <TabsTrigger key={group.id} value={group.id.toString()} className="flex items-center gap-2">
                   {getMealIcon(group.id)}
                   {group.name}
@@ -202,7 +190,7 @@ export const FoodPreferencesTab = () => {
               </TableHeader>
               <TableBody>
                 {filteredFoods.map((food) => {
-                  const foodGroup = foodGroups.find(group => group.id === food.food_group_id);
+                  const foodGroup = mealTypeOptions.find(group => group.id === food.food_group_id);
                   return (
                     <TableRow key={food.id}>
                       <TableCell>{getMealIcon(food.food_group_id)}</TableCell>
@@ -245,7 +233,7 @@ export const FoodPreferencesTab = () => {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl bg-white">
           <DialogHeader>
             <DialogTitle>
               {selectedFood ? 'Editar Alimento' : 'Adicionar Novo Alimento'}
@@ -255,7 +243,10 @@ export const FoodPreferencesTab = () => {
             <FoodForm
               food={selectedFood}
               foodGroups={foodGroups}
-              onSubmit={handleFormSubmit}
+              onSubmit={() => {
+                setIsDialogOpen(false);
+                fetchFoods();
+              }}
               onCancel={() => setIsDialogOpen(false)}
             />
           )}

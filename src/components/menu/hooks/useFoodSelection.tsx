@@ -4,10 +4,11 @@ import { ProtocolFood } from '../types';
 
 // Define os mapeamentos de food_group_id para refeições
 const FOOD_GROUP_TO_MEAL_TYPE = {
-  1: 'breakfast', // Café da manhã
-  2: 'lunch',     // Almoço
-  3: 'snack',     // Lanches
-  4: 'dinner'     // Jantar
+  1: 'breakfast',    // Café da Manhã
+  2: 'morning_snack', // Lanche da Manhã
+  3: 'lunch',        // Almoço
+  4: 'afternoon_snack', // Lanche da Tarde
+  5: 'dinner'        // Jantar
 };
 
 export const useFoodSelection = () => {
@@ -17,8 +18,9 @@ export const useFoodSelection = () => {
   // Estrutura para armazenar alimentos categorizados por refeição
   const [foodsByMealType, setFoodsByMealType] = useState<Record<string, string[]>>({
     breakfast: [],
+    morning_snack: [],
     lunch: [],
-    snack: [],
+    afternoon_snack: [],
     dinner: []
   });
 
@@ -30,7 +32,7 @@ export const useFoodSelection = () => {
       
       // Se temos o objeto de alimento completo, vamos categorizá-lo por refeição
       if (food) {
-        const mealType = FOOD_GROUP_TO_MEAL_TYPE[food.food_group_id as keyof typeof FOOD_GROUP_TO_MEAL_TYPE] || 'snack';
+        const mealType = FOOD_GROUP_TO_MEAL_TYPE[food.food_group_id as keyof typeof FOOD_GROUP_TO_MEAL_TYPE] || 'lunch';
         
         setFoodsByMealType(prev => {
           const updatedMeals = { ...prev };
