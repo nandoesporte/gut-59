@@ -1,28 +1,39 @@
 
 /**
- * Formats image URLs to handle placeholders for missing images and example URLs
+ * Formats an image URL to ensure it's properly displayed
+ * Handles different URL formats (Supabase storage URLs, full URLs, etc.)
+ * 
+ * @param url The original image URL
+ * @returns Formatted URL ready to be used in img src
  */
 export const formatImageUrl = (url: string | null | undefined): string => {
   if (!url) {
     return '/placeholder.svg';
   }
-  
-  // Check if the URL is an example URL or invalid
-  if (url.includes('example.com') || url === '') {
-    console.warn('Invalid example URL detected:', url);
-    console.info('Processing exercise GIF URL:', url, '→ /placeholder.svg');
+
+  // Clean the URL by removing any whitespace
+  const cleanUrl = url.trim();
+
+  // If URL is empty after trimming, return placeholder
+  if (!cleanUrl) {
     return '/placeholder.svg';
   }
-  
-  // For Supabase storage URLs, make sure they're properly formatted
-  if (url.includes('storage.googleapis.com') || url.includes('supabase')) {
-    return url;
+
+  // If URL is already a valid HTTP or HTTPS URL, return it as is
+  if (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://')) {
+    return cleanUrl;
   }
-  
-  // For relative URLs, ensure they start with /
-  if (!url.startsWith('http') && !url.startsWith('/')) {
-    return `/${url}`;
+
+  // If URL is a relative path starting with /, ensure it's properly formatted
+  if (cleanUrl.startsWith('/')) {
+    // Check if it's already prefixed with the public path
+    if (cleanUrl.startsWith('/public/')) {
+      return cleanUrl;
+    }
+    return cleanUrl;
   }
-  
-  return url;
+
+  // For other URLs, assume they might be from Supabase storage
+  // and return them as is (the browser will resolve them)
+  return cleanUrl;
 };

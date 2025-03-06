@@ -69,7 +69,7 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
     ));
   };
 
-  // Função para verificar se o exercício já foi mostrado na sessão atual
+  // Function to check if an exercise has already been shown in the current session
   const getUniqueExercises = (sessionExercises: any[]) => {
     const uniqueExercises = new Map();
     

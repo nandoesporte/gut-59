@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { WorkoutPreferences } from "../types";
 import { toast } from "sonner";
@@ -33,6 +34,8 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
   const [error, setError] = useState<string | null>(null);
   const [rawResponse, setRawResponse] = useState<any>(null);
   const [loadingTime, setLoadingTime] = useState(0);
+  const [loadingPhase, setLoadingPhase] = useState<string>("preparing");
+  
   const generationInProgress = useRef(false);
   const generationAttempted = useRef(false);
   const retryCount = useRef(0);
@@ -43,13 +46,28 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
   useEffect(() => {
     if (loading) {
       loadingTimer.current = setInterval(() => {
-        setLoadingTime(prev => prev + 1);
+        setLoadingTime(prev => {
+          const newTime = prev + 1;
+          
+          // Update loading phase based on time
+          if (newTime === 5 && loadingPhase === "preparing") {
+            setLoadingPhase("analyzing");
+          } else if (newTime === 15 && loadingPhase === "analyzing") {
+            setLoadingPhase("generating");
+          } else if (newTime === 30 && loadingPhase === "generating") {
+            setLoadingPhase("finalizing");
+          }
+          
+          return newTime;
+        });
       }, 1000);
     } else {
       if (loadingTimer.current) {
         clearInterval(loadingTimer.current);
         loadingTimer.current = null;
       }
+      // Reset loading phase when loading completes
+      setLoadingPhase("preparing");
     }
     
     return () => {
@@ -58,7 +76,22 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
         loadingTimer.current = null;
       }
     };
-  }, [loading]);
+  }, [loading, loadingPhase]);
+
+  const getLoadingMessage = () => {
+    switch (loadingPhase) {
+      case "preparing":
+        return `Preparando seu plano de treino ${activityLevelDescriptions[preferences.activity_level]}...`;
+      case "analyzing":
+        return `Analisando exercícios ideais para seu perfil...`;
+      case "generating":
+        return `Gerando sequência de treinos otimizada...`;
+      case "finalizing":
+        return `Finalizando seu plano personalizado...`;
+      default:
+        return `Gerando plano de treino ${activityLevelDescriptions[preferences.activity_level]}...`;
+    }
+  };
 
   const generatePlan = async () => {
     if (generationInProgress.current) {
@@ -72,6 +105,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
     setError(null);
     setRawResponse(null);
     setLoadingTime(0);
+    setLoadingPhase("preparing");
     edgeFunctionStarted.current = false;
 
     try {
@@ -84,7 +118,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       const activityDesc = activityLevelDescriptions[preferences.activity_level as keyof typeof activityLevelDescriptions] || 
                            "Personalizado";
       
-      toast.info(`Gerando plano de treino ${activityDesc}...`);
+      toast.info(getLoadingMessage());
       
       const { data: aiSettings, error: aiSettingsError } = await supabase
         .from('ai_model_settings')
@@ -232,6 +266,8 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
     error, 
     generatePlan, 
     rawResponse,
-    loadingTime 
+    loadingTime,
+    loadingPhase,
+    loadingMessage: getLoadingMessage()
   };
 };

@@ -21,7 +21,7 @@ export async function generateWorkoutPlanWithTrenner2025(
     const generationRequestId = requestId || `${userId}_${Date.now()}`;
     console.log("Using request ID:", generationRequestId);
     
-    // First fetch all exercises to provide to the AI
+    // First fetch ALL exercises to provide to the AI
     const { data: exercises, error: exercisesError } = await supabase
       .from("exercises")
       .select("*")
@@ -34,7 +34,7 @@ export async function generateWorkoutPlanWithTrenner2025(
     
     console.log(`Fetched ${exercises.length} exercises from the database`);
     
-    // Filter exercises based on preferences to send a relevant subset to the AI
+    // Enhanced filtering to select the most appropriate exercises based on user preferences
     const filteredExercises = filterExercisesByPreferences(exercises, preferences);
     console.log(`Filtered ${filteredExercises.length} exercises from ${exercises.length} total exercises based on user preferences`);
     
@@ -218,6 +218,12 @@ function structureWeeklyPlan(workoutPlan: WorkoutPlan, dbExercises: any[], daysP
     exercisesByMuscleGroup[muscleGroup].push(exercise);
   });
 
+  // Console output to check exercise distribution
+  console.log("Exercise distribution by muscle group:");
+  Object.keys(exercisesByMuscleGroup).forEach(group => {
+    console.log(`${group}: ${exercisesByMuscleGroup[group]?.length || 0} exercises`);
+  });
+
   // Helper function to find exercises for specific muscle groups
   const findExercisesForMuscleGroups = (muscleGroups: string[], count: number, excludeIds: Set<string>) => {
     const result: any[] = [];
@@ -233,8 +239,17 @@ function structureWeeklyPlan(workoutPlan: WorkoutPlan, dbExercises: any[], daysP
       });
     });
 
+    // Deduplicate exercises
+    const uniqueExercises = allRelevantExercises.filter((v, i, a) => 
+      a.findIndex(t => t.id === v.id) === i
+    );
+
+    // Prioritize exercises with GIFs
+    const exercisesWithGif = uniqueExercises.filter(ex => ex.gif_url && ex.gif_url.trim() !== '');
+    const exercisesWithoutGif = uniqueExercises.filter(ex => !ex.gif_url || ex.gif_url.trim() === '');
+    
     // Shuffle the exercises to get random selection
-    const shuffled = [...allRelevantExercises].sort(() => 0.5 - Math.random());
+    const shuffled = [...exercisesWithGif, ...exercisesWithoutGif].sort(() => 0.5 - Math.random());
     
     // Pick exercises that aren't already in the excluded set
     for (const exercise of shuffled) {
@@ -242,8 +257,12 @@ function structureWeeklyPlan(workoutPlan: WorkoutPlan, dbExercises: any[], daysP
       if (!excludeIds.has(exercise.id)) {
         result.push(exercise);
         excludeIds.add(exercise.id); // Mark as used locally
-        globalUsedExerciseIds.add(exercise.id); // NEW: Mark as used globally
+        globalUsedExerciseIds.add(exercise.id); // Mark as used globally
       }
+    }
+    
+    if (result.length < count) {
+      console.warn(`Could only find ${result.length} out of ${count} requested exercises for muscle groups: ${muscleGroups.join(', ')}`);
     }
     
     return result;
@@ -629,18 +648,25 @@ function calculateSimilarity(a: string, b: string): number {
 }
 
 function filterExercisesByPreferences(exercises: any[], preferences: WorkoutPreferences) {
+  console.log("Starting comprehensive exercise filtering based on user preferences...");
+  console.log(`Total exercises in database: ${exercises.length}`);
+  
+  // Create a copy of all exercises to work with
   let filteredExercises = [...exercises];
-
-  // Filter by preferred exercise types
+  
+  // STEP 1: Filter by preferred exercise types
   if (preferences.preferred_exercise_types && preferences.preferred_exercise_types.length > 0) {
+    const before = filteredExercises.length;
     filteredExercises = filteredExercises.filter(exercise => 
       preferences.preferred_exercise_types.includes(exercise.exercise_type)
     );
+    console.log(`After filtering by exercise types: ${filteredExercises.length} (removed ${before - filteredExercises.length})`);
   }
 
-  // Filter by available equipment
+  // STEP 2: Filter by available equipment
   if (preferences.available_equipment && preferences.available_equipment.length > 0) {
     if (!preferences.available_equipment.includes("all")) {
+      const before = filteredExercises.length;
       filteredExercises = filteredExercises.filter(exercise => {
         if (!exercise.equipment_needed || exercise.equipment_needed.length === 0) {
           return true; // Include exercises that don't need equipment
@@ -650,12 +676,16 @@ function filterExercisesByPreferences(exercises: any[], preferences: WorkoutPref
           preferences.available_equipment.includes(equipment)
         );
       });
+      console.log(`After filtering by equipment: ${filteredExercises.length} (removed ${before - filteredExercises.length})`);
     }
   }
 
-  // Consider health conditions when filtering exercises
+  // STEP 3: Filter by health conditions
   if (preferences.health_conditions && preferences.health_conditions.length > 0) {
     console.log(`Considering ${preferences.health_conditions.length} health conditions in exercise selection`);
+    
+    // Count exercises before filtering
+    const before = filteredExercises.length;
     
     // Exclude exercises contraindicated for user's health conditions
     filteredExercises = filteredExercises.filter(exercise => {
@@ -669,6 +699,8 @@ function filterExercisesByPreferences(exercises: any[], preferences: WorkoutPref
       );
     });
     
+    console.log(`After excluding contraindicated exercises: ${filteredExercises.length} (removed ${before - filteredExercises.length})`);
+    
     // Prioritize exercises suitable for user's health conditions
     filteredExercises.sort((a, b) => {
       const aScore = a.suitable_for_conditions ? 
@@ -679,31 +711,45 @@ function filterExercisesByPreferences(exercises: any[], preferences: WorkoutPref
     });
   }
 
-  // Ensure we have enough exercises to build a good plan
-  if (filteredExercises.length < 30) {
+  // STEP 4: Ensure we have enough exercises with GIFs
+  const exercisesWithGifs = filteredExercises.filter(ex => ex.gif_url && ex.gif_url.trim() !== '');
+  console.log(`Exercises with valid GIF URLs: ${exercisesWithGifs.length} out of ${filteredExercises.length}`);
+  
+  // Prioritize exercises with GIFs
+  filteredExercises.sort((a, b) => {
+    // First prioritize by GIF availability
+    if (a.gif_url && !b.gif_url) return -1;
+    if (!a.gif_url && b.gif_url) return 1;
+    return 0;
+  });
+
+  // STEP 5: Ensure minimum number of exercises
+  const MIN_EXERCISES = 40;
+  if (filteredExercises.length < MIN_EXERCISES) {
     console.log(`Warning: Only ${filteredExercises.length} exercises match the criteria. Adding more exercises...`);
     
     // Add exercises of preferred types
     const additionalExercises = exercises.filter(exercise => 
       !filteredExercises.includes(exercise) && 
-      preferences.preferred_exercise_types.includes(exercise.exercise_type)
+      (preferences.preferred_exercise_types.includes(exercise.exercise_type) || 
+       exercise.gif_url) // Prioritize exercises with GIFs
     );
     
     filteredExercises = [...filteredExercises, ...additionalExercises];
     
     // If still not enough, add any other exercises
-    if (filteredExercises.length < 30) {
+    if (filteredExercises.length < MIN_EXERCISES) {
       const remainingExercises = exercises.filter(exercise => 
         !filteredExercises.includes(exercise)
       );
       
-      filteredExercises = [...filteredExercises, ...remainingExercises.slice(0, 30 - filteredExercises.length)];
+      filteredExercises = [...filteredExercises, ...remainingExercises.slice(0, MIN_EXERCISES - filteredExercises.length)];
     }
     
     console.log(`Added additional exercises. Now using ${filteredExercises.length} exercises.`);
   }
 
-  // Group exercises by muscle groups to ensure balanced distribution
+  // STEP 6: Group exercises by muscle groups to ensure balanced distribution
   const muscleGroups = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core', 'full_body'];
   const exercisesByMuscleGroup: Record<string, any[]> = {};
   
@@ -722,6 +768,12 @@ function filterExercisesByPreferences(exercises: any[], preferences: WorkoutPref
     }
   });
   
+  // Log distribution of exercises by muscle group
+  console.log("Distribution of exercises by muscle group:");
+  muscleGroups.forEach(group => {
+    console.log(`- ${group}: ${exercisesByMuscleGroup[group].length} exercises`);
+  });
+  
   // Priority map based on exercise type and user goal
   const priorityMap: Record<string, number> = {
     "strength": preferences.goal === "gain_mass" ? 10 : 5,
@@ -729,7 +781,7 @@ function filterExercisesByPreferences(exercises: any[], preferences: WorkoutPref
     "mobility": 3
   };
 
-  // Sort exercises within each muscle group
+  // Sort exercises within each muscle group by priority (GIF availability, relevance to goal)
   Object.keys(exercisesByMuscleGroup).forEach(group => {
     exercisesByMuscleGroup[group].sort((a, b) => {
       // First prioritize exercises with GIFs
@@ -746,7 +798,7 @@ function filterExercisesByPreferences(exercises: any[], preferences: WorkoutPref
   
   // Create a balanced list by taking top exercises from each muscle group
   const organizedExercises: any[] = [];
-  const maxPerGroup = 7; // Take up to 7 exercises from each group
+  const maxPerGroup = 12; // Take up to 12 exercises from each group to ensure good coverage
   
   muscleGroups.forEach(group => {
     const groupExercises = exercisesByMuscleGroup[group] || [];
@@ -754,8 +806,8 @@ function filterExercisesByPreferences(exercises: any[], preferences: WorkoutPref
   });
   
   // Add any remaining exercises needed to meet minimum count
-  if (organizedExercises.length < 40) {
-    let remainingNeeded = 40 - organizedExercises.length;
+  if (organizedExercises.length < MIN_EXERCISES) {
+    let remainingNeeded = MIN_EXERCISES - organizedExercises.length;
     let remainingExercises: any[] = [];
     
     muscleGroups.forEach(group => {
@@ -767,6 +819,10 @@ function filterExercisesByPreferences(exercises: any[], preferences: WorkoutPref
     
     // Sort remaining by priority
     remainingExercises.sort((a, b) => {
+      // First prioritize exercises with GIFs
+      if (a.gif_url && !b.gif_url) return -1;
+      if (!a.gif_url && b.gif_url) return 1;
+      
       const aScore = priorityMap[a.exercise_type] || 0;
       const bScore = priorityMap[b.exercise_type] || 0;
       return bScore - aScore;
@@ -776,7 +832,9 @@ function filterExercisesByPreferences(exercises: any[], preferences: WorkoutPref
   }
   
   console.log(`Final organized exercise count: ${organizedExercises.length}`);
-  console.log(`Top muscle groups: ${organizedExercises.slice(0, 6).map(ex => ex.muscle_group).join(', ')}`);
+  if (organizedExercises.length > 0) {
+    console.log(`Top muscle groups: ${organizedExercises.slice(0, 6).map(ex => ex.muscle_group).join(', ')}`);
+  }
 
   // Remove unnecessary properties to reduce payload size
   return organizedExercises.map(ex => ({
