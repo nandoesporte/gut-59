@@ -103,22 +103,46 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
         // Update existing food
         const { error } = await supabase
           .from('protocol_foods')
-          .update(updatedData)
+          .update({
+            name: updatedData.name,
+            phase: updatedData.phase,
+            food_group_id: updatedData.food_group_id,
+            calories: updatedData.calories || 0,
+            protein: updatedData.protein,
+            carbs: updatedData.carbs,
+            fats: updatedData.fats,
+            portion_size: updatedData.portion_size,
+            portion_unit: updatedData.portion_unit,
+            pre_workout_compatible: updatedData.pre_workout_compatible,
+            post_workout_compatible: updatedData.post_workout_compatible,
+            protein_per_100g: updatedData.protein_per_100g,
+            carbs_per_100g: updatedData.carbs_per_100g,
+            fats_per_100g: updatedData.fats_per_100g
+          })
           .eq('id', food.id);
 
         if (error) throw error;
         toast.success('Alimento atualizado com sucesso');
       } else {
-        // Ensure calories is not null as it's required by the database
-        const dataToSubmit = {
-          ...updatedData,
-          calories: updatedData.calories || 0
-        };
-        
-        // Create new food
+        // Create new food with required fields
         const { error } = await supabase
           .from('protocol_foods')
-          .insert(dataToSubmit);
+          .insert({
+            name: updatedData.name!,
+            calories: updatedData.calories || 0,
+            phase: updatedData.phase,
+            food_group_id: updatedData.food_group_id,
+            protein: updatedData.protein,
+            carbs: updatedData.carbs,
+            fats: updatedData.fats,
+            portion_size: updatedData.portion_size,
+            portion_unit: updatedData.portion_unit,
+            pre_workout_compatible: updatedData.pre_workout_compatible,
+            post_workout_compatible: updatedData.post_workout_compatible,
+            protein_per_100g: updatedData.protein_per_100g,
+            carbs_per_100g: updatedData.carbs_per_100g,
+            fats_per_100g: updatedData.fats_per_100g
+          });
 
         if (error) throw error;
         toast.success('Alimento adicionado com sucesso');

@@ -40,7 +40,7 @@ export const FoodPreferencesTab = () => {
         throw error;
       }
 
-      setFoods(data || []);
+      setFoods(data as ProtocolFood[] || []);
     } catch (error) {
       console.error('Error fetching foods:', error);
       toast.error('Erro ao carregar alimentos');

@@ -33,6 +33,8 @@ export interface ProtocolFood {
   protein_per_100g?: number | null;
   carbs_per_100g?: number | null;
   fats_per_100g?: number | null;
+  food_group?: string | null;
+  phase_id?: number | null;
 }
 
 export interface MealFood {

@@ -81,6 +81,10 @@ export interface ProtocolFood {
   protein_per_100g: number | null;
   carbs_per_100g: number | null;
   fats_per_100g: number | null;
+  common_allergens?: string[];
+  dietary_flags?: string[];
+  fiber?: number;
+  fiber_per_100g?: number;
 }
 
 export interface PhaseFormValues {
