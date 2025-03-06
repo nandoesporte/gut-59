@@ -1,23 +1,19 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
 export const FoodDatabaseDebugger = () => {
   const [diagnosticInfo, setDiagnosticInfo] = useState<{
-    tables: string[];
-    schemaExists: boolean;
+    connectionStatus: string;
     foodsTableExists: boolean;
-    connection: string;
     foodsCount: number | null;
     sampleFood: any | null;
     error: string | null;
   }>({
-    tables: [],
-    schemaExists: false,
+    connectionStatus: "Verificando...",
     foodsTableExists: false,
-    connection: "Verificando...",
     foodsCount: null,
     sampleFood: null,
     error: null
@@ -28,54 +24,44 @@ export const FoodDatabaseDebugger = () => {
   const runDiagnostic = async () => {
     setIsRunning(true);
     try {
-      // Verificar conexão básica
-      const { data: tablesData, error: tablesError } = await supabase
-        .from('pg_catalog.pg_tables')
-        .select('tablename')
-        .eq('schemaname', 'public');
+      // Test basic connection with a simple query to an existing table
+      const { data: connectionTest, error: connectionError } = await supabase
+        .from('protocol_foods')
+        .select('count(*)', { count: 'exact', head: true });
       
-      if (tablesError) {
+      if (connectionError) {
         setDiagnosticInfo(prev => ({
           ...prev,
-          connection: "Falha",
-          error: `Erro ao verificar tabelas: ${tablesError.message}`
+          connectionStatus: "Falha",
+          error: `Erro de conexão: ${connectionError.message}`
         }));
         return;
       }
       
-      // Verificar existência da tabela protocol_foods
-      const tables = tablesData?.map(t => t.tablename) || [];
-      const foodsTableExists = tables.includes('protocol_foods');
-      
-      // Tentar buscar a contagem de alimentos
-      let foodsCount = null;
+      // Check if protocol_foods table exists and get count
+      const { count, error: countError } = await supabase
+        .from('protocol_foods')
+        .select('*', { count: 'exact', head: true });
+        
+      const foodsTableExists = !countError;
+      let foodsCount = count || 0;
       let sampleFood = null;
       
-      if (foodsTableExists) {
-        const { count, error: countError } = await supabase
+      if (foodsTableExists && foodsCount > 0) {
+        // Get a sample food
+        const { data: foodSample, error: sampleError } = await supabase
           .from('protocol_foods')
-          .select('*', { count: 'exact', head: true });
+          .select('*')
+          .limit(1);
           
-        if (!countError) {
-          foodsCount = count;
-          
-          // Buscar um exemplo de alimento
-          const { data: foodSample, error: sampleError } = await supabase
-            .from('protocol_foods')
-            .select('*')
-            .limit(1);
-            
-          if (!sampleError && foodSample && foodSample.length > 0) {
-            sampleFood = foodSample[0];
-          }
+        if (!sampleError && foodSample && foodSample.length > 0) {
+          sampleFood = foodSample[0];
         }
       }
       
       setDiagnosticInfo({
-        tables,
-        schemaExists: true,
+        connectionStatus: "OK",
         foodsTableExists,
-        connection: "OK",
         foodsCount,
         sampleFood,
         error: null
@@ -83,7 +69,7 @@ export const FoodDatabaseDebugger = () => {
     } catch (error) {
       setDiagnosticInfo(prev => ({
         ...prev,
-        connection: "Falha",
+        connectionStatus: "Falha",
         error: error instanceof Error ? error.message : 'Erro desconhecido'
       }));
     } finally {
@@ -112,22 +98,11 @@ export const FoodDatabaseDebugger = () => {
       )}
       
       <div className="text-sm space-y-2">
-        <p><strong>Status da Conexão:</strong> {diagnosticInfo.connection}</p>
+        <p><strong>Status da Conexão:</strong> {diagnosticInfo.connectionStatus}</p>
         <p><strong>Tabela 'protocol_foods' existe:</strong> {diagnosticInfo.foodsTableExists ? "✅ Sim" : "❌ Não"}</p>
         
         {diagnosticInfo.foodsCount !== null && (
           <p><strong>Quantidade de alimentos:</strong> {diagnosticInfo.foodsCount}</p>
-        )}
-        
-        {diagnosticInfo.tables.length > 0 && (
-          <div>
-            <p><strong>Tabelas disponíveis:</strong></p>
-            <ul className="list-disc pl-5">
-              {diagnosticInfo.tables.map(table => (
-                <li key={table}>{table}</li>
-              ))}
-            </ul>
-          </div>
         )}
         
         {diagnosticInfo.sampleFood && (

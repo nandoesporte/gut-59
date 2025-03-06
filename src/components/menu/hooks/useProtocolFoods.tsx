@@ -16,8 +16,11 @@ export const useProtocolFoods = () => {
         console.log("Fetching protocol foods...");
         setLoading(true);
         
-        // Log Supabase URL para diagnóstico
-        console.log("Supabase URL:", supabase.supabaseUrl);
+        // Log Supabase connection info for diagnostic
+        console.log("Supabase Connection Info:", { 
+          url: supabase.getUrl(),
+          authStatus: !!supabase.auth.getSession()
+        });
         
         const { data, error, status } = await supabase
           .from('protocol_foods')
