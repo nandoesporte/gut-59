@@ -1,4 +1,3 @@
-
 export interface ProtocolFood {
   id: string;
   name: string;
@@ -9,6 +8,16 @@ export interface ProtocolFood {
   fiber?: number;
   food_group_id?: number;
   food_group_name?: string;
+  phase?: number;
+  phase_id?: number;
+  pre_workout_compatible?: boolean;
+  post_workout_compatible?: boolean;
+  portion_size?: number;
+  portion_unit?: string;
+  protein_per_100g?: number;
+  carbs_per_100g?: number;
+  fats_per_100g?: number;
+  fiber_per_100g?: number;
 }
 
 export interface DietaryPreferences {
