@@ -16,7 +16,6 @@ interface FoodFormProps {
   onCancel: () => void;
 }
 
-// Create an interface for the food data that includes all fields we need
 interface FoodDataType {
   name: string;
   calories: number;
