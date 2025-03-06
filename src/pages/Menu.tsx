@@ -10,7 +10,6 @@ import { useMenuController } from "@/components/menu/MenuController";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useRef } from "react";
-import { FoodDatabaseDebugger } from "@/components/menu/FoodDatabaseDebugger";
 import type { DietaryPreferences } from "@/components/menu/types";
 
 const Menu = () => {
@@ -55,12 +54,15 @@ const Menu = () => {
   }, [currentStep]);
 
   useEffect(() => {
-    console.log("Current step:", currentStep);
-    console.log("Calorie needs:", calorieNeeds);
-    console.log("Protocol foods count:", protocolFoods?.length || 0);
-    console.log("Selected foods count:", selectedFoods.length);
-    console.log("Meal plan available:", !!mealPlan);
-  }, [currentStep, calorieNeeds, protocolFoods, selectedFoods.length, mealPlan]);
+    console.log("Etapa atual:", currentStep);
+    console.log("Plano de refeição disponível:", !!mealPlan);
+    if (mealPlan) {
+      console.log("Detalhes do plano:", {
+        temPlanoSemanal: !!mealPlan.weeklyPlan,
+        diasDisponiveis: mealPlan.weeklyPlan ? Object.keys(mealPlan.weeklyPlan) : []
+      });
+    }
+  }, [currentStep, mealPlan]);
 
   const handleRefreshMealPlan = async () => {
     try {
@@ -100,8 +102,6 @@ const Menu = () => {
             <p className="text-gray-600 text-sm sm:text-base">Siga as etapas abaixo para criar seu plano alimentar com o Nutri+</p>
           </div>
 
-          <FoodDatabaseDebugger />
-
           <div className="space-y-6 sm:space-y-8">
             <Card className="p-4 sm:p-6">
               <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center">
@@ -134,7 +134,7 @@ const Menu = () => {
                 <span className={`bg-${currentStep >= 2 ? 'green' : 'gray'}-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2`}>2</span>
                 Preferências Alimentares
               </h2>
-              {currentStep === 2 && protocolFoods && protocolFoods.length > 0 && (
+              {currentStep === 2 && (
                 <FoodSelector
                   protocolFoods={protocolFoods}
                   selectedFoods={selectedFoods}
@@ -144,29 +144,9 @@ const Menu = () => {
                   onConfirm={handleConfirmFoodSelection}
                 />
               )}
-              {currentStep === 2 && (!protocolFoods || protocolFoods.length === 0) && (
-                <div className="text-center py-8">
-                  <p className="text-yellow-600 mb-4">Não há alimentos disponíveis no momento. Por favor, contate o administrador.</p>
-                  <p className="text-gray-600 mb-6">Você ainda pode continuar para criar um plano alimentar básico.</p>
-                  <div className="flex justify-center gap-4">
-                    <button 
-                      onClick={() => setCurrentStep(1)} 
-                      className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-                    >
-                      Voltar
-                    </button>
-                    <button 
-                      onClick={handleConfirmFoodSelection} 
-                      className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-                    >
-                      Continuar mesmo assim
-                    </button>
-                  </div>
-                </div>
-              )}
               {currentStep > 2 && (
                 <div className="text-center py-2">
-                  <p className="text-green-600 font-medium">✓ {protocolFoods && protocolFoods.length > 0 ? `${selectedFoods.length} alimentos selecionados` : 'Etapa concluída'}</p>
+                  <p className="text-green-600 font-medium">✓ {selectedFoods.length} alimentos selecionados</p>
                   <button 
                     onClick={() => setCurrentStep(2)} 
                     className="text-sm text-gray-500 underline mt-2"

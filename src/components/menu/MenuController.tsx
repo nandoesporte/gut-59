@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -44,7 +45,7 @@ export const useMenuController = () => {
     goal: undefined,
   });
 
-  const { protocolFoods, loading: protocolFoodsLoading, error: protocolFoodsError } = useProtocolFoods();
+  const protocolFoods = useProtocolFoods();
   const { calorieNeeds, calculateCalories } = useCalorieCalculator();
   const { selectedFoods, foodsByMealType, totalCalories, handleFoodSelection, calculateTotalCalories, categorizeFoodsByMealType } = useFoodSelection();
   const wallet = useWallet();
@@ -97,7 +98,7 @@ export const useMenuController = () => {
       }
     };
 
-    if (protocolFoods && protocolFoods.length > 0) {
+    if (protocolFoods.length > 0) {
       loadSavedPreferences();
     }
   }, [protocolFoods, selectedFoods, handleFoodSelection, categorizeFoodsByMealType]);
@@ -134,7 +135,7 @@ export const useMenuController = () => {
       }
       
       console.log("Advancing to step 2 (food selection)");
-      setCurrentStep(2); // This is crucial for moving to food selection
+      setCurrentStep(2);
       return true;
     } catch (error) {
       console.error('Error in handleCalculateCalories:', error);
@@ -214,11 +215,10 @@ export const useMenuController = () => {
   const handleConfirmFoodSelection = async () => {
     console.log("Iniciando confirmação de seleção de alimentos");
     
-    if (protocolFoods.length === 0 || selectedFoods.length === 0) {
-      console.log("Sem alimentos selecionados, mas avançando mesmo assim devido à falta de opções");
-      setCurrentStep(3);
-      toast.info("Avançando para preferências dietéticas");
-      return true;
+    if (selectedFoods.length === 0) {
+      console.warn("Nenhum alimento selecionado!");
+      toast.error("Por favor, selecione pelo menos um alimento antes de prosseguir");
+      return false;
     }
     
     try {
@@ -342,7 +342,7 @@ export const useMenuController = () => {
       return false;
     }
 
-    if (protocolFoods.length > 0 && selectedFoods.length === 0) {
+    if (!selectedFoods || selectedFoods.length === 0) {
       toast.error("Selecione pelo menos um alimento");
       return false;
     }
@@ -406,6 +406,7 @@ export const useMenuController = () => {
       } else {
         console.log("Usuário não autenticado. Criando plano básico.");
         
+        // Create a basic meal plan for unauthenticated users with the correct structure
         const basicMealPlan: MealPlan = {
           userCalories: calorieNeeds,
           weeklyPlan: {
@@ -756,7 +757,7 @@ export const useMenuController = () => {
     totalCalories,
     mealPlan,
     formData,
-    loading: loading || protocolFoodsLoading,
+    loading,
     handleCalculateCalories,
     handleFoodSelection,
     handleConfirmFoodSelection,
