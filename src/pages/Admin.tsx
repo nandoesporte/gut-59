@@ -15,6 +15,7 @@ import { ProfessionalsTab } from "@/components/admin/professionals/Professionals
 import { PaymentSettingsTab } from "@/components/admin/PaymentSettingsTab";
 import { AIAgentsTab } from "@/components/admin/ai-agents/AIAgentsTab";
 import { MentalHealthTab } from "@/components/admin/mental/MentalHealthTab";
+import { FoodPreferencesTab } from "@/components/admin/food/FoodPreferencesTab";
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -76,6 +77,7 @@ const Admin = () => {
           <TabsTrigger value="payments">Pagamentos</TabsTrigger>
           <TabsTrigger value="ai-agents">Agentes de IA</TabsTrigger>
           <TabsTrigger value="mental-health">Saúde Mental</TabsTrigger>
+          <TabsTrigger value="foods">Alimentos</TabsTrigger>
         </TabsList>
         <TabsContent value="users">
           <UsersTab />
@@ -94,6 +96,9 @@ const Admin = () => {
         </TabsContent>
         <TabsContent value="mental-health">
           <MentalHealthTab />
+        </TabsContent>
+        <TabsContent value="foods">
+          <FoodPreferencesTab />
         </TabsContent>
       </Tabs>
     </div>
