@@ -19,6 +19,7 @@ interface FoodFormProps {
 }
 
 export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps) => {
+  // Initialize form data with all the necessary fields from ProtocolFood
   const [formData, setFormData] = useState<Partial<ProtocolFood>>({
     name: "",
     phase: null,
@@ -100,7 +101,7 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
       }
 
       if (food) {
-        // Update existing food
+        // Update existing food with specific fields to match database schema
         const { error } = await supabase
           .from('protocol_foods')
           .update({
@@ -124,7 +125,7 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
         if (error) throw error;
         toast.success('Alimento atualizado com sucesso');
       } else {
-        // Create new food with required fields
+        // Create new food with required fields matching database schema
         const { error } = await supabase
           .from('protocol_foods')
           .insert({
