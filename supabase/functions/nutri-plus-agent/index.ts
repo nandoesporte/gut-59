@@ -100,7 +100,9 @@ As recomendações devem incluir:
   "preworkout": "Conselho de nutrição pré-treino",
   "postworkout": "Conselho de nutrição pós-treino",
   "timing": ["Conselho específico de tempo de refeição", "Outro conselho de timing"]
-}`;
+}
+
+IMPORTANTE: Devido a limitações técnicas, sua resposta NÃO pode exceder 8000 tokens. Se necessário, simplifique as descrições de preparo dos alimentos, mas NUNCA omita informações essenciais como calorias, macronutrientes ou items requeridos.`;
 
     // Construct user message with all relevant data
     const userMessage = `Crie um plano alimentar semanal personalizado com base nestes dados:
@@ -120,7 +122,8 @@ ${dietaryPreferences.dietaryRestrictions && dietaryPreferences.dietaryRestrictio
 ${dietaryPreferences.trainingTime ? `- Horário de Treino: ${dietaryPreferences.trainingTime}` : '- Sem horário específico de treino'}
 
 ALIMENTOS DISPONÍVEIS (${selectedFoods.length} no total):
-${selectedFoods.map(food => `- ${food.name} (${food.calories} kcal, P:${food.protein}g, C:${food.carbs}g, G:${food.fats}g)`).join('\n').substring(0, 1500)}
+${selectedFoods.slice(0, 30).map(food => `- ${food.name} (${food.calories} kcal, P:${food.protein}g, C:${food.carbs}g, G:${food.fats}g)`).join('\n')}
+${selectedFoods.length > 30 ? `\n... e mais ${selectedFoods.length - 30} alimentos.` : ''}
 
 ${foodsByMealType ? `ALIMENTOS CATEGORIZADOS POR REFEIÇÃO:
 ${Object.entries(foodsByMealType).map(([mealType, foods]) => 
@@ -128,14 +131,14 @@ ${Object.entries(foodsByMealType).map(([mealType, foods]) =>
 ).join('\n')}` : ''}
 
 Por favor, crie um plano de 7 dias que:
-1. Atenda EXATAMENTE à meta de ${userData.dailyCalories} calorias diárias
+1. Atenda à meta de ${userData.dailyCalories} calorias diárias (com margem de +/- 100 kcal)
 2. Distribua adequadamente os macronutrientes (proteínas, carboidratos, gorduras, fibras)
 3. Use os alimentos disponíveis fornecidos
-4. Respeite rigorosamente as preferências e restrições alimentares do usuário
+4. Respeite as preferências e restrições alimentares do usuário
 5. Forneça variedade ao longo da semana
-6. Inclua todos os tipos de refeições necessários: café da manhã, lanche da manhã, almoço, lanche da tarde, jantar
-7. Calcule com precisão as calorias e macros para cada refeição e dia
-8. Forneça detalhes de preparo para CADA alimento (como cozinhar, temperar, combinar ingredientes)`;
+6. Inclua todos os tipos de refeições: café da manhã, lanche da manhã, almoço, lanche da tarde, jantar
+7. Calcule as calorias e macros para cada refeição e dia
+8. Forneça detalhes de preparo para cada alimento`;
 
     // Track time for API call preparation
     console.log(`[NUTRI+] Preparando chamada de API às ${new Date().toISOString()}`);
@@ -154,7 +157,7 @@ Por favor, crie um plano de 7 dias que:
         { role: "user", content: userMessage }
       ],
       temperature: temperature, // Lower temperature for more consistent output
-      max_tokens: 7000, // Allow enough tokens for a full meal plan
+      max_tokens: 4000, // Reduced from 7000 to avoid exceeding API limits
       top_p: 0.9,
       response_format: { type: "json_object" } // Request JSON format response
     };
@@ -174,8 +177,52 @@ Por favor, crie um plano de 7 dias que:
     if (!response.ok) {
       const errorData = await response.text();
       console.error(`[NUTRI+] Erro da API Groq (${response.status}):`, errorData);
+      
+      // If we received a JSON generation error, we'll try to use the failed_generation content
+      if (response.status === 400 && errorData.includes('json_validate_failed')) {
+        try {
+          const errorJson = JSON.parse(errorData);
+          if (errorJson.error && errorJson.error.failed_generation) {
+            console.log("[NUTRI+] Tentando recuperar dados do JSON inválido...");
+            
+            // Try to extract and fix the incomplete JSON
+            let failedJson = errorJson.error.failed_generation;
+            
+            // Attempt to complete the truncated JSON if necessary
+            if (!failedJson.endsWith('}')) {
+              failedJson = failedJson + '"}}}';
+            }
+            
+            try {
+              // Try to parse the fixed JSON
+              const fixedMealPlan = JSON.parse(failedJson);
+              console.log("[NUTRI+] JSON recuperado com sucesso!");
+              
+              return new Response(
+                JSON.stringify({
+                  mealPlan: fixedMealPlan.mealPlan,
+                  modelUsed: modelName,
+                  recovered: true
+                }),
+                { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+              );
+            } catch (parseError) {
+              console.error("[NUTRI+] Não foi possível recuperar o JSON:", parseError);
+            }
+          }
+        } catch (errorParseError) {
+          console.error("[NUTRI+] Erro ao analisar o erro da API:", errorParseError);
+        }
+      }
+      
+      // Return the error to the client if recovery failed
       return new Response(
-        JSON.stringify({ error: `Erro da API: ${response.status}`, details: errorData }),
+        JSON.stringify({ 
+          error: `Erro da API: ${response.status}`, 
+          details: errorData,
+          // Try alternative model next time
+          suggestedModel: modelName === "llama3-8b-8192" ? "llama3-70b-8192" : "llama3-8b-8192"
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
       );
     }
