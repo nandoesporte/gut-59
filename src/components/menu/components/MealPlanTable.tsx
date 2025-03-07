@@ -61,7 +61,9 @@ export const MealPlanTable = ({ mealPlan }: MealPlanTableProps) => {
         description: meal.description,
         foods: foodNames,
         quantities: quantities,
-        details: meal.foods.map(food => food.details).join(". ")
+        details: meal.foods.map(food => 
+          food.details ? food.details : "Sem instruções específicas"
+        ).join(". ")
       });
     });
   });
@@ -78,7 +80,7 @@ export const MealPlanTable = ({ mealPlan }: MealPlanTableProps) => {
             <TableHead>Prato</TableHead>
             <TableHead>Ingredientes</TableHead>
             <TableHead>Quantidade (g/ml/unidade)</TableHead>
-            <TableHead>Preparo</TableHead>
+            <TableHead>Modo de Preparo</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -89,7 +91,7 @@ export const MealPlanTable = ({ mealPlan }: MealPlanTableProps) => {
               <TableCell>{row.description}</TableCell>
               <TableCell>{row.foods}</TableCell>
               <TableCell>{row.quantities}</TableCell>
-              <TableCell>{row.details}</TableCell>
+              <TableCell className="whitespace-pre-wrap">{row.details}</TableCell>
             </TableRow>
           ))}
         </TableBody>

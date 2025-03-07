@@ -1,5 +1,5 @@
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FileDown, RefreshCcw, Table as TableIcon, LayoutDashboard } from "lucide-react";
@@ -32,6 +32,67 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
   const planRef = useRef<HTMLDivElement>(null);
   const [selectedDay, setSelectedDay] = useState<string>("monday");
   const [viewMode, setViewMode] = useState<"daily" | "table">("daily");
+  const [weeklyAverages, setWeeklyAverages] = useState({
+    calories: 0,
+    protein: 0,
+    carbs: 0,
+    fats: 0,
+    fiber: 0
+  });
+
+  useEffect(() => {
+    if (mealPlan && mealPlan.weeklyPlan) {
+      // Calculate weekly averages if not already provided by the API
+      if (!mealPlan.weeklyTotals || 
+          isNaN(mealPlan.weeklyTotals.averageCalories) || 
+          isNaN(mealPlan.weeklyTotals.averageProtein) ||
+          isNaN(mealPlan.weeklyTotals.averageCarbs) ||
+          isNaN(mealPlan.weeklyTotals.averageFats) ||
+          isNaN(mealPlan.weeklyTotals.averageFiber)) {
+        
+        console.log("Recalculating weekly averages due to NaN values");
+        
+        const days = Object.values(mealPlan.weeklyPlan);
+        const validDays = days.filter(day => day && day.dailyTotals);
+        const dayCount = validDays.length || 1; // Avoid division by zero
+        
+        const totals = {
+          calories: 0,
+          protein: 0,
+          carbs: 0,
+          fats: 0,
+          fiber: 0
+        };
+        
+        validDays.forEach(day => {
+          if (day.dailyTotals) {
+            totals.calories += day.dailyTotals.calories || 0;
+            totals.protein += day.dailyTotals.protein || 0;
+            totals.carbs += day.dailyTotals.carbs || 0;
+            totals.fats += day.dailyTotals.fats || 0;
+            totals.fiber += day.dailyTotals.fiber || 0;
+          }
+        });
+        
+        setWeeklyAverages({
+          calories: Math.round(totals.calories / dayCount),
+          protein: Math.round(totals.protein / dayCount),
+          carbs: Math.round(totals.carbs / dayCount),
+          fats: Math.round(totals.fats / dayCount),
+          fiber: Math.round(totals.fiber / dayCount)
+        });
+      } else {
+        // Use the API-provided weekly totals
+        setWeeklyAverages({
+          calories: Math.round(mealPlan.weeklyTotals.averageCalories) || 0,
+          protein: Math.round(mealPlan.weeklyTotals.averageProtein) || 0,
+          carbs: Math.round(mealPlan.weeklyTotals.averageCarbs) || 0,
+          fats: Math.round(mealPlan.weeklyTotals.averageFats) || 0,
+          fiber: Math.round(mealPlan.weeklyTotals.averageFiber) || 0
+        });
+      }
+    }
+  }, [mealPlan]);
 
   const handleDownloadPDF = async () => {
     if (!mealPlan) return;
@@ -176,33 +237,31 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
           <MealPlanTable mealPlan={mealPlan} />
         )}
 
-        {mealPlan.weeklyTotals && (
-          <Card className="p-4 sm:p-6 mt-8 bg-primary/5">
-            <h3 className="text-lg font-semibold mb-4">Médias Semanais</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 text-center">
-              <div>
-                <p className="text-sm text-gray-500">Calorias</p>
-                <p className="font-semibold">{Math.round(mealPlan.weeklyTotals.averageCalories)} kcal</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Proteínas</p>
-                <p className="font-semibold">{Math.round(mealPlan.weeklyTotals.averageProtein)}g</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Carboidratos</p>
-                <p className="font-semibold">{Math.round(mealPlan.weeklyTotals.averageCarbs)}g</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Gorduras</p>
-                <p className="font-semibold">{Math.round(mealPlan.weeklyTotals.averageFats)}g</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Fibras</p>
-                <p className="font-semibold">{Math.round(mealPlan.weeklyTotals.averageFiber)}g</p>
-              </div>
+        <Card className="p-4 sm:p-6 mt-8 bg-primary/5">
+          <h3 className="text-lg font-semibold mb-4">Médias Semanais</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 text-center">
+            <div>
+              <p className="text-sm text-gray-500">Calorias</p>
+              <p className="font-semibold">{weeklyAverages.calories} kcal</p>
             </div>
-          </Card>
-        )}
+            <div>
+              <p className="text-sm text-gray-500">Proteínas</p>
+              <p className="font-semibold">{weeklyAverages.protein}g</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Carboidratos</p>
+              <p className="font-semibold">{weeklyAverages.carbs}g</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Gorduras</p>
+              <p className="font-semibold">{weeklyAverages.fats}g</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Fibras</p>
+              <p className="font-semibold">{weeklyAverages.fiber}g</p>
+            </div>
+          </div>
+        </Card>
 
         {mealPlan.recommendations && (
           <Recommendations recommendations={mealPlan.recommendations} />
