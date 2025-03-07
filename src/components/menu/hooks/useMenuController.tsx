@@ -60,6 +60,19 @@ export const useMenuController = () => {
     });
   };
 
+  // Define scrollToElement at the beginning to avoid reference errors
+  const scrollToElement = (elementId: string) => {
+    setTimeout(() => {
+      const element = document.getElementById(elementId);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        console.log(`Scrolling to element with ID: ${elementId}`);
+      } else {
+        console.warn(`Element with ID: ${elementId} not found`);
+      }
+    }, 100); // Short timeout to ensure DOM is updated
+  };
+
   useEffect(() => {
     calculateTotalCalories(protocolFoods);
   }, [selectedFoods, protocolFoods, calculateTotalCalories]);
@@ -135,6 +148,10 @@ export const useMenuController = () => {
       
       console.log("Advancing to step 2 (food selection)");
       setCurrentStep(2);
+      
+      // Scroll to the food preferences section
+      scrollToElement('food-preferences-section');
+      
       return true;
     } catch (error) {
       console.error('Error in handleCalculateCalories:', error);
@@ -449,5 +466,6 @@ export const useMenuController = () => {
     handleConfirmFoodSelection,
     handleDietaryPreferences,
     setFormData,
+    scrollToElement,
   };
 };
