@@ -1,3 +1,4 @@
+
 import Profile from "@/components/Profile";
 import Messages from "@/components/Messages";
 import MessagesPersonal from "@/components/MessagesPersonal";
@@ -12,6 +13,7 @@ import { WaterTracker } from "@/components/food-diary/WaterTracker";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { GraduationCap } from "lucide-react";
+import { NutritionSummary } from "@/components/nutrition/NutritionSummary";
 
 const Index = () => {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -71,6 +73,11 @@ const Index = () => {
       <div className="w-full">
         <Profile />
       </div>
+      
+      <div className="w-full">
+        <NutritionSummary />
+      </div>
+      
       <div className="w-full">
         <Card className="p-6">
           <div className="flex items-center justify-between">
