@@ -25,25 +25,23 @@ export const useMenuController = () => {
   const { addTransaction } = useUserWallet();
   const navigate = useNavigate();
   
-  const {
-    formData,
-    setFormData,
-    calorieNeeds,
-    handleCalculateCalories,
-  } = useCalorieCalculator();
+  const calorieCalculator = useCalorieCalculator();
+  const foodSelection = useFoodSelection();
+  
+  // Destructure values from hooks
+  const { 
+    calorieNeeds
+  } = calorieCalculator;
   
   const {
-    protocolFoods,
     selectedFoods,
     foodsByMealType,
     totalCalories,
-    setSelectedFoods,
-    handleFoodSelection,
-    loadFoods,
-  } = useFoodSelection();
+    handleFoodSelection
+  } = foodSelection;
   
   useEffect(() => {
-    loadFoods().catch(error => {
+    foodSelection.loadFoods().catch(error => {
       console.error("Erro ao carregar alimentos:", error);
       setFoodsError(error as Error);
       toast.error("Erro ao carregar alimentos");
@@ -63,7 +61,11 @@ export const useMenuController = () => {
     try {
       // Save selected foods to user preferences in Supabase
       if (profile?.id) {
-        const foodIds = selectedFoods.map(food => food.id);
+        const foodIds = selectedFoods.map(food => {
+          // Handle both string IDs and object IDs
+          return typeof food === 'string' ? food : food.id;
+        });
+        
         const { error } = await supabase.rpc('update_nutrition_selected_foods', {
           p_user_id: profile.id,
           p_selected_foods: foodIds
@@ -106,18 +108,18 @@ export const useMenuController = () => {
       // Generate meal plan using Edge Function
       const userData = {
         id: profile?.id,
-        weight: Number(formData.weight),
-        height: Number(formData.height),
-        age: Number(formData.age),
-        gender: formData.gender,
-        activityLevel: formData.activityLevel,
-        goal: formData.goal,
+        weight: Number(calorieCalculator.formData.weight),
+        height: Number(calorieCalculator.formData.height),
+        age: Number(calorieCalculator.formData.age),
+        gender: calorieCalculator.formData.gender,
+        activityLevel: calorieCalculator.formData.activityLevel,
+        goal: calorieCalculator.formData.goal,
         dailyCalories: calorieNeeds
       };
       
       const generatedMealPlan = await generateMealPlan({
         userData,
-        selectedFoods,
+        selectedFoods: selectedFoods as ProtocolFood[],
         foodsByMealType,
         preferences,
         addTransaction
@@ -144,14 +146,14 @@ export const useMenuController = () => {
     calorieNeeds,
     selectedFoods,
     totalCalories,
-    formData,
-    setFormData,
-    protocolFoods,
+    formData: calorieCalculator.formData,
+    setFormData: calorieCalculator.setFormData,
+    protocolFoods: foodSelection.protocolFoods,
     dietaryPreferences,
     mealPlan,
     loading,
     foodsError,
-    handleCalculateCalories,
+    handleCalculateCalories: calorieCalculator.handleCalculateCalories,
     handleFoodSelection,
     handleConfirmFoodSelection,
     handleDietaryPreferences,

@@ -14,17 +14,10 @@ interface EmotionLog {
   created_at: string;
 }
 
-interface BreathingSession {
-  duration: number;
-  created_at: string;
-}
-
 export const MentalHealthSummary = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [latestEmotion, setLatestEmotion] = useState<EmotionLog | null>(null);
-  const [latestBreathingSession, setLatestBreathingSession] = useState<BreathingSession | null>(null);
-  const [hasChatInteraction, setHasChatInteraction] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -44,28 +37,7 @@ export const MentalHealthSummary = () => {
           .limit(1);
 
         if (emotionsError) throw emotionsError;
-
-        // Fetch the latest breathing exercise session (placeholder - adjust table name as needed)
-        const { data: breathingSessions, error: breathingError } = await supabase
-          .from('breathing_sessions')
-          .select('duration, created_at')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        // Check if user has interacted with the AI counselor
-        const { count, error: chatError } = await supabase
-          .from('mental_chat_messages')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .limit(1);
-
-        if (chatError) throw chatError;
-
         setLatestEmotion(emotions?.[0] || null);
-        setLatestBreathingSession(breathingSessions || null);
-        setHasChatInteraction(count !== null && count > 0);
       } catch (error) {
         console.error('Error fetching mental health data:', error);
         setError('Não foi possível carregar os dados de saúde mental.');
@@ -138,7 +110,7 @@ export const MentalHealthSummary = () => {
   }
 
   // If there's no mental health data yet
-  if (!latestEmotion && !latestBreathingSession && !hasChatInteraction) {
+  if (!latestEmotion) {
     return (
       <Card className="w-full">
         <CardContent className="p-6">
@@ -196,35 +168,18 @@ export const MentalHealthSummary = () => {
             </div>
           )}
 
-          {latestBreathingSession && (
-            <div className="p-4 flex items-center">
-              <div className="bg-blue-100 p-3 rounded-full mr-4">
-                <Wind className="h-6 w-6 text-blue-500" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-500">Exercício de respiração</p>
-                <p className="text-xl font-bold">{latestBreathingSession.duration} minutos</p>
-                <p className="text-sm text-gray-500">
-                  {formatDate(latestBreathingSession.created_at)}
-                </p>
-              </div>
+          <div className="p-4 flex items-center">
+            <div className="bg-purple-100 p-3 rounded-full mr-4">
+              <Brain className="h-6 w-6 text-purple-500" />
             </div>
-          )}
-
-          {hasChatInteraction && (
-            <div className="p-4 flex items-center">
-              <div className="bg-purple-100 p-3 rounded-full mr-4">
-                <Brain className="h-6 w-6 text-purple-500" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-500">IA Conselheira</p>
-                <p className="text-xl font-bold">Sessão Ativa</p>
-                <p className="text-sm text-indigo-600 hover:text-indigo-800 cursor-pointer" onClick={handleNavigateToMental}>
-                  Continuar conversa
-                </p>
-              </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-500">Acompanhamento Mental</p>
+              <p className="text-lg font-semibold">Explore recursos para sua saúde mental</p>
+              <p className="text-sm text-indigo-600 hover:text-indigo-800 cursor-pointer" onClick={handleNavigateToMental}>
+                Acessar área mental
+              </p>
             </div>
-          )}
+          </div>
         </div>
       </CardContent>
     </Card>

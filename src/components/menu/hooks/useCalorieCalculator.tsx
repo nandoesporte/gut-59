@@ -1,95 +1,103 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-import type { Database } from "@/integrations/supabase/types";
-import type { CalorieCalculatorForm } from "../CalorieCalculator";
 
-type NutritionPreference = Database['public']['Tables']['nutrition_preferences']['Insert'];
-
-const mapGoalToEnum = (goal: string): Database['public']['Enums']['nutritional_goal'] => {
-  const goalMap: Record<string, Database['public']['Enums']['nutritional_goal']> = {
-    'lose': 'lose_weight',
-    'maintain': 'maintain',
-    'gain': 'gain_mass'
-  };
-  return goalMap[goal] || 'maintain';
-};
+export interface CalorieCalculatorForm {
+  age: string;
+  weight: string;
+  height: string;
+  gender: "male" | "female";
+  activityLevel: string;
+  goal: string;
+}
 
 export const useCalorieCalculator = () => {
+  const [formData, setFormData] = useState<CalorieCalculatorForm>({
+    age: "",
+    weight: "",
+    height: "",
+    gender: "male",
+    activityLevel: "moderate",
+    goal: "maintenance"
+  });
+  
+  const [calorieNeeds, setCalorieNeeds] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [calorieNeeds, setCalorieNeeds] = useState<number | null>(null);
 
-  const calculateBMR = (data: CalorieCalculatorForm) => {
-    const weight = parseFloat(data.weight);
-    const height = parseFloat(data.height);
-    const age = parseFloat(data.age);
-
-    if (data.gender === "male") {
-      return 88.36 + (13.4 * weight) + (4.8 * height) - (5.7 * age);
-    } else {
-      return 447.6 + (9.2 * weight) + (3.1 * height) - (4.3 * age);
-    }
-  };
-
-  const calculateCalories = async (formData: CalorieCalculatorForm, selectedLevel: { multiplier: number }) => {
+  const handleCalculateCalories = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const bmr = calculateBMR(formData);
-      const activityMultiplier = selectedLevel ? selectedLevel.multiplier : 1.2;
-      const dailyCalories = Math.round(bmr * activityMultiplier);
-
-      // Don't require authentication for calculating calories
-      // This allows the calculator to work even if the user is not logged in
-      let userId = null;
-      try {
-        const { data: userData } = await supabase.auth.getUser();
-        userId = userData.user?.id;
-      } catch (authError) {
-        console.warn("User not authenticated, proceeding with calculation only:", authError);
+      // Validate form data
+      if (!formData.age || !formData.weight || !formData.height) {
+        toast.error("Por favor, preencha todos os campos");
+        return;
       }
 
-      if (!formData.goal) {
-        toast.error("Por favor, selecione um objetivo");
-        return null;
-      }
-
-      // Only save to database if user is logged in
-      if (userId) {
-        const nutritionPreference: NutritionPreference = {
-          weight: parseFloat(formData.weight),
-          height: parseFloat(formData.height),
-          age: parseFloat(formData.age),
-          gender: formData.gender,
-          activity_level: formData.activityLevel as Database['public']['Enums']['activity_level'],
-          goal: mapGoalToEnum(formData.goal),
-          user_id: userId
-        };
-
-        const { error: nutritionError } = await supabase
-          .from('nutrition_preferences')
-          .upsert(nutritionPreference);
-
-        if (nutritionError) {
-          console.error('Error saving nutrition preferences:', nutritionError);
-          // Continue anyway, this shouldn't block the calculation
-        }
-      }
-
-      setCalorieNeeds(dailyCalories);
-      return dailyCalories;
+      // Get the activity level multiplier
+      const activityLevels = {
+        sedentary: { multiplier: 1.2 },
+        light: { multiplier: 1.375 },
+        moderate: { multiplier: 1.55 },
+        active: { multiplier: 1.725 },
+        very_active: { multiplier: 1.9 }
+      };
+      
+      const selectedLevel = activityLevels[formData.activityLevel as keyof typeof activityLevels] || activityLevels.moderate;
+      
+      // Calculate the calories
+      const result = await calculateCalories(formData, selectedLevel);
+      setCalorieNeeds(result);
+      
+      return result;
     } catch (error) {
-      console.error('Error calculating calories:', error);
-      toast.error("Erro ao calcular necessidades calóricas");
-      return null;
+      console.error("Error calculating calories:", error);
+      toast.error("Erro ao calcular calorias");
     } finally {
       setLoading(false);
     }
   };
 
+  const calculateCalories = async (
+    formData: CalorieCalculatorForm, 
+    selectedLevel: { multiplier: number }
+  ) => {
+    // Convert values to numbers
+    const age = Number(formData.age);
+    const weight = Number(formData.weight);
+    const height = Number(formData.height);
+    
+    // Calculate BMR using Mifflin-St Jeor equation
+    let bmr;
+    if (formData.gender === "male") {
+      bmr = 10 * weight + 6.25 * height - 5 * age + 5;
+    } else {
+      bmr = 10 * weight + 6.25 * height - 5 * age - 161;
+    }
+    
+    // Apply activity level multiplier
+    let tdee = Math.round(bmr * selectedLevel.multiplier);
+    
+    // Adjust for goal
+    const goalMultipliers = {
+      "weight_loss": 0.8,   // 20% deficit
+      "maintenance": 1.0,   // Maintain
+      "muscle_gain": 1.1    // 10% surplus
+    };
+    
+    const goalMultiplier = goalMultipliers[formData.goal as keyof typeof goalMultipliers] || 1.0;
+    
+    // Calculate final calories
+    const finalCalories = Math.round(tdee * goalMultiplier);
+    
+    return finalCalories;
+  };
+
   return {
-    loading,
+    formData,
+    setFormData,
     calorieNeeds,
-    calculateCalories,
+    loading,
+    handleCalculateCalories,
+    calculateCalories
   };
 };
