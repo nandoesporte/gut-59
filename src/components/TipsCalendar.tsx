@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { Lock, Unlock, Check } from "lucide-react";
@@ -47,17 +48,28 @@ const TipsCalendar = () => {
   const [tips, setTips] = useState<Tip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedTip, setSelectedTip] = useState<Tip | null>(null);
+  const [isGeneratingTip, setIsGeneratingTip] = useState(false);
   const { addTransaction } = useWallet();
 
   useEffect(() => {
     const loadTips = async () => {
       try {
+        const currentDate = new Date();
+        const currentDay = currentDate.getDate();
+        const currentMonth = currentDate.getMonth();
+        const currentYear = currentDate.getFullYear();
+        
         const savedTips = localStorage.getItem('monthlyTips');
-        const currentMonth = new Date().getMonth();
         const savedMonth = localStorage.getItem('tipsMonth');
+        const savedYear = localStorage.getItem('tipsYear');
         const readTips = JSON.parse(localStorage.getItem('readTips') || '[]');
 
-        if (!savedTips || savedMonth !== currentMonth.toString()) {
+        // Reset tips if the month or year has changed
+        if (!savedTips || 
+            savedMonth !== currentMonth.toString() || 
+            savedYear !== currentYear.toString()) {
+          
+          console.log('Loading daily tips from database...');
           const { data, error } = await supabase
             .from('daily_tips')
             .select('*');
@@ -65,8 +77,8 @@ const TipsCalendar = () => {
           if (error) throw error;
 
           const tipsData = (data as DailyTip[]) || defaultTips;
-          const currentDay = new Date().getDate();
 
+          // Create a new array of tips for the current month
           const newTips = Array.from({ length: 30 }, (_, index) => {
             const tipData = tipsData[index % tipsData.length];
             return {
@@ -80,11 +92,14 @@ const TipsCalendar = () => {
 
           localStorage.setItem('monthlyTips', JSON.stringify(newTips));
           localStorage.setItem('tipsMonth', currentMonth.toString());
+          localStorage.setItem('tipsYear', currentYear.toString());
           setTips(newTips);
         } else {
+          // Update unlocked status based on current day
           const savedTipsData = JSON.parse(savedTips);
           const updatedTips = savedTipsData.map((tip: Tip) => ({
             ...tip,
+            isUnlocked: tip.id <= currentDay,
             isRead: readTips.includes(tip.id)
           }));
           setTips(updatedTips);
@@ -107,6 +122,34 @@ const TipsCalendar = () => {
 
     loadTips();
   }, []);
+
+  const generateTipContent = async (tipId: number, theme: string) => {
+    setIsGeneratingTip(true);
+    try {
+      const prompt = `Gere uma dica curta (máximo 150 palavras) sobre ${theme} para o desafio do dia ${tipId}. A dica deve ser motivacional, prática e incluir uma sugestão de ação simples para implementar. Mantenha o tom leve e positivo.`;
+      
+      // Use the llama3-8b-8192 model via supabase function
+      const { data, error } = await supabase.functions.invoke('llama-completion', {
+        body: {
+          prompt,
+          model: 'llama3-8b-8192',
+          temperature: 0.7
+        }
+      });
+
+      if (error) throw new Error(error.message);
+
+      // Extract content from response
+      const generatedContent = data?.completion || `Dica do dia ${tipId}: Pratique um hábito saudável hoje relacionado a ${theme}.`;
+      
+      return generatedContent;
+    } catch (error) {
+      console.error('Erro ao gerar conteúdo da dica:', error);
+      return `Dica do dia ${tipId}: Pratique um hábito saudável relacionado a ${theme} hoje.`;
+    } finally {
+      setIsGeneratingTip(false);
+    }
+  };
 
   const markTipAsRead = async (tipId: number) => {
     try {
@@ -134,9 +177,25 @@ const TipsCalendar = () => {
     }
   };
 
-  const handleTipClick = (tip: Tip) => {
+  const handleTipClick = async (tip: Tip) => {
     if (tip.isUnlocked) {
-      setSelectedTip(tip);
+      if (!tip.content.includes(`Dica do dia ${tip.id}:`)) {
+        setSelectedTip(tip);
+      } else {
+        // If the tip content is the default, generate a new one
+        setSelectedTip({...tip, content: "Gerando conteúdo da dica..."});
+        const generatedContent = await generateTipContent(tip.id, tip.theme);
+        
+        // Update the tip content in state and localStorage
+        const updatedTips = tips.map(t => 
+          t.id === tip.id ? {...t, content: generatedContent} : t
+        );
+        setTips(updatedTips);
+        localStorage.setItem('monthlyTips', JSON.stringify(updatedTips));
+        
+        // Update the selected tip
+        setSelectedTip({...tip, content: generatedContent});
+      }
     }
   };
 
@@ -147,6 +206,9 @@ const TipsCalendar = () => {
       </div>
     );
   }
+
+  // Get the current date for highlighting the current day
+  const currentDay = new Date().getDate();
 
   return (
     <div className="w-full px-4 py-6 bg-gradient-to-br from-slate-50 to-white rounded-lg shadow-sm border border-slate-200">
@@ -162,10 +224,11 @@ const TipsCalendar = () => {
             transition={{ duration: 0.3 }}
           >
             <Card
-              onClick={() => handleTipClick(tip)}
+              onClick={() => !isGeneratingTip && handleTipClick(tip)}
               className={`relative w-full aspect-square ${getThemeColor(tip.theme)} 
                 transition-all duration-300 cursor-pointer overflow-hidden group border
-                ${tip.isUnlocked ? 'shadow-sm hover:shadow-md' : 'opacity-80'}`}
+                ${tip.isUnlocked ? 'shadow-sm hover:shadow-md' : 'opacity-80'}
+                ${tip.id === currentDay ? 'ring-2 ring-primary ring-offset-1' : ''}`}
             >
               <div className="absolute inset-0 p-2 flex flex-col items-center justify-center">
                 <span className="text-xs font-semibold mb-1 text-slate-700">Dia {tip.id}</span>
@@ -202,9 +265,16 @@ const TipsCalendar = () => {
             </DialogTitle>
           </DialogHeader>
           <div className="p-4 bg-gradient-to-br from-slate-50 to-white rounded-lg border border-slate-200">
-            <p className="text-slate-700 leading-relaxed">
-              {selectedTip?.content}
-            </p>
+            {isGeneratingTip ? (
+              <div className="flex justify-center items-center py-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-500" />
+                <span className="ml-2 text-slate-600">Gerando conteúdo...</span>
+              </div>
+            ) : (
+              <p className="text-slate-700 leading-relaxed">
+                {selectedTip?.content}
+              </p>
+            )}
           </div>
           <DialogFooter className="sm:justify-between">
             <span className="text-sm text-slate-500">
@@ -212,7 +282,7 @@ const TipsCalendar = () => {
             </span>
             <Button
               onClick={() => selectedTip && markTipAsRead(selectedTip.id)}
-              disabled={selectedTip?.isRead}
+              disabled={selectedTip?.isRead || isGeneratingTip}
               className="bg-green-500 hover:bg-green-600"
             >
               {selectedTip?.isRead ? 'Concluído' : 'Confirmar Leitura'}
