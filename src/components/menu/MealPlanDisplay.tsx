@@ -208,7 +208,7 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
 
       <div ref={planRef} className="space-y-6 bg-white p-4 sm:p-8 rounded-lg">
         <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-700">
-          <p className="font-medium">✨ Plano gerado por Nutri+ (powered by Llama 3)</p>
+          <p className="font-medium">✨ Plano gerado por Nutri+ (Nutricionista + Tecnologia)</p>
           <p className="mt-1">Este plano foi personalizado com base em suas preferências e necessidades nutricionais.</p>
         </div>
 
