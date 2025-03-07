@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { useProtocolFoods } from "./useProtocolFoods";
 import { useCalorieCalculator, Goal } from "./useCalorieCalculator";
@@ -253,11 +254,15 @@ export const useMenuController = (): MenuState => {
         if (user) {
           try {
             console.log("💾 Tentando salvar plano alimentar para o usuário:", user.id);
+            
+            // Convert the MealPlan object to a plain JSON object
+            const planDataAsJson = JSON.parse(JSON.stringify(generatedPlan));
+            
             const { error } = await supabase
               .from('meal_plans')
               .insert({
                 user_id: user.id,
-                plan_data: generatedPlan,
+                plan_data: planDataAsJson,
                 calories: calorieNeeds
               });
               
