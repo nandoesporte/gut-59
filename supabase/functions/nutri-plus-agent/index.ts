@@ -232,11 +232,30 @@ Por favor, crie um plano de 7 dias que:
               .replace(/"afternoon_snack":/g, '"afternoonSnack":')
               .replace(/"evening_snack":/g, '"eveningSnack":')
               .replace(/"pre_workout":/g, '"preWorkout":')
-              .replace(/"post_workout":/g, '"postWorkout":');
+              .replace(/"post_workout":/g, '"postWorkout":')
+              // Fix common issues with array commas
+              .replace(/,\s*\]/g, ']')         // Remove trailing commas in arrays
+              .replace(/,\s*\}/g, '}')         // Remove trailing commas in objects
+              .replace(/\.\.\.[\s\n]*\}/g, '}')  // Fix ellipsis in JSON
+              .replace(/\.\.\.[\s\n]*\]/g, ']'); // Fix ellipsis in JSON
             
-            // Attempt to complete the truncated JSON if necessary
+            // Advanced fix for ... outros dias ... pattern which breaks the JSON
+            failedJson = failedJson.replace(/(\s*"[^"]+"\s*:\s*\{\s*\/\*[^*]*\*\/\s*\})(,\s*\/\*\s*\.\.\.\s*outros\s*dias\s*\.\.\.\s*\*\/)/g, 
+              (match, group1) => {
+                return group1;
+              }
+            );
+            
+            // Attempt to complete truncated JSON if necessary
             if (!failedJson.endsWith('}')) {
-              failedJson = failedJson + '"}}}';
+              // Count open and close braces to determine needed closing
+              const openBraces = (failedJson.match(/\{/g) || []).length;
+              const closeBraces = (failedJson.match(/\}/g) || []).length;
+              const missingCloseBraces = openBraces - closeBraces;
+              
+              if (missingCloseBraces > 0) {
+                failedJson = failedJson + '}'.repeat(missingCloseBraces);
+              }
             }
             
             try {
@@ -290,6 +309,63 @@ Por favor, crie um plano de 7 dias que:
               }
             } catch (parseError) {
               console.error("[NUTRI+] Não foi possível corrigir o JSON:", parseError);
+              console.error("[NUTRI+] JSON incorreto:", failedJson.substring(0, 500) + "...");
+              
+              // Try more aggressive JSON repair techniques
+              try {
+                // Replace problematic section with a placeholder structure
+                if (parseError.message.includes("position")) {
+                  const errorPosition = parseInt(parseError.message.match(/position (\d+)/)?.[1] || "0");
+                  const contextStart = Math.max(0, errorPosition - 100);
+                  const contextEnd = Math.min(failedJson.length, errorPosition + 100);
+                  const errorContext = failedJson.substring(contextStart, contextEnd);
+                  
+                  console.log(`[NUTRI+] Contexto do erro (posição ${errorPosition}):`, errorContext);
+                  
+                  // Find the closest enclosing array or object
+                  let braceLevel = 0;
+                  let arrayLevel = 0;
+                  let lastArrayStart = -1;
+                  
+                  for (let i = 0; i < errorPosition; i++) {
+                    if (failedJson[i] === '{') braceLevel++;
+                    if (failedJson[i] === '}') braceLevel--;
+                    if (failedJson[i] === '[') {
+                      arrayLevel++;
+                      lastArrayStart = i;
+                    }
+                    if (failedJson[i] === ']') arrayLevel--;
+                  }
+                  
+                  // If error is in an array, try to fix it by closing the array
+                  if (arrayLevel > 0 && lastArrayStart !== -1) {
+                    const beforeError = failedJson.substring(0, lastArrayStart + 1);
+                    const afterError = failedJson.substring(errorPosition);
+                    
+                    // Create a simplified version with empty array
+                    const simplifiedJson = beforeError + "]" + afterError.substring(afterError.indexOf("]") + 1);
+                    
+                    try {
+                      const fixedMealPlan = JSON.parse(simplifiedJson);
+                      console.log("[NUTRI+] JSON corrigido com sucesso após reparo agressivo!");
+                      
+                      return new Response(
+                        JSON.stringify({
+                          mealPlan: fixedMealPlan.mealPlan,
+                          modelUsed: modelName,
+                          recovered: true,
+                          repaired: true
+                        }),
+                        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                      );
+                    } catch (finalError) {
+                      console.error("[NUTRI+] Todas as tentativas de reparo falharam:", finalError);
+                    }
+                  }
+                }
+              } catch (repairError) {
+                console.error("[NUTRI+] Erro durante reparo agressivo:", repairError);
+              }
             }
           }
         } catch (errorParseError) {
@@ -333,7 +409,23 @@ Por favor, crie um plano de 7 dias que:
         .replace(/"afternoon_snack":/g, '"afternoonSnack":')
         .replace(/"evening_snack":/g, '"eveningSnack":')
         .replace(/"pre_workout":/g, '"preWorkout":')
-        .replace(/"post_workout":/g, '"postWorkout":');
+        .replace(/"post_workout":/g, '"postWorkout":')
+        // Fix common issues with array commas
+        .replace(/,\s*\]/g, ']')         // Remove trailing commas in arrays
+        .replace(/,\s*\}/g, '}')         // Remove trailing commas in objects
+        .replace(/\.\.\.[\s\n]*\}/g, '}')  // Fix ellipsis in JSON
+        .replace(/\.\.\.[\s\n]*\]/g, ']'); // Fix ellipsis in JSON
+      
+      // Advanced fix for ... outros dias ... pattern which breaks the JSON
+      formattedContent = formattedContent.replace(/(\s*"[^"]+"\s*:\s*\{\s*\/\*[^*]*\*\/\s*\})(,\s*\/\*\s*\.\.\.\s*outros\s*dias\s*\.\.\.\s*\*\/)/g, 
+        (match, group1) => {
+          return group1;
+        }
+      );
+      
+      // Log size and a preview of the content
+      console.log(`[NUTRI+] Tamanho da resposta: ${formattedContent.length} caracteres`);
+      console.log(`[NUTRI+] Prévia da resposta: ${formattedContent.substring(0, 300)}...`);
       
       // Parse and validate the JSON response
       const mealPlanJson = JSON.parse(formattedContent);
@@ -444,6 +536,55 @@ Por favor, crie um plano de 7 dias que:
       // If the response is not valid JSON, log the error and return error response
       console.error("[NUTRI+] Erro ao analisar JSON:", jsonError);
       console.error("[NUTRI+] Resposta JSON inválida:", mealPlanContent.substring(0, 1000));
+      
+      // Try to repair JSON syntax
+      try {
+        // Locate the error
+        if (jsonError.message.includes("position")) {
+          const errorPosition = parseInt(jsonError.message.match(/position (\d+)/)?.[1] || "0");
+          const contextStart = Math.max(0, errorPosition - 100);
+          const contextEnd = Math.min(mealPlanContent.length, errorPosition + 100);
+          const errorContext = mealPlanContent.substring(contextStart, contextEnd);
+          
+          console.log(`[NUTRI+] Contexto do erro (posição ${errorPosition}):`, errorContext);
+          
+          // Attempt to repair the specific syntax issue
+          let repaired = mealPlanContent;
+          
+          // Common fixes for array and object closures
+          if (jsonError.message.includes("Expected ',' or ']' after array element")) {
+            // Simply try to remove problematic commas that might be breaking arrays
+            const part1 = repaired.substring(0, errorPosition);
+            const part2 = repaired.substring(errorPosition);
+            
+            // Close any unclosed arrays or objects
+            repaired = part1 + part2
+              .replace(/,\s*\]/g, ']')         // Remove trailing commas in arrays
+              .replace(/,\s*\}/g, '}');        // Remove trailing commas in objects
+              
+            try {
+              const repairedJson = JSON.parse(repaired);
+              console.log("[NUTRI+] JSON reparado com sucesso!");
+              
+              // Return the repaired JSON if it was successfully parsed
+              if (repairedJson.mealPlan && repairedJson.mealPlan.weeklyPlan) {
+                return new Response(
+                  JSON.stringify({ 
+                    mealPlan: repairedJson.mealPlan,
+                    modelUsed: modelName,
+                    repaired: true
+                  }),
+                  { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                );
+              }
+            } catch (repairError) {
+              console.error("[NUTRI+] Falha na tentativa de reparo:", repairError);
+            }
+          }
+        }
+      } catch (repairAttemptError) {
+        console.error("[NUTRI+] Erro na tentativa de reparo:", repairAttemptError);
+      }
       
       return new Response(
         JSON.stringify({ 
