@@ -1,14 +1,15 @@
 
 import { useState, useEffect, ChangeEvent } from "react";
-import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, Search } from "lucide-react";
-import { MealFood, ProtocolFood } from "../types";
-import { supabase } from "@/integrations/supabase/client";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+import { Loader2, Search } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { MealFood } from "../types";
 
 interface FoodReplacementDialogProps {
   open: boolean;
@@ -17,13 +18,14 @@ interface FoodReplacementDialogProps {
   dayKey: string;
   mealType: string;
   foodIndex: number;
-  onFoodReplaced: (
-    originalFood: MealFood,
-    newFood: MealFood,
-    dayKey: string,
-    mealType: string,
-    foodIndex: number
-  ) => void;
+  onFoodReplaced: (originalFood: MealFood, newFood: MealFood, dayKey: string, mealType: string, foodIndex: number) => void;
+}
+
+interface SuggestedFood {
+  name: string;
+  portion: number;
+  unit: string;
+  details: string;
 }
 
 export const FoodReplacementDialog = ({
@@ -35,209 +37,285 @@ export const FoodReplacementDialog = ({
   foodIndex,
   onFoodReplaced
 }: FoodReplacementDialogProps) => {
-  const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
-  const [suggestedFoods, setSuggestedFoods] = useState<ProtocolFood[]>([]);
-  const [selectedFood, setSelectedFood] = useState<ProtocolFood | null>(null);
-  const [customPreparation, setCustomPreparation] = useState(originalFood.details || "");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchResults, setSearchResults] = useState<SuggestedFood[]>([]);
+  const [suggestions, setSuggestions] = useState<SuggestedFood[]>([]);
+  const [selectedFood, setSelectedFood] = useState<string | null>(null);
+  const [customFood, setCustomFood] = useState<SuggestedFood>({
+    name: "",
+    portion: originalFood?.portion || 100,
+    unit: originalFood?.unit || "g",
+    details: ""
+  });
+  const [selectedOption, setSelectedOption] = useState<"suggestion" | "search" | "custom">("suggestion");
 
-  // Fetch alternative food suggestions
   useEffect(() => {
-    if (open) {
-      fetchSuggestedFoods();
+    if (open && originalFood) {
+      generateSuggestions();
+      setCustomFood({
+        name: "",
+        portion: originalFood.portion,
+        unit: originalFood.unit,
+        details: ""
+      });
     }
-  }, [open]);
+  }, [open, originalFood]);
 
-  const fetchSuggestedFoods = async () => {
+  const generateSuggestions = async () => {
+    if (!originalFood) return;
+    
+    setLoading(true);
     try {
-      setLoading(true);
-      
-      // Determine the meal type for API categorization
-      let mealTypeForAPI = "";
-      switch (mealType) {
-        case "breakfast": mealTypeForAPI = "breakfast"; break;
-        case "morningSnack": mealTypeForAPI = "morning_snack"; break;
-        case "lunch": mealTypeForAPI = "lunch"; break;
-        case "afternoonSnack": mealTypeForAPI = "afternoon_snack"; break;
-        case "dinner": mealTypeForAPI = "dinner"; break;
-        default: mealTypeForAPI = "any";
-      }
-
-      // Fetch alternative foods based on meal type
+      // Get similar foods from database
       const { data, error } = await supabase
-        .from('protocol_foods')
-        .select('*')
-        .contains('meal_type', [mealTypeForAPI])
-        .limit(10);
+        .from('foods')
+        .select('name, food_group_name')
+        .ilike('name', `%${originalFood.name.split(' ')[0]}%`)
+        .limit(5);
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
-      setSuggestedFoods(data || []);
+      const defaultSuggestions: SuggestedFood[] = [
+        {
+          name: `${originalFood.name} grelhado`,
+          portion: originalFood.portion,
+          unit: originalFood.unit,
+          details: `${originalFood.name} preparado na grelha com temperos naturais para realçar o sabor.`
+        },
+        {
+          name: `${originalFood.name} cozido`,
+          portion: originalFood.portion,
+          unit: originalFood.unit,
+          details: `${originalFood.name} cozido em água com ervas aromáticas para um sabor mais suave.`
+        },
+        {
+          name: `${originalFood.name} assado`,
+          portion: originalFood.portion,
+          unit: originalFood.unit,
+          details: `${originalFood.name} assado no forno com azeite e ervas para melhor preservar nutrientes.`
+        }
+      ];
+
+      // Add database suggestions
+      const dbSuggestions = data?.map(food => ({
+        name: food.name,
+        portion: originalFood.portion,
+        unit: originalFood.unit,
+        details: `${food.name} preparado de forma simples para manter suas propriedades nutricionais.`
+      })) || [];
+
+      // Combine and filter unique suggestions
+      const allSuggestions = [...defaultSuggestions, ...dbSuggestions];
+      const uniqueSuggestions = allSuggestions.filter(
+        (suggestion, index, self) => 
+          index === self.findIndex(s => s.name === suggestion.name)
+      );
+
+      setSuggestions(uniqueSuggestions.slice(0, 5));
+      setSelectedFood(uniqueSuggestions[0]?.name || null);
     } catch (error) {
-      console.error("Erro ao buscar alimentos alternativos:", error);
-      toast.error("Erro ao buscar sugestões de alimentos");
+      console.error("Erro ao gerar sugestões:", error);
+      toast.error("Não foi possível carregar as sugestões de substituição.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSearch = async () => {
-    if (!searchTerm.trim()) {
-      toast.error("Digite um termo para buscar");
-      return;
-    }
-
+  const searchFoods = async () => {
+    if (!searchTerm.trim()) return;
+    
+    setLoading(true);
     try {
-      setLoading(true);
-      
-      // Search foods by name
       const { data, error } = await supabase
-        .from('protocol_foods')
-        .select('*')
+        .from('foods')
+        .select('name')
         .ilike('name', `%${searchTerm}%`)
-        .limit(10);
+        .limit(5);
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
-      setSuggestedFoods(data || []);
-      
-      if (data && data.length === 0) {
-        toast.info("Nenhum alimento encontrado com esse termo");
+      const foods = data?.map(food => ({
+        name: food.name,
+        portion: originalFood.portion,
+        unit: originalFood.unit,
+        details: `${food.name} preparado de forma a preservar suas propriedades nutricionais.`
+      })) || [];
+
+      setSearchResults(foods);
+      if (foods.length > 0) {
+        setSelectedFood(foods[0].name);
       }
     } catch (error) {
-      console.error("Erro na busca de alimentos:", error);
+      console.error("Erro na busca:", error);
       toast.error("Erro ao buscar alimentos");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSelectFood = (food: ProtocolFood) => {
-    setSelectedFood(food);
-    // Initialize with default preparation instructions
-    setCustomPreparation(`Prepare ${food.name} conforme sua preferência.`);
-  };
+  const handleReplace = () => {
+    let newFood: MealFood;
 
-  const handleReplaceFood = () => {
-    if (!selectedFood) {
-      toast.error("Selecione um alimento para substituir");
-      return;
+    if (selectedOption === "suggestion" || selectedOption === "search") {
+      const foodList = selectedOption === "suggestion" ? suggestions : searchResults;
+      const selected = foodList.find(f => f.name === selectedFood);
+      
+      if (!selected) {
+        toast.error("Por favor, selecione um alimento para substituição.");
+        return;
+      }
+      
+      newFood = {
+        name: selected.name,
+        portion: selected.portion,
+        unit: selected.unit,
+        details: selected.details
+      };
+    } else {
+      // Custom food option
+      if (!customFood.name.trim()) {
+        toast.error("Por favor, informe o nome do alimento.");
+        return;
+      }
+      
+      newFood = {
+        name: customFood.name,
+        portion: customFood.portion,
+        unit: customFood.unit,
+        details: customFood.details || `${customFood.name} preparado conforme sua preferência pessoal.`
+      };
     }
-
-    // Create new food object with selected food data
-    const newFood: MealFood = {
-      name: selectedFood.name,
-      portion: selectedFood.portion_size || 100,
-      unit: selectedFood.portion_unit || "g",
-      details: customPreparation
-    };
 
     onFoodReplaced(originalFood, newFood, dayKey, mealType, foodIndex);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Substituir Alimento</DialogTitle>
+          <DialogDescription>
+            Substituir {originalFood?.name} por outro alimento similar
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div>
-            <h3 className="text-sm font-medium mb-2">Alimento Atual:</h3>
-            <Card>
-              <CardContent className="p-4">
-                <p className="font-semibold">{originalFood.name}</p>
-                <p className="text-sm text-gray-600">{originalFood.portion} {originalFood.unit}</p>
-                <p className="text-sm mt-2">{originalFood.details}</p>
-              </CardContent>
-            </Card>
-          </div>
+        <div className="space-y-4 my-4">
+          <RadioGroup value={selectedOption} onValueChange={(value) => setSelectedOption(value as "suggestion" | "search" | "custom")}>
+            <div className="flex items-center space-x-2 mb-2">
+              <RadioGroupItem value="suggestion" id="suggestion" />
+              <Label htmlFor="suggestion">Usar uma sugestão</Label>
+            </div>
 
-          <div className="flex items-center space-x-2">
-            <Input
-              placeholder="Buscar alimento..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            />
-            <Button onClick={handleSearch} disabled={loading}>
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-            </Button>
-          </div>
-
-          <div>
-            <h3 className="text-sm font-medium mb-2">Sugestões de alimentos alternativos:</h3>
-            {loading ? (
-              <div className="flex justify-center p-4">
-                <Loader2 className="h-6 w-6 animate-spin" />
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {suggestedFoods.map((food) => (
-                  <Card 
-                    key={food.id}
-                    className={`cursor-pointer hover:bg-gray-50 transition-colors ${
-                      selectedFood?.id === food.id ? 'border-primary border-2' : ''
-                    }`}
-                    onClick={() => handleSelectFood(food)}
-                  >
-                    <CardContent className="p-3">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <p className="font-medium">{food.name}</p>
-                          <p className="text-xs text-gray-500">
-                            {food.calories} kcal | P: {food.protein}g | C: {food.carbs}g | G: {food.fats}g
-                          </p>
-                        </div>
-                        <div>
-                          <span className="text-sm bg-primary/10 text-primary px-2 py-1 rounded">
-                            {food.portion_size || 100}{food.portion_unit || 'g'}
-                          </span>
-                        </div>
+            {selectedOption === "suggestion" && (
+              <div className="ml-6 space-y-2">
+                {loading ? (
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  </div>
+                ) : suggestions.length > 0 ? (
+                  <RadioGroup value={selectedFood || ""} onValueChange={setSelectedFood}>
+                    {suggestions.map((food, index) => (
+                      <div key={index} className="flex items-center space-x-2">
+                        <RadioGroupItem value={food.name} id={`suggestion-${index}`} />
+                        <Label htmlFor={`suggestion-${index}`}>{food.name}</Label>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
-                {suggestedFoods.length === 0 && !loading && (
-                  <p className="text-center text-gray-500 py-4">
-                    Nenhum alimento encontrado. Tente uma busca diferente.
-                  </p>
+                    ))}
+                  </RadioGroup>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Nenhuma sugestão disponível.</p>
                 )}
               </div>
             )}
-          </div>
 
-          {selectedFood && (
-            <div>
-              <h3 className="text-sm font-medium mb-2">Modo de preparo personalizado:</h3>
-              <Textarea
-                className="min-h-[80px]"
-                value={customPreparation}
-                onChange={(e) => setCustomPreparation(e.target.value)}
-                placeholder="Descreva como preparar este alimento..."
-              />
+            <div className="flex items-center space-x-2 mb-2 mt-4">
+              <RadioGroupItem value="search" id="search" />
+              <Label htmlFor="search">Buscar um alimento</Label>
             </div>
-          )}
+
+            {selectedOption === "search" && (
+              <div className="ml-6 space-y-2">
+                <div className="flex items-center space-x-2">
+                  <Input
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Digite o nome do alimento"
+                    className="flex-1"
+                  />
+                  <Button type="button" size="icon" onClick={searchFoods} disabled={loading}>
+                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                  </Button>
+                </div>
+
+                {searchResults.length > 0 && (
+                  <RadioGroup value={selectedFood || ""} onValueChange={setSelectedFood} className="mt-2">
+                    {searchResults.map((food, index) => (
+                      <div key={index} className="flex items-center space-x-2">
+                        <RadioGroupItem value={food.name} id={`search-${index}`} />
+                        <Label htmlFor={`search-${index}`}>{food.name}</Label>
+                      </div>
+                    ))}
+                  </RadioGroup>
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center space-x-2 mb-2 mt-4">
+              <RadioGroupItem value="custom" id="custom" />
+              <Label htmlFor="custom">Adicionar manualmente</Label>
+            </div>
+
+            {selectedOption === "custom" && (
+              <div className="ml-6 space-y-3">
+                <div>
+                  <Label htmlFor="food-name">Nome do alimento</Label>
+                  <Input
+                    id="food-name"
+                    value={customFood.name}
+                    onChange={(e) => setCustomFood({ ...customFood, name: e.target.value })}
+                    placeholder="Ex: Frango grelhado"
+                  />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label htmlFor="food-portion">Porção</Label>
+                    <Input
+                      id="food-portion"
+                      type="number"
+                      value={customFood.portion}
+                      onChange={(e) => setCustomFood({ ...customFood, portion: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="food-unit">Unidade</Label>
+                    <Input
+                      id="food-unit"
+                      value={customFood.unit}
+                      onChange={(e) => setCustomFood({ ...customFood, unit: e.target.value })}
+                      placeholder="Ex: g, ml, unidade"
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <Label htmlFor="food-details">Instruções de preparo</Label>
+                  <Textarea
+                    id="food-details"
+                    value={customFood.details}
+                    onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setCustomFood({ ...customFood, details: e.target.value })}
+                    placeholder="Descreva como o alimento deve ser preparado"
+                    className="min-h-20"
+                  />
+                </div>
+              </div>
+            )}
+          </RadioGroup>
         </div>
 
-        <DialogFooter className="mt-4">
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-          >
-            Cancelar
-          </Button>
-          <Button
-            onClick={handleReplaceFood}
-            disabled={!selectedFood}
-          >
-            Substituir Alimento
-          </Button>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button onClick={handleReplace} disabled={loading}>Substituir</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
