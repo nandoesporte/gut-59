@@ -1,187 +1,145 @@
-
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronRight, AlertCircle, Wind, Brain, MessageSquare } from "lucide-react";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { useState, useEffect } from 'react';
+import { Card } from '@/components/ui/card';
+import { supabase } from '@/integrations/supabase/client';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { BarChart, Calendar, Clock } from 'lucide-react';
+import { EmotionTracker } from './EmotionTracker';
+import { BreathingExercises } from './BreathingExercises';
+import { MentalHealthProgress } from './MentalHealthProgress';
 
 interface EmotionLog {
+  id: string;
   emotion: string;
   created_at: string;
+  user_id: string;
 }
 
-export const MentalHealthSummary = () => {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [latestEmotion, setLatestEmotion] = useState<EmotionLog | null>(null);
-  const navigate = useNavigate();
+interface BreathingSession {
+  id: string;
+  duration: number;
+  technique: string;
+  created_at: string;
+  user_id: string;
+}
+
+interface ChatMessage {
+  id: string;
+  content: string;
+  role: 'user' | 'assistant';
+  created_at: string;
+  user_id: string;
+}
+
+export function MentalHealthSummary() {
+  const [emotionLogs, setEmotionLogs] = useState<EmotionLog[]>([]);
+  const [lastSession, setLastSession] = useState<BreathingSession | null>(null);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [activeTab, setActiveTab] = useState('tracker');
 
   useEffect(() => {
-    const fetchMentalHealthData = async () => {
-      try {
-        setLoading(true);
+    const fetchData = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      // Fetch emotion logs
+      const { data: emotions } = await supabase
+        .from('emotion_logs')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
         
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        // Fetch the latest emotion log
-        const { data: emotions, error: emotionsError } = await supabase
-          .from('emotion_logs')
-          .select('emotion, created_at')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(1);
-
-        if (emotionsError) throw emotionsError;
-        setLatestEmotion(emotions?.[0] || null);
-      } catch (error) {
-        console.error('Error fetching mental health data:', error);
-        setError('Não foi possível carregar os dados de saúde mental.');
-      } finally {
-        setLoading(false);
+      if (emotions) {
+        setEmotionLogs(emotions);
       }
+      
+      // We'll add these tables in a future migration to avoid deadlocks
+      // For now we'll comment these out
+      /*
+      // Fetch last breathing session
+      const { data: session } = await supabase
+        .from('breathing_sessions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+        
+      if (session) {
+        setLastSession(session);
+      }
+      
+      // Fetch chat history
+      const { data: chat } = await supabase
+        .from('mental_chat_messages')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+        
+      if (chat) {
+        setChatHistory(chat);
+      }
+      */
     };
-
-    fetchMentalHealthData();
+    
+    fetchData();
   }, []);
 
-  const handleNavigateToMental = () => {
-    navigate('/mental');
-  };
-
-  const formatDate = (dateString: string) => {
-    return format(new Date(dateString), "d 'de' MMMM 'de' yyyy", { locale: ptBR });
-  };
-
-  const getEmotionLabel = (emotionId: string) => {
-    const emotions: Record<string, string> = {
-      'happy': 'Muito Feliz',
-      'good': 'Bem',
-      'neutral': 'Neutro',
-      'sad': 'Triste',
-      'angry': 'Irritado'
-    };
-    return emotions[emotionId] || emotionId;
-  };
-
-  const getEmotionColor = (emotionId: string) => {
-    const colors: Record<string, string> = {
-      'happy': 'text-green-500',
-      'good': 'text-blue-500',
-      'neutral': 'text-yellow-500',
-      'sad': 'text-purple-500',
-      'angry': 'text-red-500'
-    };
-    return colors[emotionId] || 'text-gray-500';
-  };
-
-  if (loading) {
-    return (
-      <Card className="w-full">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <Skeleton className="h-8 w-40" />
-            <Skeleton className="h-8 w-24" />
-          </div>
-          <div className="space-y-4">
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-16 w-full" />
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card className="w-full bg-red-50">
-        <CardContent className="p-6">
-          <div className="flex items-center space-x-2 text-red-600">
-            <AlertCircle size={20} />
-            <p>{error}</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // If there's no mental health data yet
-  if (!latestEmotion) {
-    return (
-      <Card className="w-full">
-        <CardContent className="p-6">
-          <div className="text-center space-y-4">
-            <h3 className="text-lg font-medium flex items-center justify-center gap-2">
-              <Brain className="h-5 w-5 text-indigo-500" />
-              Saúde Mental
-            </h3>
-            <p className="text-gray-600">
-              Você ainda não possui dados de saúde mental registrados.
-            </p>
-            <Button onClick={handleNavigateToMental} className="w-full sm:w-auto">
-              Começar minha jornada mental
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
-    <Card className="w-full overflow-hidden">
-      <div className="bg-indigo-50 px-6 py-4 flex items-center justify-between">
-        <h3 className="text-lg font-semibold flex items-center gap-2">
-          <Brain className="h-5 w-5 text-indigo-600" />
-          Saúde Mental
-        </h3>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={handleNavigateToMental}
-          className="text-sm"
-        >
-          Ver detalhes
-          <ChevronRight className="h-4 w-4 ml-1" />
-        </Button>
+    <Card className="p-4 sm:p-6">
+      <div className="mb-4">
+        <h2 className="text-xl font-semibold text-gray-900">Saúde Mental</h2>
+        <p className="text-sm text-gray-500">Acompanhe seu progresso emocional e mental</p>
       </div>
       
-      <CardContent className="p-0">
-        <div className="divide-y divide-gray-100">
-          {latestEmotion && (
-            <div className="p-4 flex items-center">
-              <div className="bg-indigo-100 p-3 rounded-full mr-4">
-                <MessageSquare className="h-6 w-6 text-indigo-500" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-500">Seu humor recente</p>
-                <p className={`text-xl font-bold ${getEmotionColor(latestEmotion.emotion)}`}>
-                  {getEmotionLabel(latestEmotion.emotion)}
-                </p>
-                <p className="text-sm text-gray-500">
-                  {formatDate(latestEmotion.created_at)}
-                </p>
-              </div>
-            </div>
-          )}
-
-          <div className="p-4 flex items-center">
-            <div className="bg-purple-100 p-3 rounded-full mr-4">
-              <Brain className="h-6 w-6 text-purple-500" />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-gray-500">Acompanhamento Mental</p>
-              <p className="text-lg font-semibold">Explore recursos para sua saúde mental</p>
-              <p className="text-sm text-indigo-600 hover:text-indigo-800 cursor-pointer" onClick={handleNavigateToMental}>
-                Acessar área mental
-              </p>
-            </div>
-          </div>
-        </div>
-      </CardContent>
+      <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid grid-cols-3 mb-4">
+          <TabsTrigger value="tracker" className="flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            <span className="hidden sm:inline">Rastreador</span>
+          </TabsTrigger>
+          <TabsTrigger value="breathing" className="flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            <span className="hidden sm:inline">Respiração</span>
+          </TabsTrigger>
+          <TabsTrigger value="progress" className="flex items-center gap-2">
+            <BarChart className="h-4 w-4" />
+            <span className="hidden sm:inline">Progresso</span>
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="tracker">
+          <EmotionTracker emotions={emotionLogs} />
+        </TabsContent>
+        
+        <TabsContent value="breathing">
+          <BreathingExercises lastSession={lastSession} />
+        </TabsContent>
+        
+        <TabsContent value="progress">
+          <MentalHealthProgress emotions={emotionLogs} chatHistory={chatHistory} />
+        </TabsContent>
+      </Tabs>
     </Card>
   );
-};
+}
+
+// Stub components that would be implemented separately
+function EmotionTracker({ emotions }: { emotions: EmotionLog[] }) {
+  return <div>Emotion Tracker Component (implement separately)</div>;
+}
+
+function BreathingExercises({ lastSession }: { lastSession: BreathingSession | null }) {
+  return <div>Breathing Exercises Component (implement separately)</div>;
+}
+
+function MentalHealthProgress({ 
+  emotions, 
+  chatHistory 
+}: { 
+  emotions: EmotionLog[];
+  chatHistory: ChatMessage[];
+}) {
+  return <div>Mental Health Progress Component (implement separately)</div>;
+}

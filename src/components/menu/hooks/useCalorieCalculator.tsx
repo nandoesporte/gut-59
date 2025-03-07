@@ -2,13 +2,15 @@
 import { useState } from "react";
 import { toast } from "sonner";
 
+export type Goal = "weight_loss" | "maintenance" | "muscle_gain";
+
 export interface CalorieCalculatorForm {
   age: string;
   weight: string;
   height: string;
   gender: "male" | "female";
   activityLevel: string;
-  goal: string;
+  goal: Goal;
 }
 
 export const useCalorieCalculator = () => {

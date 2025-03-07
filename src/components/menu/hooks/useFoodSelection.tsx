@@ -77,9 +77,10 @@ export const useFoodSelection = () => {
     };
 
     foods.forEach(food => {
-      if (!food.meal_type || food.meal_type.length === 0 || food.meal_type.includes('any')) {
+      if (!food.meal_type || food.meal_type.length === 0 || 
+          (Array.isArray(food.meal_type) && food.meal_type.includes('any'))) {
         foodsByType.any.push(food);
-      } else {
+      } else if (Array.isArray(food.meal_type)) {
         food.meal_type.forEach(type => {
           if (type in foodsByType) {
             foodsByType[type].push(food);
