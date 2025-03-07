@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { MealPlan, ProtocolFood } from "../types";
 import { useMealPlanGeneration } from "./useMealPlanGeneration";
-import { useCalorieCalculator, CalorieCalculatorForm } from "./useCalorieCalculator";
+import { useCalorieCalculator, CalorieCalculatorForm, Goal } from "./useCalorieCalculator";
 import { useFoodSelection } from "./useFoodSelection";
 import { usePaymentHandling } from "./usePaymentHandling";
 import { useUserWallet } from '@/hooks/use-wallet';
@@ -102,7 +102,7 @@ export const useMenuController = () => {
             height: nutritionPrefs.height?.toString() || "",
             gender: nutritionPrefs.gender as "male" | "female" || "male",
             activityLevel: nutritionPrefs.activity_level || "moderate",
-            goal: nutritionPrefs.goal || "maintenance"
+            goal: mapDatabaseGoalToLocalGoal(nutritionPrefs.goal)
           });
         }
         
@@ -130,14 +130,42 @@ export const useMenuController = () => {
     
     loadUserPreferences();
   }, []);
+
+  // Helper to map database goal format to local Goal type format
+  const mapDatabaseGoalToLocalGoal = (dbGoal: string | null): Goal => {
+    switch (dbGoal) {
+      case "lose_weight":
+        return "weight_loss";
+      case "gain_mass":
+        return "muscle_gain";
+      case "maintain":
+      case "maintenance":
+      default:
+        return "maintenance";
+    }
+  };
   
-  const handleConfirmFoodSelection = () => {
+  // Helper to map local Goal type format to database format
+  const mapLocalGoalToDatabaseGoal = (localGoal: Goal): string => {
+    switch (localGoal) {
+      case "weight_loss":
+        return "lose_weight";
+      case "muscle_gain":
+        return "gain_mass";
+      case "maintenance":
+      default:
+        return "maintain";
+    }
+  };
+  
+  const handleConfirmFoodSelection = (): Promise<boolean> => {
     if (selectedFoods.length < 5) {
       toast.error("Por favor, selecione pelo menos 5 alimentos");
-      return;
+      return Promise.resolve(false);
     }
     
     setCurrentStep(3);
+    return Promise.resolve(true);
   };
   
   const handleDietaryPreferences = async (preferences: typeof dietaryPreferences) => {
@@ -156,6 +184,8 @@ export const useMenuController = () => {
         });
         
         // Save nutrition preferences
+        const foodIds = selectedFoods.map(food => food.id);
+        
         await supabase.rpc('update_nutrition_preferences', {
           p_user_id: user.id,
           p_data: {
@@ -164,9 +194,9 @@ export const useMenuController = () => {
             age: parseInt(formData.age),
             gender: formData.gender,
             activity_level: formData.activityLevel,
-            goal: formData.goal,
+            goal: mapLocalGoalToDatabaseGoal(formData.goal),
             calories_needed: calorieNeeds,
-            selected_foods: selectedFoods.map(food => food.id)
+            selected_foods: foodIds
           }
         });
       }
@@ -178,9 +208,11 @@ export const useMenuController = () => {
         }
       });
       
+      return true;
     } catch (error) {
       console.error("Error saving dietary preferences:", error);
       toast.error("Erro ao salvar preferências dietéticas");
+      return false;
     }
   };
   
@@ -192,9 +224,11 @@ export const useMenuController = () => {
         selectedFoods,
         dietaryPreferences
       });
+      return true;
     } catch (error) {
       console.error("Error generating meal plan:", error);
       toast.error("Erro ao gerar plano alimentar");
+      return false;
     }
   };
   

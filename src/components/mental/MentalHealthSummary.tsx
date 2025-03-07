@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,26 +15,8 @@ interface EmotionLog {
   user_id: string;
 }
 
-interface BreathingSession {
-  id: string;
-  duration: number;
-  technique: string;
-  created_at: string;
-  user_id: string;
-}
-
-interface ChatMessage {
-  id: string;
-  content: string;
-  role: 'user' | 'assistant';
-  created_at: string;
-  user_id: string;
-}
-
 export function MentalHealthSummary() {
   const [emotionLogs, setEmotionLogs] = useState<EmotionLog[]>([]);
-  const [lastSession, setLastSession] = useState<BreathingSession | null>(null);
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [activeTab, setActiveTab] = useState('tracker');
 
   useEffect(() => {
@@ -52,35 +35,6 @@ export function MentalHealthSummary() {
       if (emotions) {
         setEmotionLogs(emotions);
       }
-      
-      // We'll add these tables in a future migration to avoid deadlocks
-      // For now we'll comment these out
-      /*
-      // Fetch last breathing session
-      const { data: session } = await supabase
-        .from('breathing_sessions')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-        
-      if (session) {
-        setLastSession(session);
-      }
-      
-      // Fetch chat history
-      const { data: chat } = await supabase
-        .from('mental_chat_messages')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
-        
-      if (chat) {
-        setChatHistory(chat);
-      }
-      */
     };
     
     fetchData();
@@ -114,32 +68,13 @@ export function MentalHealthSummary() {
         </TabsContent>
         
         <TabsContent value="breathing">
-          <BreathingExercises lastSession={lastSession} />
+          <BreathingExercises lastSession={null} />
         </TabsContent>
         
         <TabsContent value="progress">
-          <MentalHealthProgress emotions={emotionLogs} chatHistory={chatHistory} />
+          <MentalHealthProgress emotions={emotionLogs} chatHistory={[]} />
         </TabsContent>
       </Tabs>
     </Card>
   );
-}
-
-// Stub components that would be implemented separately
-function EmotionTracker({ emotions }: { emotions: EmotionLog[] }) {
-  return <div>Emotion Tracker Component (implement separately)</div>;
-}
-
-function BreathingExercises({ lastSession }: { lastSession: BreathingSession | null }) {
-  return <div>Breathing Exercises Component (implement separately)</div>;
-}
-
-function MentalHealthProgress({ 
-  emotions, 
-  chatHistory 
-}: { 
-  emotions: EmotionLog[];
-  chatHistory: ChatMessage[];
-}) {
-  return <div>Mental Health Progress Component (implement separately)</div>;
 }

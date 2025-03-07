@@ -2,33 +2,32 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-export interface UserProfile {
+interface UserProfile {
   id: string;
-  name?: string;
-  email?: string;
-  photo_url?: string;
-  weight?: number;
-  height?: number;
-  age?: number;
-  health_conditions?: string;
-  daily_water_goal_ml?: number;
+  name: string | null;
+  email: string | null;
+  age: number | null;
+  weight: number | null;
+  height: number | null;
+  photo_url: string | null;
+  health_conditions: string | null;
+  daily_water_goal_ml: number | null;
 }
 
 export const useUserProfile = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        setIsLoading(true);
+        setLoading(true);
         
         const { data: { user } } = await supabase.auth.getUser();
         
         if (!user) {
-          setProfile(null);
-          return;
+          throw new Error('User not authenticated');
         }
         
         const { data, error } = await supabase
@@ -36,29 +35,22 @@ export const useUserProfile = () => {
           .select('*')
           .eq('id', user.id)
           .single();
-          
-        if (error) throw error;
+        
+        if (error) {
+          throw error;
+        }
         
         setProfile(data);
       } catch (err) {
-        console.error('Error fetching profile:', err);
-        setError(err instanceof Error ? err : new Error('Unknown error occurred'));
+        console.error('Error fetching user profile:', err);
+        setError(err instanceof Error ? err : new Error('Unknown error'));
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
     
     fetchProfile();
-    
-    // Set up a listener for auth state changes
-    const { data: authListener } = supabase.auth.onAuthStateChange(() => {
-      fetchProfile();
-    });
-    
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
   }, []);
-  
-  return { profile, isLoading, error };
+
+  return { profile, loading, error };
 };

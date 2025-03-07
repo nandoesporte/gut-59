@@ -1,24 +1,44 @@
 
-import { useWalletQuery, useTransactionsQuery } from './wallet/queries';
-import { useWalletMutations } from './wallet/mutations';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
-export const useWallet = () => {
-  const walletQuery = useWalletQuery();
-  const transactionsQuery = useTransactionsQuery(walletQuery.data?.id);
-  const mutations = useWalletMutations(walletQuery.data?.id);
+export const useUserWallet = () => {
+  const [wallet, setWallet] = useState<{ balance: number, id: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
 
-  return {
-    wallet: walletQuery.data ? {
-      ...walletQuery.data,
-      balance: walletQuery.data.balance
-    } : null,
-    transactions: transactionsQuery.data,
-    isLoading: walletQuery.isLoading || transactionsQuery.isLoading,
-    addTransaction: mutations.addTransaction.mutate,
-    createTransferQRCode: mutations.createQRCode.mutateAsync,
-    redeemQRCode: mutations.redeemQRCode.mutate
-  };
+  useEffect(() => {
+    const fetchWallet = async () => {
+      try {
+        setLoading(true);
+        
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) {
+          throw new Error('User not authenticated');
+        }
+        
+        const { data, error } = await supabase
+          .from('wallets')
+          .select('id, balance')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (error) {
+          throw error;
+        }
+        
+        setWallet(data);
+      } catch (err) {
+        console.error('Error fetching wallet:', err);
+        setError(err instanceof Error ? err : new Error('Unknown error'));
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchWallet();
+  }, []);
+
+  return { wallet, loading, error };
 };
-
-// Re-export as useUserWallet to match the import in useMenuController
-export const useUserWallet = useWallet;

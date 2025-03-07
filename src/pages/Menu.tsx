@@ -81,11 +81,11 @@ const Menu = () => {
   const handleRefreshMealPlan = async () => {
     try {
       toast.info("Funcionalidade de atualização em desenvolvimento");
-      return Promise.resolve(true);
+      return true;
     } catch (error) {
       console.error('Erro ao atualizar cardápio:', error);
       toast.error("Erro ao atualizar o cardápio");
-      return Promise.reject(error);
+      return false;
     }
   };
 

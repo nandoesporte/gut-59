@@ -11,7 +11,7 @@ import { FOOD_GROUP_MAP } from "./hooks/useProtocolFoods";
 
 interface FoodSelectorProps {
   protocolFoods: ProtocolFood[];
-  selectedFoods: string[];
+  selectedFoods: ProtocolFood[];
   onFoodSelection: (foodId: string, food?: ProtocolFood) => void;
   totalCalories: number;
   onBack: () => void;
@@ -28,7 +28,7 @@ const MealSection = ({
   title: string;
   icon: React.ReactNode;
   foods: ProtocolFood[];
-  selectedFoods: string[];
+  selectedFoods: ProtocolFood[];
   onFoodSelection: (foodId: string, food?: ProtocolFood) => void;
 }) => (
   <Card className="p-6 space-y-4 shadow-lg hover:shadow-xl transition-shadow">
@@ -43,11 +43,11 @@ const MealSection = ({
         foods.map((food) => (
           <Button
             key={food.id}
-            variant={selectedFoods.includes(food.id) ? "default" : "outline"}
+            variant={selectedFoods.some(f => f.id === food.id) ? "default" : "outline"}
             onClick={() => onFoodSelection(food.id, food)}
             className={`
               h-auto py-3 px-4 w-full text-left justify-start
-              ${selectedFoods.includes(food.id)
+              ${selectedFoods.some(f => f.id === food.id)
                 ? 'bg-green-100 border-green-500 text-green-700 hover:bg-green-200 hover:text-green-800'
                 : 'hover:bg-green-50 hover:border-green-200'}
             `}
