@@ -80,6 +80,7 @@ export const NutritionSummary = () => {
   const getGoalLabel = (goal: string) => {
     const goals: Record<string, string> = {
       'weight_loss': 'Perda de peso',
+      'lose_weight': 'Perda de peso',
       'weight_gain': 'Ganho de peso',
       'muscle_gain': 'Ganho de massa muscular',
       'maintenance': 'Manutenção do peso',
