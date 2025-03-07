@@ -170,7 +170,7 @@ export const NutritionSummary = () => {
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-gray-500">Necessidade calórica diária</p>
-                  <p className="text-xl font-bold">{nutritionPreference.calories_needed} kcal</p>
+                  <p className="text-xl font-bold">{latestMealPlan ? latestMealPlan.calories : nutritionPreference.calories_needed} kcal</p>
                 </div>
               </div>
 
