@@ -5,10 +5,12 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import type { CalorieCalculatorForm } from "../CalorieCalculator";
 
+// Update Goal type to match the database enum values
 export type Goal = "lose" | "maintain" | "gain";
 
 type NutritionPreference = Database['public']['Tables']['nutrition_preferences']['Insert'];
 
+// This function maps our UI goals to the database enum values
 const mapGoalToEnum = (goal: string): Database['public']['Enums']['nutritional_goal'] => {
   const goalMap: Record<string, Database['public']['Enums']['nutritional_goal']> = {
     'lose': 'lose_weight',
