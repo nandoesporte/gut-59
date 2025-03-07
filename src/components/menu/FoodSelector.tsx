@@ -359,7 +359,7 @@ export const FoodSelector = ({
         </p>
         <Button 
           onClick={handleConfirm}
-          className="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 text-lg font-bold rounded-md shadow-sm"
+          className="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 text-base sm:text-lg font-bold rounded-md shadow-sm w-full sm:w-auto"
           size="lg"
           disabled={isConfirming}
         >
@@ -367,23 +367,23 @@ export const FoodSelector = ({
         </Button>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t py-4 px-4 md:px-8 shadow-md z-10">
-        <div className="max-w-4xl mx-auto flex justify-between items-center gap-4">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t py-3 px-3 md:px-8 shadow-md z-10">
+        <div className="max-w-4xl mx-auto flex justify-between items-center gap-2 sm:gap-4">
           <Button 
             variant="outline" 
             onClick={onBack}
-            className="shrink-0"
+            className="shrink-0 text-xs sm:text-sm"
             disabled={isConfirming}
           >
             Voltar
           </Button>
           <Button 
             onClick={handleConfirm}
-            className="flex-1 bg-green-500 hover:bg-green-600 text-white max-w-sm font-semibold animate-pulse"
-            size="lg"
+            className="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold text-xs sm:text-sm rounded-md"
+            size="default"
             disabled={isConfirming}
           >
-            {isConfirming ? "Processando..." : `Confirmar Seleção (${selectedFoods.length} alimentos)`}
+            {isConfirming ? "Processando..." : `Confirmar (${selectedFoods.length})`}
           </Button>
         </div>
       </div>

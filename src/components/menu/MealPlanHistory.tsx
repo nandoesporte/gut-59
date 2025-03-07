@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -62,7 +61,6 @@ export const MealPlanHistory = () => {
 
       if (error) throw error;
 
-      // Type guard and transform the raw data
       const validPlans = (data as RawMealPlan[]).reduce<StoredMealPlan[]>((acc, plan) => {
         if (validateMealPlan(plan.plan_data)) {
           acc.push({
@@ -145,12 +143,12 @@ export const MealPlanHistory = () => {
                     Média diária: {Math.round(plan.calories)} kcal
                   </p>
                 </div>
-                <div className="flex gap-2 w-full sm:w-auto">
+                <div className="flex flex-wrap gap-2 w-full sm:w-auto justify-start">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handleViewDetails(plan)}
-                    className="flex-1 sm:flex-initial justify-center"
+                    className="flex-1 sm:flex-initial justify-center min-w-[80px]"
                   >
                     <Eye className="w-4 h-4 mr-2" />
                     <span className="sm:inline">Detalhes</span>
@@ -159,7 +157,7 @@ export const MealPlanHistory = () => {
                     variant="outline"
                     size="sm"
                     onClick={() => handleDownload(plan)}
-                    className="flex-1 sm:flex-initial justify-center"
+                    className="flex-1 sm:flex-initial justify-center min-w-[80px]"
                   >
                     <Download className="w-4 h-4 mr-2" />
                     <span className="sm:inline">Baixar PDF</span>
@@ -168,7 +166,7 @@ export const MealPlanHistory = () => {
                     variant="outline"
                     size="sm"
                     onClick={() => setDeleteId(plan.id)}
-                    className="flex-1 sm:flex-initial justify-center text-red-500 hover:text-red-600"
+                    className="flex-1 sm:flex-initial justify-center min-w-[80px] text-red-500 hover:text-red-600"
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
                     <span className="sm:inline">Excluir</span>
@@ -181,18 +179,18 @@ export const MealPlanHistory = () => {
       )}
 
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-[95%] sm:max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
             <AlertDialogDescription>
               Tem certeza que deseja excluir este plano alimentar? Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel className="w-full sm:w-auto mt-0">Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteId && handleDelete(deleteId)}
-              className="bg-red-500 hover:bg-red-600"
+              className="bg-red-500 hover:bg-red-600 w-full sm:w-auto"
             >
               Excluir
             </AlertDialogAction>
@@ -208,7 +206,6 @@ export const MealPlanHistory = () => {
           onClose={() => {
             setViewPlanId(null);
             setViewPlanData(null);
-            // Refresh plans after closing to get any updates
             fetchPlans();
           }}
         />
