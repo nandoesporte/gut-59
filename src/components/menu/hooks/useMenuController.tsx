@@ -60,7 +60,6 @@ export const useMenuController = () => {
     });
   };
 
-  // Define scrollToElement at the beginning to avoid reference errors
   const scrollToElement = (elementId: string) => {
     setTimeout(() => {
       const element = document.getElementById(elementId);

@@ -236,7 +236,7 @@ export const FoodSelector = ({
   }
 
   return (
-    <div className="space-y-8 w-full pb-24">
+    <div className="space-y-8 w-full pb-24" id="food-preferences-section">
       <div className="text-center space-y-3">
         <h2 className="text-2xl font-semibold text-gray-900">Opções de Preferência dos Alimentos</h2>
         <p className="text-gray-600 max-w-2xl mx-auto">
