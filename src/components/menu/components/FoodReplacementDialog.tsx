@@ -69,8 +69,8 @@ export const FoodReplacementDialog = ({
     try {
       // Get similar foods from database
       const { data, error } = await supabase
-        .from('foods')
-        .select('name, food_group_name')
+        .from('protocol_foods')
+        .select('name, food_group_id')
         .ilike('name', `%${originalFood.name.split(' ')[0]}%`)
         .limit(5);
 
@@ -128,7 +128,7 @@ export const FoodReplacementDialog = ({
     setLoading(true);
     try {
       const { data, error } = await supabase
-        .from('foods')
+        .from('protocol_foods')
         .select('name')
         .ilike('name', `%${searchTerm}%`)
         .limit(5);
