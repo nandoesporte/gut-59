@@ -1,3 +1,4 @@
+
 import { Card } from "@/components/ui/card";
 import { InitialMenuContent } from "@/components/menu/InitialMenuContent";
 import { CalorieCalculatorStep } from "@/components/menu/CalorieCalculatorStep";
@@ -80,7 +81,7 @@ const Menu = () => {
   const handleRefreshMealPlan = async () => {
     try {
       toast.info("Funcionalidade de atualização em desenvolvimento");
-      return Promise.resolve();
+      return Promise.resolve(true);
     } catch (error) {
       console.error('Erro ao atualizar cardápio:', error);
       toast.error("Erro ao atualizar o cardápio");

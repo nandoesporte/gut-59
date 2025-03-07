@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import type { DietaryPreferences, MealPlan } from "../types";
-import { CalorieCalculatorForm, activityLevels } from "../CalorieCalculator";
+import { Goal } from "./useCalorieCalculator";
 import { useProtocolFoods } from "./useProtocolFoods";
-import { useCalorieCalculator } from "./useCalorieCalculator";
 import { useFoodSelection } from "./useFoodSelection";
-import { useWallet } from "@/hooks/useWallet";
 import { generateMealPlan } from "./useMealPlanGeneration";
+import { usePaymentHandling } from "./usePaymentHandling";
+import { DietaryPreferences, MealPlan, ProtocolFood } from "../types";
+import type { CalorieCalculatorForm } from "../CalorieCalculator";
+
+export type MenuStep = 1 | 2 | 3 | 4;
 
 const mapGoalToDbValue = (goal: string | undefined): "maintain" | "lose_weight" | "gain_mass" => {
   if (!goal) return "maintain";
@@ -31,7 +33,7 @@ interface NutritionPreferences {
 }
 
 export const useMenuController = () => {
-  const [currentStep, setCurrentStep] = useState<number>(1);
+  const [currentStep, setCurrentStep] = useState<MenuStep>(1);
   const [dietaryPreferences, setDietaryPreferences] = useState<DietaryPreferences | null>(null);
   const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
   const [loading, setLoading] = useState(false);
@@ -48,17 +50,7 @@ export const useMenuController = () => {
   const { calorieNeeds, calculateCalories } = useCalorieCalculator();
   const { selectedFoods, foodsByMealType, totalCalories, handleFoodSelection, calculateTotalCalories, categorizeFoodsByMealType } = useFoodSelection();
   const wallet = useWallet();
-
-  const addTransactionAsync = async (params: Parameters<typeof wallet.addTransaction>[0]) => {
-    return new Promise<void>((resolve, reject) => {
-      try {
-        wallet.addTransaction(params);
-        resolve();
-      } catch (error) {
-        reject(error);
-      }
-    });
-  };
+  const { addTransactionAsync } = usePaymentHandling();
 
   const scrollToElement = (elementId: string) => {
     setTimeout(() => {
