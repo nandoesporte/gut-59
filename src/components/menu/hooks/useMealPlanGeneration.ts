@@ -77,24 +77,37 @@ export const generateMealPlan = async ({
           isNaN(data.mealPlan.weeklyTotals.averageProtein)) {
         
         console.log("⚠️ Recalculando médias semanais devido a valores ausentes ou NaN");
-        const days = Object.values(data.mealPlan.weeklyPlan || {});
-        const validDays = days.filter((day): day is DayPlan => 
-          !!day && !!day.dailyTotals && 
-          typeof day.dailyTotals.calories === 'number' &&
-          typeof day.dailyTotals.protein === 'number' &&
-          typeof day.dailyTotals.carbs === 'number' &&
-          typeof day.dailyTotals.fats === 'number' &&
-          typeof day.dailyTotals.fiber === 'number'
-        );
         
+        // Convert weeklyPlan to array of day plans, with validation
+        const weeklyPlan = data.mealPlan.weeklyPlan || {};
+        const days = Object.values(weeklyPlan);
+        
+        // Define a proper type guard function to ensure day has properly typed dailyTotals
+        const isDayPlanWithValidTotals = (day: unknown): day is DayPlan => {
+          return (
+            !!day && 
+            typeof day === 'object' &&
+            'dailyTotals' in day &&
+            !!day.dailyTotals &&
+            typeof day.dailyTotals === 'object' &&
+            'calories' in day.dailyTotals && typeof day.dailyTotals.calories === 'number' &&
+            'protein' in day.dailyTotals && typeof day.dailyTotals.protein === 'number' &&
+            'carbs' in day.dailyTotals && typeof day.dailyTotals.carbs === 'number' &&
+            'fats' in day.dailyTotals && typeof day.dailyTotals.fats === 'number' &&
+            'fiber' in day.dailyTotals && typeof day.dailyTotals.fiber === 'number'
+          );
+        };
+        
+        // Filter days to only include valid days with proper dailyTotals
+        const validDays = days.filter(isDayPlanWithValidTotals);
         const dayCount = validDays.length || 1; // Prevent division by zero
         
         data.mealPlan.weeklyTotals = {
-          averageCalories: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals.calories || 0), 0) / dayCount),
-          averageProtein: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals.protein || 0), 0) / dayCount),
-          averageCarbs: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals.carbs || 0), 0) / dayCount),
-          averageFats: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals.fats || 0), 0) / dayCount),
-          averageFiber: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals.fiber || 0), 0) / dayCount)
+          averageCalories: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.calories, 0) / dayCount),
+          averageProtein: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.protein, 0) / dayCount),
+          averageCarbs: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.carbs, 0) / dayCount),
+          averageFats: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.fats, 0) / dayCount),
+          averageFiber: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.fiber, 0) / dayCount)
         };
         
         console.log("🔄 Novos valores de médias semanais:", data.mealPlan.weeklyTotals);
