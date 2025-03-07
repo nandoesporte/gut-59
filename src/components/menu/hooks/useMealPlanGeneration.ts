@@ -55,6 +55,7 @@ export const generateMealPlan = async ({
     }
 
     console.log("Successfully received meal plan from Nutri+ agent");
+    console.log("Meal plan data:", JSON.stringify(data.mealPlan).substring(0, 200) + "...");
     
     // Save the meal plan to the database if user is authenticated
     if (userData.id) {

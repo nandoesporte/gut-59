@@ -7,7 +7,7 @@ import { DietaryPreferencesForm } from "@/components/menu/DietaryPreferencesForm
 import { MealPlanDisplay } from "@/components/menu/MealPlanDisplay";
 import { MealPlanHistory } from "@/components/menu/MealPlanHistory";
 import { MenuHeader } from "@/components/menu/MenuHeader";
-import { useMenuController } from "@/components/menu/MenuController";
+import { useMenuController } from "@/components/menu/hooks/useMenuController";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useRef } from "react";
@@ -69,7 +69,8 @@ const Menu = () => {
     if (mealPlan) {
       console.log("Meal plan available:", {
         hasWeeklyPlan: !!mealPlan.weeklyPlan,
-        availableDays: mealPlan.weeklyPlan ? Object.keys(mealPlan.weeklyPlan) : []
+        availableDays: mealPlan.weeklyPlan ? Object.keys(mealPlan.weeklyPlan) : [],
+        generatedBy: mealPlan.generatedBy || "unknown"
       });
     }
   }, [currentStep, protocolFoods, selectedFoods, mealPlan]);
@@ -232,10 +233,6 @@ const Menu = () => {
                     <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">4</span>
                     Seu Plano Alimentar Personalizado
                   </h2>
-                  <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-700">
-                    <p className="font-medium">✨ Plano gerado por Nutri+ (powered by Llama 3)</p>
-                    <p className="mt-1">Este plano foi personalizado com base em suas preferências e necessidades nutricionais.</p>
-                  </div>
                   <MealPlanDisplay
                     mealPlan={mealPlan}
                     onRefresh={handleRefreshMealPlan}
