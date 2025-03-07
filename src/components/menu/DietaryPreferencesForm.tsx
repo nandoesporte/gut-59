@@ -1,10 +1,10 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import type { DietaryPreferences } from "./types";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface DietaryPreferencesFormProps {
   onSubmit: (preferences: DietaryPreferences) => void;
@@ -19,6 +19,7 @@ export const DietaryPreferencesForm = ({ onSubmit, onBack }: DietaryPreferencesF
     trainingTime: null,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isMobile = useIsMobile();
 
   const handleAllergiesChange = (checked: boolean) => {
     setPreferences(prev => ({
@@ -130,13 +131,18 @@ export const DietaryPreferencesForm = ({ onSubmit, onBack }: DietaryPreferencesF
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row justify-between gap-4">
-        <Button type="button" variant="outline" onClick={onBack} className="w-full sm:w-auto">
+      <div className={`${isMobile ? 'grid grid-cols-1 gap-3' : 'flex justify-between'} sticky bottom-0 pt-4 pb-2 bg-white border-t`}>
+        <Button 
+          type="button" 
+          variant="outline" 
+          onClick={onBack} 
+          className={`${isMobile ? 'w-full' : 'w-auto'} rounded-full`}
+        >
           Voltar
         </Button>
         <Button 
           type="submit" 
-          className="w-full sm:w-auto bg-green-500 hover:bg-green-600"
+          className={`${isMobile ? 'w-full' : 'w-auto'} bg-green-500 hover:bg-green-600 rounded-full`}
           disabled={isSubmitting}
         >
           {isSubmitting ? "Processando..." : "Continuar"}

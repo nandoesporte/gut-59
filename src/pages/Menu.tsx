@@ -1,3 +1,4 @@
+
 import { Card } from "@/components/ui/card";
 import { InitialMenuContent } from "@/components/menu/InitialMenuContent";
 import { CalorieCalculatorStep } from "@/components/menu/CalorieCalculatorStep";
@@ -10,10 +11,12 @@ import { useMenuController } from "@/components/menu/hooks/useMenuController";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useRef } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const Menu = () => {
   const mealPlanRef = useRef<HTMLDivElement>(null);
   const restrictionsCardRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
   
   const {
     currentStep,
@@ -132,7 +135,7 @@ const Menu = () => {
                   <p className="text-green-600 font-medium">✓ Calorias diárias calculadas: {calorieNeeds} kcal</p>
                   <button 
                     onClick={() => setCurrentStep(1)} 
-                    className="text-sm text-gray-500 underline mt-2"
+                    className="text-sm text-gray-500 underline mt-2 px-4 py-1 rounded-md hover:bg-gray-100 transition-colors"
                   >
                     Editar
                   </button>
@@ -156,7 +159,7 @@ const Menu = () => {
                       </p>
                       <button 
                         onClick={() => window.location.reload()} 
-                        className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+                        className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-full w-full sm:w-auto"
                       >
                         Tentar Novamente
                       </button>
@@ -170,7 +173,7 @@ const Menu = () => {
                       </p>
                       <button 
                         onClick={() => window.location.reload()} 
-                        className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+                        className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-full w-full sm:w-auto"
                       >
                         Tentar Novamente
                       </button>
@@ -192,7 +195,7 @@ const Menu = () => {
                   <p className="text-green-600 font-medium">✓ {selectedFoods.length} alimentos selecionados</p>
                   <button 
                     onClick={() => setCurrentStep(2)} 
-                    className="text-sm text-gray-500 underline mt-2"
+                    className="text-sm text-gray-500 underline mt-2 px-4 py-1 rounded-md hover:bg-gray-100 transition-colors"
                   >
                     Editar
                   </button>
@@ -217,7 +220,7 @@ const Menu = () => {
                     <p className="text-green-600 font-medium">✓ Preferências dietéticas registradas</p>
                     <button 
                       onClick={() => setCurrentStep(3)} 
-                      className="text-sm text-gray-500 underline mt-2"
+                      className="text-sm text-gray-500 underline mt-2 px-4 py-1 rounded-md hover:bg-gray-100 transition-colors"
                     >
                       Editar
                     </button>

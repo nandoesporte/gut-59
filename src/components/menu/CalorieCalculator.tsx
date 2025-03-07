@@ -3,12 +3,12 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Scale, Activity, Footprints, Dumbbell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GoalCards, Goal } from "./GoalCards";
 import { SelectCard } from "@/components/workout/components/SelectCard";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export interface CalorieCalculatorForm {
   weight: string;
@@ -63,6 +63,8 @@ const CalorieCalculator = ({
   onCalculate,
   calorieNeeds,
 }: CalorieCalculatorProps) => {
+  const isMobile = useIsMobile();
+
   return (
     <div className="space-y-6">
       <div className="space-y-4">
@@ -124,7 +126,7 @@ const CalorieCalculator = ({
                     onClick={() => onInputChange("gender", "male")}
                   >
                     <div className="text-center">
-                      <span className="text-lg">Masculino</span>
+                      <span className={`${isMobile ? 'text-sm' : 'text-lg'}`}>Masculino</span>
                     </div>
                   </SelectCard>
                   <SelectCard
@@ -132,7 +134,7 @@ const CalorieCalculator = ({
                     onClick={() => onInputChange("gender", "female")}
                   >
                     <div className="text-center">
-                      <span className="text-lg">Feminino</span>
+                      <span className={`${isMobile ? 'text-sm' : 'text-lg'}`}>Feminino</span>
                     </div>
                   </SelectCard>
                 </div>
@@ -170,7 +172,7 @@ const CalorieCalculator = ({
 
             <Button
               type="submit"
-              className="w-full bg-green-500 hover:bg-green-600 text-white mt-4"
+              className="w-full bg-green-500 hover:bg-green-600 text-white mt-4 py-6 sm:py-4 rounded-full text-lg font-semibold"
               disabled={!formData.goal}
             >
               Calcular Necessidades Calóricas
