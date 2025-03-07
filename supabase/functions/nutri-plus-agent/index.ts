@@ -157,7 +157,7 @@ Por favor, crie um plano de 7 dias que:
         { role: "user", content: userMessage }
       ],
       temperature: temperature, // Lower temperature for more consistent output
-      max_tokens: 4000, // Reduced from 7000 to avoid exceeding API limits
+      max_tokens: 7000, // Aumentado de 4000 para 7000
       top_p: 0.9,
       response_format: { type: "json_object" } // Request JSON format response
     };
