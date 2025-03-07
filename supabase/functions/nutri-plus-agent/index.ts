@@ -94,6 +94,13 @@ Certifique-se de que o weeklyPlan contenha TODOS os 7 dias (segunda a domingo). 
 
 É FUNDAMENTAL que cada alimento na lista "foods" contenha instruções detalhadas de preparo no campo "details", explicando como o alimento deve ser preparado, cozido ou consumido.
 
+IMPORTANTE: Respeite rigorosamente a categorização dos alimentos por tipo de refeição:
+- Alimentos categorizados como 'breakfast' devem ser colocados APENAS na refeição do café da manhã
+- Alimentos categorizados como 'morning_snack' devem ser colocados APENAS no lanche da manhã
+- Alimentos categorizados como 'lunch' devem ser colocados APENAS no almoço
+- Alimentos categorizados como 'afternoon_snack' devem ser colocados APENAS no lanche da tarde
+- Alimentos categorizados como 'dinner' devem ser colocados APENAS no jantar
+
 As recomendações devem incluir:
 {
   "general": "Conselho geral de nutrição",
@@ -138,7 +145,8 @@ Por favor, crie um plano de 7 dias que:
 5. Forneça variedade ao longo da semana
 6. Inclua todos os tipos de refeições: café da manhã, lanche da manhã, almoço, lanche da tarde, jantar
 7. Calcule as calorias e macros para cada refeição e dia
-8. Forneça detalhes de preparo para cada alimento`;
+8. Forneça detalhes de preparo para cada alimento
+9. MUITO IMPORTANTE: Respeite a categorização dos alimentos - não coloque alimentos de uma categoria (ex: breakfast) em outra refeição (ex: dinner)`;
 
     // Track time for API call preparation
     console.log(`[NUTRI+] Preparando chamada de API às ${new Date().toISOString()}`);

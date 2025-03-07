@@ -9,7 +9,8 @@ interface MealSectionProps {
 }
 
 export const MealSection = ({ title, icon, meal }: MealSectionProps) => {
-  if (!meal) return null;
+  // Return null if the meal data is not provided or invalid
+  if (!meal || !meal.foods || meal.foods.length === 0) return null;
 
   return (
     <Card>
