@@ -248,6 +248,29 @@ export const useMenuController = (): MenuState => {
 
       if (generatedPlan) {
         setMealPlan(generatedPlan);
+        
+        // Save the meal plan to the database
+        if (user) {
+          try {
+            console.log("💾 Tentando salvar plano alimentar para o usuário:", user.id);
+            const { error } = await supabase
+              .from('meal_plans')
+              .insert({
+                user_id: user.id,
+                plan_data: generatedPlan,
+                calories: calorieNeeds
+              });
+              
+            if (error) {
+              console.error("❌ Erro ao salvar plano alimentar:", error);
+            } else {
+              console.log("✅ Plano alimentar salvo com sucesso");
+            }
+          } catch (error) {
+            console.error("❌ Erro ao salvar plano alimentar:", error);
+          }
+        }
+        
         setCurrentStep(4);
       } else {
         toast.error("Não foi possível gerar o plano alimentar. Por favor, tente novamente.");
