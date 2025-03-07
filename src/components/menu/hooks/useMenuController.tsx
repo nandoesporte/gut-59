@@ -227,6 +227,7 @@ export const useMenuController = () => {
         console.log("Usuário não autenticado, avançando sem salvar preferências");
         toast.success("Seleção de alimentos confirmada!");
         setCurrentStep(3);
+        scrollToElement('dietary-restrictions-section');
         return true;
       }
 
@@ -309,6 +310,7 @@ export const useMenuController = () => {
         console.log("Avançando para a etapa 3 (restrições dietéticas)");
         
         setCurrentStep(3);
+        scrollToElement('dietary-restrictions-section');
         
         if (updateSuccess) {
           toast.success("Preferências de alimentos salvas! Agora informe suas restrições dietéticas.");

@@ -1,4 +1,3 @@
-
 import { Card } from "@/components/ui/card";
 import { InitialMenuContent } from "@/components/menu/InitialMenuContent";
 import { CalorieCalculatorStep } from "@/components/menu/CalorieCalculatorStep";
@@ -204,7 +203,7 @@ const Menu = () => {
             </Card>
 
             <div ref={restrictionsCardRef}>
-              <Card className={`p-4 sm:p-6 ${currentStep < 3 ? 'opacity-70' : ''}`}>
+              <Card id="dietary-restrictions-section" className={`p-4 sm:p-6 ${currentStep < 3 ? 'opacity-70' : ''}`}>
                 <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center">
                   <span className={`bg-${currentStep >= 3 ? 'green' : 'gray'}-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2`}>3</span>
                   Restrições e Preferências
