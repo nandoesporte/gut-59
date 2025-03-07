@@ -47,7 +47,14 @@ export const NutriSummary = () => {
 
         if (data) {
           console.log("Found last meal plan:", data);
-          setLastPlan(data as LastMealPlanData);
+          // Convert the JSON data to the expected MealPlan type
+          const planDataWithTypes: LastMealPlanData = {
+            id: data.id,
+            created_at: data.created_at,
+            calories: data.calories,
+            plan_data: data.plan_data as MealPlan
+          };
+          setLastPlan(planDataWithTypes);
         }
       } catch (error) {
         console.error('Error fetching last meal plan:', error);
