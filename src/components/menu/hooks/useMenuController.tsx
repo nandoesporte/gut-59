@@ -8,13 +8,14 @@ import { DietaryPreferences, MealPlan, ProtocolFood } from "../types";
 import { useWallet } from "@/hooks/useWallet";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { CalorieCalculatorForm } from "../CalorieCalculator";
 
-// Types
-interface FormData {
+// Types for form data
+export interface FormData {
   weight: number;
   height: number;
   age: number;
-  gender: string;
+  gender: "male" | "female";
   activityLevel: string;
   goal: string;
 }
@@ -27,10 +28,10 @@ interface MenuState {
   protocolFoods: ProtocolFood[];
   totalCalories: number; 
   mealPlan: MealPlan | null;
-  formData: FormData;
+  formData: CalorieCalculatorForm;
   loading: boolean;
   foodsError: Error | null;
-  setFormData: (data: FormData) => void;
+  setFormData: (data: CalorieCalculatorForm) => void;
   handleCalculateCalories: () => void;
   handleFoodSelection: (foodId: string, food?: ProtocolFood) => void;
   handleConfirmFoodSelection: () => void;
@@ -49,13 +50,13 @@ export const useMenuController = (): MenuState => {
     dietaryRestrictions: [],
     trainingTime: null,
   });
-  const [formData, setFormData] = useState<FormData>({
-    weight: 70,
-    height: 170,
-    age: 30,
+  const [formData, setFormData] = useState<CalorieCalculatorForm>({
+    weight: "70",
+    height: "170",
+    age: "30",
     gender: "male",
     activityLevel: "moderate",
-    goal: "maintenance",
+    goal: "maintain"
   });
   
   const { protocolFoods, error: foodsError, foodsByMealType } = useProtocolFoods();
@@ -101,15 +102,14 @@ export const useMenuController = (): MenuState => {
         console.error("Erro ao carregar preferências nutricionais:", nutritionError);
       } else if (nutritionPrefs) {
         console.log("Loaded nutrition preferences:", nutritionPrefs);
-        setFormData(prev => ({
-          ...prev,
-          weight: nutritionPrefs.weight || prev.weight,
-          height: nutritionPrefs.height || prev.height,
-          age: nutritionPrefs.age || prev.age,
-          gender: nutritionPrefs.gender || prev.gender,
-          activityLevel: nutritionPrefs.activity_level || prev.activityLevel,
-          goal: nutritionPrefs.goal || prev.goal,
-        }));
+        setFormData({
+          weight: String(nutritionPrefs.weight || 70),
+          height: String(nutritionPrefs.height || 170),
+          age: String(nutritionPrefs.age || 30),
+          gender: (nutritionPrefs.gender === "female" ? "female" : "male"),
+          activityLevel: nutritionPrefs.activity_level || "moderate",
+          goal: nutritionPrefs.goal || "maintain",
+        });
       }
       
       // Fetch dietary preferences
@@ -138,43 +138,40 @@ export const useMenuController = (): MenuState => {
 
   // Handle Calorie Calculation
   const handleCalculateCalories = useCallback(() => {
-    const calculatedCalories = calculateCalories(
-      formData.weight,
-      formData.height,
-      formData.age,
-      formData.gender,
-      formData.activityLevel,
-      formData.goal
-    );
-    setCalorieNeeds(calculatedCalories);
-    setCurrentStep(2);
+    const selectedLevel = activityLevels.find(level => level.value === formData.activityLevel);
+    const calculatedCalories = calculateCalories(formData, selectedLevel || { multiplier: 1.2 });
     
-    // Save nutrition preferences for authenticated users
-    const savePreferences = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { error } = await supabase.from('nutrition_preferences').upsert({
-            user_id: user.id,
-            weight: formData.weight,
-            height: formData.height,
-            age: formData.age,
-            gender: formData.gender,
-            activity_level: formData.activityLevel,
-            goal: formData.goal,
-            calories_needed: calculatedCalories
-          });
-          
-          if (error) {
-            console.error("Error saving nutrition preferences:", error);
+    if (calculatedCalories) {
+      setCalorieNeeds(calculatedCalories);
+      setCurrentStep(2);
+      
+      // Save nutrition preferences for authenticated users
+      const savePreferences = async () => {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { error } = await supabase.from('nutrition_preferences').upsert({
+              user_id: user.id,
+              weight: parseFloat(formData.weight),
+              height: parseFloat(formData.height),
+              age: parseFloat(formData.age),
+              gender: formData.gender,
+              activity_level: formData.activityLevel as any,
+              goal: formData.goal as any,
+              calories_needed: calculatedCalories
+            });
+            
+            if (error) {
+              console.error("Error saving nutrition preferences:", error);
+            }
           }
+        } catch (error) {
+          console.error("Error saving nutrition preferences:", error);
         }
-      } catch (error) {
-        console.error("Error saving nutrition preferences:", error);
-      }
-    };
-    
-    savePreferences();
+      };
+      
+      savePreferences();
+    }
   }, [formData, calculateCalories]);
 
   // Handle Confirm Food Selection
@@ -219,9 +216,9 @@ export const useMenuController = (): MenuState => {
       const generatedPlan = await generateMealPlan({
         userData: {
           id: user?.id,
-          weight: formData.weight,
-          height: formData.height,
-          age: formData.age,
+          weight: parseFloat(formData.weight),
+          height: parseFloat(formData.height),
+          age: parseFloat(formData.age),
           gender: formData.gender,
           activityLevel: formData.activityLevel,
           goal: formData.goal,
@@ -271,3 +268,11 @@ export const useMenuController = (): MenuState => {
     handleDietaryPreferences,
   };
 };
+
+// Activity levels with multipliers
+const activityLevels = [
+  { value: "sedentary", multiplier: 1.2 },
+  { value: "light", multiplier: 1.375 },
+  { value: "moderate", multiplier: 1.55 },
+  { value: "intense", multiplier: 1.725 }
+];
