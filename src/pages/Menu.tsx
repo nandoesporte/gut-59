@@ -11,6 +11,7 @@ import { Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useRef } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { supabase } from "@/lib/supabase";
 
 const Menu = () => {
   const mealPlanRef = useRef<HTMLDivElement>(null);
@@ -79,7 +80,19 @@ const Menu = () => {
 
   const handleRefreshMealPlan = async (): Promise<void> => {
     try {
-      toast.info("Funcionalidade de atualização em desenvolvimento");
+      console.log("Refreshing meal plan");
+      
+      // Check if user is authenticated
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.warning("Faça login para gerar um novo plano");
+        return;
+      }
+      
+      // Reset to food selection step
+      setCurrentStep(2);
+      
+      toast.info("Voltando para seleção de alimentos. Você pode escolher novos alimentos para seu plano.");
       return Promise.resolve();
     } catch (error) {
       console.error('Erro ao atualizar cardápio:', error);

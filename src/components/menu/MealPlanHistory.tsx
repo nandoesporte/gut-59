@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { MealPlan } from './types';
 import { generateMealPlanPDF } from './utils/pdf-generator';
 import { toast } from 'sonner';
-import { Download, Eye, List, Trash2 } from 'lucide-react';
+import { Download, Eye, List, Trash2, RefreshCw } from 'lucide-react';
 import { SavedMealPlanDetails } from './components/SavedMealPlanDetails';
 
 interface StoredMealPlan {
@@ -43,6 +43,7 @@ export const MealPlanHistory = () => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [viewPlanId, setViewPlanId] = useState<string | null>(null);
   const [viewPlanData, setViewPlanData] = useState<MealPlan | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPlans();
@@ -51,17 +52,33 @@ export const MealPlanHistory = () => {
   const fetchPlans = async () => {
     try {
       setLoading(true);
+      setError(null);
+      
+      console.log("Fetching meal plan history...");
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      
+      if (!user) {
+        console.log("User not authenticated, can't fetch meal plan history");
+        setError("Faça login para ver seu histórico de planos alimentares");
+        setLoading(false);
+        return;
+      }
 
+      console.log("Fetching meal plans for user:", user.id);
       const { data, error } = await supabase
         .from('meal_plans')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching meal plans:", error);
+        setError("Erro ao carregar histórico de planos: " + error.message);
+        throw error;
+      }
 
+      console.log("Received meal plans data:", data?.length || 0, "records");
+      
       const validPlans = (data as RawMealPlan[]).reduce<StoredMealPlan[]>((acc, plan) => {
         if (validateMealPlan(plan.plan_data)) {
           acc.push({
@@ -76,9 +93,11 @@ export const MealPlanHistory = () => {
         return acc;
       }, []);
 
+      console.log("Valid meal plans after filtering:", validPlans.length);
       setPlans(validPlans);
     } catch (error) {
       console.error('Error fetching meal plans:', error);
+      setError("Erro ao carregar histórico de planos");
       toast.error('Erro ao carregar histórico de planos');
     } finally {
       setLoading(false);
@@ -87,12 +106,17 @@ export const MealPlanHistory = () => {
 
   const handleDelete = async (id: string) => {
     try {
+      console.log("Deleting meal plan with ID:", id);
       const { error } = await supabase
         .from('meal_plans')
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error deleting meal plan:", error);
+        toast.error('Erro ao excluir plano: ' + error.message);
+        throw error;
+      }
 
       setPlans(plans.filter(plan => plan.id !== id));
       toast.success('Plano excluído com sucesso');
@@ -120,16 +144,35 @@ export const MealPlanHistory = () => {
 
   return (
     <div className="mt-12">
-      <h2 className="text-2xl font-semibold mb-6 flex items-center gap-2">
-        <List className="w-6 h-6" />
-        Histórico de Planos Alimentares
-      </h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-semibold flex items-center gap-2">
+          <List className="w-6 h-6" />
+          Histórico de Planos Alimentares
+        </h2>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={fetchPlans} 
+          className="flex items-center gap-1"
+          disabled={loading}
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          <span>Atualizar</span>
+        </Button>
+      </div>
       
       {loading ? (
-        <div className="text-center">Carregando histórico...</div>
+        <div className="text-center p-8">
+          <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p>Carregando histórico...</p>
+        </div>
+      ) : error ? (
+        <Card className="p-6 text-center text-gray-500">
+          {error}
+        </Card>
       ) : plans.length === 0 ? (
         <Card className="p-6 text-center text-gray-500">
-          Nenhum plano alimentar gerado ainda
+          Nenhum plano alimentar encontrado no histórico
         </Card>
       ) : (
         <div className="grid gap-4">
