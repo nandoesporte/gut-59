@@ -34,21 +34,21 @@ serve(async (req) => {
     console.log(`Received meal plan generation request for user: ${user_id}`);
     console.log(`User input: ${JSON.stringify(userInput)}`);
 
-    // Prepare the prompt for Groq with explicit JSON format instructions
+    // Improved prompt with clearer JSON format instructions
     const prompt = `
     Create a detailed meal plan based on the following user preferences:
     
     ${JSON.stringify(userInput, null, 2)}
     
     The meal plan should:
-    - Include 5-6 meals per day (breakfast, morning snack, lunch, afternoon snack, dinner, and optional evening snack)
+    - Include 5-6 meals per day (breakfast, morning snack, lunch, afternoon snack, dinner)
     - Specify portion sizes and quantities
     - Include nutritional information (calories, protein, carbs, fats)
     - Consider any dietary restrictions mentioned
     - Be realistic and practical for daily preparation
     - Include a shopping list
 
-    Your response MUST be a valid JSON object with the following structure. Do not include any text outside the JSON object:
+    The response format MUST be a valid JSON object with the following structure:
 
     {
       "meal_plan": {
@@ -88,11 +88,9 @@ serve(async (req) => {
         ]
       },
       "recommendations": string[]
-    }
-    
-    Ensure there are no trailing commas in arrays or objects, and all property names must be in double quotes.`;
+    }`;
 
-    // Make request to Groq API with JSON response format explicitly set
+    // Make request to Groq API with explicit JSON response format
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -132,25 +130,35 @@ serve(async (req) => {
 
     console.log('Successfully received response from Groq');
     
-    // Extract JSON from the response with better error handling
+    // Enhanced JSON parsing with better error handling
     let mealPlanJson;
     try {
       // First, try direct parsing as it should be a valid JSON response
-      mealPlanJson = JSON.parse(mealPlanContent);
+      if (typeof mealPlanContent === 'string') {
+        mealPlanJson = JSON.parse(mealPlanContent);
+      } else {
+        // If it's already an object, use it directly
+        mealPlanJson = mealPlanContent;
+      }
+      console.log('Successfully parsed JSON response');
     } catch (jsonError) {
       console.error('Failed to parse JSON directly:', jsonError);
       
       try {
         // If direct parsing fails, try cleaning up possible markdown formatting
-        const cleanedContent = mealPlanContent
-          .replace(/```json|```/g, '')  // Remove markdown code block markers
-          .trim();
-        
-        mealPlanJson = JSON.parse(cleanedContent);
-        console.log('Parsed JSON after cleaning markdown formatting');
+        if (typeof mealPlanContent === 'string') {
+          const cleanedContent = mealPlanContent
+            .replace(/```json|```/g, '')  // Remove markdown code block markers
+            .trim();
+          
+          mealPlanJson = JSON.parse(cleanedContent);
+          console.log('Parsed JSON after cleaning markdown formatting');
+        } else {
+          throw new Error('Content is not a string and cannot be parsed as JSON');
+        }
       } catch (cleaningError) {
         console.error('Failed to parse JSON after cleaning:', cleaningError);
-        console.log('Raw content:', mealPlanContent);
+        console.log('Raw content:', typeof mealPlanContent === 'string' ? mealPlanContent.substring(0, 500) : 'Not a string');
         throw new Error('Failed to parse meal plan JSON from Groq response');
       }
     }

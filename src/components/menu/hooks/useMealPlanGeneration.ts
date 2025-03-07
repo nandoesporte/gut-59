@@ -1,4 +1,3 @@
-
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { DietaryPreferences, MealPlan, ProtocolFood, DayPlan } from "../types";
@@ -177,11 +176,12 @@ const saveMealPlanToDatabase = async (
     try {
       console.log("💾 Tentando salvar plano alimentar para o usuário:", userData.id);
       
+      // Fix: Convert MealPlan to JSON before inserting
       const { error: saveError } = await supabase
         .from('meal_plans')
         .insert({
           user_id: userData.id,
-          plan_data: mealPlan,
+          plan_data: JSON.parse(JSON.stringify(mealPlan)), // Convert to JSON compatible format
           calories: userData.dailyCalories,
           generated_by: modelUsed || "nutri-plus-agent-llama3",
           preferences: preferences // Save the user preferences with the meal plan
