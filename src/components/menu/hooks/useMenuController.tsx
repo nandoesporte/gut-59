@@ -1,13 +1,16 @@
+
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Goal } from "./useCalorieCalculator";
+import { Goal, useCalorieCalculator } from "./useCalorieCalculator";
 import { useProtocolFoods } from "./useProtocolFoods";
 import { useFoodSelection } from "./useFoodSelection";
 import { generateMealPlan } from "./useMealPlanGeneration";
 import { usePaymentHandling } from "./usePaymentHandling";
 import { DietaryPreferences, MealPlan, ProtocolFood } from "../types";
 import type { CalorieCalculatorForm } from "../CalorieCalculator";
+import { activityLevels } from "../CalorieCalculator";
+import { useWallet } from "@/hooks/useWallet";
 
 export type MenuStep = 1 | 2 | 3 | 4;
 
