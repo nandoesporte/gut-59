@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { useProtocolFoods } from "./useProtocolFoods";
 import { useCalorieCalculator, Goal } from "./useCalorieCalculator";
@@ -45,6 +44,15 @@ const mapGoalToDbEnum = (goal: Goal): Database['public']['Enums']['nutritional_g
     'gain': 'gain_mass'
   };
   return goalMap[goal];
+};
+
+const mapDbEnumToGoal = (dbGoal: Database['public']['Enums']['nutritional_goal']): Goal => {
+  const goalMap: Record<Database['public']['Enums']['nutritional_goal'], Goal> = {
+    'lose_weight': 'lose',
+    'maintain': 'maintain',
+    'gain_mass': 'gain'
+  };
+  return goalMap[dbGoal] || 'maintain';
 };
 
 export const useMenuController = (): MenuState => {
@@ -107,13 +115,16 @@ export const useMenuController = (): MenuState => {
         console.error("Erro ao carregar preferências nutricionais:", nutritionError);
       } else if (nutritionPrefs) {
         console.log("Loaded nutrition preferences:", nutritionPrefs);
+        
+        const uiGoal: Goal = nutritionPrefs.goal ? mapDbEnumToGoal(nutritionPrefs.goal) : 'maintain';
+        
         setFormData({
           weight: String(nutritionPrefs.weight || 70),
           height: String(nutritionPrefs.height || 170),
           age: String(nutritionPrefs.age || 30),
           gender: (nutritionPrefs.gender === "female" ? "female" : "male"),
           activityLevel: nutritionPrefs.activity_level || "moderate",
-          goal: nutritionPrefs.goal || "maintain",
+          goal: uiGoal,
         });
       }
       
