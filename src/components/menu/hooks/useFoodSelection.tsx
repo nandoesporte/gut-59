@@ -131,7 +131,7 @@ export const useFoodSelection = () => {
     handleFoodSelection,
     calculateTotalCalories,
     categorizeFoodsByMealType,
-    addFood,            // Added this missing method
-    resetSelection      // Added this missing method
+    addFood,
+    resetSelection
   };
 };
