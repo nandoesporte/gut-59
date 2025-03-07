@@ -9,7 +9,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { MealPlan } from './types';
 import { generateMealPlanPDF } from './utils/pdf-generator';
 import { toast } from 'sonner';
-import { Download, List, Trash2 } from 'lucide-react';
+import { Download, Eye, List, Trash2 } from 'lucide-react';
+import { SavedMealPlanDetails } from './components/SavedMealPlanDetails';
 
 interface StoredMealPlan {
   id: string;
@@ -40,6 +41,8 @@ export const MealPlanHistory = () => {
   const [plans, setPlans] = useState<StoredMealPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [viewPlanId, setViewPlanId] = useState<string | null>(null);
+  const [viewPlanData, setViewPlanData] = useState<MealPlan | null>(null);
 
   useEffect(() => {
     fetchPlans();
@@ -111,6 +114,11 @@ export const MealPlanHistory = () => {
     }
   };
 
+  const handleViewDetails = (plan: StoredMealPlan) => {
+    setViewPlanId(plan.id);
+    setViewPlanData(plan.plan_data);
+  };
+
   return (
     <div className="mt-12">
       <h2 className="text-2xl font-semibold mb-6 flex items-center gap-2">
@@ -138,6 +146,15 @@ export const MealPlanHistory = () => {
                   </p>
                 </div>
                 <div className="flex gap-2 w-full sm:w-auto">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleViewDetails(plan)}
+                    className="flex-1 sm:flex-initial justify-center"
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    <span className="sm:inline">Detalhes</span>
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
@@ -182,6 +199,20 @@ export const MealPlanHistory = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {viewPlanData && (
+        <SavedMealPlanDetails
+          planId={viewPlanId || ""}
+          planData={viewPlanData}
+          isOpen={!!viewPlanId}
+          onClose={() => {
+            setViewPlanId(null);
+            setViewPlanData(null);
+            // Refresh plans after closing to get any updates
+            fetchPlans();
+          }}
+        />
+      )}
     </div>
   );
 };
