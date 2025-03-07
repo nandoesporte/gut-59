@@ -6,10 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Scale, Activity, Footprints, Dumbbell } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { GoalCards } from "./GoalCards";
+import { GoalCards, Goal } from "./GoalCards";
 import { SelectCard } from "@/components/workout/components/SelectCard";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Goal } from "./hooks/useCalorieCalculator";
 
 export interface CalorieCalculatorForm {
   weight: string;

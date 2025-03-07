@@ -64,9 +64,7 @@ Sua tarefa é analisar os dados do usuário e criar um plano alimentar semanal d
 REGRAS IMPORTANTES DE FORMATO DE SAÍDA:
 1. Sua resposta DEVE ser um JSON válido que possa ser processado com JSON.parse().
 2. Sua resposta deve conter APENAS o objeto JSON sem explicações, narrativas ou texto adicional.
-3. A saída deve ser um objeto JSON simples e compacto, com tamanho máximo de 4000 tokens.
-4. Use nomes curtos para propriedades, evite redundâncias e comentários no JSON.
-5. A saída deve seguir esta estrutura simplificada:
+3. A saída deve seguir exatamente esta estrutura:
 {
   "mealPlan": {
     "weeklyPlan": {
@@ -79,24 +77,69 @@ REGRAS IMPORTANTES DE FORMATO DE SAÍDA:
   }
 }
 
-Cada dia deve ter a seguinte estrutura SIMPLIFICADA:
+Certifique-se de que o weeklyPlan contenha TODOS os 7 dias (segunda a domingo). Cada dia deve ter a seguinte estrutura:
 {
   "dayName": "Nome do Dia",
   "meals": {
     "breakfast": {
-      "description": "Descrição breve",
-      "foods": [{"name": "Nome do alimento", "portion": 100, "unit": "g", "details": "Instruções breves"}],
+      "description": "Descrição do café da manhã",
+      "foods": [{"name": "Nome do alimento", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento"}],
       "calories": 500,
       "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
     },
-    /* outras refeições */
+    "morningSnack": {
+      "description": "Descrição do lanche da manhã",
+      "foods": [{"name": "Nome do alimento", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento"}],
+      "calories": 500,
+      "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
+    },
+    "lunch": {
+      "description": "Descrição do almoço",
+      "foods": [{"name": "Nome do alimento", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento"}],
+      "calories": 500,
+      "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
+    },
+    "afternoonSnack": {
+      "description": "Descrição do lanche da tarde",
+      "foods": [{"name": "Nome do alimento", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento"}],
+      "calories": 500,
+      "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
+    },
+    "dinner": {
+      "description": "Descrição do jantar",
+      "foods": [{"name": "Nome do alimento", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento"}],
+      "calories": 500,
+      "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
+    }
   },
   "dailyTotals": {"calories": 2000, "protein": 120, "carbs": 180, "fats": 60, "fiber": 25}
 }
 
-IMPORTANTE: Use exatamente os nomes de propriedades especificados acima em camelCase:
-- "breakfast", "morningSnack", "lunch", "afternoonSnack", "dinner"
-- NÃO use nomes com underscores como "morning_snack"`;
+IMPORTANTE: Use exatamente os nomes de propriedades especificados acima:
+- Use "breakfast" para café da manhã (não "breakfast_meal" ou "morning_meal")
+- Use "morningSnack" para lanche da manhã (não "morning_snack")
+- Use "lunch" para almoço
+- Use "afternoonSnack" para lanche da tarde (não "afternoon_snack")
+- Use "dinner" para jantar
+
+É FUNDAMENTAL que cada alimento na lista "foods" contenha instruções detalhadas de preparo no campo "details", explicando como o alimento deve ser preparado, cozido ou consumido.
+
+IMPORTANTE: Respeite rigorosamente a categorização dos alimentos por tipo de refeição:
+- Alimentos categorizados como 'breakfast' devem ser colocados APENAS na refeição do café da manhã
+- Alimentos categorizados como 'morning_snack' devem ser colocados APENAS no lanche da manhã
+- Alimentos categorizados como 'lunch' devem ser colocados APENAS no almoço
+- Alimentos categorizados como 'afternoon_snack' devem ser colocados APENAS no lanche da tarde
+- Alimentos categorizados como 'dinner' devem ser colocados APENAS no jantar
+
+As recomendações devem incluir:
+{
+  "general": "Conselho geral de nutrição",
+  "preworkout": "Conselho de nutrição pré-treino",
+  "postworkout": "Conselho de nutrição pós-treino",
+  "timing": ["Conselho específico de tempo de refeição", "Outro conselho de timing"]
+}
+
+IMPORTANTE: Devido a limitações técnicas, sua resposta NÃO pode exceder 8000 tokens. Se necessário, simplifique as descrições de preparo dos alimentos, mas NUNCA omita informações essenciais como calorias, macronutrientes ou items requeridos.`;
 
     // Construct user message with all relevant data
     const userMessage = `Crie um plano alimentar semanal personalizado com base nestes dados:
@@ -116,13 +159,24 @@ ${dietaryPreferences.dietaryRestrictions && dietaryPreferences.dietaryRestrictio
 ${dietaryPreferences.trainingTime ? `- Horário de Treino: ${dietaryPreferences.trainingTime}` : '- Sem horário específico de treino'}
 
 ALIMENTOS DISPONÍVEIS (${selectedFoods.length} no total):
-${selectedFoods.slice(0, 20).map(food => `- ${food.name} (${food.calories} kcal, P:${food.protein}g, C:${food.carbs}g, G:${food.fats}g)`).join('\n')}
-${selectedFoods.length > 20 ? `\n... e mais ${selectedFoods.length - 20} alimentos.` : ''}
+${selectedFoods.slice(0, 30).map(food => `- ${food.name} (${food.calories} kcal, P:${food.protein}g, C:${food.carbs}g, G:${food.fats}g)`).join('\n')}
+${selectedFoods.length > 30 ? `\n... e mais ${selectedFoods.length - 30} alimentos.` : ''}
 
-IMPORTANTE: Sua resposta deve ser MUITO SIMPLIFICADA e SEM COMENTÁRIOS para evitar erros de parsing JSON.
-Crie apenas 3 dias (segunda, terça, quarta) para economizar tokens.
-Use descrições curtas e instruções breves para manter o JSON compacto.
-Limite o número de alimentos por refeição a no máximo 3.`;
+${foodsByMealType ? `ALIMENTOS CATEGORIZADOS POR REFEIÇÃO:
+${Object.entries(foodsByMealType).map(([mealType, foods]) => 
+  `- ${mealType}: ${Array.isArray(foods) ? foods.length : 0} alimentos`
+).join('\n')}` : ''}
+
+Por favor, crie um plano de 7 dias que:
+1. Atenda à meta de ${userData.dailyCalories} calorias diárias (com margem de +/- 100 kcal)
+2. Distribua adequadamente os macronutrientes (proteínas, carboidratos, gorduras, fibras)
+3. Use os alimentos disponíveis fornecidos
+4. Respeite as preferências e restrições alimentares do usuário
+5. Forneça variedade ao longo da semana
+6. Inclua todos os tipos de refeições: café da manhã, lanche da manhã, almoço, lanche da tarde, jantar
+7. Calcule as calorias e macros para cada refeição e dia
+8. Forneça detalhes de preparo para cada alimento
+9. MUITO IMPORTANTE: Use a nomenclatura correta para as refeições em camelCase: "breakfast", "morningSnack", "lunch", "afternoonSnack", "dinner" - não use versões com underscore como "morning_snack" ou "afternoon_snack"`;
 
     // Track time for API call preparation
     console.log(`[NUTRI+] Preparando chamada de API às ${new Date().toISOString()}`);
@@ -140,10 +194,10 @@ Limite o número de alimentos por refeição a no máximo 3.`;
         { role: "system", content: systemMessage },
         { role: "user", content: userMessage }
       ],
-      temperature: temperature,
-      max_tokens: 4000,
+      temperature: temperature, // Lower temperature for more consistent output
+      max_tokens: 7000, // Aumentado de 4000 para 7000
       top_p: 0.9,
-      response_format: { type: "json_object" }
+      response_format: { type: "json_object" } // Request JSON format response
     };
 
     console.log(`[NUTRI+] Chamando API Groq com modelo: ${groqPayload.model}`);
@@ -162,15 +216,172 @@ Limite o número de alimentos por refeição a no máximo 3.`;
       const errorData = await response.text();
       console.error(`[NUTRI+] Erro da API Groq (${response.status}):`, errorData);
       
-      // Return an alternative meal plan for development purposes
+      // If we received a JSON generation error, we'll try to fix the failed_generation content
+      if (response.status === 400 && errorData.includes('json_validate_failed')) {
+        try {
+          const errorJson = JSON.parse(errorData);
+          if (errorJson.error && errorJson.error.failed_generation) {
+            console.log("[NUTRI+] Tentando corrigir JSON inválido...");
+            
+            // Get the failed JSON generation
+            let failedJson = errorJson.error.failed_generation;
+            
+            // Fix common JSON format issues with meal types
+            failedJson = failedJson
+              .replace(/"morning_snack":/g, '"morningSnack":')
+              .replace(/"afternoon_snack":/g, '"afternoonSnack":')
+              .replace(/"evening_snack":/g, '"eveningSnack":')
+              .replace(/"pre_workout":/g, '"preWorkout":')
+              .replace(/"post_workout":/g, '"postWorkout":')
+              // Fix common issues with array commas
+              .replace(/,\s*\]/g, ']')         // Remove trailing commas in arrays
+              .replace(/,\s*\}/g, '}')         // Remove trailing commas in objects
+              .replace(/\.\.\.[\s\n]*\}/g, '}')  // Fix ellipsis in JSON
+              .replace(/\.\.\.[\s\n]*\]/g, ']'); // Fix ellipsis in JSON
+            
+            // Advanced fix for ... outros dias ... pattern which breaks the JSON
+            failedJson = failedJson.replace(/(\s*"[^"]+"\s*:\s*\{\s*\/\*[^*]*\*\/\s*\})(,\s*\/\*\s*\.\.\.\s*outros\s*dias\s*\.\.\.\s*\*\/)/g, 
+              (match, group1) => {
+                return group1;
+              }
+            );
+            
+            // Attempt to complete truncated JSON if necessary
+            if (!failedJson.endsWith('}')) {
+              // Count open and close braces to determine needed closing
+              const openBraces = (failedJson.match(/\{/g) || []).length;
+              const closeBraces = (failedJson.match(/\}/g) || []).length;
+              const missingCloseBraces = openBraces - closeBraces;
+              
+              if (missingCloseBraces > 0) {
+                failedJson = failedJson + '}'.repeat(missingCloseBraces);
+              }
+            }
+            
+            try {
+              // Try to parse the fixed JSON
+              const fixedMealPlan = JSON.parse(failedJson);
+              console.log("[NUTRI+] JSON corrigido com sucesso!");
+              
+              // Final validation of meal plan structure
+              if (fixedMealPlan.mealPlan && fixedMealPlan.mealPlan.weeklyPlan) {
+                // Fix any remaining meal type inconsistencies in the weekly plan
+                Object.keys(fixedMealPlan.mealPlan.weeklyPlan).forEach(day => {
+                  const dayPlan = fixedMealPlan.mealPlan.weeklyPlan[day];
+                  if (dayPlan && dayPlan.meals) {
+                    // Create a new meals object with correct keys
+                    const correctedMeals = {};
+                    
+                    // Map different meal type formats to the correct format
+                    const mealTypeMap = {
+                      'breakfast': 'breakfast',
+                      'morning_snack': 'morningSnack',
+                      'morningSnack': 'morningSnack',
+                      'lunch': 'lunch',
+                      'afternoon_snack': 'afternoonSnack',
+                      'afternoonSnack': 'afternoonSnack',
+                      'dinner': 'dinner',
+                      'evening_snack': 'eveningSnack',
+                      'eveningSnack': 'eveningSnack'
+                    };
+                    
+                    // Copy and correct each meal
+                    Object.keys(dayPlan.meals).forEach(mealType => {
+                      const correctMealType = mealTypeMap[mealType] || mealType;
+                      if (dayPlan.meals[mealType]) {
+                        correctedMeals[correctMealType] = dayPlan.meals[mealType];
+                      }
+                    });
+                    
+                    // Replace the meals object with the corrected one
+                    dayPlan.meals = correctedMeals;
+                  }
+                });
+                
+                return new Response(
+                  JSON.stringify({
+                    mealPlan: fixedMealPlan.mealPlan,
+                    modelUsed: modelName,
+                    recovered: true
+                  }),
+                  { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                );
+              }
+            } catch (parseError) {
+              console.error("[NUTRI+] Não foi possível corrigir o JSON:", parseError);
+              console.error("[NUTRI+] JSON incorreto:", failedJson.substring(0, 500) + "...");
+              
+              // Try more aggressive JSON repair techniques
+              try {
+                // Replace problematic section with a placeholder structure
+                if (parseError.message.includes("position")) {
+                  const errorPosition = parseInt(parseError.message.match(/position (\d+)/)?.[1] || "0");
+                  const contextStart = Math.max(0, errorPosition - 100);
+                  const contextEnd = Math.min(failedJson.length, errorPosition + 100);
+                  const errorContext = failedJson.substring(contextStart, contextEnd);
+                  
+                  console.log(`[NUTRI+] Contexto do erro (posição ${errorPosition}):`, errorContext);
+                  
+                  // Find the closest enclosing array or object
+                  let braceLevel = 0;
+                  let arrayLevel = 0;
+                  let lastArrayStart = -1;
+                  
+                  for (let i = 0; i < errorPosition; i++) {
+                    if (failedJson[i] === '{') braceLevel++;
+                    if (failedJson[i] === '}') braceLevel--;
+                    if (failedJson[i] === '[') {
+                      arrayLevel++;
+                      lastArrayStart = i;
+                    }
+                    if (failedJson[i] === ']') arrayLevel--;
+                  }
+                  
+                  // If error is in an array, try to fix it by closing the array
+                  if (arrayLevel > 0 && lastArrayStart !== -1) {
+                    const beforeError = failedJson.substring(0, lastArrayStart + 1);
+                    const afterError = failedJson.substring(errorPosition);
+                    
+                    // Create a simplified version with empty array
+                    const simplifiedJson = beforeError + "]" + afterError.substring(afterError.indexOf("]") + 1);
+                    
+                    try {
+                      const fixedMealPlan = JSON.parse(simplifiedJson);
+                      console.log("[NUTRI+] JSON corrigido com sucesso após reparo agressivo!");
+                      
+                      return new Response(
+                        JSON.stringify({
+                          mealPlan: fixedMealPlan.mealPlan,
+                          modelUsed: modelName,
+                          recovered: true,
+                          repaired: true
+                        }),
+                        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                      );
+                    } catch (finalError) {
+                      console.error("[NUTRI+] Todas as tentativas de reparo falharam:", finalError);
+                    }
+                  }
+                }
+              } catch (repairError) {
+                console.error("[NUTRI+] Erro durante reparo agressivo:", repairError);
+              }
+            }
+          }
+        } catch (errorParseError) {
+          console.error("[NUTRI+] Erro ao analisar o erro da API:", errorParseError);
+        }
+      }
+      
+      // Return the error to the client if recovery failed
       return new Response(
         JSON.stringify({ 
-          mealPlan: generateFallbackMealPlan(userData.dailyCalories, selectedFoods),
-          modelUsed: "fallback",
-          error: `Erro da API Groq: ${response.status}`,
-          errorDetails: errorData.substring(0, 500)
+          error: `Erro da API: ${response.status}`, 
+          details: errorData,
+          // Try alternative model next time
+          suggestedModel: modelName === "llama3-8b-8192" ? "llama3-70b-8192" : "llama3-8b-8192"
         }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
       );
     }
 
@@ -182,190 +393,206 @@ Limite o número de alimentos por refeição a no máximo 3.`;
     if (!apiResponse.choices || !apiResponse.choices[0] || !apiResponse.choices[0].message) {
       console.error("[NUTRI+] Formato de resposta da API inválido:", JSON.stringify(apiResponse).substring(0, 200));
       return new Response(
-        JSON.stringify({ 
-          mealPlan: generateFallbackMealPlan(userData.dailyCalories, selectedFoods),
-          modelUsed: "fallback",
-          error: "Formato de resposta da API inválido"
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "Formato de resposta da API inválido" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
       );
     }
 
     // Get the model's response content
     const mealPlanContent = apiResponse.choices[0].message.content;
     
-    // Log size and a preview of the content
-    console.log(`[NUTRI+] Tamanho da resposta: ${mealPlanContent.length} caracteres`);
-    console.log(`[NUTRI+] Prévia da resposta: ${mealPlanContent.substring(0, 300)}...`);
-    
+    // Ensure the response is valid JSON
     try {
-      // Parse and validate the JSON response with safer approach
-      let mealPlanJson;
+      // Fix common format issues before parsing
+      let formattedContent = mealPlanContent
+        .replace(/"morning_snack":/g, '"morningSnack":')
+        .replace(/"afternoon_snack":/g, '"afternoonSnack":')
+        .replace(/"evening_snack":/g, '"eveningSnack":')
+        .replace(/"pre_workout":/g, '"preWorkout":')
+        .replace(/"post_workout":/g, '"postWorkout":')
+        // Fix common issues with array commas
+        .replace(/,\s*\]/g, ']')         // Remove trailing commas in arrays
+        .replace(/,\s*\}/g, '}')         // Remove trailing commas in objects
+        .replace(/\.\.\.[\s\n]*\}/g, '}')  // Fix ellipsis in JSON
+        .replace(/\.\.\.[\s\n]*\]/g, ']'); // Fix ellipsis in JSON
       
-      try {
-        // First try normal parsing
-        mealPlanJson = JSON.parse(mealPlanContent);
-      } catch (parseError) {
-        console.error("[NUTRI+] Erro no parsing inicial:", parseError.message);
-        
-        // Try with normalizing the content first
-        try {
-          // Remove any markdown formatting and normalize meal type names
-          const normalizedContent = mealPlanContent
-            .replace(/```json|```/g, '')
-            .replace(/"morning_snack":/g, '"morningSnack":')
-            .replace(/"afternoon_snack":/g, '"afternoonSnack":')
-            .replace(/,\s*\]/g, ']')  // Remove trailing commas in arrays
-            .replace(/,\s*\}/g, '}')  // Remove trailing commas in objects
-            .trim();
-          
-          mealPlanJson = JSON.parse(normalizedContent);
-          console.log("[NUTRI+] JSON corrigido após normalização");
-        } catch (normalizeError) {
-          console.error("[NUTRI+] Erro após normalização:", normalizeError.message);
-          
-          // If all parsing attempts fail, use fallback
-          throw new Error(`Erro de parsing do JSON: ${parseError.message}`);
+      // Advanced fix for ... outros dias ... pattern which breaks the JSON
+      formattedContent = formattedContent.replace(/(\s*"[^"]+"\s*:\s*\{\s*\/\*[^*]*\*\/\s*\})(,\s*\/\*\s*\.\.\.\s*outros\s*dias\s*\.\.\.\s*\*\/)/g, 
+        (match, group1) => {
+          return group1;
         }
-      }
+      );
+      
+      // Log size and a preview of the content
+      console.log(`[NUTRI+] Tamanho da resposta: ${formattedContent.length} caracteres`);
+      console.log(`[NUTRI+] Prévia da resposta: ${formattedContent.substring(0, 300)}...`);
+      
+      // Parse and validate the JSON response
+      const mealPlanJson = JSON.parse(formattedContent);
       
       // Validate the structure
       if (!mealPlanJson.mealPlan || !mealPlanJson.mealPlan.weeklyPlan) {
-        throw new Error("Estrutura do plano alimentar inválida");
+        console.error("[NUTRI+] Resposta da API sem estrutura requerida. Resposta:", formattedContent.substring(0, 500));
+        return new Response(
+          JSON.stringify({ error: "Estrutura do plano alimentar inválida" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        );
       }
       
-      // Ensure at least 3 days are present (can be expanded to 7 if needed)
-      const weeklyPlan = mealPlanJson.mealPlan.weeklyPlan;
-      const daysOfWeek = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
-      const availableDays = Object.keys(weeklyPlan);
-      
-      console.log(`[NUTRI+] Dias disponíveis: ${availableDays.join(', ')}`);
-      
-      // If missing days, duplicate from available days
-      if (availableDays.length < 3) {
-        console.log("[NUTRI+] Adicionando dias faltantes no plano");
-        
-        const templateDay = weeklyPlan[availableDays[0]];
-        for (let i = 0; i < 3; i++) {
-          if (!weeklyPlan[daysOfWeek[i]]) {
-            weeklyPlan[daysOfWeek[i]] = structuredClone(templateDay);
-            weeklyPlan[daysOfWeek[i]].dayName = capitalizeFirstLetter(daysOfWeek[i]);
-          }
-        }
-      }
-      
-      // Ensure all days have complete meal data
-      Object.keys(weeklyPlan).forEach(day => {
-        const dayPlan = weeklyPlan[day];
-        if (!dayPlan.meals) {
-          dayPlan.meals = {};
-        }
-        
-        // Ensure all meal types exist
-        const mealTypes = ["breakfast", "morningSnack", "lunch", "afternoonSnack", "dinner"];
-        mealTypes.forEach(mealType => {
-          if (!dayPlan.meals[mealType]) {
-            dayPlan.meals[mealType] = {
-              description: `${capitalizeFirstLetter(mealType)} padrão`,
-              foods: [],
-              calories: 0,
-              macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
-            };
-          }
-        });
-        
-        // Ensure dailyTotals exists
-        if (!dayPlan.dailyTotals) {
-          dayPlan.dailyTotals = {
-            calories: 0,
-            protein: 0,
-            carbs: 0,
-            fats: 0,
-            fiber: 0
+      // Fix any remaining meal type inconsistencies in the weekly plan
+      Object.keys(mealPlanJson.mealPlan.weeklyPlan).forEach(day => {
+        const dayPlan = mealPlanJson.mealPlan.weeklyPlan[day];
+        if (dayPlan && dayPlan.meals) {
+          // Create a new meals object with correct keys
+          const correctedMeals = {};
+          
+          // Map different meal type formats to the correct format
+          const mealTypeMap = {
+            'breakfast': 'breakfast',
+            'morning_snack': 'morningSnack',
+            'morningSnack': 'morningSnack',
+            'lunch': 'lunch',
+            'afternoon_snack': 'afternoonSnack',
+            'afternoonSnack': 'afternoonSnack',
+            'dinner': 'dinner',
+            'evening_snack': 'eveningSnack',
+            'eveningSnack': 'eveningSnack'
           };
           
-          // Calculate totals from meals
-          Object.values(dayPlan.meals).forEach((meal: any) => {
-            dayPlan.dailyTotals.calories += meal.calories || 0;
-            dayPlan.dailyTotals.protein += meal.macros?.protein || 0;
-            dayPlan.dailyTotals.carbs += meal.macros?.carbs || 0;
-            dayPlan.dailyTotals.fats += meal.macros?.fats || 0;
-            dayPlan.dailyTotals.fiber += meal.macros?.fiber || 0;
+          // Copy and correct each meal
+          Object.keys(dayPlan.meals).forEach(mealType => {
+            const correctMealType = mealTypeMap[mealType] || mealType;
+            if (dayPlan.meals[mealType]) {
+              correctedMeals[correctMealType] = dayPlan.meals[mealType];
+            }
+          });
+          
+          // Replace the meals object with the corrected one
+          dayPlan.meals = correctedMeals;
+        }
+      });
+      
+      // Complete meal plan with the latest data
+      const mealPlan = {
+        ...mealPlanJson.mealPlan,
+        userCalories: userData.dailyCalories,
+        generatedBy: "nutri-plus-agent-llama3"
+      };
+      
+      // Ensure all days have complete meal data and details for each food
+      Object.keys(mealPlan.weeklyPlan).forEach(day => {
+        const dayPlan = mealPlan.weeklyPlan[day];
+        if (dayPlan && dayPlan.meals) {
+          Object.keys(dayPlan.meals).forEach(mealType => {
+            const meal = dayPlan.meals[mealType];
+            if (meal && meal.foods) {
+              meal.foods.forEach(food => {
+                // Ensure each food has details for preparation
+                if (!food.details || food.details === "") {
+                  food.details = "Preparar conforme preferência pessoal. Consumir fresco quando possível.";
+                }
+              });
+            }
           });
         }
       });
       
-      // Ensure weeklyTotals exists and is valid
-      if (!mealPlanJson.mealPlan.weeklyTotals) {
-        mealPlanJson.mealPlan.weeklyTotals = {
-          averageCalories: userData.dailyCalories || 2000,
-          averageProtein: 0,
-          averageCarbs: 0,
-          averageFats: 0,
-          averageFiber: 0
-        };
+      // Verify the weekly totals match the user's calorie goal
+      if (!mealPlan.weeklyTotals || 
+          isNaN(mealPlan.weeklyTotals.averageCalories) || 
+          isNaN(mealPlan.weeklyTotals.averageProtein) ||
+          isNaN(mealPlan.weeklyTotals.averageCarbs) ||
+          isNaN(mealPlan.weeklyTotals.averageFats) ||
+          isNaN(mealPlan.weeklyTotals.averageFiber)) {
         
-        // Calculate from available days
-        const days = Object.values(weeklyPlan);
-        if (days.length > 0) {
-          const validDays = days.filter((day: any) => day && day.dailyTotals);
-          const dayCount = validDays.length || 1;
-          
-          mealPlanJson.mealPlan.weeklyTotals = {
-            averageCalories: Math.round(validDays.reduce((sum, day: any) => sum + (day.dailyTotals?.calories || 0), 0) / dayCount),
-            averageProtein: Math.round(validDays.reduce((sum, day: any) => sum + (day.dailyTotals?.protein || 0), 0) / dayCount),
-            averageCarbs: Math.round(validDays.reduce((sum, day: any) => sum + (day.dailyTotals?.carbs || 0), 0) / dayCount),
-            averageFats: Math.round(validDays.reduce((sum, day: any) => sum + (day.dailyTotals?.fats || 0), 0) / dayCount),
-            averageFiber: Math.round(validDays.reduce((sum, day: any) => sum + (day.dailyTotals?.fiber || 0), 0) / dayCount)
-          };
-        }
-      }
-      
-      // Ensure recommendations exist
-      if (!mealPlanJson.mealPlan.recommendations) {
-        mealPlanJson.mealPlan.recommendations = {
-          general: "Mantenha uma alimentação balanceada e variada.",
-          preworkout: "Consuma carboidratos de rápida absorção antes do treino.",
-          postworkout: "Consuma proteínas e carboidratos após o treino para recuperação.",
-          timing: [
-            "Café da manhã: Logo ao acordar",
-            "Lanche da manhã: 2-3 horas após café",
-            "Almoço: 12-13h",
-            "Lanche da tarde: 15-16h",
-            "Jantar: 19-20h"
-          ]
+        console.log("[NUTRI+] Recalculando médias semanais devido a valores inválidos");
+        
+        const days = Object.values(mealPlan.weeklyPlan);
+        const validDays = days.filter(day => day && day.dailyTotals);
+        const dayCount = validDays.length || 1; // Avoid division by zero
+        
+        mealPlan.weeklyTotals = {
+          averageCalories: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.calories || 0), 0) / dayCount),
+          averageProtein: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.protein || 0), 0) / dayCount),
+          averageCarbs: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.carbs || 0), 0) / dayCount),
+          averageFats: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.fats || 0), 0) / dayCount),
+          averageFiber: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.fiber || 0), 0) / dayCount)
         };
       }
-      
-      // Add user calories to the meal plan
-      mealPlanJson.mealPlan.userCalories = userData.dailyCalories;
-      mealPlanJson.mealPlan.generatedBy = "nutri-plus-agent-llama3";
-      
-      console.log(`[NUTRI+] Plano alimentar processado com sucesso às ${new Date().toISOString()}`);
+
+      console.log(`[NUTRI+] Plano alimentar gerado com sucesso às ${new Date().toISOString()}`);
       console.log(`[NUTRI+] Duração do processo: ${(new Date().getTime() - new Date(startTime).getTime()) / 1000}s`);
       
       // Return the successful response with model info
       return new Response(
         JSON.stringify({ 
-          mealPlan: mealPlanJson.mealPlan,
+          mealPlan,
           modelUsed: modelName
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
       
-    } catch (error) {
-      // Handle any unexpected errors in parsing or validation
-      console.error("[NUTRI+] Erro ao processar resposta:", error);
+    } catch (jsonError) {
+      // If the response is not valid JSON, log the error and return error response
+      console.error("[NUTRI+] Erro ao analisar JSON:", jsonError);
+      console.error("[NUTRI+] Resposta JSON inválida:", mealPlanContent.substring(0, 1000));
       
-      // Return fallback meal plan
+      // Try to repair JSON syntax
+      try {
+        // Locate the error
+        if (jsonError.message.includes("position")) {
+          const errorPosition = parseInt(jsonError.message.match(/position (\d+)/)?.[1] || "0");
+          const contextStart = Math.max(0, errorPosition - 100);
+          const contextEnd = Math.min(mealPlanContent.length, errorPosition + 100);
+          const errorContext = mealPlanContent.substring(contextStart, contextEnd);
+          
+          console.log(`[NUTRI+] Contexto do erro (posição ${errorPosition}):`, errorContext);
+          
+          // Attempt to repair the specific syntax issue
+          let repaired = mealPlanContent;
+          
+          // Common fixes for array and object closures
+          if (jsonError.message.includes("Expected ',' or ']' after array element")) {
+            // Simply try to remove problematic commas that might be breaking arrays
+            const part1 = repaired.substring(0, errorPosition);
+            const part2 = repaired.substring(errorPosition);
+            
+            // Close any unclosed arrays or objects
+            repaired = part1 + part2
+              .replace(/,\s*\]/g, ']')         // Remove trailing commas in arrays
+              .replace(/,\s*\}/g, '}');        // Remove trailing commas in objects
+              
+            try {
+              const repairedJson = JSON.parse(repaired);
+              console.log("[NUTRI+] JSON reparado com sucesso!");
+              
+              // Return the repaired JSON if it was successfully parsed
+              if (repairedJson.mealPlan && repairedJson.mealPlan.weeklyPlan) {
+                return new Response(
+                  JSON.stringify({ 
+                    mealPlan: repairedJson.mealPlan,
+                    modelUsed: modelName,
+                    repaired: true
+                  }),
+                  { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                );
+              }
+            } catch (repairError) {
+              console.error("[NUTRI+] Falha na tentativa de reparo:", repairError);
+            }
+          }
+        }
+      } catch (repairAttemptError) {
+        console.error("[NUTRI+] Erro na tentativa de reparo:", repairAttemptError);
+      }
+      
       return new Response(
         JSON.stringify({ 
-          mealPlan: generateFallbackMealPlan(userData.dailyCalories, selectedFoods),
-          modelUsed: "fallback",
-          error: error.message,
-          errorDetails: "Ocorreu um erro ao processar o plano alimentar. Um plano básico foi gerado."
+          error: "Falha ao analisar JSON do plano alimentar",
+          details: jsonError.message,
+          rawContent: mealPlanContent.substring(0, 500) + "..." 
         }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
       );
     }
     
@@ -373,140 +600,8 @@ Limite o número de alimentos por refeição a no máximo 3.`;
     // Handle any unexpected errors
     console.error("[NUTRI+] Erro inesperado:", error);
     return new Response(
-      JSON.stringify({ 
-        error: "Erro interno do servidor", 
-        details: error.message,
-        mealPlan: generateFallbackMealPlan(2000, []) // Provide fallback with default values
-      }),
+      JSON.stringify({ error: "Erro interno do servidor", details: error.message }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
     );
   }
 });
-
-// Helper function to capitalize first letter
-function capitalizeFirstLetter(string: string): string {
-  return string.charAt(0).toUpperCase() + string.slice(1);
-}
-
-// Generate a fallback meal plan when the API fails
-function generateFallbackMealPlan(calories: number = 2000, foods: any[]): any {
-  // Create a simple meal plan structure with basic meals
-  const sampleFoods = foods.length > 10 ? foods.slice(0, 10) : foods;
-  
-  // Default recommendations
-  const recommendations = {
-    general: "Mantenha uma alimentação balanceada com proteínas, carboidratos e gorduras saudáveis.",
-    preworkout: "Consuma carboidratos 30-60 minutos antes do treino para energia.",
-    postworkout: "Consuma proteínas após o treino para recuperação muscular.",
-    timing: [
-      "Café da manhã: Logo ao acordar",
-      "Lanche da manhã: 10:00",
-      "Almoço: 13:00",
-      "Lanche da tarde: 16:00",
-      "Jantar: 19:00"
-    ]
-  };
-
-  // Create a meal template
-  const createMeal = (name: string, calories: number) => {
-    const protein = Math.round(calories * 0.3 / 4); // 30% from protein
-    const carbs = Math.round(calories * 0.5 / 4);   // 50% from carbs
-    const fats = Math.round(calories * 0.2 / 9);    // 20% from fats
-    
-    // Get 1-2 random foods if available
-    const mealFoods = [];
-    if (sampleFoods.length > 0) {
-      const randomIndex = Math.floor(Math.random() * sampleFoods.length);
-      const food = sampleFoods[randomIndex];
-      mealFoods.push({
-        name: food.name || "Alimento genérico",
-        portion: 100,
-        unit: "g",
-        details: "Prepare conforme sua preferência."
-      });
-    } else {
-      mealFoods.push({
-        name: `${name} genérico`,
-        portion: 100,
-        unit: "g",
-        details: "Prepare conforme sua preferência."
-      });
-    }
-    
-    return {
-      description: `${name} básico`,
-      foods: mealFoods,
-      calories: calories,
-      macros: {
-        protein: protein,
-        carbs: carbs,
-        fats: fats,
-        fiber: Math.round(carbs * 0.2) // Approximately 20% of carbs as fiber
-      }
-    };
-  };
-
-  // Create day template with balanced calorie distribution
-  const createDay = (dayName: string) => {
-    const breakfastCal = Math.round(calories * 0.25);
-    const morningSnackCal = Math.round(calories * 0.1);
-    const lunchCal = Math.round(calories * 0.3);
-    const afternoonSnackCal = Math.round(calories * 0.1);
-    const dinnerCal = Math.round(calories * 0.25);
-    
-    const breakfast = createMeal("Café da manhã", breakfastCal);
-    const morningSnack = createMeal("Lanche da manhã", morningSnackCal);
-    const lunch = createMeal("Almoço", lunchCal);
-    const afternoonSnack = createMeal("Lanche da tarde", afternoonSnackCal);
-    const dinner = createMeal("Jantar", dinnerCal);
-    
-    const totalProtein = breakfast.macros.protein + morningSnack.macros.protein + 
-                         lunch.macros.protein + afternoonSnack.macros.protein + dinner.macros.protein;
-                         
-    const totalCarbs = breakfast.macros.carbs + morningSnack.macros.carbs + 
-                      lunch.macros.carbs + afternoonSnack.macros.carbs + dinner.macros.carbs;
-                      
-    const totalFats = breakfast.macros.fats + morningSnack.macros.fats + 
-                     lunch.macros.fats + afternoonSnack.macros.fats + dinner.macros.fats;
-                     
-    const totalFiber = breakfast.macros.fiber + morningSnack.macros.fiber + 
-                      lunch.macros.fiber + afternoonSnack.macros.fiber + dinner.macros.fiber;
-    
-    return {
-      dayName: dayName,
-      meals: {
-        breakfast,
-        morningSnack,
-        lunch,
-        afternoonSnack,
-        dinner
-      },
-      dailyTotals: {
-        calories: calories,
-        protein: totalProtein,
-        carbs: totalCarbs,
-        fats: totalFats,
-        fiber: totalFiber
-      }
-    };
-  };
-
-  // Create the week plan with 3 days
-  return {
-    weeklyPlan: {
-      monday: createDay("Segunda-feira"),
-      tuesday: createDay("Terça-feira"),
-      wednesday: createDay("Quarta-feira")
-    },
-    weeklyTotals: {
-      averageCalories: calories,
-      averageProtein: Math.round(calories * 0.3 / 4),
-      averageCarbs: Math.round(calories * 0.5 / 4),
-      averageFats: Math.round(calories * 0.2 / 9),
-      averageFiber: Math.round(calories * 0.5 / 4 * 0.2)
-    },
-    recommendations,
-    userCalories: calories,
-    generatedBy: "fallback-generator"
-  };
-}

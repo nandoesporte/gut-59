@@ -19,8 +19,6 @@ export interface ProtocolFood {
   carbs_per_100g?: number;
   fats_per_100g?: number;
   fiber_per_100g?: number;
-  meal_type?: string[];
-  nutritional_category?: string[];
 }
 
 export interface DietaryPreferences {

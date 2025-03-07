@@ -1,112 +1,116 @@
 
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { ProtocolFood } from "../types";
-import { toast } from "sonner";
+import { useState, useCallback } from 'react';
+import { ProtocolFood } from '../types';
+import { FOOD_GROUP_MAP } from './useProtocolFoods';
+
+// Define os mapeamentos de food_group_id para refeições
+const FOOD_GROUP_TO_MEAL_TYPE = {
+  1: 'breakfast',      // Café da Manhã
+  2: 'morning_snack',  // Lanche da Manhã
+  3: 'lunch',          // Almoço
+  4: 'afternoon_snack', // Lanche da Tarde
+  5: 'dinner'          // Jantar
+};
 
 export const useFoodSelection = () => {
-  const [protocolFoods, setProtocolFoods] = useState<ProtocolFood[]>([]);
-  const [selectedFoods, setSelectedFoods] = useState<ProtocolFood[]>([]);
-  const [foodsByMealType, setFoodsByMealType] = useState<Record<string, ProtocolFood[]>>({});
-  const [totalCalories, setTotalCalories] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [selectedFoods, setSelectedFoods] = useState<string[]>([]);
+  const [totalCalories, setTotalCalories] = useState<number>(0);
+  
+  // Estrutura para armazenar alimentos categorizados por refeição
+  const [foodsByMealType, setFoodsByMealType] = useState<Record<string, string[]>>({
+    breakfast: [],
+    morning_snack: [],
+    lunch: [],
+    afternoon_snack: [],
+    dinner: [],
+    uncategorized: [] // Alimentos sem grupo definido
+  });
 
-  // Load protocol foods
-  const loadFoods = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("protocol_foods")
-        .select("*")
-        .order("name");
-
-      if (error) {
-        throw error;
-      }
-
-      setProtocolFoods(data as ProtocolFood[]);
-      return data;
-    } catch (error) {
-      console.error("Error loading foods:", error);
-      toast.error("Erro ao carregar alimentos");
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Calculate total calories
-  const calculateTotalCalories = (foods: ProtocolFood[]) => {
-    return foods.reduce((total, food) => total + (food.calories || 0), 0);
-  };
-
-  // Handle food selection
-  const handleFoodSelection = (foodId: string, food?: ProtocolFood) => {
-    const foodToUse = food || protocolFoods.find(f => f.id === foodId);
-    
-    if (!foodToUse) return;
-    
-    setSelectedFoods(prevSelectedFoods => {
-      // Check if this food is already selected
-      const isSelected = prevSelectedFoods.some(f => f.id === foodId);
+  const handleFoodSelection = useCallback((foodId: string, food?: ProtocolFood) => {
+    setSelectedFoods(prevSelected => {
+      const newSelected = prevSelected.includes(foodId)
+        ? prevSelected.filter(id => id !== foodId)
+        : [...prevSelected, foodId];
       
-      // If selected, remove it
-      if (isSelected) {
-        const newSelectedFoods = prevSelectedFoods.filter(f => f.id !== foodId);
-        setTotalCalories(calculateTotalCalories(newSelectedFoods));
-        return newSelectedFoods;
-      } 
-      // If not selected, add it
-      else {
-        const newSelectedFoods = [...prevSelectedFoods, foodToUse];
-        setTotalCalories(calculateTotalCalories(newSelectedFoods));
-        return newSelectedFoods;
+      // Se temos o objeto de alimento completo, vamos categorizá-lo por refeição
+      if (food) {
+        let mealType = 'uncategorized';
+        
+        // Verifica se há um food_group_id válido
+        if (food.food_group_id !== null && food.food_group_id !== undefined) {
+          // Certifica-se de que o food_group_id é um número entre 1 e 5
+          const groupId = Number(food.food_group_id);
+          if (!isNaN(groupId) && groupId >= 1 && groupId <= 5) {
+            mealType = FOOD_GROUP_TO_MEAL_TYPE[groupId as keyof typeof FOOD_GROUP_TO_MEAL_TYPE] || 'uncategorized';
+          }
+        }
+        
+        setFoodsByMealType(prev => {
+          const updatedMeals = { ...prev };
+          
+          // Se o alimento foi selecionado, adiciona à refeição correspondente
+          if (!prevSelected.includes(foodId)) {
+            updatedMeals[mealType] = [...updatedMeals[mealType], foodId];
+          } 
+          // Se foi desselecionado, remove da refeição correspondente
+          else {
+            updatedMeals[mealType] = updatedMeals[mealType].filter(id => id !== foodId);
+          }
+          
+          return updatedMeals;
+        });
       }
+      
+      return newSelected;
     });
-  };
+  }, []);
 
-  // Categorize foods by meal type
-  const categorizeFoodsByMealType = (foods: ProtocolFood[]) => {
-    const foodsByType: Record<string, ProtocolFood[]> = {
+  const calculateTotalCalories = useCallback((foods: ProtocolFood[]) => {
+    const selected = foods.filter(food => selectedFoods.includes(food.id));
+    const total = selected.reduce((sum, food) => sum + (food.calories || 0), 0);
+    setTotalCalories(total);
+    return total;
+  }, [selectedFoods]);
+
+  // Função para organizar alimentos já selecionados por tipo de refeição
+  const categorizeFoodsByMealType = useCallback((foods: ProtocolFood[]) => {
+    const mealTypeMap: Record<string, string[]> = {
       breakfast: [],
       morning_snack: [],
       lunch: [],
       afternoon_snack: [],
       dinner: [],
-      any: []
+      uncategorized: []
     };
-
-    foods.forEach(food => {
-      if (!food.meal_type || food.meal_type.length === 0 || 
-          (Array.isArray(food.meal_type) && food.meal_type.includes('any'))) {
-        foodsByType.any.push(food);
-      } else if (Array.isArray(food.meal_type)) {
-        food.meal_type.forEach(type => {
-          if (type in foodsByType) {
-            foodsByType[type].push(food);
+    
+    selectedFoods.forEach(foodId => {
+      const food = foods.find(f => f.id === foodId);
+      if (food) {
+        let mealType = 'uncategorized';
+        
+        // Verifica se há um food_group_id válido
+        if (food.food_group_id !== null && food.food_group_id !== undefined) {
+          // Certifica-se de que o food_group_id é um número entre 1 e 5
+          const groupId = Number(food.food_group_id);
+          if (!isNaN(groupId) && groupId >= 1 && groupId <= 5) {
+            mealType = FOOD_GROUP_TO_MEAL_TYPE[groupId as keyof typeof FOOD_GROUP_TO_MEAL_TYPE] || 'uncategorized';
           }
-        });
+        }
+
+        mealTypeMap[mealType].push(foodId);
       }
     });
-
-    return foodsByType;
-  };
-
-  // Update foodsByMealType when selectedFoods change
-  useEffect(() => {
-    setFoodsByMealType(categorizeFoodsByMealType(selectedFoods));
+    
+    setFoodsByMealType(mealTypeMap);
+    return mealTypeMap;
   }, [selectedFoods]);
 
   return {
-    protocolFoods,
     selectedFoods,
     foodsByMealType,
     totalCalories,
-    loading,
-    setSelectedFoods,
     handleFoodSelection,
     calculateTotalCalories,
-    categorizeFoodsByMealType,
-    loadFoods
+    categorizeFoodsByMealType
   };
 };
