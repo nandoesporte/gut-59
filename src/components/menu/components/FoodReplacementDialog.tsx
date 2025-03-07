@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, ChangeEvent } from "react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, Search } from "lucide-react";
 import { MealFood, ProtocolFood } from "../types";
 import { supabase } from "@/integrations/supabase/client";
+import { Textarea } from "@/components/ui/textarea";
 
 interface FoodReplacementDialogProps {
   open: boolean;
@@ -214,8 +215,7 @@ export const FoodReplacementDialog = ({
           {selectedFood && (
             <div>
               <h3 className="text-sm font-medium mb-2">Modo de preparo personalizado:</h3>
-              <Input
-                as="textarea"
+              <Textarea
                 className="min-h-[80px]"
                 value={customPreparation}
                 onChange={(e) => setCustomPreparation(e.target.value)}

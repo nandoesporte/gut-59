@@ -63,9 +63,12 @@ export const SavedMealPlanDetails = ({ planId, planData, isOpen, onClose }: Save
             return;
           }
 
+          // Convert the MealPlan to a compatible JSON structure for Supabase
           const { error } = await supabase
             .from('meal_plans')
-            .update({ plan_data: updatedPlanData })
+            .update({ 
+              plan_data: updatedPlanData as unknown as Record<string, any> 
+            })
             .eq('id', planId);
 
           if (error) {
