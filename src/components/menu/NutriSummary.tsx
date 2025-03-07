@@ -52,7 +52,7 @@ export const NutriSummary = () => {
             id: data.id,
             created_at: data.created_at,
             calories: data.calories,
-            plan_data: data.plan_data as MealPlan
+            plan_data: JSON.parse(JSON.stringify(data.plan_data)) as MealPlan
           };
           setLastPlan(planDataWithTypes);
         }
