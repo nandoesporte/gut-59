@@ -29,6 +29,7 @@ export const generateMealPlan = async ({
 }: GenerateMealPlanParams): Promise<MealPlan | null> => {
   console.log("🚀 Iniciando geração do plano alimentar com o agente Nutri+");
   console.log(`👤 Dados do usuário: ${userData.weight}kg, ${userData.height}cm, ${userData.age} anos, ${userData.gender}`);
+  console.log(`🥅 Meta: ${userData.goal}, Calorias diárias: ${userData.dailyCalories}kcal`);
   console.log(`🍎 Alimentos selecionados: ${selectedFoods.length}`);
   console.log(`🥗 Preferências alimentares:`, preferences);
   
@@ -66,6 +67,32 @@ export const generateMealPlan = async ({
     console.log("📋 Dados do plano:", JSON.stringify(data.mealPlan).substring(0, 200) + "...");
     console.log("🧠 Modelo utilizado:", data.modelUsed || "llama3-8b-8192");
     
+    // Ensure the meal plan uses the user's specified daily calories
+    if (data.mealPlan && userData.dailyCalories) {
+      data.mealPlan.userCalories = userData.dailyCalories;
+      
+      // If weeklyTotals is missing or has NaN values, recalculate it here
+      if (!data.mealPlan.weeklyTotals || 
+          isNaN(data.mealPlan.weeklyTotals.averageCalories) || 
+          isNaN(data.mealPlan.weeklyTotals.averageProtein)) {
+        
+        console.log("⚠️ Recalculando médias semanais devido a valores ausentes ou NaN");
+        const days = Object.values(data.mealPlan.weeklyPlan);
+        const validDays = days.filter(day => day && day.dailyTotals);
+        const dayCount = validDays.length || 1; // Prevent division by zero
+        
+        data.mealPlan.weeklyTotals = {
+          averageCalories: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.calories || 0), 0) / dayCount),
+          averageProtein: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.protein || 0), 0) / dayCount),
+          averageCarbs: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.carbs || 0), 0) / dayCount),
+          averageFats: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.fats || 0), 0) / dayCount),
+          averageFiber: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.fiber || 0), 0) / dayCount)
+        };
+        
+        console.log("🔄 Novos valores de médias semanais:", data.mealPlan.weeklyTotals);
+      }
+    }
+    
     // Save the meal plan to the database if user is authenticated
     if (userData.id) {
       try {
@@ -75,7 +102,8 @@ export const generateMealPlan = async ({
             user_id: userData.id,
             plan_data: data.mealPlan,
             calories: userData.dailyCalories,
-            generated_by: data.modelUsed || "nutri-plus-agent-llama3"
+            generated_by: data.modelUsed || "nutri-plus-agent-llama3",
+            preferences: preferences // Save the user preferences with the meal plan
           });
 
         if (saveError) {

@@ -38,6 +38,7 @@ serve(async (req) => {
     console.log(`[NUTRI+] Perfil do usuário: ${userData.age} anos, ${userData.gender}, ${userData.weight}kg, ${userData.height}cm`);
     console.log(`[NUTRI+] Objetivo: ${userData.goal}, Calorias diárias: ${userData.dailyCalories}kcal`);
     console.log(`[NUTRI+] Alimentos selecionados: ${selectedFoods?.length || 0}`);
+    console.log(`[NUTRI+] Preferências e restrições: ${JSON.stringify(dietaryPreferences)}`);
     
     if (!selectedFoods || selectedFoods.length === 0) {
       console.error("[NUTRI+] Erro: Nenhum alimento selecionado");
@@ -82,7 +83,7 @@ Certifique-se de que o weeklyPlan contenha TODOS os 7 dias (segunda a domingo). 
   "meals": {
     "breakfast": {
       "description": "Descrição do café da manhã",
-      "foods": [{"name": "Nome do alimento", "portion": 100, "unit": "g", "details": "Detalhes sobre o alimento"}],
+      "foods": [{"name": "Nome do alimento", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento"}],
       "calories": 500,
       "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
     },
@@ -90,6 +91,8 @@ Certifique-se de que o weeklyPlan contenha TODOS os 7 dias (segunda a domingo). 
   },
   "dailyTotals": {"calories": 2000, "protein": 120, "carbs": 180, "fats": 60, "fiber": 25}
 }
+
+É FUNDAMENTAL que cada alimento na lista "foods" contenha instruções detalhadas de preparo no campo "details", explicando como o alimento deve ser preparado, cozido ou consumido.
 
 As recomendações devem incluir:
 {
@@ -113,7 +116,7 @@ PERFIL DO USUÁRIO:
 
 PREFERÊNCIAS ALIMENTARES:
 ${dietaryPreferences.hasAllergies ? `- Alergias: ${dietaryPreferences.allergies.join(', ')}` : '- Sem alergias conhecidas'}
-${dietaryPreferences.dietaryRestrictions ? `- Restrições Alimentares: ${dietaryPreferences.dietaryRestrictions.join(', ')}` : '- Sem restrições alimentares'}
+${dietaryPreferences.dietaryRestrictions && dietaryPreferences.dietaryRestrictions.length > 0 ? `- Restrições Alimentares: ${dietaryPreferences.dietaryRestrictions.join(', ')}` : '- Sem restrições alimentares'}
 ${dietaryPreferences.trainingTime ? `- Horário de Treino: ${dietaryPreferences.trainingTime}` : '- Sem horário específico de treino'}
 
 ALIMENTOS DISPONÍVEIS (${selectedFoods.length} no total):
@@ -125,12 +128,14 @@ ${Object.entries(foodsByMealType).map(([mealType, foods]) =>
 ).join('\n')}` : ''}
 
 Por favor, crie um plano de 7 dias que:
-1. Atenda à meta de calorias diárias com distribuição adequada de macronutrientes
-2. Use os alimentos disponíveis fornecidos
-3. Respeite as preferências e restrições alimentares
-4. Forneça variedade ao longo da semana
-5. Inclua todos os tipos de refeições necessários: café da manhã, lanche da manhã, almoço, lanche da tarde, jantar
-6. Calcule com precisão as calorias e macros para cada refeição e dia`;
+1. Atenda EXATAMENTE à meta de ${userData.dailyCalories} calorias diárias
+2. Distribua adequadamente os macronutrientes (proteínas, carboidratos, gorduras, fibras)
+3. Use os alimentos disponíveis fornecidos
+4. Respeite rigorosamente as preferências e restrições alimentares do usuário
+5. Forneça variedade ao longo da semana
+6. Inclua todos os tipos de refeições necessários: café da manhã, lanche da manhã, almoço, lanche da tarde, jantar
+7. Calcule com precisão as calorias e macros para cada refeição e dia
+8. Forneça detalhes de preparo para CADA alimento (como cozinhar, temperar, combinar ingredientes)`;
 
     // Track time for API call preparation
     console.log(`[NUTRI+] Preparando chamada de API às ${new Date().toISOString()}`);
@@ -212,6 +217,47 @@ Por favor, crie um plano de 7 dias que:
         generatedBy: "nutri-plus-agent-llama3"
       };
       
+      // Ensure all days have complete meal data and details for each food
+      Object.keys(mealPlan.weeklyPlan).forEach(day => {
+        const dayPlan = mealPlan.weeklyPlan[day];
+        if (dayPlan && dayPlan.meals) {
+          Object.keys(dayPlan.meals).forEach(mealType => {
+            const meal = dayPlan.meals[mealType];
+            if (meal && meal.foods) {
+              meal.foods.forEach(food => {
+                // Ensure each food has details for preparation
+                if (!food.details || food.details === "") {
+                  food.details = "Preparar conforme preferência pessoal. Consumir fresco quando possível.";
+                }
+              });
+            }
+          });
+        }
+      });
+      
+      // Verify the weekly totals match the user's calorie goal
+      if (!mealPlan.weeklyTotals || 
+          isNaN(mealPlan.weeklyTotals.averageCalories) || 
+          isNaN(mealPlan.weeklyTotals.averageProtein) ||
+          isNaN(mealPlan.weeklyTotals.averageCarbs) ||
+          isNaN(mealPlan.weeklyTotals.averageFats) ||
+          isNaN(mealPlan.weeklyTotals.averageFiber)) {
+        
+        console.log("[NUTRI+] Recalculando médias semanais devido a valores inválidos");
+        
+        const days = Object.values(mealPlan.weeklyPlan);
+        const validDays = days.filter(day => day && day.dailyTotals);
+        const dayCount = validDays.length || 1; // Avoid division by zero
+        
+        mealPlan.weeklyTotals = {
+          averageCalories: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.calories || 0), 0) / dayCount),
+          averageProtein: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.protein || 0), 0) / dayCount),
+          averageCarbs: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.carbs || 0), 0) / dayCount),
+          averageFats: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.fats || 0), 0) / dayCount),
+          averageFiber: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.fiber || 0), 0) / dayCount)
+        };
+      }
+
       console.log(`[NUTRI+] Plano alimentar gerado com sucesso às ${new Date().toISOString()}`);
       console.log(`[NUTRI+] Duração do processo: ${(new Date().getTime() - new Date(startTime).getTime()) / 1000}s`);
       

@@ -1,6 +1,6 @@
 
-import { MacroDistributionBar } from "./MacroDistributionBar";
-import type { Meal } from "../types";
+import { Card, CardContent } from "@/components/ui/card";
+import { Meal } from "../types";
 
 interface MealSectionProps {
   title: string;
@@ -8,79 +8,65 @@ interface MealSectionProps {
   meal: Meal;
 }
 
-export const MealSection = ({ 
-  title, 
-  icon, 
-  meal,
-}: MealSectionProps) => {
-  // Ensure meal has all required properties with fallbacks
-  const safeFood = {
-    calories: meal?.calories || 0,
-    description: meal?.description || "",
-    foods: meal?.foods || [],
-    macros: {
-      protein: meal?.macros?.protein || 0,
-      carbs: meal?.macros?.carbs || 0,
-      fats: meal?.macros?.fats || 0,
-      fiber: meal?.macros?.fiber || 0
-    }
-  };
+export const MealSection = ({ title, icon, meal }: MealSectionProps) => {
+  if (!meal) return null;
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
-      <h3 className="text-lg font-semibold flex items-center gap-2 text-gray-900 mb-4">
-        {icon}
-        {title}
-      </h3>
-
-      <div className="mb-4">
-        <p className="text-gray-600 italic">
-          {safeFood.description}
-        </p>
-      </div>
-
-      <div className="space-y-4">
-        {safeFood.foods.map((food, index) => (
-          <div key={index} className="text-gray-700">
-            <div className="flex justify-between items-start">
-              <div className="flex-1">
-                <div className="flex items-baseline gap-1 flex-wrap">
-                  <span className="font-medium">{food.portion} {food.unit}</span>
-                  <span className="text-gray-600">de</span>
-                  <span>{food.name}</span>
+    <Card>
+      <CardContent className="p-4 sm:p-6">
+        <div className="flex items-center gap-2 mb-4">
+          {icon}
+          <h3 className="text-lg font-semibold">{title}</h3>
+        </div>
+        
+        <p className="mb-3 text-gray-700">{meal.description}</p>
+        
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div>
+              <h4 className="text-sm font-medium text-gray-500 mb-2">Alimentos</h4>
+              <ul className="space-y-2">
+                {meal.foods.map((food, index) => (
+                  <li key={index} className="border-b pb-2">
+                    <div className="flex justify-between">
+                      <span className="font-medium">{food.name}</span>
+                      <span>{food.portion} {food.unit}</span>
+                    </div>
+                    {food.details && (
+                      <p className="text-sm text-gray-600 mt-1">
+                        <span className="font-medium">Modo de preparo:</span> {food.details}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            
+            <div>
+              <h4 className="text-sm font-medium text-gray-500 mb-2">Informação Nutricional</h4>
+              <div className="bg-gray-50 p-3 rounded-md">
+                <p className="mb-1">
+                  <span className="font-medium">Calorias:</span> {meal.calories} kcal
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <p className="text-sm">
+                    <span className="font-medium">Proteínas:</span> {meal.macros.protein}g
+                  </p>
+                  <p className="text-sm">
+                    <span className="font-medium">Carboidratos:</span> {meal.macros.carbs}g
+                  </p>
+                  <p className="text-sm">
+                    <span className="font-medium">Gorduras:</span> {meal.macros.fats}g
+                  </p>
+                  <p className="text-sm">
+                    <span className="font-medium">Fibras:</span> {meal.macros.fiber}g
+                  </p>
                 </div>
-                {food.details && (
-                  <span className="text-gray-500 text-sm block mt-1 ml-4">
-                    {food.details}
-                  </span>
-                )}
               </div>
             </div>
-            {index < safeFood.foods.length - 1 && <div className="border-b my-3 border-gray-100" />}
           </div>
-        ))}
-      </div>
-
-      <div className="mt-6 text-sm text-gray-600 border-t pt-4">
-        <div className="mb-2 text-md font-medium">
-          Total: {safeFood.calories} kcal
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
-          <div className="font-medium">Proteínas: {safeFood.macros.protein}g</div>
-          <div className="font-medium">Carbos: {safeFood.macros.carbs}g</div>
-          <div className="font-medium">Gorduras: {safeFood.macros.fats}g</div>
-          <div className="font-medium">Fibras: {safeFood.macros.fiber}g</div>
-        </div>
-        <div className="mt-3">
-          <MacroDistributionBar 
-            macros={{
-              protein: safeFood.macros.protein,
-              carbs: safeFood.macros.carbs,
-              fats: safeFood.macros.fats
-            }}
-          />
-        </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 };
