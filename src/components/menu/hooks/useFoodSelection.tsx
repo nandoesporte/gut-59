@@ -26,6 +26,25 @@ export const useFoodSelection = () => {
     uncategorized: [] // Alimentos sem grupo definido
   });
 
+  // Add food to selection
+  const addFood = useCallback((food: ProtocolFood) => {
+    handleFoodSelection(food.id, food);
+  }, []);
+
+  // Reset selection
+  const resetSelection = useCallback(() => {
+    setSelectedFoods([]);
+    setTotalCalories(0);
+    setFoodsByMealType({
+      breakfast: [],
+      morning_snack: [],
+      lunch: [],
+      afternoon_snack: [],
+      dinner: [],
+      uncategorized: []
+    });
+  }, []);
+
   const handleFoodSelection = useCallback((foodId: string, food?: ProtocolFood) => {
     setSelectedFoods(prevSelected => {
       const newSelected = prevSelected.includes(foodId)
@@ -111,6 +130,8 @@ export const useFoodSelection = () => {
     totalCalories,
     handleFoodSelection,
     calculateTotalCalories,
-    categorizeFoodsByMealType
+    categorizeFoodsByMealType,
+    addFood,            // Added this missing method
+    resetSelection      // Added this missing method
   };
 };

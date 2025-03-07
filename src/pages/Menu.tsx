@@ -1,3 +1,4 @@
+
 import { Card } from "@/components/ui/card";
 import { InitialMenuContent } from "@/components/menu/InitialMenuContent";
 import { CalorieCalculatorStep } from "@/components/menu/CalorieCalculatorStep";
@@ -11,7 +12,7 @@ import { Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useRef } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 
 const Menu = () => {
   const mealPlanRef = useRef<HTMLDivElement>(null);
@@ -136,8 +137,25 @@ const Menu = () => {
               </h2>
               {currentStep === 1 && (
                 <CalorieCalculatorStep
-                  formData={formData}
-                  onInputChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
+                  formData={{
+                    weight: String(formData.weight),
+                    height: String(formData.height),
+                    age: String(formData.age),
+                    gender: formData.gender,
+                    activityLevel: formData.activityLevel,
+                    goal: formData.goal
+                  }}
+                  onInputChange={(field, value) => {
+                    setFormData(prev => {
+                      const updatedData = { ...prev };
+                      if (field === 'weight' || field === 'height' || field === 'age') {
+                        updatedData[field] = Number(value);
+                      } else {
+                        updatedData[field as 'gender' | 'activityLevel' | 'goal'] = value as string;
+                      }
+                      return updatedData;
+                    });
+                  }}
                   onCalculate={handleCalculateCalories}
                   calorieNeeds={calorieNeeds}
                 />

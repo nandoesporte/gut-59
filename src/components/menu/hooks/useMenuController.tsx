@@ -23,7 +23,7 @@ interface MenuState {
   currentStep: number;
   setCurrentStep: (step: number) => void;
   calorieNeeds: number;
-  selectedFoods: ProtocolFood[];
+  selectedFoods: string[];
   protocolFoods: ProtocolFood[];
   totalCalories: number; 
   mealPlan: MealPlan | null;
@@ -32,7 +32,7 @@ interface MenuState {
   foodsError: Error | null;
   setFormData: (data: FormData) => void;
   handleCalculateCalories: () => void;
-  handleFoodSelection: (food: ProtocolFood) => void;
+  handleFoodSelection: (foodId: string, food?: ProtocolFood) => void;
   handleConfirmFoodSelection: () => void;
   handleDietaryPreferences: (preferences: DietaryPreferences) => void;
 }
@@ -60,7 +60,16 @@ export const useMenuController = (): MenuState => {
   
   const { protocolFoods, error: foodsError, foodsByMealType } = useProtocolFoods();
   const { calculateCalories } = useCalorieCalculator();
-  const { selectedFoods, totalCalories, addFood, resetSelection } = useFoodSelection();
+  const { 
+    selectedFoods, 
+    totalCalories, 
+    handleFoodSelection, 
+    calculateTotalCalories, 
+    categorizeFoodsByMealType,
+    addFood,
+    resetSelection 
+  } = useFoodSelection();
+  
   const wallet = useWallet();
 
   // Check for authenticated user
@@ -168,11 +177,6 @@ export const useMenuController = (): MenuState => {
     savePreferences();
   }, [formData, calculateCalories]);
 
-  // Handle Food Selection
-  const handleFoodSelection = useCallback((food: ProtocolFood) => {
-    addFood(food);
-  }, [addFood]);
-
   // Handle Confirm Food Selection
   const handleConfirmFoodSelection = useCallback(() => {
     if (selectedFoods.length === 0) {
@@ -223,7 +227,7 @@ export const useMenuController = (): MenuState => {
           goal: formData.goal,
           dailyCalories: calorieNeeds
         },
-        selectedFoods,
+        selectedFoods: protocolFoods.filter(food => selectedFoods.includes(food.id)),
         foodsByMealType,
         preferences,
         addTransaction: wallet ? async (params) => {
@@ -247,7 +251,7 @@ export const useMenuController = (): MenuState => {
     } finally {
       setLoading(false);
     }
-  }, [formData, calorieNeeds, selectedFoods, foodsByMealType, wallet]);
+  }, [formData, calorieNeeds, selectedFoods, protocolFoods, foodsByMealType, wallet]);
 
   return {
     currentStep,

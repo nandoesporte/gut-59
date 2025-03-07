@@ -1,11 +1,9 @@
 
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { ProtocolFood } from "../types";
-import { toast } from "sonner";
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { ProtocolFood } from '../types';
 
-// Definir o mapeamento de food_group_id para descrições legíveis
-export const FOOD_GROUP_MAP: Record<number, string> = {
+export const FOOD_GROUP_MAP = {
   1: 'Café da Manhã',
   2: 'Lanche da Manhã',
   3: 'Almoço',
@@ -15,95 +13,71 @@ export const FOOD_GROUP_MAP: Record<number, string> = {
 
 export const useProtocolFoods = () => {
   const [protocolFoods, setProtocolFoods] = useState<ProtocolFood[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
+  const [foodsByMealType, setFoodsByMealType] = useState<Record<string, string[]>>({
+    breakfast: [],
+    morning_snack: [],
+    lunch: [],
+    afternoon_snack: [],
+    dinner: [],
+    uncategorized: []
+  });
 
   useEffect(() => {
-    const fetchFoods = async () => {
+    const fetchProtocolFoods = async () => {
       try {
         setLoading(true);
-        console.log("Fetching protocol foods from database...");
         
-        // Buscar alimentos e dados de food_groups (para obter os nomes das categorias)
         const { data, error } = await supabase
           .from('protocol_foods')
           .select('*')
           .order('name');
-
-        if (error) {
-          throw new Error(`Error fetching foods: ${error.message}`);
-        }
-
-        console.log(`Fetched ${data?.length || 0} protocol foods`);
-        
-        if (data?.length === 0) {
-          console.warn("No protocol foods found in the database. Make sure to add some in the admin panel.");
-          toast.warning("Nenhum alimento encontrado no banco de dados. Adicione alimentos no painel administrativo.");
-        }
-        
-        // Processar os dados para garantir que todos os alimentos tenham food_group_id válido
-        const processedData = data?.map(food => {
-          // Garantir que os alimentos tenham categorias apropriadas
-          if (food.food_group_id === null) {
-            // Estratégia de categorização por nome de alimento
-            const name = food.name.toLowerCase();
-            
-            // Café da manhã: alimentos típicos de café da manhã
-            if (name.includes('café') || name.includes('pão') || name.includes('tapioca') || 
-                name.includes('crepioca') || name.includes('cuscuz') || name.includes('leite') ||
-                name.includes('queijo') || name.includes('iogurte') || name.includes('aveia')) {
-              food.food_group_id = 1; // Café da Manhã
-            } 
-            // Lanches: frutas e lanches leves
-            else if (name.includes('fruta') || name.includes('maçã') || name.includes('banana') ||
-                     name.includes('snack') || name.includes('castanha') || name.includes('nozes')) {
-              food.food_group_id = 2; // Lanche da Manhã
-            }
-            // Almoço/Jantar: proteínas e pratos principais
-            else if (name.includes('arroz') || name.includes('feijão') || name.includes('carne') ||
-                    name.includes('frango') || name.includes('peixe') || name.includes('legume') ||
-                    name.includes('batata') || name.includes('massa')) {
-              food.food_group_id = 3; // Almoço
-            }
-          }
           
-          return food;
+        if (error) {
+          throw new Error(`Error fetching protocol foods: ${error.message}`);
+        }
+        
+        const foods = data as ProtocolFood[];
+        setProtocolFoods(foods);
+        
+        // Categorize foods by meal type
+        const categorizedFoods: Record<string, string[]> = {
+          breakfast: [],
+          morning_snack: [],
+          lunch: [],
+          afternoon_snack: [],
+          dinner: [],
+          uncategorized: []
+        };
+        
+        foods.forEach(food => {
+          if (food.food_group_id === 1) {
+            categorizedFoods.breakfast.push(food.id);
+          } else if (food.food_group_id === 2) {
+            categorizedFoods.morning_snack.push(food.id);
+          } else if (food.food_group_id === 3) {
+            categorizedFoods.lunch.push(food.id);
+          } else if (food.food_group_id === 4) {
+            categorizedFoods.afternoon_snack.push(food.id);
+          } else if (food.food_group_id === 5) {
+            categorizedFoods.dinner.push(food.id);
+          } else {
+            categorizedFoods.uncategorized.push(food.id);
+          }
         });
         
-        // Adicionar log para verificar a distribuição de alimentos por categoria
-        if (processedData && processedData.length > 0) {
-          const mealTypeCounts = processedData.reduce((acc: Record<string, number>, food) => {
-            const groupId = food.food_group_id?.toString() || 'uncategorized';
-            
-            // Fix: Using a type guard to safely access FOOD_GROUP_MAP
-            // Convert groupId to a number and check if it's a valid key
-            let groupName = 'Não categorizado';
-            const numericGroupId = Number(groupId);
-            
-            // Check if the numericGroupId is a valid key in FOOD_GROUP_MAP (keys are 1-5)
-            if (!isNaN(numericGroupId) && numericGroupId >= 1 && numericGroupId <= 5) {
-              groupName = FOOD_GROUP_MAP[numericGroupId as keyof typeof FOOD_GROUP_MAP];
-            }
-            
-            acc[groupName] = (acc[groupName] || 0) + 1;
-            return acc;
-          }, {});
-          
-          console.log("Foods by meal type:", mealTypeCounts);
-        }
-        
-        setProtocolFoods(processedData || []);
+        setFoodsByMealType(categorizedFoods);
       } catch (err) {
-        console.error('Error in useProtocolFoods:', err);
+        console.error('Failed to fetch protocol foods:', err);
         setError(err instanceof Error ? err : new Error(String(err)));
-        toast.error("Erro ao carregar alimentos. Por favor, tente novamente.");
       } finally {
         setLoading(false);
       }
     };
-
-    fetchFoods();
+    
+    fetchProtocolFoods();
   }, []);
 
-  return { protocolFoods, loading, error };
+  return { protocolFoods, loading, error, foodsByMealType };
 };
