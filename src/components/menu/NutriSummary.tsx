@@ -108,9 +108,9 @@ export const NutriSummary = () => {
 
   if (loading) {
     return (
-      <Card className="w-full animate-pulse">
-        <CardContent className="p-6">
-          <div className="h-24 bg-gray-200 rounded-md"></div>
+      <Card className="w-full h-[250px] animate-pulse">
+        <CardContent className="p-6 flex items-center justify-center h-full">
+          <div className="h-24 w-24 rounded-full bg-gray-200 animate-pulse"></div>
         </CardContent>
       </Card>
     );
@@ -118,23 +118,28 @@ export const NutriSummary = () => {
 
   if (!lastPlan) {
     return (
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <PieChart className="w-5 h-5 text-primary" />
+      <Card className="w-full overflow-hidden shadow-md border-0">
+        <CardHeader className="bg-gradient-to-r from-blue-50 to-primary/5 border-b pb-4">
+          <CardTitle className="flex items-center gap-2 text-primary">
+            <PieChart className="w-5 h-5" />
             Nutri
           </CardTitle>
           <CardDescription>
             Resumo do seu plano nutricional
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-6 text-center">
-          <p className="text-muted-foreground mb-4">
-            Você ainda não tem um plano alimentar.
-          </p>
-          <Button onClick={() => navigate('/menu')} className="mt-2">
-            Criar plano alimentar
-          </Button>
+        <CardContent className="p-8 text-center">
+          <div className="flex flex-col items-center justify-center gap-4">
+            <div className="rounded-full bg-primary/10 p-6">
+              <PieChart className="w-12 h-12 text-primary/60" />
+            </div>
+            <p className="text-muted-foreground">
+              Você ainda não tem um plano alimentar.
+            </p>
+            <Button onClick={() => navigate('/menu')} className="mt-2">
+              Criar plano alimentar
+            </Button>
+          </div>
         </CardContent>
       </Card>
     );
@@ -143,10 +148,10 @@ export const NutriSummary = () => {
   const macros = getMacrosPercentage();
 
   return (
-    <Card className="w-full overflow-hidden">
-      <CardHeader className="bg-gradient-to-r from-primary/10 to-primary/5 pb-2">
-        <CardTitle className="flex items-center gap-2">
-          <PieChart className="w-5 h-5 text-primary" />
+    <Card className="w-full overflow-hidden shadow-md border-0">
+      <CardHeader className="bg-gradient-to-r from-blue-50 to-primary/5 border-b pb-4">
+        <CardTitle className="flex items-center gap-2 text-primary">
+          <PieChart className="w-5 h-5" />
           Nutri
         </CardTitle>
         <CardDescription>
@@ -154,60 +159,60 @@ export const NutriSummary = () => {
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="p-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="flex flex-col p-3 border rounded-lg bg-card/50">
+        <div className="p-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="col-span-2 lg:col-span-1 flex flex-col p-4 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/10">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-sm font-medium text-muted-foreground">Calorias Diárias</span>
+              <span className="text-sm font-medium text-primary/80">Calorias Diárias</span>
               <Flame className="w-4 h-4 text-orange-500" />
             </div>
             <div className="flex items-baseline">
-              <span className="text-2xl font-bold">{lastPlan.calories}</span>
+              <span className="text-3xl font-bold text-primary">{lastPlan.calories}</span>
               <span className="ml-1 text-xs text-muted-foreground">kcal</span>
             </div>
           </div>
           
-          <div className="flex flex-col p-3 border rounded-lg bg-card/50">
+          <div className="flex flex-col p-4 rounded-xl bg-gradient-to-br from-green-100 to-green-50 border border-green-100">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-sm font-medium text-muted-foreground">Objetivo</span>
-              <Target className="w-4 h-4 text-blue-500" />
+              <span className="text-sm font-medium text-green-700">Objetivo</span>
+              <Target className="w-4 h-4 text-green-600" />
             </div>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-bold text-green-800">
               {getGoalText()}
             </div>
           </div>
           
-          <div className="flex flex-col p-3 border rounded-lg bg-card/50 sm:col-span-2 lg:col-span-1">
+          <div className="flex flex-col p-4 rounded-xl bg-gradient-to-br from-blue-100 to-blue-50 border border-blue-100">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-sm font-medium text-muted-foreground">Gerado em</span>
-              <Calendar className="w-4 h-4 text-green-500" />
+              <span className="text-sm font-medium text-blue-700">Gerado em</span>
+              <Calendar className="w-4 h-4 text-blue-600" />
             </div>
-            <div className="text-lg font-medium">
+            <div className="text-lg font-medium text-blue-800 truncate">
               {formatDate(lastPlan.created_at)}
             </div>
           </div>
         </div>
         
-        <div className="p-4 pt-0">
-          <div className="flex flex-col p-3 border rounded-lg bg-card/50">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm font-medium text-muted-foreground">Distribuição de Macros</span>
-              <BarChart className="w-4 h-4 text-purple-500" />
+        <div className="px-5 pb-4">
+          <div className="flex flex-col p-4 rounded-xl bg-gradient-to-br from-purple-100 to-purple-50 border border-purple-100">
+            <div className="flex justify-between items-center mb-3">
+              <span className="text-sm font-medium text-purple-700">Distribuição de Macros</span>
+              <BarChart className="w-4 h-4 text-purple-600" />
             </div>
             <div className="flex items-center gap-3">
               <div className="flex-1 flex flex-col items-center">
-                <div className="text-lg font-bold">{macros.protein}%</div>
+                <div className="text-xl font-bold text-blue-700">{macros.protein}%</div>
                 <div className="text-xs text-muted-foreground">Proteína</div>
               </div>
               <div className="flex-1 flex flex-col items-center">
-                <div className="text-lg font-bold">{macros.carbs}%</div>
+                <div className="text-xl font-bold text-green-700">{macros.carbs}%</div>
                 <div className="text-xs text-muted-foreground">Carboidratos</div>
               </div>
               <div className="flex-1 flex flex-col items-center">
-                <div className="text-lg font-bold">{macros.fats}%</div>
+                <div className="text-xl font-bold text-yellow-700">{macros.fats}%</div>
                 <div className="text-xs text-muted-foreground">Gorduras</div>
               </div>
             </div>
-            <div className="w-full h-2 bg-gray-100 rounded-full mt-3 flex overflow-hidden">
+            <div className="w-full h-3 bg-gray-100 rounded-full mt-3 flex overflow-hidden">
               <div className="bg-blue-400 h-full" style={{ width: `${macros.protein}%` }}></div>
               <div className="bg-green-400 h-full" style={{ width: `${macros.carbs}%` }}></div>
               <div className="bg-yellow-400 h-full" style={{ width: `${macros.fats}%` }}></div>
@@ -215,9 +220,9 @@ export const NutriSummary = () => {
           </div>
         </div>
         
-        <div className="px-4 pb-4 flex justify-end">
-          <Button variant="outline" size="sm" onClick={() => navigate('/menu')} className="flex items-center gap-1">
-            Ver detalhes
+        <div className="p-5 pt-2 flex justify-end">
+          <Button variant="outline" size="sm" onClick={() => navigate('/menu')} className="flex items-center gap-1 border-primary text-primary hover:bg-primary/5">
+            Ver detalhes completos
             <ArrowUpRight className="w-3 h-3" />
           </Button>
         </div>
