@@ -66,6 +66,8 @@ export const MealPlanTable = ({ mealPlan }: MealPlanTableProps) => {
     });
   });
 
+  console.log("Generated table rows for meal plan:", tableRows.length);
+
   return (
     <div className="overflow-x-auto">
       <Table>

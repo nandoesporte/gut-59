@@ -1,4 +1,3 @@
-
 import { Card } from "@/components/ui/card";
 import { InitialMenuContent } from "@/components/menu/InitialMenuContent";
 import { CalorieCalculatorStep } from "@/components/menu/CalorieCalculatorStep";
@@ -67,6 +66,7 @@ const Menu = () => {
     }
     
     if (mealPlan) {
+      console.log("Plan has weeklyPlan?", !!mealPlan.weeklyPlan);
       console.log("Meal plan available:", {
         hasWeeklyPlan: !!mealPlan.weeklyPlan,
         availableDays: mealPlan.weeklyPlan ? Object.keys(mealPlan.weeklyPlan) : [],

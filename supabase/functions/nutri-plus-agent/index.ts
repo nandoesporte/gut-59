@@ -19,136 +19,142 @@ serve(async (req) => {
   try {
     // Log start of process with timestamp
     const startTime = new Date().toISOString();
-    console.log(`[NUTRI+] Processing started at ${startTime}`);
+    console.log(`[NUTRI+] Processamento iniciado às ${startTime}`);
 
     // Parse the request body
     const requestData = await req.json();
     
     // Validate request data
     if (!requestData || !requestData.userData) {
-      console.error("[NUTRI+] Error: Invalid request data - missing userData");
+      console.error("[NUTRI+] Erro: Dados de requisição inválidos - userData ausente");
       return new Response(
-        JSON.stringify({ error: "Invalid request data" }),
+        JSON.stringify({ error: "Dados de requisição inválidos" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
     }
 
-    const { userData, selectedFoods, foodsByMealType, dietaryPreferences } = requestData;
-    console.log(`[NUTRI+] Received data for user: ${userData.id || 'anonymous'}`);
-    console.log(`[NUTRI+] User profile: ${userData.age}yo, ${userData.gender}, ${userData.weight}kg, ${userData.height}cm`);
-    console.log(`[NUTRI+] Goal: ${userData.goal}, Daily calories: ${userData.dailyCalories}kcal`);
-    console.log(`[NUTRI+] Selected foods count: ${selectedFoods?.length || 0}`);
+    const { userData, selectedFoods, foodsByMealType, dietaryPreferences, modelConfig } = requestData;
+    console.log(`[NUTRI+] Dados recebidos para usuário: ${userData.id || 'anônimo'}`);
+    console.log(`[NUTRI+] Perfil do usuário: ${userData.age} anos, ${userData.gender}, ${userData.weight}kg, ${userData.height}cm`);
+    console.log(`[NUTRI+] Objetivo: ${userData.goal}, Calorias diárias: ${userData.dailyCalories}kcal`);
+    console.log(`[NUTRI+] Alimentos selecionados: ${selectedFoods?.length || 0}`);
     
     if (!selectedFoods || selectedFoods.length === 0) {
-      console.error("[NUTRI+] Error: No foods selected");
+      console.error("[NUTRI+] Erro: Nenhum alimento selecionado");
       return new Response(
-        JSON.stringify({ error: "No foods selected" }),
+        JSON.stringify({ error: "Nenhum alimento selecionado" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
     }
 
     // Check if GROQ API key is available
     if (!GROQ_API_KEY) {
-      console.error("[NUTRI+] Error: GROQ_API_KEY not found in environment variables");
+      console.error("[NUTRI+] Erro: GROQ_API_KEY não encontrada nas variáveis de ambiente");
       return new Response(
-        JSON.stringify({ error: "API configuration error" }),
+        JSON.stringify({ error: "Erro de configuração da API" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
       );
     }
 
     // Prepare system message for Nutri+ agent
-    const systemMessage = `You are Nutri+, an expert nutrition agent specializing in creating personalized meal plans. 
-Your task is to analyze the user data and create a detailed, scientifically-sound weekly meal plan.
+    const systemMessage = `Você é Nutri+, um agente especialista em nutrição que cria planos alimentares personalizados. 
+Sua tarefa é analisar os dados do usuário e criar um plano alimentar semanal detalhado e cientificamente fundamentado.
 
-IMPORTANT OUTPUT FORMAT RULES:
-1. Your response MUST be valid JSON that can be parsed with JSON.parse().
-2. Your response should be ONLY the JSON object with no explanation, narrative, or additional text.
-3. The output must follow this exact structure:
+REGRAS IMPORTANTES DE FORMATO DE SAÍDA:
+1. Sua resposta DEVE ser um JSON válido que possa ser processado com JSON.parse().
+2. Sua resposta deve conter APENAS o objeto JSON sem explicações, narrativas ou texto adicional.
+3. A saída deve seguir exatamente esta estrutura:
 {
   "mealPlan": {
     "weeklyPlan": {
-      "monday": { /* day plan structure */ },
-      "tuesday": { /* day plan structure */ },
-      /* ... other days ... */
+      "monday": { /* estrutura do plano diário */ },
+      "tuesday": { /* estrutura do plano diário */ },
+      /* ... outros dias ... */
     },
-    "weeklyTotals": { /* weekly nutrition averages */ },
-    "recommendations": { /* personalized recommendations */ }
+    "weeklyTotals": { /* médias nutricionais semanais */ },
+    "recommendations": { /* recomendações personalizadas */ }
   }
 }
 
-Make sure the weeklyPlan contains ALL 7 days (monday through sunday). Each day must have the following structure:
+Certifique-se de que o weeklyPlan contenha TODOS os 7 dias (segunda a domingo). Cada dia deve ter a seguinte estrutura:
 {
-  "dayName": "Day Name",
+  "dayName": "Nome do Dia",
   "meals": {
     "breakfast": {
-      "description": "Breakfast description",
-      "foods": [{"name": "Food name", "portion": 100, "unit": "g", "details": "Details about the food"}],
+      "description": "Descrição do café da manhã",
+      "foods": [{"name": "Nome do alimento", "portion": 100, "unit": "g", "details": "Detalhes sobre o alimento"}],
       "calories": 500,
       "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
     },
-    /* other meals: morningSnack, lunch, afternoonSnack, dinner */
+    /* outras refeições: morningSnack, lunch, afternoonSnack, dinner */
   },
   "dailyTotals": {"calories": 2000, "protein": 120, "carbs": 180, "fats": 60, "fiber": 25}
 }
 
-Recommendations should include:
+As recomendações devem incluir:
 {
-  "general": "General nutrition advice",
-  "preworkout": "Pre-workout nutrition advice",
-  "postworkout": "Post-workout nutrition advice",
-  "timing": ["Specific meal timing advice", "Another timing advice"]
+  "general": "Conselho geral de nutrição",
+  "preworkout": "Conselho de nutrição pré-treino",
+  "postworkout": "Conselho de nutrição pós-treino",
+  "timing": ["Conselho específico de tempo de refeição", "Outro conselho de timing"]
 }`;
 
     // Construct user message with all relevant data
-    const userMessage = `Create a personalized weekly meal plan based on this data:
+    const userMessage = `Crie um plano alimentar semanal personalizado com base nestes dados:
 
-USER PROFILE:
-- Age: ${userData.age}
-- Gender: ${userData.gender}
-- Weight: ${userData.weight}kg
-- Height: ${userData.height}cm
-- Activity Level: ${userData.activityLevel}
-- Goal: ${userData.goal}
-- Daily Calorie Target: ${userData.dailyCalories}kcal
+PERFIL DO USUÁRIO:
+- Idade: ${userData.age}
+- Gênero: ${userData.gender}
+- Peso: ${userData.weight}kg
+- Altura: ${userData.height}cm
+- Nível de Atividade: ${userData.activityLevel}
+- Objetivo: ${userData.goal}
+- Meta de Calorias Diárias: ${userData.dailyCalories}kcal
 
-DIETARY PREFERENCES:
-${dietaryPreferences.hasAllergies ? `- Allergies: ${dietaryPreferences.allergies.join(', ')}` : '- No known allergies'}
-${dietaryPreferences.dietaryRestrictions ? `- Dietary Restrictions: ${dietaryPreferences.dietaryRestrictions.join(', ')}` : '- No dietary restrictions'}
-${dietaryPreferences.trainingTime ? `- Training Time: ${dietaryPreferences.trainingTime}` : '- No specific training time'}
+PREFERÊNCIAS ALIMENTARES:
+${dietaryPreferences.hasAllergies ? `- Alergias: ${dietaryPreferences.allergies.join(', ')}` : '- Sem alergias conhecidas'}
+${dietaryPreferences.dietaryRestrictions ? `- Restrições Alimentares: ${dietaryPreferences.dietaryRestrictions.join(', ')}` : '- Sem restrições alimentares'}
+${dietaryPreferences.trainingTime ? `- Horário de Treino: ${dietaryPreferences.trainingTime}` : '- Sem horário específico de treino'}
 
-AVAILABLE FOODS (${selectedFoods.length} total):
-${selectedFoods.map(food => `- ${food.name} (${food.calories} kcal, P:${food.protein}g, C:${food.carbs}g, F:${food.fats}g)`).join('\n').substring(0, 1500)}
+ALIMENTOS DISPONÍVEIS (${selectedFoods.length} no total):
+${selectedFoods.map(food => `- ${food.name} (${food.calories} kcal, P:${food.protein}g, C:${food.carbs}g, G:${food.fats}g)`).join('\n').substring(0, 1500)}
 
-${foodsByMealType ? `FOODS CATEGORIZED BY MEAL:
+${foodsByMealType ? `ALIMENTOS CATEGORIZADOS POR REFEIÇÃO:
 ${Object.entries(foodsByMealType).map(([mealType, foods]) => 
-  `- ${mealType}: ${Array.isArray(foods) ? foods.length : 0} foods`
+  `- ${mealType}: ${Array.isArray(foods) ? foods.length : 0} alimentos`
 ).join('\n')}` : ''}
 
-Please create a 7-day meal plan that:
-1. Meets the daily calorie target with proper macronutrient distribution
-2. Uses the available foods provided
-3. Respects dietary preferences and restrictions
-4. Provides variety across the week
-5. Includes all required meal types: breakfast, morningSnack, lunch, afternoonSnack, dinner
-6. Accurately calculates calories and macros for each meal and day`;
+Por favor, crie um plano de 7 dias que:
+1. Atenda à meta de calorias diárias com distribuição adequada de macronutrientes
+2. Use os alimentos disponíveis fornecidos
+3. Respeite as preferências e restrições alimentares
+4. Forneça variedade ao longo da semana
+5. Inclua todos os tipos de refeições necessários: café da manhã, lanche da manhã, almoço, lanche da tarde, jantar
+6. Calcule com precisão as calorias e macros para cada refeição e dia`;
 
     // Track time for API call preparation
-    console.log(`[NUTRI+] Preparing API call at ${new Date().toISOString()}`);
+    console.log(`[NUTRI+] Preparando chamada de API às ${new Date().toISOString()}`);
+
+    // Get model settings from request or use defaults
+    const modelName = modelConfig?.model || "llama3-8b-8192";
+    const temperature = modelConfig?.temperature || 0.3;
+    
+    console.log(`[NUTRI+] Usando modelo: ${modelName} com temperatura: ${temperature}`);
 
     // Prepare the API call to Groq
     const groqPayload = {
-      model: "llama3-8b-8192", // Using Llama3 8B model
+      model: modelName,
       messages: [
         { role: "system", content: systemMessage },
         { role: "user", content: userMessage }
       ],
-      temperature: 0.3, // Lower temperature for more consistent output
+      temperature: temperature, // Lower temperature for more consistent output
       max_tokens: 7000, // Allow enough tokens for a full meal plan
       top_p: 0.9,
       response_format: { type: "json_object" } // Request JSON format response
     };
 
-    console.log(`[NUTRI+] Calling Groq API with model: ${groqPayload.model}`);
+    console.log(`[NUTRI+] Chamando API Groq com modelo: ${groqPayload.model}`);
 
     // Call the Groq API
     const response = await fetch(GROQ_API_URL, {
@@ -162,22 +168,22 @@ Please create a 7-day meal plan that:
 
     if (!response.ok) {
       const errorData = await response.text();
-      console.error(`[NUTRI+] Groq API error (${response.status}):`, errorData);
+      console.error(`[NUTRI+] Erro da API Groq (${response.status}):`, errorData);
       return new Response(
-        JSON.stringify({ error: `API error: ${response.status}`, details: errorData }),
+        JSON.stringify({ error: `Erro da API: ${response.status}`, details: errorData }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
       );
     }
 
     // Get the API response
     const apiResponse = await response.json();
-    console.log(`[NUTRI+] Received response from Groq API at ${new Date().toISOString()}`);
+    console.log(`[NUTRI+] Resposta recebida da API Groq às ${new Date().toISOString()}`);
     
     // Check for valid response content
     if (!apiResponse.choices || !apiResponse.choices[0] || !apiResponse.choices[0].message) {
-      console.error("[NUTRI+] Invalid API response format:", JSON.stringify(apiResponse).substring(0, 200));
+      console.error("[NUTRI+] Formato de resposta da API inválido:", JSON.stringify(apiResponse).substring(0, 200));
       return new Response(
-        JSON.stringify({ error: "Invalid API response format" }),
+        JSON.stringify({ error: "Formato de resposta da API inválido" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
       );
     }
@@ -192,9 +198,9 @@ Please create a 7-day meal plan that:
       
       // Validate the structure
       if (!mealPlanJson.mealPlan || !mealPlanJson.mealPlan.weeklyPlan) {
-        console.error("[NUTRI+] API response missing required structure. Response:", mealPlanContent.substring(0, 500));
+        console.error("[NUTRI+] Resposta da API sem estrutura requerida. Resposta:", mealPlanContent.substring(0, 500));
         return new Response(
-          JSON.stringify({ error: "Invalid meal plan structure" }),
+          JSON.stringify({ error: "Estrutura do plano alimentar inválida" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
         );
       }
@@ -206,23 +212,26 @@ Please create a 7-day meal plan that:
         generatedBy: "nutri-plus-agent-llama3"
       };
       
-      console.log(`[NUTRI+] Successfully generated meal plan at ${new Date().toISOString()}`);
-      console.log(`[NUTRI+] Process duration: ${(new Date().getTime() - new Date(startTime).getTime()) / 1000}s`);
+      console.log(`[NUTRI+] Plano alimentar gerado com sucesso às ${new Date().toISOString()}`);
+      console.log(`[NUTRI+] Duração do processo: ${(new Date().getTime() - new Date(startTime).getTime()) / 1000}s`);
       
-      // Return the successful response
+      // Return the successful response with model info
       return new Response(
-        JSON.stringify({ mealPlan }),
+        JSON.stringify({ 
+          mealPlan,
+          modelUsed: modelName
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
       
     } catch (jsonError) {
       // If the response is not valid JSON, log the error and return error response
-      console.error("[NUTRI+] JSON parsing error:", jsonError);
-      console.error("[NUTRI+] Invalid JSON response:", mealPlanContent.substring(0, 1000));
+      console.error("[NUTRI+] Erro ao analisar JSON:", jsonError);
+      console.error("[NUTRI+] Resposta JSON inválida:", mealPlanContent.substring(0, 1000));
       
       return new Response(
         JSON.stringify({ 
-          error: "Failed to parse meal plan JSON",
+          error: "Falha ao analisar JSON do plano alimentar",
           details: jsonError.message,
           rawContent: mealPlanContent.substring(0, 500) + "..." 
         }),
@@ -232,9 +241,9 @@ Please create a 7-day meal plan that:
     
   } catch (error) {
     // Handle any unexpected errors
-    console.error("[NUTRI+] Unexpected error:", error);
+    console.error("[NUTRI+] Erro inesperado:", error);
     return new Response(
-      JSON.stringify({ error: "Internal server error", details: error.message }),
+      JSON.stringify({ error: "Erro interno do servidor", details: error.message }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
     );
   }
