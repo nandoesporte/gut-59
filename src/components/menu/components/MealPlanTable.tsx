@@ -26,7 +26,12 @@ const mealNameMap: Record<string, string> = {
 
 export const MealPlanTable = ({ mealPlan }: MealPlanTableProps) => {
   if (!mealPlan || !mealPlan.weeklyPlan) {
-    return <div className="text-center p-4">Nenhum plano alimentar disponível</div>;
+    return (
+      <div className="text-center p-4">
+        <p className="text-yellow-600 mb-2">Formato do plano alimentar incompatível</p>
+        <p className="text-sm text-gray-500">Não foi possível exibir os detalhes neste formato.</p>
+      </div>
+    );
   }
 
   const tableRows: Array<{
@@ -39,36 +44,57 @@ export const MealPlanTable = ({ mealPlan }: MealPlanTableProps) => {
   }> = [];
 
   // Convert the meal plan data to the table format
-  Object.entries(mealPlan.weeklyPlan).forEach(([dayKey, dayPlan]) => {
-    const dayName = dayNameMap[dayKey] || dayKey;
-    
-    Object.entries(dayPlan.meals).forEach(([mealKey, meal]) => {
-      if (!meal) return;
+  try {
+    Object.entries(mealPlan.weeklyPlan).forEach(([dayKey, dayPlan]) => {
+      if (!dayPlan || !dayPlan.meals) return;
       
-      const mealName = mealNameMap[mealKey] || mealKey;
+      const dayName = dayNameMap[dayKey] || dayKey;
       
-      // Join food names for the "Ingredientes" column
-      const foodNames = meal.foods.map(food => food.name).join(", ");
-      
-      // Create quantities string
-      const quantities = meal.foods.map(food => 
-        `${food.portion}${food.unit}`
-      ).join(", ");
-      
-      tableRows.push({
-        day: dayName,
-        meal: mealName,
-        description: meal.description,
-        foods: foodNames,
-        quantities: quantities,
-        details: meal.foods.map(food => 
-          food.details ? food.details : "Sem instruções específicas"
-        ).join(". ")
+      Object.entries(dayPlan.meals).forEach(([mealKey, meal]) => {
+        if (!meal || !meal.foods) return;
+        
+        const mealName = mealNameMap[mealKey] || mealKey;
+        
+        // Join food names for the "Ingredientes" column
+        const foodNames = meal.foods.map(food => food?.name || "").filter(Boolean).join(", ");
+        
+        // Create quantities string
+        const quantities = meal.foods
+          .map(food => food && food.portion && food.unit ? `${food.portion}${food.unit}` : "")
+          .filter(Boolean)
+          .join(", ");
+        
+        tableRows.push({
+          day: dayName,
+          meal: mealName,
+          description: meal.description || "Sem descrição",
+          foods: foodNames || "Sem ingredientes",
+          quantities: quantities || "Não especificado",
+          details: meal.foods
+            .map(food => food?.details || "")
+            .filter(Boolean)
+            .join(". ") || "Sem instruções específicas"
+        });
       });
     });
-  });
+  } catch (error) {
+    console.error("Error processing meal plan data for table:", error);
+    return (
+      <div className="text-center p-4 text-red-500">
+        Erro ao processar dados do plano alimentar. Por favor, atualize a página.
+      </div>
+    );
+  }
 
   console.log("Generated table rows for meal plan:", tableRows.length);
+
+  if (tableRows.length === 0) {
+    return (
+      <div className="text-center p-4 text-yellow-600">
+        Este plano alimentar não contém dados de refeições.
+      </div>
+    );
+  }
 
   return (
     <div className="overflow-x-auto">
