@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Goal } from "./hooks/useCalorieCalculator";
 import { Card } from "@/components/ui/card";
@@ -6,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Scale, Activity, Footprints, Dumbbell } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { GoalCards, Goal } from "./GoalCards";
+import { GoalCards } from "./GoalCards";
 import { SelectCard } from "@/components/workout/components/SelectCard";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -70,7 +71,7 @@ const CalorieCalculator = ({
       <div className="space-y-4">
         <Label className="text-lg font-medium">Selecione seu objetivo</Label>
         <GoalCards
-          selectedGoal={formData.goal as Goal}
+          selectedGoal={formData.goal}
           onSelect={(goal) => onInputChange("goal", goal)}
         />
       </div>

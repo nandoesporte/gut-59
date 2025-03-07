@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { useProtocolFoods } from "./useProtocolFoods";
 import { useCalorieCalculator, Goal } from "./useCalorieCalculator";
@@ -8,6 +9,7 @@ import { useWallet } from "@/hooks/useWallet";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { CalorieCalculatorForm } from "../CalorieCalculator";
+import type { Database } from "@/integrations/supabase/types";
 
 export interface FormData {
   weight: number;
