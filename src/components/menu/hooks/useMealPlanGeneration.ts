@@ -15,7 +15,7 @@ interface GenerateMealPlanParams {
     dailyCalories: number;
   };
   selectedFoods: ProtocolFood[];
-  foodsByMealType: Record<string, string[]>;
+  foodsByMealType: Record<string, ProtocolFood[]>;
   preferences: DietaryPreferences;
   addTransaction?: (params: any) => Promise<void>;
 }
@@ -66,6 +66,17 @@ export const generateMealPlan = async ({
     console.log("✅ Plano alimentar recebido com sucesso do agente Nutri+");
     console.log("📋 Dados do plano:", JSON.stringify(data.mealPlan).substring(0, 200) + "...");
     console.log("🧠 Modelo utilizado:", data.modelUsed || "llama3-8b-8192");
+    
+    // Type assertion for weeklyPlan to satisfy TypeScript
+    const typedWeeklyPlan: MealPlan['weeklyPlan'] = {
+      monday: data.mealPlan.weeklyPlan.monday as DayPlan,
+      tuesday: data.mealPlan.weeklyPlan.tuesday as DayPlan,
+      wednesday: data.mealPlan.weeklyPlan.wednesday as DayPlan,
+      thursday: data.mealPlan.weeklyPlan.thursday as DayPlan,
+      friday: data.mealPlan.weeklyPlan.friday as DayPlan,
+      saturday: data.mealPlan.weeklyPlan.saturday as DayPlan,
+      sunday: data.mealPlan.weeklyPlan.sunday as DayPlan
+    };
     
     // Ensure the meal plan uses the user's specified daily calories
     if (data.mealPlan && userData.dailyCalories) {
@@ -127,7 +138,7 @@ export const generateMealPlan = async ({
             plan_data: data.mealPlan,
             calories: userData.dailyCalories,
             generated_by: data.modelUsed || "nutri-plus-agent-llama3",
-            preferences: preferences // Save the user preferences with the meal plan
+            dietary_preferences: JSON.stringify(preferences) // Convert to JSON string
           });
 
         if (saveError) {
