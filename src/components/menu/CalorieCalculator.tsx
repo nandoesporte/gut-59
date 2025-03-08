@@ -1,13 +1,12 @@
 
 import { useState } from "react";
-import { Goal } from "./hooks/useCalorieCalculator";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Scale, Activity, Footprints, Dumbbell } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { GoalCards } from "./GoalCards";
+import { GoalCards, Goal } from "./GoalCards";
 import { SelectCard } from "@/components/workout/components/SelectCard";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -17,7 +16,7 @@ export interface CalorieCalculatorForm {
   age: string;
   gender: "male" | "female";
   activityLevel: string;
-  goal: Goal;
+  goal?: Goal;
 }
 
 export const activityLevels = [
@@ -71,7 +70,7 @@ const CalorieCalculator = ({
       <div className="space-y-4">
         <Label className="text-lg font-medium">Selecione seu objetivo</Label>
         <GoalCards
-          selectedGoal={formData.goal}
+          selectedGoal={formData.goal as Goal}
           onSelect={(goal) => onInputChange("goal", goal)}
         />
       </div>

@@ -11,7 +11,7 @@ import { Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useRef } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 
 const Menu = () => {
   const mealPlanRef = useRef<HTMLDivElement>(null);
@@ -137,12 +137,7 @@ const Menu = () => {
               {currentStep === 1 && (
                 <CalorieCalculatorStep
                   formData={formData}
-                  onInputChange={(field, value) => {
-                    setFormData({
-                      ...formData,
-                      [field]: value
-                    });
-                  }}
+                  onInputChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
                   onCalculate={handleCalculateCalories}
                   calorieNeeds={calorieNeeds}
                 />

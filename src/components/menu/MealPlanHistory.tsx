@@ -26,30 +26,15 @@ interface RawMealPlan {
   calories: number;
 }
 
-// Improving validation function to be more flexible
 const validateMealPlan = (planData: unknown): planData is MealPlan => {
-  if (!planData || typeof planData !== 'object') {
-    console.log("Invalid meal plan: not an object", planData);
-    return false;
-  }
-  
-  const plan = planData as any;
-  
-  // Log the structure to debug
-  console.log("Plan structure:", Object.keys(plan));
-  
-  // More flexible validation, checking if it has at least weeklyPlan or recommendations
-  const hasWeeklyPlan = 'weeklyPlan' in plan && plan.weeklyPlan && typeof plan.weeklyPlan === 'object';
-  const hasRecommendations = 'recommendations' in plan && plan.recommendations;
-  
-  // Accept if it has at least one of the main properties
-  const isValid = hasWeeklyPlan || hasRecommendations;
-  
-  if (!isValid) {
-    console.log("Invalid meal plan: missing required properties", plan);
-  }
-  
-  return isValid;
+  const plan = planData as MealPlan;
+  return !!(
+    plan &&
+    typeof plan === 'object' &&
+    'weeklyPlan' in plan &&
+    'weeklyTotals' in plan &&
+    'recommendations' in plan
+  );
 };
 
 export const MealPlanHistory = () => {
@@ -92,18 +77,7 @@ export const MealPlanHistory = () => {
         throw error;
       }
 
-      if (!data || data.length === 0) {
-        console.log("No meal plans found");
-        setLoading(false);
-        return;
-      }
-
       console.log("Received meal plans data:", data?.length || 0, "records");
-      
-      // For debugging: log the first plan's raw data
-      if (data && data.length > 0) {
-        console.log("First plan raw data:", data[0]);
-      }
       
       const validPlans = (data as RawMealPlan[]).reduce<StoredMealPlan[]>((acc, plan) => {
         if (validateMealPlan(plan.plan_data)) {
