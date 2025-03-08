@@ -267,24 +267,40 @@ function ensureMealPlanStructure(mealPlan: any, userCalories: number): MealPlan 
     
     mealPlan.weeklyTotals = {
       averageCalories: Math.round(days.reduce((sum: number, day: any) => {
+        // Ensure we're working with numbers by converting or providing default 0
         const calories = day.dailyTotals?.calories;
-        return sum + (typeof calories === 'number' ? calories : Number(calories || 0));
+        // Convert to number if needed and handle undefined/null cases
+        const caloriesNum = typeof calories === 'number' ? calories : 
+                          calories ? Number(calories) : 0;
+        return sum + caloriesNum;
       }, 0) / dayCount),
+      
       averageProtein: Math.round(days.reduce((sum: number, day: any) => {
         const protein = day.dailyTotals?.protein;
-        return sum + (typeof protein === 'number' ? protein : Number(protein || 0));
+        const proteinNum = typeof protein === 'number' ? protein : 
+                         protein ? Number(protein) : 0;
+        return sum + proteinNum;
       }, 0) / dayCount),
+      
       averageCarbs: Math.round(days.reduce((sum: number, day: any) => {
         const carbs = day.dailyTotals?.carbs;
-        return sum + (typeof carbs === 'number' ? carbs : Number(carbs || 0));
+        const carbsNum = typeof carbs === 'number' ? carbs : 
+                       carbs ? Number(carbs) : 0;
+        return sum + carbsNum;
       }, 0) / dayCount),
+      
       averageFats: Math.round(days.reduce((sum: number, day: any) => {
         const fats = day.dailyTotals?.fats;
-        return sum + (typeof fats === 'number' ? fats : Number(fats || 0));
+        const fatsNum = typeof fats === 'number' ? fats : 
+                      fats ? Number(fats) : 0;
+        return sum + fatsNum;
       }, 0) / dayCount),
+      
       averageFiber: Math.round(days.reduce((sum: number, day: any) => {
         const fiber = day.dailyTotals?.fiber;
-        return sum + (typeof fiber === 'number' ? fiber : Number(fiber || 0));
+        const fiberNum = typeof fiber === 'number' ? fiber : 
+                       fiber ? Number(fiber) : 0;
+        return sum + fiberNum;
       }, 0) / dayCount)
     };
   }
