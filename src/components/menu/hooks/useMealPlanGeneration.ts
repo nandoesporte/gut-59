@@ -1,4 +1,3 @@
-
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { DietaryPreferences, MealPlan, ProtocolFood, DayPlan } from "../types";
@@ -36,24 +35,20 @@ export const generateMealPlan = async ({
   try {
     console.log("📡 Chamando função edge do Supabase - nutri-plus-agent (Llama3-8b)");
     
-    // Convert foodsByMealType from ProtocolFood[] to expected format for edge function
     const simplifiedFoodsByMealType: Record<string, string[]> = {};
     Object.entries(foodsByMealType).forEach(([mealType, foods]) => {
       simplifiedFoodsByMealType[mealType] = foods.map(food => food.name);
     });
     
-    // Tell the user we're working on it
     toast.loading("Gerando plano alimentar personalizado...", {
       id: "meal-plan-generation",
       duration: 20000
     });
     
-    // Create a timeout to handle edge function hanging
     const timeoutPromise = new Promise<{data: null, error: Error}>((_, reject) => {
       setTimeout(() => reject(new Error('Timeout: A geração do plano alimentar está demorando mais que o esperado.')), 30000);
     });
     
-    // Prepara os dados para a chamada da função edge com configurações otimizadas
     const requestBody = {
       userData,
       selectedFoods: selectedFoods.map(food => ({
@@ -75,21 +70,17 @@ export const generateMealPlan = async ({
       }
     };
     
-    // Call the Nutri+ agent edge function with timeout
     const edgeFunctionPromise = supabase.functions.invoke('nutri-plus-agent', {
       body: requestBody
     });
     
-    // Race between the timeout and the actual function call
     const { data, error } = await Promise.race([timeoutPromise, edgeFunctionPromise]);
 
-    // Dismiss the loading toast
     toast.dismiss("meal-plan-generation");
 
     if (error) {
       console.error("❌ Erro ao chamar o agente Nutri+:", error);
       
-      // Check for specific Groq API errors related to JSON validation
       if (error.message && (
           error.message.includes("json_validate_failed") || 
           error.message.includes("Failed to generate JSON") ||
@@ -103,7 +94,6 @@ export const generateMealPlan = async ({
         });
         
         try {
-          // Try the Groq-specific edge function as fallback
           const { data: fallbackData, error: fallbackError } = await supabase.functions.invoke('generate-meal-plan-groq', {
             body: {
               userInput: {
@@ -128,10 +118,8 @@ export const generateMealPlan = async ({
           console.log("✅ Plano alimentar gerado com sucesso pelo método alternativo");
           toast.success("Plano alimentar gerado com sucesso!");
           
-          // Verifica se o plano contém a estrutura esperada e corrige se necessário
           const mealPlan = ensureMealPlanStructure(fallbackData.mealPlan, userData.dailyCalories);
           
-          // If we have wallet functions, record the transaction
           if (userData.id && addTransaction) {
             await addTransaction({
               amount: 10,
@@ -165,30 +153,22 @@ export const generateMealPlan = async ({
     console.log("📋 Dados do plano:", JSON.stringify(data.mealPlan).substring(0, 200) + "...");
     console.log("🧠 Modelo utilizado:", data.modelUsed || "llama3-8b-8192");
     
-    // Ensure the meal plan uses the user's specified daily calories and has valid structure
     const processedMealPlan = ensureMealPlanStructure(data.mealPlan, userData.dailyCalories);
     
-    // Save the meal plan to the database if user is authenticated
     if (userData.id) {
       try {
-        // Check if we have a user ID before attempting to save
         console.log("💾 Tentando salvar plano alimentar para o usuário:", userData.id);
         
-        // Create a clean version of the meal plan for database storage
-        // Using JSON.stringify and then JSON.parse to ensure we have a plain JavaScript object
-        // This removes any special prototypes or non-serializable properties
         const mealPlanForStorage = JSON.parse(JSON.stringify(processedMealPlan));
         
-        // We need to explicitly cast the meal plan to any to bypass TypeScript checking
-        // because Supabase expects a specific Json type that doesn't match our MealPlan type
         const { error: saveError } = await supabase
           .from('meal_plans')
           .insert({
             user_id: userData.id,
-            plan_data: mealPlanForStorage as any, // Cast to any to bypass TypeScript checking
+            plan_data: mealPlanForStorage as any,
             calories: userData.dailyCalories,
             generated_by: data.modelUsed || "nutri-plus-agent-llama3",
-            preferences: preferences // Save the user preferences with the meal plan
+            preferences: preferences
           });
 
         if (saveError) {
@@ -198,7 +178,6 @@ export const generateMealPlan = async ({
           console.log("💾 Plano alimentar salvo no banco de dados com sucesso");
           toast.success("Plano alimentar salvo no histórico");
           
-          // Add transaction if wallet function is available
           if (addTransaction) {
             await addTransaction({
               amount: 10,
@@ -220,7 +199,6 @@ export const generateMealPlan = async ({
 
     toast.success("Plano alimentar gerado com sucesso!");
     
-    // Return the meal plan exactly as generated by the AI
     return processedMealPlan;
   } catch (error) {
     console.error("❌ Erro inesperado em generateMealPlan:", error);
@@ -230,28 +208,23 @@ export const generateMealPlan = async ({
 };
 
 function ensureMealPlanStructure(mealPlan: any, userCalories: number): MealPlan {
-  // Garantir que weeklyPlan existe
   if (!mealPlan.weeklyPlan) {
     console.warn("⚠️ Plano alimentar sem weeklyPlan - criando estrutura básica");
     mealPlan.weeklyPlan = {};
   }
   
-  // Garantir que todos os dias da semana estão presentes
   const requiredDays = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo'];
   const dayNames = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"];
   
   requiredDays.forEach((day, index) => {
     if (!mealPlan.weeklyPlan[day]) {
       console.warn(`⚠️ Dia ausente no plano: ${day} - criando dia`);
-      // Criar um template básico para o dia
       mealPlan.weeklyPlan[day] = createDefaultDayPlan(dayNames[index], userCalories);
     } else {
-      // Verificar se a estrutura do dia está completa
       ensureDayStructureComplete(mealPlan.weeklyPlan[day], dayNames[index], userCalories);
     }
   });
   
-  // Garantir que weeklyTotals existe e é válido
   if (!mealPlan.weeklyTotals || 
       isNaN(Number(mealPlan.weeklyTotals.averageCalories)) || 
       isNaN(Number(mealPlan.weeklyTotals.averageProtein)) ||
@@ -263,52 +236,47 @@ function ensureMealPlanStructure(mealPlan: any, userCalories: number): MealPlan 
     
     const weeklyPlan = mealPlan.weeklyPlan || {};
     const days = Object.values(weeklyPlan);
-    const dayCount = Math.max(days.length || 1, 1); // Evitar divisão por zero
+    const dayCount = Math.max(days.length || 1, 1);
+    
+    const getNumericValue = (value: any): number => {
+      if (typeof value === 'number') {
+        return isNaN(value) ? 0 : value;
+      }
+      if (value === null || value === undefined) {
+        return 0;
+      }
+      const parsed = Number(value);
+      return isNaN(parsed) ? 0 : parsed;
+    };
     
     mealPlan.weeklyTotals = {
       averageCalories: Math.round(days.reduce((sum: number, day: any) => {
         const dayTotal = day?.dailyTotals || {};
-        // Ensure calories is a number or default to 0
-        const calories = typeof dayTotal.calories === 'number' ? dayTotal.calories : 
-                        (dayTotal.calories ? Number(dayTotal.calories) : 0);
-        return sum + calories;
+        return sum + getNumericValue(dayTotal.calories);
       }, 0) / dayCount),
       
       averageProtein: Math.round(days.reduce((sum: number, day: any) => {
         const dayTotal = day?.dailyTotals || {};
-        // Ensure protein is a number or default to 0
-        const protein = typeof dayTotal.protein === 'number' ? dayTotal.protein : 
-                       (dayTotal.protein ? Number(dayTotal.protein) : 0);
-        return sum + protein;
+        return sum + getNumericValue(dayTotal.protein);
       }, 0) / dayCount),
       
       averageCarbs: Math.round(days.reduce((sum: number, day: any) => {
         const dayTotal = day?.dailyTotals || {};
-        // Ensure carbs is a number or default to 0
-        const carbs = typeof dayTotal.carbs === 'number' ? dayTotal.carbs : 
-                     (dayTotal.carbs ? Number(dayTotal.carbs) : 0);
-        return sum + carbs;
+        return sum + getNumericValue(dayTotal.carbs);
       }, 0) / dayCount),
       
       averageFats: Math.round(days.reduce((sum: number, day: any) => {
         const dayTotal = day?.dailyTotals || {};
-        // Ensure fats is a number or default to 0
-        const fats = typeof dayTotal.fats === 'number' ? dayTotal.fats : 
-                    (dayTotal.fats ? Number(dayTotal.fats) : 0);
-        return sum + fats;
+        return sum + getNumericValue(dayTotal.fats);
       }, 0) / dayCount),
       
       averageFiber: Math.round(days.reduce((sum: number, day: any) => {
         const dayTotal = day?.dailyTotals || {};
-        // Ensure fiber is a number or default to 0
-        const fiber = typeof dayTotal.fiber === 'number' ? dayTotal.fiber : 
-                     (dayTotal.fiber ? Number(dayTotal.fiber) : 0);
-        return sum + fiber;
+        return sum + getNumericValue(dayTotal.fiber);
       }, 0) / dayCount)
     };
   }
   
-  // Garantir que recommendations existe
   if (!mealPlan.recommendations) {
     console.warn("⚠️ Sem recomendações no plano - adicionando valores padrão");
     mealPlan.recommendations = {
@@ -322,20 +290,18 @@ function ensureMealPlanStructure(mealPlan: any, userCalories: number): MealPlan 
     };
   }
   
-  // Arredondar todos os valores numéricos para inteiros
   processNumericValues(mealPlan);
   
-  // Adicionar userCalories
   mealPlan.userCalories = userCalories;
   
   return mealPlan as MealPlan;
 }
 
 function createDefaultDayPlan(dayName: string, totalCalories: number): DayPlan {
-  const caloriesPerMeal = Math.round(totalCalories / 5); // 5 refeições
-  const protein = Math.round((totalCalories * 0.3) / 4); // 30% das calorias de proteínas
-  const carbs = Math.round((totalCalories * 0.5) / 4);   // 50% das calorias de carboidratos
-  const fats = Math.round((totalCalories * 0.2) / 9);    // 20% das calorias de gorduras
+  const caloriesPerMeal = Math.round(totalCalories / 5);
+  const protein = Math.round((totalCalories * 0.3) / 4);
+  const carbs = Math.round((totalCalories * 0.5) / 4);
+  const fats = Math.round((totalCalories * 0.2) / 9);
   
   const proteinPerMeal = Math.round(protein / 5);
   const carbsPerMeal = Math.round(carbs / 5);
@@ -413,7 +379,6 @@ function ensureDayStructureComplete(day: any, dayName: string, userCalories: num
         }
       };
     } else {
-      // Garantir que a refeição tem todos os campos necessários
       const currentMeal = day.meals[meal];
       
       if (!currentMeal.description) {
@@ -442,7 +407,6 @@ function ensureDayStructureComplete(day: any, dayName: string, userCalories: num
           fiber: 5
         };
       } else {
-        // Garantir que todos os macros existem
         if (isNaN(currentMeal.macros.protein)) currentMeal.macros.protein = 15;
         if (isNaN(currentMeal.macros.carbs)) currentMeal.macros.carbs = 30;
         if (isNaN(currentMeal.macros.fats)) currentMeal.macros.fats = 10;
@@ -451,7 +415,6 @@ function ensureDayStructureComplete(day: any, dayName: string, userCalories: num
     }
   });
   
-  // Verificar e corrigir dailyTotals
   if (!day.dailyTotals) {
     console.warn(`⚠️ dailyTotals ausente - calculando totais para ${dayName}`);
     
@@ -464,7 +427,6 @@ function ensureDayStructureComplete(day: any, dayName: string, userCalories: num
       fiber: Object.values(meals).reduce((sum: number, meal: any) => sum + (meal?.macros?.fiber || 0), 0)
     };
   } else {
-    // Garantir que todos os valores existem e são números
     if (isNaN(day.dailyTotals.calories)) day.dailyTotals.calories = userCalories;
     if (isNaN(day.dailyTotals.protein)) day.dailyTotals.protein = Math.round((userCalories * 0.3) / 4);
     if (isNaN(day.dailyTotals.carbs)) day.dailyTotals.carbs = Math.round((userCalories * 0.5) / 4);
@@ -485,13 +447,10 @@ function processNumericValues(obj: any): void {
     const value = obj[key];
     
     if (typeof value === 'number') {
-      // Arredondar todos os números para inteiros
       obj[key] = Math.round(value);
     } else if (typeof value === 'string' && !isNaN(parseFloat(value))) {
-      // Converter strings numéricas para inteiros
       obj[key] = Math.round(parseFloat(value));
     } else if (typeof value === 'object' && value !== null) {
-      // Processar recursivamente objetos aninhados
       processNumericValues(value);
     }
   });
