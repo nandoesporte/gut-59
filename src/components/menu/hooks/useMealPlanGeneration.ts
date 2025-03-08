@@ -238,16 +238,16 @@ function ensureMealPlanStructure(mealPlan: any, userCalories: number): MealPlan 
     const days = Object.values(weeklyPlan);
     const dayCount = Math.max(days.length || 1, 1);
     
-    // Helper function to ensure we're working with numeric values
+    // Helper function to ensure we're always working with numeric values
     const getNumericValue = (value: any): number => {
       if (typeof value === 'number' && !isNaN(value)) {
         return value;
       }
-      if (value === null || value === undefined) {
-        return 0;
+      if (typeof value === 'string') {
+        const parsed = Number(value);
+        return isNaN(parsed) ? 0 : parsed;
       }
-      const parsed = Number(value);
-      return isNaN(parsed) ? 0 : parsed;
+      return 0; // Default to 0 for null, undefined, or other non-numeric values
     };
     
     mealPlan.weeklyTotals = {
