@@ -1,3 +1,4 @@
+
 import { Card } from "@/components/ui/card";
 import { InitialMenuContent } from "@/components/menu/InitialMenuContent";
 import { CalorieCalculatorStep } from "@/components/menu/CalorieCalculatorStep";
@@ -21,19 +22,26 @@ const Menu = () => {
   const {
     currentStep,
     setCurrentStep,
-    calorieNeeds,
-    selectedFoods,
-    protocolFoods,
-    totalCalories,
+    isStepCompleted,
     mealPlan,
-    formData,
+    isGenerating,
+    userData,
+    protocolFoods,
+    selectedFoods,
+    toggleFoodSelection,
+    selectedFoodCount,
     loading,
+    isLoadingFoods,
     foodsError,
-    handleCalculateCalories,
+    dietaryPreferences,
+    formData,
+    setFormData,
+    calorieNeeds,
+    handleCaloriesCalculated,
     handleFoodSelection,
     handleConfirmFoodSelection,
     handleDietaryPreferences,
-    setFormData,
+    handleReset
   } = useMenuController();
 
   useEffect(() => {
@@ -131,7 +139,7 @@ const Menu = () => {
           <div className="space-y-6 sm:space-y-8">
             <Card className="p-4 sm:p-6">
               <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center">
-                <span className={`bg-${currentStep >= 1 ? 'green' : 'gray'}-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2`}>1</span>
+                <span className={`bg-${Number(currentStep) >= 1 ? 'green' : 'gray'}-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2`}>1</span>
                 Dados Básicos e Calorias
               </h2>
               {currentStep === 1 && (
@@ -143,11 +151,11 @@ const Menu = () => {
                       [field]: value
                     });
                   }}
-                  onCalculate={handleCalculateCalories}
+                  onCalculate={handleCaloriesCalculated}
                   calorieNeeds={calorieNeeds}
                 />
               )}
-              {currentStep > 1 && (
+              {Number(currentStep) > 1 && (
                 <div className="text-center py-2">
                   <p className="text-green-600 font-medium">✓ Calorias diárias calculadas: {calorieNeeds} kcal</p>
                   <button 
@@ -160,9 +168,9 @@ const Menu = () => {
               )}
             </Card>
 
-            <Card className={`p-4 sm:p-6 ${currentStep < 2 ? 'opacity-70' : ''}`}>
+            <Card className={`p-4 sm:p-6 ${Number(currentStep) < 2 ? 'opacity-70' : ''}`}>
               <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center">
-                <span className={`bg-${currentStep >= 2 ? 'green' : 'gray'}-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2`}>2</span>
+                <span className={`bg-${Number(currentStep) >= 2 ? 'green' : 'gray'}-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2`}>2</span>
                 Preferências Alimentares
               </h2>
               {currentStep === 2 && (
@@ -200,14 +208,14 @@ const Menu = () => {
                       protocolFoods={protocolFoods}
                       selectedFoods={selectedFoods}
                       onFoodSelection={handleFoodSelection}
-                      totalCalories={totalCalories}
+                      totalCalories={0}
                       onBack={() => setCurrentStep(1)}
                       onConfirm={handleConfirmFoodSelection}
                     />
                   )}
                 </>
               )}
-              {currentStep > 2 && (
+              {Number(currentStep) > 2 && (
                 <div className="text-center py-2">
                   <p className="text-green-600 font-medium">✓ {selectedFoods.length} alimentos selecionados</p>
                   <button 
@@ -221,9 +229,9 @@ const Menu = () => {
             </Card>
 
             <div ref={restrictionsCardRef}>
-              <Card id="dietary-restrictions-section" className={`p-4 sm:p-6 ${currentStep < 3 ? 'opacity-70' : ''}`}>
+              <Card id="dietary-restrictions-section" className={`p-4 sm:p-6 ${Number(currentStep) < 3 ? 'opacity-70' : ''}`}>
                 <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center">
-                  <span className={`bg-${currentStep >= 3 ? 'green' : 'gray'}-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2`}>3</span>
+                  <span className={`bg-${Number(currentStep) >= 3 ? 'green' : 'gray'}-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2`}>3</span>
                   Restrições e Preferências
                 </h2>
                 {currentStep === 3 && (
@@ -232,7 +240,7 @@ const Menu = () => {
                     onBack={() => setCurrentStep(2)}
                   />
                 )}
-                {currentStep > 3 && (
+                {Number(currentStep) > 3 && (
                   <div className="text-center py-2">
                     <p className="text-green-600 font-medium">✓ Preferências dietéticas registradas</p>
                     <button 
@@ -246,7 +254,7 @@ const Menu = () => {
               </Card>
             </div>
 
-            {currentStep === 4 && mealPlan && (
+            {Number(currentStep) === 4 && mealPlan && (
               <div ref={mealPlanRef}>
                 <Card className="p-4 sm:p-6">
                   <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center">

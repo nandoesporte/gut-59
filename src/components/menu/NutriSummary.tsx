@@ -11,7 +11,7 @@ interface LastMealPlanData {
   id: string;
   created_at: string;
   calories: number;
-  plan_data: MealPlan;
+  plan_data: any; // Use any instead of MealPlan to handle Json type
 }
 
 export const NutriSummary = () => {
@@ -47,7 +47,8 @@ export const NutriSummary = () => {
 
         if (data) {
           console.log("Found last meal plan:", data);
-          setLastPlan(data as LastMealPlanData);
+          // Type assertion to handle database types
+          setLastPlan(data as unknown as LastMealPlanData);
         }
       } catch (error) {
         console.error('Error fetching last meal plan:', error);

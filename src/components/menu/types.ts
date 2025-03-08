@@ -106,7 +106,7 @@ export interface TransactionParams {
   amount: number;
   description: string;
   category: string;
-  type?: string;
+  type: string;
 }
 
 export interface TransactionInput {
