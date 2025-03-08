@@ -12,7 +12,6 @@ import { WaterTracker } from "@/components/food-diary/WaterTracker";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { GraduationCap } from "lucide-react";
-import { NutriSummary } from "@/components/menu/NutriSummary";
 
 const Index = () => {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -72,11 +71,6 @@ const Index = () => {
       <div className="w-full">
         <Profile />
       </div>
-      
-      <div className="w-full">
-        <NutriSummary />
-      </div>
-      
       <div className="w-full">
         <Card className="p-6">
           <div className="flex items-center justify-between">
@@ -90,15 +84,12 @@ const Index = () => {
           </div>
         </Card>
       </div>
-      
       <div className="w-full">
         <StepCounter />
       </div>
-      
       <div className="w-full">
         <WaterTracker />
       </div>
-      
       {isAdmin ? (
         <div className="w-full">
           <MessagesTab />
@@ -117,7 +108,6 @@ const Index = () => {
           </div>
         </>
       )}
-      
       <div className="w-full">
         <TipsCalendar />
       </div>

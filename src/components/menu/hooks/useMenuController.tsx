@@ -1,358 +1,315 @@
 
 import { useState, useEffect, useCallback } from "react";
+import { useProtocolFoods } from "./useProtocolFoods";
+import { useCalorieCalculator, Goal } from "./useCalorieCalculator";
+import { useFoodSelection } from "./useFoodSelection";
+import { generateMealPlan } from "./useMealPlanGeneration";
+import { DietaryPreferences, MealPlan, ProtocolFood } from "../types";
+import { useWallet } from "@/hooks/useWallet";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import type { MealPlan, ProtocolFood, DietaryPreferences, TransactionParams, MenuStep } from "../types";
-import { useCalorieCalculator, Goal } from "./useCalorieCalculator";
-import { generateMealPlan } from "./useMealPlanGeneration";
-import { useProtocolFoods } from "./useProtocolFoods";
-import { usePaymentHandling } from "./usePaymentHandling";
-import { useWallet } from "@/hooks/useWallet";
-import { TransactionType } from "@/types/wallet";
-import { TransactionInput } from "@/hooks/wallet/types";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
+import { CalorieCalculatorForm } from "../CalorieCalculator";
+import type { Database } from "@/integrations/supabase/types";
 
-interface CalorieCalculatorForm {
-  weight: string;
-  height: string;
-  age: string;
-  gender: "male" | "female";
-  activityLevel: string;
-  goal: Goal;
-}
-
-interface UserCalorieData {
-  userId?: string;
+export interface FormData {
   weight: number;
   height: number;
   age: number;
-  gender: string;
+  gender: "male" | "female";
   activityLevel: string;
   goal: string;
-  dailyCalories: number;
 }
 
-// Main hook for menu controller
-export const useMenuController = () => {
-  // State variables for workflow
-  const [currentStep, setCurrentStep] = useState<MenuStep>('initial');
-  const [isStepCompleted, setIsStepCompleted] = useState<Record<MenuStep, boolean>>({
-    initial: true,
-    calculator: false,
-    foods: false,
-    preferences: false,
-    result: false
-  });
-  const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
-  const [formData, setFormData] = useState<CalorieCalculatorForm>({
-    weight: '',
-    height: '',
-    age: '',
-    gender: 'male',
-    activityLevel: 'moderate',
-    goal: 'maintain'
-  });
-  const [userData, setUserData] = useState<UserCalorieData>({
-    weight: 0,
-    height: 0,
-    age: 0,
-    gender: 'male',
-    activityLevel: 'moderate',
-    goal: 'maintain',
-    dailyCalories: 0
-  });
+interface MenuState {
+  currentStep: number;
+  setCurrentStep: (step: number) => void;
+  calorieNeeds: number;
+  selectedFoods: string[];
+  protocolFoods: ProtocolFood[];
+  totalCalories: number; 
+  mealPlan: MealPlan | null;
+  formData: CalorieCalculatorForm;
+  loading: boolean;
+  foodsError: Error | null;
+  setFormData: (data: CalorieCalculatorForm) => void;
+  handleCalculateCalories: () => void;
+  handleFoodSelection: (foodId: string, food?: ProtocolFood) => void;
+  handleConfirmFoodSelection: () => void;
+  handleDietaryPreferences: (preferences: DietaryPreferences) => void;
+}
+
+const mapGoalToDbEnum = (goal: Goal): Database['public']['Enums']['nutritional_goal'] => {
+  const goalMap: Record<Goal, Database['public']['Enums']['nutritional_goal']> = {
+    'lose': 'lose_weight',
+    'maintain': 'maintain',
+    'gain': 'gain_mass'
+  };
+  return goalMap[goal];
+};
+
+const mapDbEnumToGoal = (dbGoal: Database['public']['Enums']['nutritional_goal']): Goal => {
+  const goalMap: Record<Database['public']['Enums']['nutritional_goal'], Goal> = {
+    'lose_weight': 'lose',
+    'maintain': 'maintain',
+    'gain_mass': 'gain'
+  };
+  return goalMap[dbGoal] || 'maintain';
+};
+
+export const useMenuController = (): MenuState => {
+  const [currentStep, setCurrentStep] = useState<number>(1);
   const [calorieNeeds, setCalorieNeeds] = useState<number>(0);
-  const [loading, setLoading] = useState(false);
-  const [totalCalories, setTotalCalories] = useState(0);
-  
-  // Set up hooks for different functionalities
-  const { calculateCalories } = useCalorieCalculator();
-  const { 
-    protocolFoods, 
-    selectedFoods, 
-    toggleFoodSelection, 
-    selectedFoodCount,
-    isLoadingFoods,
-    loading: loadingFoods,
-    error: foodsError,
-    foodsByMealType
-  } = useProtocolFoods();
-  
+  const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
   const [dietaryPreferences, setDietaryPreferences] = useState<DietaryPreferences>({
     hasAllergies: false,
     allergies: [],
     dietaryRestrictions: [],
-    trainingTime: undefined
+    trainingTime: null,
   });
-
-  // Payment handling for meal plan generation
+  const [formData, setFormData] = useState<CalorieCalculatorForm>({
+    weight: "70",
+    height: "170",
+    age: "30",
+    gender: "male",
+    activityLevel: "moderate",
+    goal: "maintain"
+  });
+  
+  const { protocolFoods, error: foodsError, foodsByMealType } = useProtocolFoods();
+  const { calculateCalories } = useCalorieCalculator();
   const { 
-    isProcessingPayment,
-    preferenceId,
-    hasPaid,
-    currentPrice,
-    handlePaymentAndContinue,
-    showConfirmation,
-    setShowConfirmation,
-    confirmationMessage,
-    addTransactionAsync
-  } = usePaymentHandling();
+    selectedFoods, 
+    totalCalories, 
+    handleFoodSelection, 
+    calculateTotalCalories, 
+    categorizeFoodsByMealType,
+    addFood,
+    resetSelection 
+  } = useFoodSelection();
+  
+  const wallet = useWallet();
 
-  // Payment access state
-  const [hasPlanAccess, setHasPlanAccess] = useState(false);
-  const [isPlanAccessLoading, setIsPlanAccessLoading] = useState(false);
-  const [loadingPlanAccess, setLoadingPlanAccess] = useState(false);
-  
-  const createPayment = async () => {
-    // Implementation for creating payment
-    toast.info("Creating payment...");
-    return true;
-  };
-  
-  const checkPaymentStatus = async () => {
-    // Implementation for checking payment
-    return true;
-  };
-  
-  const setPlanAccess = async () => {
-    setHasPlanAccess(true);
-    return true;
-  };
-  
-  // Wallet integration for balance and transactions
-  const { addTransaction } = useWallet();
-
-  // Effect to check if user has access to meal plan generation
   useEffect(() => {
-    if (!loadingPlanAccess && !hasPlanAccess) {
-      console.log("User does not have meal plan access");
-    }
-  }, [loadingPlanAccess, hasPlanAccess]);
-
-  // Navigation functions
-  const goToStep = useCallback((step: MenuStep) => {
-    // Only allow navigation to steps that have prerequisites completed
-    switch (step) {
-      case 'foods':
-        if (!isStepCompleted.calculator) {
-          toast.error("Complete a calculadora de calorias primeiro");
-          return;
-        }
-        break;
-      case 'preferences':
-        if (!isStepCompleted.foods) {
-          toast.error("Selecione alimentos primeiro");
-          return;
-        }
-        break;
-      case 'result':
-        if (!isStepCompleted.preferences) {
-          toast.error("Configure suas preferências primeiro");
-          return;
-        }
-        break;
-      default:
-        break;
-    }
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.log("User not authenticated, some features will be limited");
+      } else {
+        console.log("User authenticated:", user.id);
+        loadSavedPreferences(user.id);
+      }
+    };
     
-    setCurrentStep(step);
-  }, [isStepCompleted]);
-
-  // Handle calculator completion
-  const handleCaloriesCalculated = useCallback(() => {
-    const calories = calculateCalories(formData, {
-      multiplier: 1.2 // Default multiplier
-    });
-    
-    setCalorieNeeds(calories);
-    setUserData({
-      weight: Number(formData.weight),
-      height: Number(formData.height),
-      age: Number(formData.age),
-      gender: formData.gender,
-      activityLevel: formData.activityLevel,
-      goal: formData.goal,
-      dailyCalories: calories
-    });
-    
-    setIsStepCompleted(prev => ({ ...prev, calculator: true }));
-    goToStep('foods');
-  }, [formData, calculateCalories, goToStep]);
-
-  // Handle foods selection completion
-  const handleFoodsSelected = useCallback(() => {
-    if (selectedFoodCount < 5) {
-      toast.error("Selecione pelo menos 5 alimentos");
-      return;
-    }
-    
-    setIsStepCompleted(prev => ({ ...prev, foods: true }));
-    goToStep('preferences');
-  }, [selectedFoodCount, goToStep]);
-
-  // Handle food selection
-  const handleFoodSelection = useCallback((food: ProtocolFood) => {
-    toggleFoodSelection(food);
-  }, [toggleFoodSelection]);
-
-  // Handle confirm food selection
-  const handleConfirmFoodSelection = useCallback(() => {
-    handleFoodsSelected();
-  }, [handleFoodsSelected]);
-
-  // Handle preferences completion
-  const handlePreferencesSubmitted = useCallback((preferences: DietaryPreferences) => {
-    setDietaryPreferences(preferences);
-    setIsStepCompleted(prev => ({ ...prev, preferences: true }));
-    
-    // Check if user has access to meal plan generation
-    if (hasPlanAccess) {
-      handleGenerateMealPlan();
-    } else {
-      setIsPaymentDialogOpen(true);
-    }
-  }, [hasPlanAccess]);
-
-  // Handle dietary preferences
-  const handleDietaryPreferences = useCallback((preferences: DietaryPreferences) => {
-    handlePreferencesSubmitted(preferences);
-  }, [handlePreferencesSubmitted]);
-
-  // Handle meal plan generation
-  const handleGenerateMealPlan = useCallback(async () => {
-    setIsGenerating(true);
-    setLoading(true);
-    toast.loading("Gerando plano alimentar personalizado...");
-    
+    checkUser();
+  }, []);
+  
+  const loadSavedPreferences = async (userId: string) => {
     try {
-      // Prepare transaction function for wallet
-      const handleAddTransaction = async (params: TransactionParams) => {
-        if (addTransaction) {
-          const transactionType = params.type as unknown as TransactionType;
-          await addTransaction({
-            ...params,
-            type: transactionType
-          } as unknown as TransactionInput);
+      const { data: nutritionPrefs, error: nutritionError } = await supabase
+        .from('nutrition_preferences')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+      
+      if (nutritionError && !nutritionError.message.includes("no rows")) {
+        console.error("Erro ao carregar preferências nutricionais:", nutritionError);
+      } else if (nutritionPrefs) {
+        console.log("Loaded nutrition preferences:", nutritionPrefs);
+        
+        const uiGoal: Goal = nutritionPrefs.goal ? mapDbEnumToGoal(nutritionPrefs.goal) : 'maintain';
+        
+        setFormData({
+          weight: String(nutritionPrefs.weight || 70),
+          height: String(nutritionPrefs.height || 170),
+          age: String(nutritionPrefs.age || 30),
+          gender: (nutritionPrefs.gender === "female" ? "female" : "male"),
+          activityLevel: nutritionPrefs.activity_level || "moderate",
+          goal: uiGoal,
+        });
+      }
+      
+      const { data: dietaryPrefs, error: dietaryError } = await supabase
+        .from('dietary_preferences')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+      
+      if (dietaryError && !dietaryError.message.includes("no rows")) {
+        console.error("Erro ao carregar preferências alimentares:", dietaryError);
+      } else if (dietaryPrefs) {
+        console.log("Loaded dietary preferences:", dietaryPrefs);
+        setDietaryPreferences(prev => ({
+          ...prev,
+          hasAllergies: dietaryPrefs.has_allergies || false,
+          allergies: dietaryPrefs.allergies || [],
+          dietaryRestrictions: dietaryPrefs.dietary_restrictions || [],
+          trainingTime: dietaryPrefs.training_time || null,
+        }));
+      }
+    } catch (error) {
+      console.error("Erro ao carregar preferências:", error);
+    }
+  };
+
+  const handleCalculateCalories = useCallback(() => {
+    const selectedLevel = activityLevels.find(level => level.value === formData.activityLevel);
+    const calculatedCalories = calculateCalories(formData, selectedLevel || { multiplier: 1.2 });
+    
+    if (calculatedCalories) {
+      setCalorieNeeds(calculatedCalories);
+      setCurrentStep(2);
+      
+      const savePreferences = async () => {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const dbGoal = mapGoalToDbEnum(formData.goal as Goal);
+            
+            const { error } = await supabase.from('nutrition_preferences').upsert({
+              user_id: user.id,
+              weight: parseFloat(formData.weight),
+              height: parseFloat(formData.height),
+              age: parseFloat(formData.age),
+              gender: formData.gender,
+              activity_level: formData.activityLevel as any,
+              goal: dbGoal,
+              calories_needed: calculatedCalories
+            });
+            
+            if (error) {
+              console.error("Error saving nutrition preferences:", error);
+            }
+          }
+        } catch (error) {
+          console.error("Error saving nutrition preferences:", error);
         }
       };
       
-      // Generate the meal plan
-      const generatedPlan = await generateMealPlan({
-        userData: {
-          id: userData.userId,
-          ...userData
-        },
-        selectedFoods,
-        foodsByMealType,
-        preferences: dietaryPreferences,
-        addTransaction: handleAddTransaction
-      });
-      
-      if (generatedPlan) {
-        setMealPlan(generatedPlan);
-        setIsStepCompleted(prev => ({ ...prev, result: true }));
-        goToStep('result');
-        toast.success("Plano alimentar gerado com sucesso!");
-      } else {
-        toast.error("Falha ao gerar plano alimentar. Tente novamente.");
-      }
-    } catch (error) {
-      console.error("Erro ao gerar plano alimentar:", error);
-      toast.error("Erro ao gerar plano alimentar. Tente novamente mais tarde.");
-    } finally {
-      setIsGenerating(false);
-      setLoading(false);
-      toast.dismiss();
+      savePreferences();
     }
-  }, [userData, selectedFoods, dietaryPreferences, goToStep, foodsByMealType, addTransaction]);
+  }, [formData, calculateCalories]);
 
-  // Handle payment completion
-  const handlePaymentCompleted = useCallback(async () => {
-    await setPlanAccess();
-    handleGenerateMealPlan();
-    setIsPaymentDialogOpen(false);
-  }, [setPlanAccess, handleGenerateMealPlan]);
+  const handleConfirmFoodSelection = useCallback(() => {
+    if (selectedFoods.length === 0) {
+      toast.error("Por favor, selecione pelo menos um alimento.");
+      return;
+    }
+    setCurrentStep(3);
+  }, [selectedFoods]);
 
-  // Handle saving meal plan as PDF
-  const handleSavePDF = useCallback(async () => {
-    if (!mealPlan) return;
+  const handleDietaryPreferences = useCallback(async (preferences: DietaryPreferences) => {
+    setDietaryPreferences(preferences);
+    setLoading(true);
     
     try {
-      const element = document.getElementById('meal-plan-container');
-      if (!element) {
-        toast.error("Elemento do plano alimentar não encontrado");
-        return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { error } = await supabase.from('dietary_preferences').upsert({
+          user_id: user.id,
+          has_allergies: preferences.hasAllergies,
+          allergies: preferences.allergies,
+          dietary_restrictions: preferences.dietaryRestrictions,
+          training_time: preferences.trainingTime
+        });
+        
+        if (error) {
+          console.error("Error saving dietary preferences:", error);
+        }
       }
-      
-      const canvas = await html2canvas(element);
-      const imgData = canvas.toDataURL('image/png');
-      
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgProps = pdf.getImageProperties(imgData);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-      
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save('plano-alimentar.pdf');
-      
-      toast.success("PDF baixado com sucesso!");
     } catch (error) {
-      console.error("Erro ao gerar PDF:", error);
-      toast.error("Erro ao gerar PDF. Tente novamente.");
+      console.error("Error saving dietary preferences:", error);
     }
-  }, [mealPlan]);
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const generatedPlan = await generateMealPlan({
+        userData: {
+          id: user?.id,
+          weight: parseFloat(formData.weight),
+          height: parseFloat(formData.height),
+          age: parseFloat(formData.age),
+          gender: formData.gender,
+          activityLevel: formData.activityLevel,
+          goal: formData.goal,
+          dailyCalories: calorieNeeds
+        },
+        selectedFoods: protocolFoods.filter(food => selectedFoods.includes(food.id)),
+        foodsByMealType,
+        preferences,
+        addTransaction: wallet ? async (params) => {
+          try {
+            wallet.addTransaction(params);
+          } catch (e) {
+            console.error("Error adding transaction:", e);
+          }
+        } : undefined
+      });
 
-  // Reset the workflow
-  const handleReset = useCallback(() => {
-    setMealPlan(null);
-    setIsStepCompleted({
-      initial: true,
-      calculator: false,
-      foods: false,
-      preferences: false,
-      result: false
-    });
-    setCurrentStep('initial');
-  }, []);
+      if (generatedPlan) {
+        setMealPlan(generatedPlan);
+        
+        // Save the meal plan to the database
+        if (user) {
+          try {
+            console.log("💾 Tentando salvar plano alimentar para o usuário:", user.id);
+            
+            // Convert the MealPlan object to a plain JSON object
+            const planDataAsJson = JSON.parse(JSON.stringify(generatedPlan));
+            
+            const { error } = await supabase
+              .from('meal_plans')
+              .insert({
+                user_id: user.id,
+                plan_data: planDataAsJson,
+                calories: calorieNeeds
+              });
+              
+            if (error) {
+              console.error("❌ Erro ao salvar plano alimentar:", error);
+            } else {
+              console.log("✅ Plano alimentar salvo com sucesso");
+            }
+          } catch (error) {
+            console.error("❌ Erro ao salvar plano alimentar:", error);
+          }
+        }
+        
+        setCurrentStep(4);
+      } else {
+        toast.error("Não foi possível gerar o plano alimentar. Por favor, tente novamente.");
+      }
+    } catch (error) {
+      console.error("Error generating meal plan:", error);
+      toast.error("Erro ao gerar o plano alimentar. Por favor, tente novamente.");
+    } finally {
+      setLoading(false);
+    }
+  }, [formData, calorieNeeds, selectedFoods, protocolFoods, foodsByMealType, wallet]);
 
   return {
     currentStep,
     setCurrentStep,
-    isStepCompleted,
-    mealPlan,
-    isGenerating,
-    userData,
     calorieNeeds,
-    protocolFoods,
     selectedFoods,
-    toggleFoodSelection,
-    selectedFoodCount,
-    loading,
-    isLoadingFoods,
-    foodsError,
-    dietaryPreferences,
-    formData,
-    setFormData,
+    protocolFoods,
     totalCalories,
-    setDietaryPreferences,
-    isPaymentDialogOpen,
-    setIsPaymentDialogOpen,
-    isPlanAccessLoading,
-    hasPlanAccess,
-    createPayment,
-    checkPaymentStatus,
-    goToStep,
-    handleCaloriesCalculated,
+    mealPlan,
+    formData,
+    loading,
+    foodsError,
+    setFormData,
+    handleCalculateCalories,
     handleFoodSelection,
     handleConfirmFoodSelection,
-    handleFoodsSelected,
     handleDietaryPreferences,
-    handleGenerateMealPlan,
-    handlePaymentCompleted,
-    handleSavePDF,
-    handleReset
   };
 };
+
+const activityLevels = [
+  { value: "sedentary", multiplier: 1.2 },
+  { value: "light", multiplier: 1.375 },
+  { value: "moderate", multiplier: 1.55 },
+  { value: "intense", multiplier: 1.725 }
+];

@@ -19,7 +19,6 @@ export interface ProtocolFood {
   carbs_per_100g?: number;
   fats_per_100g?: number;
   fiber_per_100g?: number;
-  meal_type?: string[];
 }
 
 export interface DietaryPreferences {
@@ -100,14 +99,3 @@ export interface MealPlan {
   userCalories?: number;
   generatedBy?: string;
 }
-
-import { TransactionType } from "@/types/wallet";
-
-export interface TransactionParams {
-  amount: number;
-  description: string;
-  category?: string;
-  type: TransactionType;
-}
-
-export type MenuStep = 'initial' | 'calculator' | 'foods' | 'preferences' | 'result';

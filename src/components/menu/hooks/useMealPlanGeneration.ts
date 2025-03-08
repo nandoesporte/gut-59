@@ -1,8 +1,7 @@
 
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import type { DietaryPreferences, MealPlan, ProtocolFood, TransactionParams, DayPlan } from "../types";
-import { TransactionType } from "@/types/wallet";
+import type { DietaryPreferences, MealPlan, ProtocolFood, DayPlan } from "../types";
 
 interface GenerateMealPlanParams {
   userData: {
@@ -16,9 +15,9 @@ interface GenerateMealPlanParams {
     dailyCalories: number;
   };
   selectedFoods: ProtocolFood[];
-  foodsByMealType: Record<string, ProtocolFood[]>;
+  foodsByMealType: Record<string, string[]>;
   preferences: DietaryPreferences;
-  addTransaction?: (params: TransactionParams) => Promise<void>;
+  addTransaction?: (params: any) => Promise<void>;
 }
 
 export const generateMealPlan = async ({
@@ -36,6 +35,7 @@ export const generateMealPlan = async ({
   
   try {
     console.log("📡 Chamando função edge do Supabase - nutri-plus-agent (Llama3-8b)");
+    // Call the Nutri+ agent edge function
     const { data, error } = await supabase.functions.invoke('nutri-plus-agent', {
       body: {
         userData,
@@ -43,6 +43,7 @@ export const generateMealPlan = async ({
         foodsByMealType,
         dietaryPreferences: preferences,
         modelConfig: {
+          // Explicitly specify model to use
           model: "llama3-8b-8192",
           temperature: 0.3
         }
@@ -66,20 +67,22 @@ export const generateMealPlan = async ({
     console.log("📋 Dados do plano:", JSON.stringify(data.mealPlan).substring(0, 200) + "...");
     console.log("🧠 Modelo utilizado:", data.modelUsed || "llama3-8b-8192");
     
-    const mealPlan = data.mealPlan as MealPlan;
-    
-    if (mealPlan && userData.dailyCalories) {
-      mealPlan.userCalories = userData.dailyCalories;
+    // Ensure the meal plan uses the user's specified daily calories
+    if (data.mealPlan && userData.dailyCalories) {
+      data.mealPlan.userCalories = userData.dailyCalories;
       
-      if (!mealPlan.weeklyTotals || 
-          isNaN(mealPlan.weeklyTotals.averageCalories) || 
-          isNaN(mealPlan.weeklyTotals.averageProtein)) {
+      // If weeklyTotals is missing or has NaN values, recalculate it here
+      if (!data.mealPlan.weeklyTotals || 
+          isNaN(data.mealPlan.weeklyTotals.averageCalories) || 
+          isNaN(data.mealPlan.weeklyTotals.averageProtein)) {
         
         console.log("⚠️ Recalculando médias semanais devido a valores ausentes ou NaN");
         
-        const weeklyPlan = mealPlan.weeklyPlan || {};
+        // Convert weeklyPlan to array of day plans, with validation
+        const weeklyPlan = data.mealPlan.weeklyPlan || {};
         const days = Object.values(weeklyPlan);
         
+        // Define a proper type guard function to ensure day has properly typed dailyTotals
         const isDayPlanWithValidTotals = (day: unknown): day is DayPlan => {
           return (
             !!day && 
@@ -95,10 +98,11 @@ export const generateMealPlan = async ({
           );
         };
         
+        // Filter days to only include valid days with proper dailyTotals
         const validDays = days.filter(isDayPlanWithValidTotals);
-        const dayCount = validDays.length || 1;
+        const dayCount = validDays.length || 1; // Prevent division by zero
         
-        mealPlan.weeklyTotals = {
+        data.mealPlan.weeklyTotals = {
           averageCalories: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.calories, 0) / dayCount),
           averageProtein: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.protein, 0) / dayCount),
           averageCarbs: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.carbs, 0) / dayCount),
@@ -106,22 +110,24 @@ export const generateMealPlan = async ({
           averageFiber: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.fiber, 0) / dayCount)
         };
         
-        console.log("🔄 Novos valores de médias semanais:", mealPlan.weeklyTotals);
+        console.log("🔄 Novos valores de médias semanais:", data.mealPlan.weeklyTotals);
       }
     }
     
+    // Save the meal plan to the database if user is authenticated
     if (userData.id) {
       try {
+        // Check if we have a user ID before attempting to save
         console.log("💾 Tentando salvar plano alimentar para o usuário:", userData.id);
         
         const { error: saveError } = await supabase
           .from('meal_plans')
           .insert({
             user_id: userData.id,
-            plan_data: JSON.stringify(mealPlan),
+            plan_data: data.mealPlan,
             calories: userData.dailyCalories,
             generated_by: data.modelUsed || "nutri-plus-agent-llama3",
-            dietary_preferences: JSON.stringify(preferences)
+            preferences: preferences // Save the user preferences with the meal plan
           });
 
         if (saveError) {
@@ -131,11 +137,13 @@ export const generateMealPlan = async ({
           console.log("💾 Plano alimentar salvo no banco de dados com sucesso");
           toast.success("Plano alimentar salvo no histórico");
           
+          // Add transaction if wallet function is available
           if (addTransaction) {
             await addTransaction({
               amount: 10,
-              type: 'meal_plan_generation' as TransactionType,
-              description: 'Geração de plano alimentar'
+              type: 'expense',
+              description: 'Geração de plano alimentar',
+              category: 'meal_plan'
             });
             console.log("💰 Transação adicionada para geração do plano alimentar");
           }
@@ -149,7 +157,8 @@ export const generateMealPlan = async ({
       toast.warning("Faça login para salvar o plano no histórico");
     }
 
-    return mealPlan;
+    // Return the meal plan exactly as generated by the AI
+    return data.mealPlan;
   } catch (error) {
     console.error("❌ Erro inesperado em generateMealPlan:", error);
     toast.error("Erro ao gerar plano alimentar. Por favor, tente novamente.");

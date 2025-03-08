@@ -11,8 +11,8 @@ export type Goal = "lose" | "maintain" | "gain";
 type NutritionPreference = Database['public']['Tables']['nutrition_preferences']['Insert'];
 
 // This function maps our UI goals to the database enum values
-const mapGoalToEnum = (goal: Goal): Database['public']['Enums']['nutritional_goal'] => {
-  const goalMap: Record<Goal, Database['public']['Enums']['nutritional_goal']> = {
+const mapGoalToEnum = (goal: string): Database['public']['Enums']['nutritional_goal'] => {
+  const goalMap: Record<string, Database['public']['Enums']['nutritional_goal']> = {
     'lose': 'lose_weight',
     'maintain': 'maintain',
     'gain': 'gain_mass'
@@ -23,26 +23,6 @@ const mapGoalToEnum = (goal: Goal): Database['public']['Enums']['nutritional_goa
 export const useCalorieCalculator = () => {
   const [loading, setLoading] = useState(false);
   const [calorieNeeds, setCalorieNeeds] = useState<number | null>(null);
-  
-  // Create form data state with proper typing
-  const [userData, setUserData] = useState<{
-    id?: string;
-    weight: number;
-    height: number;
-    age: number;
-    gender: string;
-    activityLevel: string;
-    goal: Goal;
-    dailyCalories: number;
-  }>({
-    weight: 0,
-    height: 0,
-    age: 0,
-    gender: 'male',
-    activityLevel: 'moderate',
-    goal: 'maintain',
-    dailyCalories: 0
-  });
 
   const calculateBMR = (data: CalorieCalculatorForm) => {
     const weight = parseFloat(data.weight);
@@ -69,26 +49,15 @@ export const useCalorieCalculator = () => {
       
       if (!formData.goal) {
         toast.error("Por favor, selecione um objetivo");
-        return 0;
+        return null;
       }
-
-      // Update user data
-      setUserData({
-        weight: parseFloat(formData.weight),
-        height: parseFloat(formData.height),
-        age: parseFloat(formData.age),
-        gender: formData.gender,
-        activityLevel: formData.activityLevel,
-        goal: formData.goal as Goal,
-        dailyCalories
-      });
 
       setCalorieNeeds(dailyCalories);
       return dailyCalories;
     } catch (error) {
       console.error('Error calculating calories:', error);
       toast.error("Erro ao calcular necessidades calóricas");
-      return 0;
+      return null;
     } finally {
       setLoading(false);
     }
@@ -98,7 +67,5 @@ export const useCalorieCalculator = () => {
     loading,
     calorieNeeds,
     calculateCalories,
-    userData,
-    setUserData
   };
 };

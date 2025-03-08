@@ -32,7 +32,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.generate-meal-plan-groq]
-verify_jwt = true
+verify_jwt = false
 
 [functions.grant-plan-access]
 verify_jwt = true
@@ -47,10 +47,4 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.generate-workout-plan-llama]
-verify_jwt = true
-
-[functions.generate-meal-suggestions]
-verify_jwt = true
-
-[functions.nutri-plus-agent]
 verify_jwt = true
