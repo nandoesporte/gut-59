@@ -1,7 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { DietaryPreferences, MealPlan, ProtocolFood } from "../types";
-import { useMemo } from "react";
 import { toast } from "sonner";
 
 export interface UserData {
@@ -77,10 +76,10 @@ const standardizeMealPlanFormat = (rawData: any): MealPlan => {
       return {
         weeklyPlan,
         weeklyTotals: rawData.meal_plan.macro_distribution ? {
-          averageCalories: rawData.meal_plan.daily_calories || 0,
-          averageProtein: rawData.meal_plan.macro_distribution.protein_percentage || 0,
-          averageCarbs: rawData.meal_plan.macro_distribution.carbs_percentage || 0,
-          averageFats: rawData.meal_plan.macro_distribution.fat_percentage || 0,
+          averageCalories: Number(rawData.meal_plan.daily_calories || 0),
+          averageProtein: Number(rawData.meal_plan.macro_distribution.protein_percentage || 0),
+          averageCarbs: Number(rawData.meal_plan.macro_distribution.carbs_percentage || 0),
+          averageFats: Number(rawData.meal_plan.macro_distribution.fat_percentage || 0),
           averageFiber: 0
         } : {
           averageCalories: 0,
@@ -131,12 +130,12 @@ const createDayPlan = (dayName: string, mealPlanData: any) => {
         unit: food.unit || "g",
         details: food.details || ""
       })) : [],
-      calories: mealData.total_calories || 0,
+      calories: Number(mealData.total_calories || 0),
       macros: {
-        protein: mealData.total_protein || 0,
-        carbs: mealData.total_carbs || 0,
-        fats: mealData.total_fat || 0,
-        fiber: 0
+        protein: Number(mealData.total_protein || 0),
+        carbs: Number(mealData.total_carbs || 0),
+        fats: Number(mealData.total_fat || 0),
+        fiber: Number(mealData.total_fiber || 0)
       }
     };
   };
@@ -311,13 +310,16 @@ export const generateMealPlan = async (params: MealPlanGenerationParams): Promis
       
       // Check if the plan is already in the database (by ID from response)
       if (!response.data.id) {
+        // Convert the preferences to a JSON-compatible object
+        const preferencesJson = JSON.parse(JSON.stringify(preferences));
+
         const { error } = await supabase
           .from('meal_plans')
           .insert({
             user_id: userData.id,
             plan_data: planJson,
             calories: userData.dailyCalories,
-            dietary_preferences: preferences
+            dietary_preferences: preferencesJson
           });
           
         if (error) {

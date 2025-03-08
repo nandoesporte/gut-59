@@ -163,18 +163,93 @@ serve(async (req) => {
       throw new Error('Failed to parse meal plan JSON from Groq response');
     }
 
-    // Create a wrapper object if necessary to standardize format
-    const standardizedMealPlan = mealPlanJson.weeklyPlan ? 
-      mealPlanJson : 
-      { mealPlan: mealPlanJson };
-    
-    console.log('Standardized meal plan format:', Object.keys(standardizedMealPlan));
-    
-    // Check for required properties to validate response structure
-    if (!standardizedMealPlan.weeklyPlan && 
-        !standardizedMealPlan.mealPlan?.weeklyPlan) {
-      console.error('Invalid meal plan structure - missing weeklyPlan:', standardizedMealPlan);
+    // Validate the meal plan structure
+    if (!mealPlanJson.weeklyPlan) {
+      console.error('Invalid meal plan structure - missing weeklyPlan:', mealPlanJson);
       throw new Error('Invalid meal plan structure returned by Groq API');
+    }
+
+    // Ensure all days are present in the weekly plan
+    const requiredDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const missingDays = requiredDays.filter(day => !mealPlanJson.weeklyPlan[day]);
+    
+    if (missingDays.length > 0) {
+      console.error(`Missing days in meal plan: ${missingDays.join(', ')}`);
+      // Fill in missing days with empty structures
+      missingDays.forEach(day => {
+        const emptyMeal = {
+          description: "Refeição não especificada",
+          foods: [],
+          calories: 0,
+          macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+        };
+        
+        mealPlanJson.weeklyPlan[day] = {
+          dayName: getDayName(day),
+          meals: {
+            breakfast: emptyMeal,
+            morningSnack: emptyMeal,
+            lunch: emptyMeal,
+            afternoonSnack: emptyMeal,
+            dinner: emptyMeal
+          },
+          dailyTotals: { calories: 0, protein: 0, carbs: 0, fats: 0, fiber: 0 }
+        };
+      });
+    }
+
+    // Ensure weekly totals are present
+    if (!mealPlanJson.weeklyTotals) {
+      console.error('Missing weeklyTotals in meal plan, calculating from daily totals');
+      
+      // Calculate weekly totals from daily totals
+      const totals = {
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fats: 0,
+        fiber: 0
+      };
+      
+      let daysCount = 0;
+      
+      requiredDays.forEach(day => {
+        if (mealPlanJson.weeklyPlan[day] && mealPlanJson.weeklyPlan[day].dailyTotals) {
+          totals.calories += Number(mealPlanJson.weeklyPlan[day].dailyTotals.calories || 0);
+          totals.protein += Number(mealPlanJson.weeklyPlan[day].dailyTotals.protein || 0);
+          totals.carbs += Number(mealPlanJson.weeklyPlan[day].dailyTotals.carbs || 0);
+          totals.fats += Number(mealPlanJson.weeklyPlan[day].dailyTotals.fats || 0);
+          totals.fiber += Number(mealPlanJson.weeklyPlan[day].dailyTotals.fiber || 0);
+          daysCount++;
+        }
+      });
+      
+      daysCount = daysCount || 1; // Avoid division by zero
+      
+      mealPlanJson.weeklyTotals = {
+        averageCalories: Math.round(totals.calories / daysCount),
+        averageProtein: Math.round(totals.protein / daysCount),
+        averageCarbs: Math.round(totals.carbs / daysCount),
+        averageFats: Math.round(totals.fats / daysCount),
+        averageFiber: Math.round(totals.fiber / daysCount)
+      };
+    }
+
+    // Ensure recommendations are present
+    if (!mealPlanJson.recommendations) {
+      console.error('Missing recommendations in meal plan, adding defaults');
+      mealPlanJson.recommendations = {
+        general: "Siga este plano alimentar de acordo com suas necessidades e preferências.",
+        preworkout: "Consuma carboidratos de rápida absorção antes do treino.",
+        postworkout: "Consuma proteínas e carboidratos após o treino para recuperação muscular.",
+        timing: [
+          "Café da manhã: Até 1 hora após acordar",
+          "Lanche da manhã: 2-3 horas após o café da manhã",
+          "Almoço: 2-3 horas após o lanche da manhã",
+          "Lanche da tarde: 2-3 horas após o almoço",
+          "Jantar: 2-3 horas após o lanche da tarde"
+        ]
+      };
     }
 
     // Store the generated meal plan in the database
@@ -183,7 +258,7 @@ serve(async (req) => {
         .from('meal_plans')
         .insert({
           user_id: user_id,
-          plan_data: standardizedMealPlan,
+          plan_data: mealPlanJson,
           calories: userInput.dailyCalories || 0,
           generated_at: new Date().toISOString()
         })
@@ -209,7 +284,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           success: true, 
-          mealPlan: standardizedMealPlan,
+          mealPlan: mealPlanJson,
           id: insertData?.id
         }),
         { 
@@ -240,3 +315,18 @@ serve(async (req) => {
     );
   }
 });
+
+// Helper function to get day names in Portuguese
+function getDayName(day: string): string {
+  const dayNames: Record<string, string> = {
+    'monday': 'Segunda-feira',
+    'tuesday': 'Terça-feira',
+    'wednesday': 'Quarta-feira',
+    'thursday': 'Quinta-feira',
+    'friday': 'Sexta-feira',
+    'saturday': 'Sábado',
+    'sunday': 'Domingo'
+  };
+  
+  return dayNames[day] || day;
+}

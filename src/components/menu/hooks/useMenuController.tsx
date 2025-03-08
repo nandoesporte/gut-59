@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { useProtocolFoods } from "./useProtocolFoods";
 import { useCalorieCalculator, Goal } from "./useCalorieCalculator";
@@ -10,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { CalorieCalculatorForm } from "../CalorieCalculator";
 import type { Database } from "@/integrations/supabase/types";
+import { TransactionInput } from "@/hooks/wallet/types";
 
 export interface FormData {
   weight: number;
@@ -224,6 +224,34 @@ export const useMenuController = (): MenuState => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
+      const typedFoodsByMealType: { [key: string]: ProtocolFood[] } = {};
+      
+      if (foodsByMealType) {
+        Object.keys(foodsByMealType).forEach(mealType => {
+          typedFoodsByMealType[mealType] = protocolFoods.filter(food => 
+            selectedFoods.includes(food.id) && 
+            (food.meal_type?.includes(mealType) || food.meal_type?.includes('any'))
+          );
+        });
+      }
+      
+      const addWalletTransaction = wallet ? async (params: {
+        amount: number; 
+        description: string; 
+        transactionType: "purchase" | "reward" | "admin"
+      }) => {
+        try {
+          const txInput: TransactionInput = {
+            amount: params.amount,
+            description: params.description,
+            type: params.transactionType,
+          };
+          wallet.addTransaction(txInput);
+        } catch (e) {
+          console.error("Error adding transaction:", e);
+        }
+      } : undefined;
+      
       const generatedPlan = await generateMealPlan({
         userData: {
           id: user?.id,
@@ -236,45 +264,13 @@ export const useMenuController = (): MenuState => {
           dailyCalories: calorieNeeds
         },
         selectedFoods: protocolFoods.filter(food => selectedFoods.includes(food.id)),
-        foodsByMealType,
+        foodsByMealType: typedFoodsByMealType,
         preferences,
-        addTransaction: wallet ? async (params) => {
-          try {
-            wallet.addTransaction(params);
-          } catch (e) {
-            console.error("Error adding transaction:", e);
-          }
-        } : undefined
+        addTransaction: addWalletTransaction
       });
 
       if (generatedPlan) {
         setMealPlan(generatedPlan);
-        
-        // Save the meal plan to the database
-        if (user) {
-          try {
-            console.log("💾 Tentando salvar plano alimentar para o usuário:", user.id);
-            
-            // Convert the MealPlan object to a plain JSON object
-            const planDataAsJson = JSON.parse(JSON.stringify(generatedPlan));
-            
-            const { error } = await supabase
-              .from('meal_plans')
-              .insert({
-                user_id: user.id,
-                plan_data: planDataAsJson,
-                calories: calorieNeeds
-              });
-              
-            if (error) {
-              console.error("❌ Erro ao salvar plano alimentar:", error);
-            } else {
-              console.log("✅ Plano alimentar salvo com sucesso");
-            }
-          } catch (error) {
-            console.error("❌ Erro ao salvar plano alimentar:", error);
-          }
-        }
         
         setCurrentStep(4);
       } else {
