@@ -38,8 +38,20 @@ serve(async (req) => {
     // Enhanced logging with proper user identification
     const userId = userData.id || 'não autenticado';
     console.log(`[NUTRI+] Dados recebidos para usuário: ${userId}`);
-    console.log(`[NUTRI+] Perfil do usuário: ${userData.age} anos, ${userData.gender}, ${userData.weight}kg, ${userData.height}cm`);
-    console.log(`[NUTRI+] Objetivo: ${userData.goal}, Calorias diárias: ${userData.dailyCalories}kcal`);
+    
+    // Log important user data with null checks
+    if (userData.age && userData.gender && userData.weight && userData.height) {
+      console.log(`[NUTRI+] Perfil do usuário: ${userData.age} anos, ${userData.gender}, ${userData.weight}kg, ${userData.height}cm`);
+    } else {
+      console.log(`[NUTRI+] Perfil do usuário incompleto: ${JSON.stringify(userData)}`);
+    }
+    
+    if (userData.goal && userData.dailyCalories) {
+      console.log(`[NUTRI+] Objetivo: ${userData.goal}, Calorias diárias: ${userData.dailyCalories}kcal`);
+    } else {
+      console.log(`[NUTRI+] Objetivo ou calorias não especificados`);
+    }
+    
     console.log(`[NUTRI+] Alimentos selecionados: ${selectedFoods?.length || 0}`);
     
     // Safer logging of dietary preferences
@@ -81,8 +93,8 @@ serve(async (req) => {
       );
     }
 
-    // Prepare system message for Nutri+ agent
-    const systemMessage = `Você é Nutri+, um agente especialista em nutrição que cria planos alimentares personalizados. 
+    // Prepare system message for Nutri+ agent with Portuguese instructions
+    const systemMessage = `Você é Nutri+, um agente especialista em nutrição que cria planos alimentares personalizados em Português do Brasil.
 Sua tarefa é analisar os dados do usuário e criar um plano alimentar semanal detalhado e cientificamente fundamentado.
 
 REGRAS IMPORTANTES DE FORMATO DE SAÍDA:
@@ -90,48 +102,51 @@ REGRAS IMPORTANTES DE FORMATO DE SAÍDA:
 2. Sua resposta deve conter APENAS o objeto JSON sem explicações, narrativas ou texto adicional.
 3. A saída deve seguir exatamente esta estrutura:
 {
-  "mealPlan": {
-    "weeklyPlan": {
-      "monday": { /* estrutura do plano diário */ },
-      "tuesday": { /* estrutura do plano diário */ },
-      /* ... outros dias ... */
-    },
-    "weeklyTotals": { /* médias nutricionais semanais */ },
-    "recommendations": { /* recomendações personalizadas */ }
-  }
+  "weeklyPlan": {
+    "monday": { /* estrutura do plano diário */ },
+    "tuesday": { /* estrutura do plano diário */ },
+    /* ... outros dias ... */
+  },
+  "weeklyTotals": { /* médias nutricionais semanais */ },
+  "recommendations": { /* recomendações personalizadas */ }
 }
+
+MUITO IMPORTANTE: Você DEVE usar Português do Brasil para TODOS os nomes, incluindo:
+- Dias da semana: "segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo"
+- Refeições: "cafeDaManha", "lancheDaManha", "almoco", "lancheDaTarde", "jantar"
+- Todos os nomes de alimentos, descrições e recomendações
 
 Certifique-se de que o weeklyPlan contenha TODOS os 7 dias (segunda a domingo). Cada dia deve ter a seguinte estrutura:
 {
-  "dayName": "Nome do Dia",
+  "dayName": "Nome do Dia em Português",
   "meals": {
-    "breakfast": {
-      "description": "Descrição do café da manhã",
-      "foods": [{"name": "Nome do alimento", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento"}],
+    "cafeDaManha": {
+      "description": "Descrição do café da manhã em Português",
+      "foods": [{"name": "Nome do alimento em Português", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento em Português"}],
       "calories": 500,
       "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
     },
-    "morningSnack": {
-      "description": "Descrição do lanche da manhã",
-      "foods": [{"name": "Nome do alimento", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento"}],
+    "lancheDaManha": {
+      "description": "Descrição do lanche da manhã em Português",
+      "foods": [{"name": "Nome do alimento em Português", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento em Português"}],
       "calories": 500,
       "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
     },
-    "lunch": {
-      "description": "Descrição do almoço",
-      "foods": [{"name": "Nome do alimento", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento"}],
+    "almoco": {
+      "description": "Descrição do almoço em Português",
+      "foods": [{"name": "Nome do alimento em Português", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento em Português"}],
       "calories": 500,
       "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
     },
-    "afternoonSnack": {
-      "description": "Descrição do lanche da tarde",
-      "foods": [{"name": "Nome do alimento", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento"}],
+    "lancheDaTarde": {
+      "description": "Descrição do lanche da tarde em Português",
+      "foods": [{"name": "Nome do alimento em Português", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento em Português"}],
       "calories": 500,
       "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
     },
-    "dinner": {
-      "description": "Descrição do jantar",
-      "foods": [{"name": "Nome do alimento", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento"}],
+    "jantar": {
+      "description": "Descrição do jantar em Português",
+      "foods": [{"name": "Nome do alimento em Português", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento em Português"}],
       "calories": 500,
       "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
     }
@@ -140,27 +155,27 @@ Certifique-se de que o weeklyPlan contenha TODOS os 7 dias (segunda a domingo). 
 }
 
 IMPORTANTE: Use exatamente os nomes de propriedades especificados acima:
-- Use "breakfast" para café da manhã (não "breakfast_meal" ou "morning_meal")
-- Use "morningSnack" para lanche da manhã (não "morning_snack")
-- Use "lunch" para almoço
-- Use "afternoonSnack" para lanche da tarde (não "afternoon_snack")
-- Use "dinner" para jantar
+- Use "cafeDaManha" para café da manhã (não "breakfast")
+- Use "lancheDaManha" para lanche da manhã (não "morningSnack" ou "morning_snack")
+- Use "almoco" para almoço (não "lunch")
+- Use "lancheDaTarde" para lanche da tarde (não "afternoonSnack" ou "afternoon_snack")
+- Use "jantar" para jantar (não "dinner")
 
-É FUNDAMENTAL que cada alimento na lista "foods" contenha instruções detalhadas de preparo no campo "details", explicando como o alimento deve ser preparado, cozido ou consumido.
+É FUNDAMENTAL que cada alimento na lista "foods" contenha instruções detalhadas de preparo no campo "details", explicando como o alimento deve ser preparado, cozido ou consumido. Tudo em Português do Brasil.
 
 IMPORTANTE: Respeite rigorosamente a categorização dos alimentos por tipo de refeição:
-- Alimentos categorizados como 'breakfast' devem ser colocados APENAS na refeição do café da manhã
-- Alimentos categorizados como 'morning_snack' devem ser colocados APENAS no lanche da manhã
-- Alimentos categorizados como 'lunch' devem ser colocados APENAS no almoço
-- Alimentos categorizados como 'afternoon_snack' devem ser colocados APENAS no lanche da tarde
-- Alimentos categorizados como 'dinner' devem ser colocados APENAS no jantar
+- Alimentos categorizados como 'cafeDaManha' devem ser colocados APENAS na refeição do café da manhã
+- Alimentos categorizados como 'lancheDaManha' devem ser colocados APENAS no lanche da manhã
+- Alimentos categorizados como 'almoco' devem ser colocados APENAS no almoço
+- Alimentos categorizados como 'lancheDaTarde' devem ser colocados APENAS no lanche da tarde
+- Alimentos categorizados como 'jantar' devem ser colocados APENAS no jantar
 
 As recomendações devem incluir:
 {
-  "general": "Conselho geral de nutrição",
-  "preworkout": "Conselho de nutrição pré-treino",
-  "postworkout": "Conselho de nutrição pós-treino",
-  "timing": ["Conselho específico de tempo de refeição", "Outro conselho de timing"]
+  "general": "Conselho geral de nutrição em Português",
+  "preworkout": "Conselho de nutrição pré-treino em Português",
+  "postworkout": "Conselho de nutrição pós-treino em Português",
+  "timing": ["Conselho específico de tempo de refeição em Português", "Outro conselho de timing em Português"]
 }
 
 IMPORTANTE:
@@ -172,7 +187,7 @@ IMPORTANTE:
 IMPORTANTE: Devido a limitações técnicas, sua resposta NÃO pode exceder 8000 tokens. Se necessário, simplifique as descrições de preparo dos alimentos, mas NUNCA omita informações essenciais como calorias, macronutrientes ou items requeridos.`;
 
     // Construct user message with all relevant data
-    const userMessage = `Crie um plano alimentar semanal personalizado com base nestes dados:
+    const userMessage = `Crie um plano alimentar semanal personalizado em Português do Brasil com base nestes dados:
 
 PERFIL DO USUÁRIO:
 - Idade: ${userData.age}
@@ -206,8 +221,10 @@ Por favor, crie um plano de 7 dias que:
 6. Inclua todos os tipos de refeições: café da manhã, lanche da manhã, almoço, lanche da tarde, jantar
 7. Calcule as calorias e macros para cada refeição e dia
 8. Forneça detalhes de preparo para cada alimento
-9. MUITO IMPORTANTE: Use a nomenclatura correta para as refeições em camelCase: "breakfast", "morningSnack", "lunch", "afternoonSnack", "dinner" - não use versões com underscore como "morning_snack" ou "afternoon_snack"
-10. MUITO IMPORTANTE: Todos os valores de macronutrientes e calorias devem ser números inteiros, NÃO inclua 'g' como sufixo nos valores`;
+9. MUITO IMPORTANTE: Use a nomenclatura correta para as refeições em português: "cafeDaManha", "lancheDaManha", "almoco", "lancheDaTarde", "jantar"
+10. MUITO IMPORTANTE: Todos os valores de macronutrientes e calorias devem ser números inteiros, NÃO inclua 'g' como sufixo nos valores
+11. NÃO utilize nomes em inglês (como "breakfast", "lunch", "dinner", "morning", "snack", etc)
+12. Use os seguintes nomes para os dias da semana: "segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo"`;
 
     // Track time for API call preparation
     console.log(`[NUTRI+] Preparando chamada de API às ${new Date().toISOString()}`);
@@ -247,222 +264,7 @@ Por favor, crie um plano de 7 dias que:
       const errorText = await response.text();
       console.error(`[NUTRI+] Erro da API Groq (${response.status}):`, errorText);
       
-      // If we received a JSON generation error, we'll try to fix the failed_generation content
-      if (response.status === 400 && errorText.includes('json_validate_failed')) {
-        try {
-          const errorJson = JSON.parse(errorText);
-          if (errorJson.error && errorJson.error.failed_generation) {
-            console.log("[NUTRI+] Tentando corrigir JSON inválido...");
-            
-            // Get the failed JSON generation
-            let failedJson = errorJson.error.failed_generation;
-            
-            // Fix numeric values with 'g' suffix - this is the main issue we're fixing
-            failedJson = failedJson.replace(/"protein"\s*:\s*"?(\d+)g"?/g, '"protein": $1');
-            failedJson = failedJson.replace(/"carbs"\s*:\s*"?(\d+)g"?/g, '"carbs": $1');
-            failedJson = failedJson.replace(/"fats"\s*:\s*"?(\d+)g"?/g, '"fats": $1');
-            failedJson = failedJson.replace(/"fiber"\s*:\s*"?(\d+)g"?/g, '"fiber": $1');
-            
-            // Fix common JSON format issues with meal types
-            failedJson = failedJson
-              .replace(/"morning_snack":/g, '"morningSnack":')
-              .replace(/"afternoon_snack":/g, '"afternoonSnack":')
-              .replace(/"evening_snack":/g, '"eveningSnack":')
-              .replace(/"pre_workout":/g, '"preWorkout":')
-              .replace(/"post_workout":/g, '"postWorkout":')
-              // Fix common issues with array commas
-              .replace(/,\s*\]/g, ']')         // Remove trailing commas in arrays
-              .replace(/,\s*\}/g, '}')         // Remove trailing commas in objects
-              .replace(/\.\.\.[\s\n]*\}/g, '}')  // Fix ellipsis in JSON
-              .replace(/\.\.\.[\s\n]*\]/g, ']'); // Fix ellipsis in JSON
-            
-            // Advanced fix for ... outros dias ... pattern which breaks the JSON
-            failedJson = failedJson.replace(/(\s*"[^"]+"\s*:\s*\{\s*\/\*[^*]*\*\/\s*\})(,\s*\/\*\s*\.\.\.\s*outros\s*dias\s*\.\.\.\s*\*\/)/g, 
-              (match, group1) => {
-                return group1;
-              }
-            );
-            
-            // Attempt to complete truncated JSON if necessary
-            if (!failedJson.endsWith('}')) {
-              // Count open and close braces to determine needed closing
-              const openBraces = (failedJson.match(/\{/g) || []).length;
-              const closeBraces = (failedJson.match(/\}/g) || []).length;
-              const missingCloseBraces = openBraces - closeBraces;
-              
-              if (missingCloseBraces > 0) {
-                failedJson = failedJson + '}'.repeat(missingCloseBraces);
-              }
-            }
-            
-            try {
-              // Try to parse the fixed JSON
-              const fixedMealPlan = JSON.parse(failedJson);
-              console.log("[NUTRI+] JSON corrigido com sucesso!");
-              
-              // Final validation of meal plan structure
-              if (fixedMealPlan.mealPlan && fixedMealPlan.mealPlan.weeklyPlan) {
-                // Process all days to ensure numeric values
-                Object.keys(fixedMealPlan.mealPlan.weeklyPlan).forEach(day => {
-                  const dayPlan = fixedMealPlan.mealPlan.weeklyPlan[day];
-                  
-                  // Make sure dailyTotals contains numeric values
-                  if (dayPlan && dayPlan.dailyTotals) {
-                    Object.keys(dayPlan.dailyTotals).forEach(key => {
-                      const value = dayPlan.dailyTotals[key];
-                      if (typeof value === 'string') {
-                        // Extract numeric part from strings like "140g"
-                        const numericValue = parseInt(value);
-                        if (!isNaN(numericValue)) {
-                          dayPlan.dailyTotals[key] = numericValue;
-                        }
-                      }
-                    });
-                  }
-                  
-                  // Fix meal macros
-                  if (dayPlan && dayPlan.meals) {
-                    Object.keys(dayPlan.meals).forEach(mealType => {
-                      const meal = dayPlan.meals[mealType];
-                      if (meal && meal.macros) {
-                        Object.keys(meal.macros).forEach(key => {
-                          const value = meal.macros[key];
-                          if (typeof value === 'string') {
-                            // Extract numeric part from strings like "140g"
-                            const numericValue = parseInt(value);
-                            if (!isNaN(numericValue)) {
-                              meal.macros[key] = numericValue;
-                            }
-                          }
-                        });
-                      }
-                    });
-                  }
-                });
-                
-                // Fix any remaining meal type inconsistencies in the weekly plan
-                Object.keys(fixedMealPlan.mealPlan.weeklyPlan).forEach(day => {
-                  const dayPlan = fixedMealPlan.mealPlan.weeklyPlan[day];
-                  if (dayPlan && dayPlan.meals) {
-                    // Create a new meals object with correct keys
-                    const correctedMeals = {};
-                    
-                    // Map different meal type formats to the correct format
-                    const mealTypeMap = {
-                      'breakfast': 'breakfast',
-                      'morning_snack': 'morningSnack',
-                      'morningSnack': 'morningSnack',
-                      'lunch': 'lunch',
-                      'afternoon_snack': 'afternoonSnack',
-                      'afternoonSnack': 'afternoonSnack',
-                      'dinner': 'dinner',
-                      'evening_snack': 'eveningSnack',
-                      'eveningSnack': 'eveningSnack'
-                    };
-                    
-                    // Copy and correct each meal
-                    Object.keys(dayPlan.meals).forEach(mealType => {
-                      const correctMealType = mealTypeMap[mealType] || mealType;
-                      if (dayPlan.meals[mealType]) {
-                        correctedMeals[correctMealType] = dayPlan.meals[mealType];
-                      }
-                    });
-                    
-                    // Replace the meals object with the corrected one
-                    dayPlan.meals = correctedMeals;
-                  }
-                });
-                
-                // Also ensure weekly totals have numeric values
-                if (fixedMealPlan.mealPlan.weeklyTotals) {
-                  Object.keys(fixedMealPlan.mealPlan.weeklyTotals).forEach(key => {
-                    const value = fixedMealPlan.mealPlan.weeklyTotals[key];
-                    if (typeof value === 'string') {
-                      // Extract numeric part from strings like "140g"
-                      const numericValue = parseInt(value);
-                      if (!isNaN(numericValue)) {
-                        fixedMealPlan.mealPlan.weeklyTotals[key] = numericValue;
-                      }
-                    }
-                  });
-                }
-                
-                return new Response(
-                  JSON.stringify({
-                    mealPlan: fixedMealPlan.mealPlan,
-                    modelUsed: modelName,
-                    recovered: true
-                  }),
-                  { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-                );
-              }
-            } catch (parseError) {
-              console.error("[NUTRI+] Não foi possível corrigir o JSON:", parseError);
-              console.error("[NUTRI+] JSON incorreto:", failedJson.substring(0, 500) + "...");
-              
-              // Try more aggressive JSON repair techniques
-              try {
-                // Replace problematic section with a placeholder structure
-                if (parseError.message.includes("position")) {
-                  const errorPosition = parseInt(parseError.message.match(/position (\d+)/)?.[1] || "0");
-                  const contextStart = Math.max(0, errorPosition - 100);
-                  const contextEnd = Math.min(failedJson.length, errorPosition + 100);
-                  const errorContext = failedJson.substring(contextStart, contextEnd);
-                  
-                  console.log(`[NUTRI+] Contexto do erro (posição ${errorPosition}):`, errorContext);
-                  
-                  // Find the closest enclosing array or object
-                  let braceLevel = 0;
-                  let arrayLevel = 0;
-                  let lastArrayStart = -1;
-                  
-                  for (let i = 0; i < errorPosition; i++) {
-                    if (failedJson[i] === '{') braceLevel++;
-                    if (failedJson[i] === '}') braceLevel--;
-                    if (failedJson[i] === '[') {
-                      arrayLevel++;
-                      lastArrayStart = i;
-                    }
-                    if (failedJson[i] === ']') arrayLevel--;
-                  }
-                  
-                  // If error is in an array, try to fix it by closing the array
-                  if (arrayLevel > 0 && lastArrayStart !== -1) {
-                    const beforeError = failedJson.substring(0, lastArrayStart + 1);
-                    const afterError = failedJson.substring(errorPosition);
-                    
-                    // Create a simplified version with empty array
-                    const simplifiedJson = beforeError + "]" + afterError.substring(afterError.indexOf("]") + 1);
-                    
-                    try {
-                      const fixedMealPlan = JSON.parse(simplifiedJson);
-                      console.log("[NUTRI+] JSON corrigido com sucesso após reparo agressivo!");
-                      
-                      return new Response(
-                        JSON.stringify({
-                          mealPlan: fixedMealPlan.mealPlan,
-                          modelUsed: modelName,
-                          recovered: true,
-                          repaired: true
-                        }),
-                        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-                      );
-                    } catch (finalError) {
-                      console.error("[NUTRI+] Todas as tentativas de reparo falharam:", finalError);
-                    }
-                  }
-                }
-              } catch (repairError) {
-                console.error("[NUTRI+] Erro durante reparo agressivo:", repairError);
-              }
-            }
-          }
-        } catch (errorParseError) {
-          console.error("[NUTRI+] Erro ao analisar o erro da API:", errorParseError);
-        }
-      }
-      
-      // Return the error to the client if recovery failed
+      // Return the error to the client
       return new Response(
         JSON.stringify({ 
           error: `Erro da API: ${response.status}`, 
@@ -490,303 +292,35 @@ Por favor, crie um plano de 7 dias que:
     // Get the model's response content
     const mealPlanContent = apiResponse.choices[0].message.content;
     
+    // Log size and a preview of the content
+    console.log(`[NUTRI+] Tamanho da resposta: ${mealPlanContent.length} caracteres`);
+    console.log(`[NUTRI+] Prévia da resposta: ${mealPlanContent.substring(0, 300)}...`);
+    
     // Ensure the response is valid JSON
     try {
-      // Fix numeric values with 'g' suffix
-      let formattedContent = mealPlanContent
-        .replace(/"protein"\s*:\s*"?(\d+)g"?/g, '"protein": $1')
-        .replace(/"carbs"\s*:\s*"?(\d+)g"?/g, '"carbs": $1')
-        .replace(/"fats"\s*:\s*"?(\d+)g"?/g, '"fats": $1')
-        .replace(/"fiber"\s*:\s*"?(\d+)g"?/g, '"fiber": $1');
-        
-      // Fix common format issues before parsing
-      formattedContent = formattedContent
-        .replace(/"morning_snack":/g, '"morningSnack":')
-        .replace(/"afternoon_snack":/g, '"afternoonSnack":')
-        .replace(/"evening_snack":/g, '"eveningSnack":')
-        .replace(/"pre_workout":/g, '"preWorkout":')
-        .replace(/"post_workout":/g, '"postWorkout":')
-        // Fix common issues with array commas
-        .replace(/,\s*\]/g, ']')         // Remove trailing commas in arrays
-        .replace(/,\s*\}/g, '}')         // Remove trailing commas in objects
-        .replace(/\.\.\.[\s\n]*\}/g, '}')  // Fix ellipsis in JSON
-        .replace(/\.\.\.[\s\n]*\]/g, ']'); // Fix ellipsis in JSON
-      
-      // Advanced fix for ... outros dias ... pattern which breaks the JSON
-      formattedContent = formattedContent.replace(/(\s*"[^"]+"\s*:\s*\{\s*\/\*[^*]*\*\/\s*\})(,\s*\/\*\s*\.\.\.\s*outros\s*dias\s*\.\.\.\s*\*\/)/g, 
-        (match, group1) => {
-          return group1;
-        }
-      );
-      
-      // Log size and a preview of the content
-      console.log(`[NUTRI+] Tamanho da resposta: ${formattedContent.length} caracteres`);
-      console.log(`[NUTRI+] Prévia da resposta: ${formattedContent.substring(0, 300)}...`);
-      
       // Parse and validate the JSON response
-      const mealPlanJson = JSON.parse(formattedContent);
+      const mealPlanJson = JSON.parse(mealPlanContent);
       
-      // Validate the structure
-      if (!mealPlanJson.mealPlan || !mealPlanJson.mealPlan.weeklyPlan) {
-        console.error("[NUTRI+] Resposta da API sem estrutura requerida. Resposta:", formattedContent.substring(0, 500));
-        return new Response(
-          JSON.stringify({ error: "Estrutura do plano alimentar inválida" }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-        );
-      }
+      // For backwards compatibility, we add a mealPlan wrapper if needed
+      const finalResponse = mealPlanJson.mealPlan ? mealPlanJson : { mealPlan: mealPlanJson };
       
-      // Process all days to ensure numeric values for macros
-      Object.keys(mealPlanJson.mealPlan.weeklyPlan).forEach(day => {
-        const dayPlan = mealPlanJson.mealPlan.weeklyPlan[day];
-        
-        // Make sure dailyTotals contains numeric values
-        if (dayPlan && dayPlan.dailyTotals) {
-          Object.keys(dayPlan.dailyTotals).forEach(key => {
-            const value = dayPlan.dailyTotals[key];
-            if (typeof value === 'string') {
-              // Extract numeric part from strings like "140g"
-              const numericValue = parseInt(value);
-              if (!isNaN(numericValue)) {
-                dayPlan.dailyTotals[key] = numericValue;
-              }
-            }
-          });
-        }
-        
-        // Fix meal macros
-        if (dayPlan && dayPlan.meals) {
-          Object.keys(dayPlan.meals).forEach(mealType => {
-            const meal = dayPlan.meals[mealType];
-            if (meal && meal.macros) {
-              Object.keys(meal.macros).forEach(key => {
-                const value = meal.macros[key];
-                if (typeof value === 'string') {
-                  // Extract numeric part from strings like "140g"
-                  const numericValue = parseInt(value);
-                  if (!isNaN(numericValue)) {
-                    meal.macros[key] = numericValue;
-                  }
-                }
-              });
-            }
-          });
-        }
-      });
+      // Add metadata to the response
+      finalResponse.modelUsed = modelName;
       
-      // Fix any remaining meal type inconsistencies in the weekly plan
-      Object.keys(mealPlanJson.mealPlan.weeklyPlan).forEach(day => {
-        const dayPlan = mealPlanJson.mealPlan.weeklyPlan[day];
-        if (dayPlan && dayPlan.meals) {
-          // Create a new meals object with correct keys
-          const correctedMeals = {};
-          
-          // Map different meal type formats to the correct format
-          const mealTypeMap = {
-            'breakfast': 'breakfast',
-            'morning_snack': 'morningSnack',
-            'morningSnack': 'morningSnack',
-            'lunch': 'lunch',
-            'afternoon_snack': 'afternoonSnack',
-            'afternoonSnack': 'afternoonSnack',
-            'dinner': 'dinner',
-            'evening_snack': 'eveningSnack',
-            'eveningSnack': 'eveningSnack'
-          };
-          
-          // Copy and correct each meal
-          Object.keys(dayPlan.meals).forEach(mealType => {
-            const correctMealType = mealTypeMap[mealType] || mealType;
-            if (dayPlan.meals[mealType]) {
-              correctedMeals[correctMealType] = dayPlan.meals[mealType];
-            }
-          });
-          
-          // Replace the meals object with the corrected one
-          dayPlan.meals = correctedMeals;
-        }
-      });
-      
-      // Also ensure weekly totals have numeric values
-      if (mealPlanJson.mealPlan.weeklyTotals) {
-        Object.keys(mealPlanJson.mealPlan.weeklyTotals).forEach(key => {
-          const value = mealPlanJson.mealPlan.weeklyTotals[key];
-          if (typeof value === 'string') {
-            // Extract numeric part from strings like "140g"
-            const numericValue = parseInt(value);
-            if (!isNaN(numericValue)) {
-              mealPlanJson.mealPlan.weeklyTotals[key] = numericValue;
-            }
-          }
-        });
-      }
-      
-      // Complete meal plan with the latest data
-      const mealPlan = {
-        ...mealPlanJson.mealPlan,
-        userCalories: userData.dailyCalories,
-        generatedBy: "nutri-plus-agent-llama3"
-      };
-      
-      // Ensure all days have complete meal data and details for each food
-      Object.keys(mealPlan.weeklyPlan).forEach(day => {
-        const dayPlan = mealPlan.weeklyPlan[day];
-        if (dayPlan && dayPlan.meals) {
-          Object.keys(dayPlan.meals).forEach(mealType => {
-            const meal = dayPlan.meals[mealType];
-            if (meal && meal.foods) {
-              meal.foods.forEach(food => {
-                // Ensure each food has details for preparation
-                if (!food.details || food.details === "") {
-                  food.details = "Preparar conforme preferência pessoal. Consumir fresco quando possível.";
-                }
-              });
-            }
-          });
-        }
-      });
-      
-      // Verify the weekly totals match the user's calorie goal
-      if (!mealPlan.weeklyTotals || 
-          isNaN(mealPlan.weeklyTotals.averageCalories) || 
-          isNaN(mealPlan.weeklyTotals.averageProtein) ||
-          isNaN(mealPlan.weeklyTotals.averageCarbs) ||
-          isNaN(mealPlan.weeklyTotals.averageFats) ||
-          isNaN(mealPlan.weeklyTotals.averageFiber)) {
-        
-        console.log("[NUTRI+] Recalculando médias semanais devido a valores inválidos");
-        
-        const days = Object.values(mealPlan.weeklyPlan);
-        const validDays = days.filter(day => day && day.dailyTotals);
-        const dayCount = validDays.length || 1; // Avoid division by zero
-        
-        mealPlan.weeklyTotals = {
-          averageCalories: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.calories || 0), 0) / dayCount),
-          averageProtein: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.protein || 0), 0) / dayCount),
-          averageCarbs: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.carbs || 0), 0) / dayCount),
-          averageFats: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.fats || 0), 0) / dayCount),
-          averageFiber: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.fiber || 0), 0) / dayCount)
-        };
-      }
-
+      // Log success
       console.log(`[NUTRI+] Plano alimentar gerado com sucesso às ${new Date().toISOString()}`);
       console.log(`[NUTRI+] Duração do processo: ${(new Date().getTime() - new Date(startTime).getTime()) / 1000}s`);
       
-      // Return the successful response with model info
+      // Return the successful response
       return new Response(
-        JSON.stringify({ 
-          mealPlan,
-          modelUsed: modelName
-        }),
+        JSON.stringify(finalResponse),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
       
     } catch (jsonError) {
       // If the response is not valid JSON, log the error and return error response
-      console.error("[NUTRI+] Erro ao analisar JSON:", jsonError);
-      console.error("[NUTRI+] Resposta JSON inválida:", mealPlanContent.substring(0, 1000));
-      
-      // Try to repair JSON syntax
-      try {
-        // Fix g suffix in numeric values first
-        let repairedJson = mealPlanContent
-          .replace(/"protein"\s*:\s*"?(\d+)g"?/g, '"protein": $1')
-          .replace(/"carbs"\s*:\s*"?(\d+)g"?/g, '"carbs": $1')
-          .replace(/"fats"\s*:\s*"?(\d+)g"?/g, '"fats": $1')
-          .replace(/"fiber"\s*:\s*"?(\d+)g"?/g, '"fiber": $1');
-            
-        // Locate the error
-        if (jsonError.message.includes("position")) {
-          const errorPosition = parseInt(jsonError.message.match(/position (\d+)/)?.[1] || "0");
-          const contextStart = Math.max(0, errorPosition - 100);
-          const contextEnd = Math.min(repairedJson.length, errorPosition + 100);
-          const errorContext = repairedJson.substring(contextStart, contextEnd);
-          
-          console.log(`[NUTRI+] Contexto do erro (posição ${errorPosition}):`, errorContext);
-          
-          // Attempt to repair the specific syntax issue
-          
-          // Common fixes for array and object closures
-          if (jsonError.message.includes("Expected ',' or ']' after array element")) {
-            // Simply try to remove problematic commas that might be breaking arrays
-            const part1 = repairedJson.substring(0, errorPosition);
-            const part2 = repairedJson.substring(errorPosition);
-            
-            // Close any unclosed arrays or objects
-            repairedJson = part1 + part2
-              .replace(/,\s*\]/g, ']')         // Remove trailing commas in arrays
-              .replace(/,\s*\}/g, '}');        // Remove trailing commas in objects
-              
-            try {
-              const repairedMealPlan = JSON.parse(repairedJson);
-              console.log("[NUTRI+] JSON reparado com sucesso!");
-              
-              // Ensure numeric values for macros in the repaired JSON
-              if (repairedMealPlan.mealPlan && repairedMealPlan.mealPlan.weeklyPlan) {
-                Object.keys(repairedMealPlan.mealPlan.weeklyPlan).forEach(day => {
-                  const dayPlan = repairedMealPlan.mealPlan.weeklyPlan[day];
-                  
-                  // Fix dailyTotals
-                  if (dayPlan && dayPlan.dailyTotals) {
-                    Object.keys(dayPlan.dailyTotals).forEach(key => {
-                      const value = dayPlan.dailyTotals[key];
-                      if (typeof value === 'string') {
-                        const numericValue = parseInt(value);
-                        if (!isNaN(numericValue)) {
-                          dayPlan.dailyTotals[key] = numericValue;
-                        }
-                      }
-                    });
-                  }
-                  
-                  // Fix meals
-                  if (dayPlan && dayPlan.meals) {
-                    Object.keys(dayPlan.meals).forEach(mealType => {
-                      const meal = dayPlan.meals[mealType];
-                      if (meal && meal.macros) {
-                        Object.keys(meal.macros).forEach(key => {
-                          const value = meal.macros[key];
-                          if (typeof value === 'string') {
-                            const numericValue = parseInt(value);
-                            if (!isNaN(numericValue)) {
-                              meal.macros[key] = numericValue;
-                            }
-                          }
-                        });
-                      }
-                    });
-                  }
-                });
-                
-                // Fix weekly totals
-                if (repairedMealPlan.mealPlan.weeklyTotals) {
-                  Object.keys(repairedMealPlan.mealPlan.weeklyTotals).forEach(key => {
-                    const value = repairedMealPlan.mealPlan.weeklyTotals[key];
-                    if (typeof value === 'string') {
-                      const numericValue = parseInt(value);
-                      if (!isNaN(numericValue)) {
-                        repairedMealPlan.mealPlan.weeklyTotals[key] = numericValue;
-                      }
-                    }
-                  });
-                }
-              }
-              
-              return new Response(
-                JSON.stringify({ 
-                  mealPlan: repairedMealPlan.mealPlan,
-                  modelUsed: modelName,
-                  repaired: true
-                }),
-                { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-              );
-            } catch (repairError) {
-              console.error("[NUTRI+] Falha na tentativa de reparo:", repairError);
-            }
-          }
-        }
-      } catch (repairAttemptError) {
-        console.error("[NUTRI+] Erro na tentativa de reparo:", repairAttemptError);
-      }
+      console.error("[NUTRI+] Erro ao analisar JSON:", jsonError.message);
+      console.error("[NUTRI+] Resposta JSON inválida:", mealPlanContent.substring(0, 500));
       
       return new Response(
         JSON.stringify({ 
