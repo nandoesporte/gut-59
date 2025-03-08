@@ -58,7 +58,7 @@ export const useProtocolFoods = () => {
         const foods = data as ProtocolFood[];
         setProtocolFoods(foods);
         
-        // Categorize foods by meal type
+        // Categorize foods by meal type with proper typing
         const categorizedFoods: Record<string, ProtocolFood[]> = {
           breakfast: [],
           morning_snack: [],

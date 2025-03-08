@@ -102,18 +102,14 @@ export interface MealPlan {
 }
 
 // Transaction types for wallet functionality
+// Using TransactionType from wallet.ts for better compatibility
+import { TransactionType } from "@/types/wallet";
+
 export interface TransactionParams {
   amount: number;
   description: string;
   category?: string;
-  type: string;
-}
-
-export interface TransactionInput {
-  amount: number;
-  description: string;
-  category?: string;
-  type: string;
+  type: TransactionType; // Updated to TransactionType for compatibility
 }
 
 // MenuStep type for the menu workflow
