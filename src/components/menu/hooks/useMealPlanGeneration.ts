@@ -239,8 +239,8 @@ function ensureMealPlanStructure(mealPlan: any, userCalories: number): MealPlan 
     const dayCount = Math.max(days.length || 1, 1);
     
     const getNumericValue = (value: any): number => {
-      if (typeof value === 'number') {
-        return isNaN(value) ? 0 : value;
+      if (typeof value === 'number' && !isNaN(value)) {
+        return value;
       }
       if (value === null || value === undefined) {
         return 0;
@@ -253,27 +253,27 @@ function ensureMealPlanStructure(mealPlan: any, userCalories: number): MealPlan 
       averageCalories: Math.round(days.reduce((sum: number, day: any) => {
         const dayTotal = day?.dailyTotals || {};
         return sum + getNumericValue(dayTotal.calories);
-      }, 0) / dayCount),
+      }, 0) / (dayCount || 1)),
       
       averageProtein: Math.round(days.reduce((sum: number, day: any) => {
         const dayTotal = day?.dailyTotals || {};
         return sum + getNumericValue(dayTotal.protein);
-      }, 0) / dayCount),
+      }, 0) / (dayCount || 1)),
       
       averageCarbs: Math.round(days.reduce((sum: number, day: any) => {
         const dayTotal = day?.dailyTotals || {};
         return sum + getNumericValue(dayTotal.carbs);
-      }, 0) / dayCount),
+      }, 0) / (dayCount || 1)),
       
       averageFats: Math.round(days.reduce((sum: number, day: any) => {
         const dayTotal = day?.dailyTotals || {};
         return sum + getNumericValue(dayTotal.fats);
-      }, 0) / dayCount),
+      }, 0) / (dayCount || 1)),
       
       averageFiber: Math.round(days.reduce((sum: number, day: any) => {
         const dayTotal = day?.dailyTotals || {};
         return sum + getNumericValue(dayTotal.fiber);
-      }, 0) / dayCount)
+      }, 0) / (dayCount || 1))
     };
   }
   
