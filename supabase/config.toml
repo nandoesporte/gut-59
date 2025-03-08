@@ -41,12 +41,10 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.llama-completion]
-verify_jwt = false
-timeout_seconds = 120
+verify_jwt = true
 
 [functions.groq-chat]
 verify_jwt = true
 
 [functions.generate-workout-plan-llama]
 verify_jwt = true
-

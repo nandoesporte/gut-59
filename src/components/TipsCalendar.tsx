@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { Lock, Unlock, Check } from "lucide-react";
@@ -49,28 +48,16 @@ const TipsCalendar = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedTip, setSelectedTip] = useState<Tip | null>(null);
   const { addTransaction } = useWallet();
-  const [isFetchingTip, setIsFetchingTip] = useState(false);
-  
+
   useEffect(() => {
     const loadTips = async () => {
       try {
-        const today = new Date();
-        const currentMonth = today.getMonth();
-        const currentDay = today.getDate();
-        const currentYear = today.getFullYear();
-        
         const savedTips = localStorage.getItem('monthlyTips');
+        const currentMonth = new Date().getMonth();
         const savedMonth = localStorage.getItem('tipsMonth');
-        const savedYear = localStorage.getItem('tipsYear');
         const readTips = JSON.parse(localStorage.getItem('readTips') || '[]');
 
-        // If it's a new month/year or we don't have saved tips, fetch new ones
-        if (!savedTips || 
-            savedMonth !== currentMonth.toString() || 
-            savedYear !== currentYear.toString()) {
-          
-          console.log("Fetching new tips for month:", currentMonth + 1, "year:", currentYear);
-          
+        if (!savedTips || savedMonth !== currentMonth.toString()) {
           const { data, error } = await supabase
             .from('daily_tips')
             .select('*');
@@ -78,7 +65,8 @@ const TipsCalendar = () => {
           if (error) throw error;
 
           const tipsData = (data as DailyTip[]) || defaultTips;
-          
+          const currentDay = new Date().getDate();
+
           const newTips = Array.from({ length: 30 }, (_, index) => {
             const tipData = tipsData[index % tipsData.length];
             return {
@@ -92,14 +80,11 @@ const TipsCalendar = () => {
 
           localStorage.setItem('monthlyTips', JSON.stringify(newTips));
           localStorage.setItem('tipsMonth', currentMonth.toString());
-          localStorage.setItem('tipsYear', currentYear.toString());
           setTips(newTips);
         } else {
-          // Update unlocked status based on current day
           const savedTipsData = JSON.parse(savedTips);
-          const updatedTips = savedTipsData.map((tip: Tip, index: number) => ({
+          const updatedTips = savedTipsData.map((tip: Tip) => ({
             ...tip,
-            isUnlocked: index + 1 <= currentDay,
             isRead: readTips.includes(tip.id)
           }));
           setTips(updatedTips);
@@ -122,39 +107,6 @@ const TipsCalendar = () => {
 
     loadTips();
   }, []);
-
-  const generateTipWithLlama = async (tipId: number, theme: string): Promise<string> => {
-    setIsFetchingTip(true);
-    try {
-      const prompt = `Por favor, gere uma dica diária curta e motivacional sobre ${theme}. 
-      A dica deve ser prática, inspiradora e fácil de aplicar no dia a dia.
-      Responda em Português, com no máximo 3 frases.`;
-      
-      const response = await supabase.functions.invoke('llama-completion', {
-        body: { prompt, max_tokens: 500, temperature: 0.7 }
-      });
-      
-      if (response.error) {
-        throw new Error(`Erro ao gerar dica: ${response.error.message}`);
-      }
-      
-      const result = response.data?.completion || '';
-      console.log(`Generated tip for day ${tipId}:`, result);
-      
-      // Clean up the result - remove quotation marks, code blocks, etc.
-      const cleanedResult = result
-        .replace(/```[a-z]*\n|```/g, '') // Remove code block markers
-        .replace(/^["']|["']$/g, '') // Remove surrounding quotes
-        .trim();
-      
-      return cleanedResult || `Dica do dia ${tipId} sobre ${theme}`;
-    } catch (error) {
-      console.error('Erro ao gerar dica com modelo Llama:', error);
-      return `Dica do dia ${tipId} sobre ${theme}: Pratique hábitos saudáveis diariamente.`;
-    } finally {
-      setIsFetchingTip(false);
-    }
-  };
 
   const markTipAsRead = async (tipId: number) => {
     try {
@@ -182,34 +134,9 @@ const TipsCalendar = () => {
     }
   };
 
-  const handleTipClick = async (tip: Tip) => {
+  const handleTipClick = (tip: Tip) => {
     if (tip.isUnlocked) {
-      // For unread tips, generate content with Llama model when opened
-      if (!tip.isRead) {
-        const storedTipContent = JSON.parse(localStorage.getItem('monthlyTips') || '[]')
-          .find((t: Tip) => t.id === tip.id)?.content;
-        
-        // Check if content is just the default placeholder
-        const isDefaultTip = storedTipContent === `Dica do dia ${tip.id}` || !storedTipContent;
-        
-        if (isDefaultTip) {
-          const generatedContent = await generateTipWithLlama(tip.id, tip.theme);
-          const updatedTip = { ...tip, content: generatedContent };
-          
-          // Update the tip in the state and localStorage
-          setTips(tips.map(t => t.id === tip.id ? updatedTip : t));
-          
-          const updatedTips = JSON.parse(localStorage.getItem('monthlyTips') || '[]')
-            .map((t: Tip) => t.id === tip.id ? { ...t, content: generatedContent } : t);
-          
-          localStorage.setItem('monthlyTips', JSON.stringify(updatedTips));
-          setSelectedTip(updatedTip);
-        } else {
-          setSelectedTip(tip);
-        }
-      } else {
-        setSelectedTip(tip);
-      }
+      setSelectedTip(tip);
     }
   };
 
@@ -275,15 +202,9 @@ const TipsCalendar = () => {
             </DialogTitle>
           </DialogHeader>
           <div className="p-4 bg-gradient-to-br from-slate-50 to-white rounded-lg border border-slate-200">
-            {isFetchingTip ? (
-              <div className="flex justify-center py-4">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
-              </div>
-            ) : (
-              <p className="text-slate-700 leading-relaxed">
-                {selectedTip?.content}
-              </p>
-            )}
+            <p className="text-slate-700 leading-relaxed">
+              {selectedTip?.content}
+            </p>
           </div>
           <DialogFooter className="sm:justify-between">
             <span className="text-sm text-slate-500">
@@ -291,7 +212,7 @@ const TipsCalendar = () => {
             </span>
             <Button
               onClick={() => selectedTip && markTipAsRead(selectedTip.id)}
-              disabled={selectedTip?.isRead || isFetchingTip}
+              disabled={selectedTip?.isRead}
               className="bg-green-500 hover:bg-green-600"
             >
               {selectedTip?.isRead ? 'Concluído' : 'Confirmar Leitura'}
