@@ -20,24 +20,6 @@ interface GenerateMealPlanParams {
   addTransaction?: (params: any) => Promise<void>;
 }
 
-// Função para traduzir os tipos de refeições para português
-const translateMealType = (mealType: string): string => {
-  const translations: Record<string, string> = {
-    'breakfast': 'café da manhã',
-    'morningSnack': 'lanche da manhã',
-    'lunch': 'almoço',
-    'afternoonSnack': 'lanche da tarde',
-    'dinner': 'jantar',
-    'eveningSnack': 'ceia'
-  };
-  return translations[mealType] || mealType;
-};
-
-// Função auxiliar para converter os nomes dos alimentos para uma string
-const convertFoodsToString = (foods: ProtocolFood[]): string => {
-  return foods.map(food => food.name).join(", ");
-};
-
 export const generateMealPlan = async ({
   userData,
   selectedFoods,
@@ -52,197 +34,114 @@ export const generateMealPlan = async ({
   console.log(`🥗 Preferências alimentares:`, preferences);
   
   try {
-    console.log("📡 Chamando função edge do Supabase - llama-completion");
+    console.log("📡 Chamando função edge do Supabase - nutri-plus-agent (Llama3-8b)");
     
-    // Preparar os alimentos por tipo de refeição em português
-    const foodsByMealTypePortuguese: Record<string, string> = {};
-    
+    // Convert foodsByMealType from ProtocolFood[] to expected format for edge function
+    const simplifiedFoodsByMealType: Record<string, string[]> = {};
     Object.entries(foodsByMealType).forEach(([mealType, foods]) => {
-      const translatedMealType = translateMealType(mealType);
-      foodsByMealTypePortuguese[translatedMealType] = convertFoodsToString(foods);
+      simplifiedFoodsByMealType[mealType] = foods.map(food => food.name);
     });
     
-    // Traduzir o gênero para português
-    const genderInPortuguese = userData.gender === 'male' ? 'masculino' : 'feminino';
-    
-    // Traduzir o nível de atividade para português
-    let activityLevelInPortuguese = userData.activityLevel;
-    switch (userData.activityLevel) {
-      case 'sedentary': activityLevelInPortuguese = 'sedentário'; break;
-      case 'light': activityLevelInPortuguese = 'leve'; break;
-      case 'moderate': activityLevelInPortuguese = 'moderado'; break;
-      case 'active': activityLevelInPortuguese = 'ativo'; break;
-      case 'very_active': activityLevelInPortuguese = 'muito ativo'; break;
-    }
-    
-    // Traduzir o objetivo para português
-    let goalInPortuguese = userData.goal || 'manutenção';
-    switch (userData.goal) {
-      case 'weight_loss': goalInPortuguese = 'perda de peso'; break;
-      case 'maintenance': goalInPortuguese = 'manutenção'; break;
-      case 'muscle_gain': goalInPortuguese = 'ganho de massa muscular'; break;
-    }
-    
-    // Traduzir restrições dietéticas para português
-    const translatedRestrictions: string[] = [];
-    if (preferences.dietaryRestrictions) {
-      preferences.dietaryRestrictions.forEach(restriction => {
-        switch (restriction) {
-          case 'gluten_free': translatedRestrictions.push('sem glúten'); break;
-          case 'lactose_free': translatedRestrictions.push('sem lactose'); break;
-          case 'vegetarian': translatedRestrictions.push('vegetariano'); break;
-          case 'vegan': translatedRestrictions.push('vegano'); break;
-          case 'low_carb': translatedRestrictions.push('baixo carboidrato'); break;
-          case 'keto': translatedRestrictions.push('cetogênico'); break;
-          default: translatedRestrictions.push(restriction);
-        }
-      });
-    }
-    
-    // Criar o prompt em português
-    const prompt = `
-    Por favor, crie um plano alimentar semanal detalhado para uma pessoa com as seguintes características:
-    
-    - Peso: ${userData.weight} kg
-    - Altura: ${userData.height} cm
-    - Idade: ${userData.age} anos
-    - Gênero: ${genderInPortuguese}
-    - Nível de atividade: ${activityLevelInPortuguese}
-    - Objetivo: ${goalInPortuguese}
-    - Calorias diárias: ${userData.dailyCalories} kcal
-    
-    Alimentos preferidos por refeição:
-    ${Object.entries(foodsByMealTypePortuguese)
-      .map(([mealType, foods]) => `- ${mealType}: ${foods}`)
-      .join('\n')}
-    
-    ${preferences.hasAllergies && preferences.allergies && preferences.allergies.length > 0 
-      ? `Alergias alimentares: ${preferences.allergies.join(', ')}` 
-      : 'Sem alergias alimentares.'}
-    
-    ${translatedRestrictions.length > 0 
-      ? `Restrições dietéticas: ${translatedRestrictions.join(', ')}` 
-      : 'Sem restrições dietéticas.'}
-    
-    ${preferences.trainingTime 
-      ? `Horário de treino: ${preferences.trainingTime}` 
-      : 'Sem horário de treino definido.'}
-    
-    Por favor, retorne o plano alimentar em formato JSON, com os seguintes elementos:
-    - Um plano semanal completo (7 dias) com "weeklyPlan" contendo dias da semana em português (segunda, terça, etc.)
-    - Cada dia deve ter 5 refeições: café da manhã, lanche da manhã, almoço, lanche da tarde, jantar
-    - Cada refeição deve incluir alimentos dos selecionados quando possível
-    - Inclua os totais diários de calorias, proteínas, carboidratos, gorduras e fibras
-    - Inclua também recomendações gerais em português e uma média semanal dos macronutrientes
-    
-    IMPORTANTE: Todos os nomes de alimentos, refeições e descrições DEVEM estar em português. Todos os valores de macronutrientes devem ser numéricos (sem "g").
-    `;
-    
-    // Chamar a função edge llama-completion
-    const { data, error } = await supabase.functions.invoke('llama-completion', {
+    // Call the Nutri+ agent edge function
+    const { data, error } = await supabase.functions.invoke('nutri-plus-agent', {
       body: {
-        prompt,
-        temperature: 0.4,
-        language: "pt-BR"
+        userData,
+        selectedFoods,
+        foodsByMealType: simplifiedFoodsByMealType, // Send simplified version
+        dietaryPreferences: preferences,
+        modelConfig: {
+          // Explicitly specify model to use
+          model: "llama3-8b-8192",
+          temperature: 0.3
+        }
       }
     });
 
     if (error) {
-      console.error("❌ Erro ao chamar a função llama-completion:", error);
+      console.error("❌ Erro ao chamar o agente Nutri+:", error);
       toast.error("Erro ao gerar plano alimentar. Por favor, tente novamente.");
       return null;
     }
 
-    if (!data?.completion) {
-      console.error("❌ Nenhum plano alimentar retornado pela função llama-completion");
+    if (!data?.mealPlan) {
+      console.error("❌ Nenhum plano alimentar retornado pelo agente Nutri+");
       console.error("Resposta completa:", data);
       toast.error("Não foi possível gerar o plano alimentar. Por favor, tente novamente.");
       return null;
     }
 
-    console.log("✅ Resposta recebida da função llama-completion");
-    console.log("📋 Primeiros 200 caracteres da resposta:", data.completion.substring(0, 200) + "...");
+    console.log("✅ Plano alimentar recebido com sucesso do agente Nutri+");
+    console.log("📋 Dados do plano:", JSON.stringify(data.mealPlan).substring(0, 200) + "...");
+    console.log("🧠 Modelo utilizado:", data.modelUsed || "llama3-8b-8192");
     
-    // Tentar extrair o JSON da resposta
-    let jsonContent = data.completion;
-    
-    // Verificar se o conteúdo precisa ser extraído (se a resposta contém mais que apenas o JSON)
-    const jsonStart = jsonContent.indexOf('{');
-    const jsonEnd = jsonContent.lastIndexOf('}');
-    
-    if (jsonStart !== -1 && jsonEnd !== -1 && jsonStart < jsonEnd) {
-      jsonContent = jsonContent.substring(jsonStart, jsonEnd + 1);
-      console.log("🔍 JSON extraído da resposta");
-    }
-    
-    // Tentar analisar o JSON
-    let mealPlan: MealPlan;
-    
-    try {
-      mealPlan = JSON.parse(jsonContent);
-      console.log("✅ JSON analisado com sucesso");
-    } catch (parseError) {
-      console.error("❌ Erro ao analisar JSON:", parseError);
-      console.error("Conteúdo JSON com problema:", jsonContent);
-      toast.error("Erro ao processar o plano alimentar. Por favor, tente novamente.");
-      return null;
-    }
-    
-    // Verificar se mealPlan tem a estrutura esperada
-    if (!mealPlan || typeof mealPlan !== 'object') {
-      console.error("❌ Estrutura de plano alimentar inválida");
-      toast.error("O plano alimentar gerado tem formato inválido. Por favor, tente novamente.");
-      return null;
-    }
-    
-    // Verificar se a estrutura contém weeklyPlan - correção do problema anterior
-    if (!mealPlan.weeklyPlan) {
-      // Se não houver weeklyPlan diretamente, verificar se existe uma estrutura aninhada
-      if (Object.keys(mealPlan).length === 1 && typeof mealPlan[Object.keys(mealPlan)[0]] === 'object') {
-        // Temos uma estrutura aninhada, vamos tentar extrair o plano real
-        const potentialPlan = mealPlan[Object.keys(mealPlan)[0]];
-        if (potentialPlan && potentialPlan.weeklyPlan) {
-          console.log("⚠️ Estrutura aninhada detectada, extraindo o plano alimentar");
-          mealPlan = potentialPlan;
-        }
-      }
+    // Ensure the meal plan uses the user's specified daily calories
+    if (data.mealPlan && userData.dailyCalories) {
+      data.mealPlan.userCalories = userData.dailyCalories;
       
-      // Se ainda não temos weeklyPlan, o formato está incorreto
-      if (!mealPlan.weeklyPlan) {
-        console.error("❌ Formato de plano sem weeklyPlan:", Object.keys(mealPlan));
-        toast.error("O plano alimentar gerado tem formato inválido (sem weeklyPlan). Por favor, tente novamente.");
-        return null;
+      // If weeklyTotals is missing or has NaN values, recalculate it here
+      if (!data.mealPlan.weeklyTotals || 
+          isNaN(data.mealPlan.weeklyTotals.averageCalories) || 
+          isNaN(data.mealPlan.weeklyTotals.averageProtein)) {
+        
+        console.log("⚠️ Recalculando médias semanais devido a valores ausentes ou NaN");
+        
+        // Convert weeklyPlan to array of day plans, with validation
+        const weeklyPlan = data.mealPlan.weeklyPlan || {};
+        const days = Object.values(weeklyPlan);
+        
+        // Define a proper type guard function to ensure day has properly typed dailyTotals
+        const isDayPlanWithValidTotals = (day: unknown): day is DayPlan => {
+          return (
+            !!day && 
+            typeof day === 'object' &&
+            'dailyTotals' in day &&
+            !!day.dailyTotals &&
+            typeof day.dailyTotals === 'object' &&
+            'calories' in day.dailyTotals && typeof day.dailyTotals.calories === 'number' &&
+            'protein' in day.dailyTotals && typeof day.dailyTotals.protein === 'number' &&
+            'carbs' in day.dailyTotals && typeof day.dailyTotals.carbs === 'number' &&
+            'fats' in day.dailyTotals && typeof day.dailyTotals.fats === 'number' &&
+            'fiber' in day.dailyTotals && typeof day.dailyTotals.fiber === 'number'
+          );
+        };
+        
+        // Filter days to only include valid days with proper dailyTotals
+        const validDays = days.filter(isDayPlanWithValidTotals);
+        const dayCount = validDays.length || 1; // Prevent division by zero
+        
+        data.mealPlan.weeklyTotals = {
+          averageCalories: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.calories, 0) / dayCount),
+          averageProtein: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.protein, 0) / dayCount),
+          averageCarbs: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.carbs, 0) / dayCount),
+          averageFats: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.fats, 0) / dayCount),
+          averageFiber: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.fiber, 0) / dayCount)
+        };
+        
+        console.log("🔄 Novos valores de médias semanais:", data.mealPlan.weeklyTotals);
       }
     }
     
-    console.log("✅ Plano alimentar estruturado:", Object.keys(mealPlan));
-    console.log("📋 Dias no plano:", mealPlan.weeklyPlan ? Object.keys(mealPlan.weeklyPlan) : "Nenhum");
-    console.log("🧠 Modelo utilizado:", data.modelUsed || "Desconhecido");
-    
-    // Garantir que userCalories esteja presente
-    if (userData.dailyCalories) {
-      mealPlan.userCalories = userData.dailyCalories;
-    }
-    
-    // Adicionar informação sobre o modelo usado
-    mealPlan.generatedBy = data.modelUsed || "llama-completion";
-    
-    // Salvar o plano alimentar no banco de dados se o usuário estiver autenticado
+    // Save the meal plan to the database if user is authenticated
     if (userData.id) {
       try {
+        // Check if we have a user ID before attempting to save
         console.log("💾 Tentando salvar plano alimentar para o usuário:", userData.id);
         
-        // Criar uma versão limpa do plano para armazenamento no banco de dados
-        const mealPlanForStorage = JSON.parse(JSON.stringify(mealPlan));
+        // Create a clean version of the meal plan for database storage
+        // Using JSON.stringify and then JSON.parse to ensure we have a plain JavaScript object
+        // This removes any special prototypes or non-serializable properties
+        const mealPlanForStorage = JSON.parse(JSON.stringify(data.mealPlan));
         
+        // We need to explicitly cast the meal plan to any to bypass TypeScript checking
+        // because Supabase expects a specific Json type that doesn't match our MealPlan type
         const { error: saveError } = await supabase
           .from('meal_plans')
           .insert({
             user_id: userData.id,
-            plan_data: mealPlanForStorage,
+            plan_data: mealPlanForStorage as any, // Cast to any to bypass TypeScript checking
             calories: userData.dailyCalories,
-            generated_by: data.modelUsed || "llama-completion",
-            preferences: preferences
+            generated_by: data.modelUsed || "nutri-plus-agent-llama3",
+            preferences: preferences // Save the user preferences with the meal plan
           });
 
         if (saveError) {
@@ -252,7 +151,7 @@ export const generateMealPlan = async ({
           console.log("💾 Plano alimentar salvo no banco de dados com sucesso");
           toast.success("Plano alimentar salvo no histórico");
           
-          // Adicionar transação se a função de carteira estiver disponível
+          // Add transaction if wallet function is available
           if (addTransaction) {
             await addTransaction({
               amount: 10,
@@ -272,7 +171,8 @@ export const generateMealPlan = async ({
       toast.warning("Faça login para salvar o plano no histórico");
     }
 
-    return mealPlan;
+    // Return the meal plan exactly as generated by the AI
+    return data.mealPlan as MealPlan;
   } catch (error) {
     console.error("❌ Erro inesperado em generateMealPlan:", error);
     toast.error("Erro ao gerar plano alimentar. Por favor, tente novamente.");
