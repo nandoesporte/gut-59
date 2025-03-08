@@ -249,7 +249,7 @@ Por favor, crie um plano de 7 dias que:
         { role: "user", content: userMessage }
       ],
       temperature: temperature,
-      max_tokens: 4000, // Reduced token count to help with completion
+      max_tokens: 4000,
       top_p: 0.95,
       response_format: { type: "json_object" } // Request JSON format response
     };
@@ -274,82 +274,278 @@ Por favor, crie um plano de 7 dias que:
       if (response.status === 400 && errorText.includes("json_validate_failed")) {
         console.log("[NUTRI+] Erro de validação JSON na resposta da API");
         
-        // For json validation errors, try to extract and fix the partial JSON
+        // Extract the full JSON content from the error message
+        let extractedJson = null;
         let mealPlanData = null;
         
         try {
-          // Extract the JSON content from the error message
+          // Various extraction strategies to recover the JSON from error response
+          
+          // Strategy 1: Extract from failed_generation
           const failedGenerationMatch = errorText.match(/"failed_generation"\s*:\s*"([\s\S]*)"/);
           if (failedGenerationMatch && failedGenerationMatch[1]) {
             // Clean the extracted content by replacing escaped newlines and quotes
-            const jsonContent = failedGenerationMatch[1]
+            extractedJson = failedGenerationMatch[1]
               .replace(/\\n/g, '')
               .replace(/\\"/g, '"')
               .replace(/\\\\/g, '\\');
             
-            console.log("[NUTRI+] Tentando recuperar dados parciais do JSON");
+            console.log("[NUTRI+] Extraindo JSON da mensagem de erro (failed_generation)");
             
-            // Try to parse the extracted JSON
+            // Attempt to parse the JSON directly
             try {
-              const fixedJson = JSON.parse(`{${jsonContent.split('{')[1]}`);
-              if (fixedJson.weeklyPlan) {
-                console.log("[NUTRI+] Recuperação parcial do JSON bem-sucedida");
-                mealPlanData = fixedJson;
+              // First try: direct parse by adding curly braces if missing
+              if (!extractedJson.trim().startsWith('{')) {
+                extractedJson = '{' + extractedJson;
               }
-            } catch (jsonParseError) {
-              console.error("[NUTRI+] Não foi possível recuperar dados parciais:", jsonParseError);
+              if (!extractedJson.trim().endsWith('}')) {
+                extractedJson = extractedJson + '}';
+              }
+              
+              mealPlanData = JSON.parse(extractedJson);
+              console.log("[NUTRI+] Conversão direta do JSON bem-sucedida");
+            } catch (directParseError) {
+              console.log("[NUTRI+] Erro na conversão direta:", directParseError.message);
+              
+              try {
+                // Second try: Using regex to extract everything between the first { and last }
+                const jsonMatch = extractedJson.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                  const jsonContent = jsonMatch[0];
+                  mealPlanData = JSON.parse(jsonContent);
+                  console.log("[NUTRI+] Extração de JSON com regex bem-sucedida");
+                }
+              } catch (regexError) {
+                console.log("[NUTRI+] Erro na extração com regex:", regexError.message);
+                
+                try {
+                  // Third try: Split by the first { and rebuild
+                  const parts = extractedJson.split('{');
+                  if (parts.length > 1) {
+                    const reconstructed = '{' + parts.slice(1).join('{');
+                    // Find the last valid closing brace
+                    let validJson = reconstructed;
+                    let braceCount = 0;
+                    for (let i = 0; i < reconstructed.length; i++) {
+                      if (reconstructed[i] === '{') braceCount++;
+                      if (reconstructed[i] === '}') braceCount--;
+                      if (braceCount === 0) {
+                        validJson = reconstructed.substring(0, i + 1);
+                        break;
+                      }
+                    }
+                    mealPlanData = JSON.parse(validJson);
+                    console.log("[NUTRI+] Reconstrução de JSON bem-sucedida");
+                  }
+                } catch (reconstructError) {
+                  console.log("[NUTRI+] Erro na reconstrução:", reconstructError.message);
+                }
+              }
             }
           }
         } catch (extractError) {
-          console.error("[NUTRI+] Erro ao extrair dados do JSON:", extractError);
+          console.error("[NUTRI+] Erro ao extrair JSON:", extractError.message);
         }
         
-        // If we successfully recovered partial data, return it
+        // If we successfully recovered partial data, process and return it
         if (mealPlanData) {
-          console.log("[NUTRI+] Retornando dados recuperados parcialmente");
+          console.log("[NUTRI+] Dados JSON recuperados com sucesso da resposta de erro");
+          
+          // Process all numeric values to ensure they're integers
+          const processNumericValues = (obj) => {
+            if (!obj || typeof obj !== 'object') return obj;
+            
+            Object.keys(obj).forEach(key => {
+              if (typeof obj[key] === 'number') {
+                // Round to integer
+                obj[key] = Math.round(obj[key]);
+              } else if (typeof obj[key] === 'string' && !isNaN(obj[key])) {
+                // Convert string numbers to integers
+                obj[key] = Math.round(parseFloat(obj[key]));
+              } else if (Array.isArray(obj[key])) {
+                obj[key].forEach(item => {
+                  if (typeof item === 'object' && item !== null) {
+                    processNumericValues(item);
+                  }
+                });
+              } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+                processNumericValues(obj[key]);
+              }
+            });
+            return obj;
+          };
+          
+          // Process all numeric values to integers
+          mealPlanData = processNumericValues(mealPlanData);
           
           // Ensure basic structure is complete
-          if (!mealPlanData.recommendations) {
-            mealPlanData.recommendations = {
-              general: "Mantenha uma alimentação balanceada e variada.",
-              preworkout: "Consuma carboidratos antes do treino para energia.",
-              postworkout: "Consuma proteínas após o treino para recuperação muscular.",
-              timing: ["Distribua as refeições a cada 3-4 horas."]
-            };
-          }
+          const ensureStructureComplete = () => {
+            if (!mealPlanData.weeklyPlan) {
+              mealPlanData.weeklyPlan = {};
+              console.log("[NUTRI+] Criando estrutura de plano semanal ausente");
+            }
+            
+            // Check for required days
+            const requiredDays = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo'];
+            const dayNames = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"];
+            
+            // Get an existing day structure to clone if needed
+            const existingDay = Object.values(mealPlanData.weeklyPlan)[0];
+            
+            requiredDays.forEach((day, index) => {
+              if (!mealPlanData.weeklyPlan[day]) {
+                console.log(`[NUTRI+] Adicionando dia ausente: ${day}`);
+                
+                if (existingDay) {
+                  // Clone structure from existing day
+                  mealPlanData.weeklyPlan[day] = JSON.parse(JSON.stringify(existingDay));
+                  mealPlanData.weeklyPlan[day].dayName = dayNames[index];
+                } else {
+                  // Create basic structure if no existing day
+                  const mealTemplate = {
+                    description: "Refeição",
+                    foods: [{ name: "Alimento", portion: 100, unit: "g", details: "Preparar conforme instruções" }],
+                    calories: userData.dailyCalories / 5, // Rough estimate
+                    macros: { protein: 20, carbs: 30, fats: 10, fiber: 5 }
+                  };
+                  
+                  mealPlanData.weeklyPlan[day] = {
+                    dayName: dayNames[index],
+                    meals: {
+                      cafeDaManha: JSON.parse(JSON.stringify(mealTemplate)),
+                      lancheDaManha: JSON.parse(JSON.stringify(mealTemplate)),
+                      almoco: JSON.parse(JSON.stringify(mealTemplate)),
+                      lancheDaTarde: JSON.parse(JSON.stringify(mealTemplate)),
+                      jantar: JSON.parse(JSON.stringify(mealTemplate)),
+                    },
+                    dailyTotals: {
+                      calories: userData.dailyCalories,
+                      protein: Math.round(userData.dailyCalories * 0.25 / 4), // 25% from protein
+                      carbs: Math.round(userData.dailyCalories * 0.5 / 4), // 50% from carbs
+                      fats: Math.round(userData.dailyCalories * 0.25 / 9), // 25% from fats
+                      fiber: 25 // Default value
+                    }
+                  };
+                }
+              }
+              
+              // Check meal structure for each day
+              const dayData = mealPlanData.weeklyPlan[day];
+              if (!dayData.meals) {
+                dayData.meals = {};
+              }
+              
+              const requiredMeals = ['cafeDaManha', 'lancheDaManha', 'almoco', 'lancheDaTarde', 'jantar'];
+              requiredMeals.forEach(meal => {
+                if (!dayData.meals[meal]) {
+                  console.log(`[NUTRI+] Adicionando refeição ausente: ${meal} para ${day}`);
+                  
+                  // Find an existing meal to clone, or create default
+                  const existingMeal = Object.values(dayData.meals)[0];
+                  
+                  if (existingMeal) {
+                    dayData.meals[meal] = JSON.parse(JSON.stringify(existingMeal));
+                    dayData.meals[meal].description = `Refeição ${meal}`;
+                  } else {
+                    dayData.meals[meal] = {
+                      description: `Refeição ${meal}`,
+                      foods: [{ name: "Alimento", portion: 100, unit: "g", details: "Preparar conforme instruções" }],
+                      calories: Math.round(userData.dailyCalories / 5),
+                      macros: { protein: 20, carbs: 30, fats: 10, fiber: 5 }
+                    };
+                  }
+                }
+                
+                // Ensure food items are correctly structured
+                const mealData = dayData.meals[meal];
+                if (!mealData.foods || !Array.isArray(mealData.foods) || mealData.foods.length === 0) {
+                  mealData.foods = [{ name: "Alimento", portion: 100, unit: "g", details: "Preparar conforme instruções" }];
+                }
+                
+                // Ensure numeric meal values
+                if (typeof mealData.calories !== 'number') {
+                  mealData.calories = Math.round(userData.dailyCalories / 5);
+                }
+                
+                if (!mealData.macros) {
+                  mealData.macros = { protein: 20, carbs: 30, fats: 10, fiber: 5 };
+                }
+              });
+              
+              // Recalculate daily totals
+              if (!dayData.dailyTotals) {
+                console.log(`[NUTRI+] Recalculando totais diários para: ${day}`);
+                
+                const meals = dayData.meals;
+                dayData.dailyTotals = {
+                  calories: Object.values(meals).reduce((sum, meal) => sum + (meal.calories || 0), 0),
+                  protein: Object.values(meals).reduce((sum, meal) => sum + (meal.macros?.protein || 0), 0),
+                  carbs: Object.values(meals).reduce((sum, meal) => sum + (meal.macros?.carbs || 0), 0),
+                  fats: Object.values(meals).reduce((sum, meal) => sum + (meal.macros?.fats || 0), 0),
+                  fiber: Object.values(meals).reduce((sum, meal) => sum + (meal.macros?.fiber || 0), 0)
+                };
+              }
+            });
+          };
           
-          if (!mealPlanData.weeklyTotals) {
-            // Calculate weeklyTotals from available days
-            const days = Object.values(mealPlanData.weeklyPlan);
-            const validDays = days.filter(day => day && day.dailyTotals);
-            const dayCount = validDays.length || 1;
+          ensureStructureComplete();
+          
+          // Calculate or fix weekly totals
+          if (!mealPlanData.weeklyTotals || 
+              isNaN(mealPlanData.weeklyTotals.averageCalories) || 
+              isNaN(mealPlanData.weeklyTotals.averageProtein)) {
+            
+            console.log("[NUTRI+] Calculando médias semanais");
+            
+            const weeklyPlan = mealPlanData.weeklyPlan || {};
+            const days = Object.values(weeklyPlan);
+            const dayCount = days.length || 1; // Prevent division by zero
             
             mealPlanData.weeklyTotals = {
-              averageCalories: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals.calories || 0), 0) / dayCount),
-              averageProtein: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals.protein || 0), 0) / dayCount),
-              averageCarbs: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals.carbs || 0), 0) / dayCount),
-              averageFats: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals.fats || 0), 0) / dayCount),
-              averageFiber: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals.fiber || 0), 0) / dayCount)
+              averageCalories: Math.round(days.reduce((sum, day) => sum + (day.dailyTotals?.calories || 0), 0) / dayCount),
+              averageProtein: Math.round(days.reduce((sum, day) => sum + (day.dailyTotals?.protein || 0), 0) / dayCount),
+              averageCarbs: Math.round(days.reduce((sum, day) => sum + (day.dailyTotals?.carbs || 0), 0) / dayCount),
+              averageFats: Math.round(days.reduce((sum, day) => sum + (day.dailyTotals?.fats || 0), 0) / dayCount),
+              averageFiber: Math.round(days.reduce((sum, day) => sum + (day.dailyTotals?.fiber || 0), 0) / dayCount)
             };
           }
           
-          // Add metadata
+          // Ensure recommendations are complete
+          if (!mealPlanData.recommendations) {
+            console.log("[NUTRI+] Adicionando recomendações padrão");
+            
+            mealPlanData.recommendations = {
+              general: "Mantenha uma alimentação balanceada e variada. Beba pelo menos 2 litros de água por dia.",
+              preworkout: "Consuma carboidratos 30-60 minutos antes do treino para energia.",
+              postworkout: "Consuma proteínas e carboidratos dentro de 30 minutos após o treino para recuperação muscular.",
+              timing: [
+                "Distribua as refeições a cada 3-4 horas durante o dia.",
+                "Evite refeições pesadas antes de dormir."
+              ]
+            };
+          }
+          
+          // Add metadata to the response
           mealPlanData.modelUsed = modelName;
           mealPlanData.generatedAt = new Date().toISOString();
-          mealPlanData.recovered = true;
+          mealPlanData.userCalories = userData.dailyCalories;
+          mealPlanData.recoveredFromError = true;
+          
+          console.log(`[NUTRI+] Plano alimentar recuperado e normalizado às ${new Date().toISOString()}`);
           
           return new Response(
-            JSON.stringify(mealPlanData),
+            JSON.stringify({ mealPlan: mealPlanData }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
         
-        // If recovery failed, try with a different approach
+        // If recovery failed, return sensible error with suggestions
         return new Response(
           JSON.stringify({ 
             error: "Erro de validação JSON na resposta da API", 
-            details: errorText.substring(0, 500),
-            suggestedModel: "llama3-70b-8192"
+            details: "Não foi possível recuperar um plano alimentar válido da resposta",
+            suggestedModel: "llama3-70b-8192",
+            recoveryFailed: true
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
         );
@@ -411,9 +607,14 @@ Por favor, crie um plano de 7 dias que:
           if (typeof obj[key] === 'number') {
             // Round to integer
             obj[key] = Math.round(obj[key]);
+          } else if (typeof obj[key] === 'string' && !isNaN(obj[key])) {
+            // Convert string numbers to integers
+            obj[key] = Math.round(parseFloat(obj[key]));
           } else if (Array.isArray(obj[key])) {
             obj[key].forEach(item => {
-              if (typeof item === 'object') processNumericValues(item);
+              if (typeof item === 'object' && item !== null) {
+                processNumericValues(item);
+              }
             });
           } else if (typeof obj[key] === 'object' && obj[key] !== null) {
             processNumericValues(obj[key]);
@@ -481,50 +682,121 @@ Por favor, crie um plano de 7 dias que:
       
       // Return the successful response
       return new Response(
-        JSON.stringify(mealPlanJson),
+        JSON.stringify({ mealPlan: mealPlanJson }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
       
     } catch (jsonError) {
-      // If the response is not valid JSON, log the error and return error response
+      // If the response is not valid JSON, try to recover
       console.error("[NUTRI+] Erro ao analisar JSON:", jsonError.message);
       console.error("[NUTRI+] Resposta JSON inválida:", mealPlanContent.substring(0, 500));
       
       try {
         // Attempt to fix common JSON issues
+        console.log("[NUTRI+] Tentando corrigir problemas comuns de JSON");
+        
         const fixedContent = mealPlanContent
           .replace(/,\s*}/g, '}') // Remove trailing commas in objects
           .replace(/,\s*\]/g, ']') // Remove trailing commas in arrays
-          .replace(/([0-9]+)\.([0-9]+)/g, (match, p1, p2) => Math.round(parseFloat(`${p1}.${p2}`)).toString()); // Round decimals
+          .replace(/([0-9]+)\.([0-9]+)/g, (match, p1, p2) => Math.round(parseFloat(`${p1}.${p2}`)).toString()) // Round decimals
+          .replace(/:\s*NaN/g, ': 0') // Replace NaN with 0
+          .replace(/:\s*null/g, ': 0') // Replace null numeric values with 0
+          .replace(/:\s*undefined/g, ': 0') // Replace undefined with 0
+          .replace(/\\n/g, '') // Remove newlines
+          .replace(/\\r/g, '') // Remove carriage returns
+          .replace(/\\t/g, '') // Remove tabs
+          .replace(/\n|\r|\t/g, ''); // Remove any actual newlines or tabs
         
-        console.log("[NUTRI+] Tentando corrigir JSON");
+        console.log("[NUTRI+] Tentando analisar JSON corrigido");
         const mealPlanJson = JSON.parse(fixedContent);
         
         if (mealPlanJson.weeklyPlan) {
           console.log("[NUTRI+] Correção do JSON bem-sucedida");
           
+          // Process all numeric values
+          const processNumericValues = (obj) => {
+            if (!obj || typeof obj !== 'object') return obj;
+            
+            Object.keys(obj).forEach(key => {
+              if (typeof obj[key] === 'number') {
+                obj[key] = Math.round(obj[key]);
+              } else if (Array.isArray(obj[key])) {
+                obj[key].forEach(item => {
+                  if (typeof item === 'object' && item !== null) {
+                    processNumericValues(item);
+                  }
+                });
+              } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+                processNumericValues(obj[key]);
+              }
+            });
+            return obj;
+          };
+          
+          // Process all numeric values to integers
+          processNumericValues(mealPlanJson);
+          
           // Add metadata
           mealPlanJson.modelUsed = modelName;
           mealPlanJson.generatedAt = new Date().toISOString();
+          mealPlanJson.userCalories = userData.dailyCalories;
           mealPlanJson.fixed = true;
           
           return new Response(
-            JSON.stringify(mealPlanJson),
+            JSON.stringify({ mealPlan: mealPlanJson }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
+        } else {
+          throw new Error("Estrutura JSON ainda inválida após correções");
         }
       } catch (fixError) {
         console.error("[NUTRI+] Falha na correção do JSON:", fixError.message);
+        
+        // Try to extract JSON using regex if the fixes didn't work
+        try {
+          console.log("[NUTRI+] Tentando extrair JSON com regex");
+          
+          const jsonMatch = mealPlanContent.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const extractedJson = jsonMatch[0]
+              .replace(/,\s*}/g, '}') // Remove trailing commas
+              .replace(/,\s*\]/g, ']')
+              .replace(/([0-9]+)\.([0-9]+)/g, (match, p1, p2) => Math.round(parseFloat(`${p1}.${p2}`)).toString());
+            
+            const mealPlanJson = JSON.parse(extractedJson);
+            
+            if (mealPlanJson.weeklyPlan) {
+              console.log("[NUTRI+] Extração de JSON com regex bem-sucedida");
+              
+              // Add metadata
+              mealPlanJson.modelUsed = modelName;
+              mealPlanJson.generatedAt = new Date().toISOString();
+              mealPlanJson.userCalories = userData.dailyCalories;
+              mealPlanJson.extractedWithRegex = true;
+              
+              return new Response(
+                JSON.stringify({ mealPlan: mealPlanJson }),
+                { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+              );
+            }
+          }
+          
+          throw new Error("Nenhum JSON válido encontrado com regex");
+        } catch (regexError) {
+          console.error("[NUTRI+] Falha na extração por regex:", regexError.message);
+          
+          // All recovery attempts failed, return error
+          return new Response(
+            JSON.stringify({ 
+              error: "Falha ao analisar JSON do plano alimentar",
+              details: jsonError.message,
+              suggestedModel: "llama3-70b-8192",
+              recoveryAttempted: true
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+          );
+        }
       }
-      
-      return new Response(
-        JSON.stringify({ 
-          error: "Falha ao analisar JSON do plano alimentar",
-          details: jsonError.message,
-          suggestedModel: "llama3-70b-8192"
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-      );
     }
     
   } catch (error) {
