@@ -1,3 +1,4 @@
+
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { DietaryPreferences, MealPlan, ProtocolFood, DayPlan } from "../types";
@@ -266,33 +267,43 @@ function ensureMealPlanStructure(mealPlan: any, userCalories: number): MealPlan 
     
     mealPlan.weeklyTotals = {
       averageCalories: Math.round(days.reduce((sum: number, day: any) => {
-        const dayTotal = day?.dailyTotals;
-        const calories = dayTotal?.calories;
-        return sum + (Number.isFinite(Number(calories)) ? Number(calories) : 0);
+        const dayTotal = day?.dailyTotals || {};
+        // Ensure calories is a number or default to 0
+        const calories = typeof dayTotal.calories === 'number' ? dayTotal.calories : 
+                        (dayTotal.calories ? Number(dayTotal.calories) : 0);
+        return sum + calories;
       }, 0) / dayCount),
       
       averageProtein: Math.round(days.reduce((sum: number, day: any) => {
-        const dayTotal = day?.dailyTotals;
-        const protein = dayTotal?.protein;
-        return sum + (Number.isFinite(Number(protein)) ? Number(protein) : 0);
+        const dayTotal = day?.dailyTotals || {};
+        // Ensure protein is a number or default to 0
+        const protein = typeof dayTotal.protein === 'number' ? dayTotal.protein : 
+                       (dayTotal.protein ? Number(dayTotal.protein) : 0);
+        return sum + protein;
       }, 0) / dayCount),
       
       averageCarbs: Math.round(days.reduce((sum: number, day: any) => {
-        const dayTotal = day?.dailyTotals;
-        const carbs = dayTotal?.carbs;
-        return sum + (Number.isFinite(Number(carbs)) ? Number(carbs) : 0);
+        const dayTotal = day?.dailyTotals || {};
+        // Ensure carbs is a number or default to 0
+        const carbs = typeof dayTotal.carbs === 'number' ? dayTotal.carbs : 
+                     (dayTotal.carbs ? Number(dayTotal.carbs) : 0);
+        return sum + carbs;
       }, 0) / dayCount),
       
       averageFats: Math.round(days.reduce((sum: number, day: any) => {
-        const dayTotal = day?.dailyTotals;
-        const fats = dayTotal?.fats;
-        return sum + (Number.isFinite(Number(fats)) ? Number(fats) : 0);
+        const dayTotal = day?.dailyTotals || {};
+        // Ensure fats is a number or default to 0
+        const fats = typeof dayTotal.fats === 'number' ? dayTotal.fats : 
+                    (dayTotal.fats ? Number(dayTotal.fats) : 0);
+        return sum + fats;
       }, 0) / dayCount),
       
       averageFiber: Math.round(days.reduce((sum: number, day: any) => {
-        const dayTotal = day?.dailyTotals;
-        const fiber = dayTotal?.fiber;
-        return sum + (Number.isFinite(Number(fiber)) ? Number(fiber) : 0);
+        const dayTotal = day?.dailyTotals || {};
+        // Ensure fiber is a number or default to 0
+        const fiber = typeof dayTotal.fiber === 'number' ? dayTotal.fiber : 
+                     (dayTotal.fiber ? Number(dayTotal.fiber) : 0);
+        return sum + fiber;
       }, 0) / dayCount)
     };
   }
