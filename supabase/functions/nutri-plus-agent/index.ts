@@ -93,98 +93,101 @@ serve(async (req) => {
       );
     }
 
-    // Prepare system message for Nutri+ agent with Portuguese instructions
+    // Prepare system message with updated instructions for Nutri+ agent
     const systemMessage = `Você é Nutri+, um agente especialista em nutrição que cria planos alimentares personalizados em Português do Brasil.
 Sua tarefa é analisar os dados do usuário e criar um plano alimentar semanal detalhado e cientificamente fundamentado.
 
-REGRAS IMPORTANTES DE FORMATO DE SAÍDA:
+REGRAS IMPORTANTES PARA GERAÇÃO DE JSON VÁLIDO:
 1. Sua resposta DEVE ser um JSON válido que possa ser processado com JSON.parse().
-2. Sua resposta deve conter APENAS o objeto JSON sem explicações, narrativas ou texto adicional.
-3. A saída deve seguir exatamente esta estrutura:
+2. Nunca use aspas simples (') para strings, use APENAS aspas duplas (").
+3. Não use notação científica como 1e5 para números.
+4. Garanta que o JSON não tenha vírgulas extras no final dos objetos e arrays.
+5. Garanta que cada propriedade de objeto tenha um valor.
+6. Todos os valores numéricos devem ser números (sem aspas).
+7. Não inclua comentários no JSON.
+8. Não deixe o JSON truncado ou incompleto.
+9. Incluir recomendações completas, mas concisas.
+
+ESTRUTURA DO JSON:
 {
   "weeklyPlan": {
-    "monday": { /* estrutura do plano diário */ },
-    "tuesday": { /* estrutura do plano diário */ },
-    /* ... outros dias ... */
+    "segunda": {
+      "dayName": "Segunda-feira",
+      "meals": {
+        "cafeDaManha": {
+          "description": "Descrição em português",
+          "foods": [
+            {
+              "name": "Nome do alimento em português",
+              "portion": 100,
+              "unit": "g",
+              "details": "Detalhes de preparo em português"
+            }
+          ],
+          "calories": 500,
+          "macros": {
+            "protein": 30,
+            "carbs": 40,
+            "fats": 15,
+            "fiber": 5
+          }
+        },
+        "lancheDaManha": { /* mesma estrutura */ },
+        "almoco": { /* mesma estrutura */ },
+        "lancheDaTarde": { /* mesma estrutura */ },
+        "jantar": { /* mesma estrutura */ }
+      },
+      "dailyTotals": {
+        "calories": 2000,
+        "protein": 120,
+        "carbs": 180,
+        "fats": 60,
+        "fiber": 25
+      }
+    },
+    "terca": { /* mesma estrutura */ },
+    "quarta": { /* mesma estrutura */ },
+    "quinta": { /* mesma estrutura */ },
+    "sexta": { /* mesma estrutura */ },
+    "sabado": { /* mesma estrutura */ },
+    "domingo": { /* mesma estrutura */ }
   },
-  "weeklyTotals": { /* médias nutricionais semanais */ },
-  "recommendations": { /* recomendações personalizadas */ }
-}
-
-MUITO IMPORTANTE: Você DEVE usar Português do Brasil para TODOS os nomes, incluindo:
-- Dias da semana: "segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo"
-- Refeições: "cafeDaManha", "lancheDaManha", "almoco", "lancheDaTarde", "jantar"
-- Todos os nomes de alimentos, descrições e recomendações
-
-Certifique-se de que o weeklyPlan contenha TODOS os 7 dias (segunda a domingo). Cada dia deve ter a seguinte estrutura:
-{
-  "dayName": "Nome do Dia em Português",
-  "meals": {
-    "cafeDaManha": {
-      "description": "Descrição do café da manhã em Português",
-      "foods": [{"name": "Nome do alimento em Português", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento em Português"}],
-      "calories": 500,
-      "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
-    },
-    "lancheDaManha": {
-      "description": "Descrição do lanche da manhã em Português",
-      "foods": [{"name": "Nome do alimento em Português", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento em Português"}],
-      "calories": 500,
-      "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
-    },
-    "almoco": {
-      "description": "Descrição do almoço em Português",
-      "foods": [{"name": "Nome do alimento em Português", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento em Português"}],
-      "calories": 500,
-      "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
-    },
-    "lancheDaTarde": {
-      "description": "Descrição do lanche da tarde em Português",
-      "foods": [{"name": "Nome do alimento em Português", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento em Português"}],
-      "calories": 500,
-      "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
-    },
-    "jantar": {
-      "description": "Descrição do jantar em Português",
-      "foods": [{"name": "Nome do alimento em Português", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento em Português"}],
-      "calories": 500,
-      "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
-    }
+  "weeklyTotals": {
+    "averageCalories": 2000,
+    "averageProtein": 120,
+    "averageCarbs": 180,
+    "averageFats": 60,
+    "averageFiber": 25
   },
-  "dailyTotals": {"calories": 2000, "protein": 120, "carbs": 180, "fats": 60, "fiber": 25}
+  "recommendations": {
+    "general": "Recomendação geral em português",
+    "preworkout": "Recomendação pré-treino em português",
+    "postworkout": "Recomendação pós-treino em português",
+    "timing": [
+      "Recomendação de tempo 1 em português",
+      "Recomendação de tempo 2 em português"
+    ]
+  }
 }
 
-IMPORTANTE: Use exatamente os nomes de propriedades especificados acima:
-- Use "cafeDaManha" para café da manhã (não "breakfast")
-- Use "lancheDaManha" para lanche da manhã (não "morningSnack" ou "morning_snack")
-- Use "almoco" para almoço (não "lunch")
-- Use "lancheDaTarde" para lanche da tarde (não "afternoonSnack" ou "afternoon_snack")
-- Use "jantar" para jantar (não "dinner")
+MUITO IMPORTANTE:
+1. Use os nomes EXATOS das propriedades como especificado acima:
+   - cafeDaManha (não "café da manhã" ou "breakfast")
+   - lancheDaManha (não "lanche da manhã" ou "morningSnack")
+   - almoco (não "almoço" ou "lunch")
+   - lancheDaTarde (não "lanche da tarde" ou "afternoonSnack")
+   - jantar (não "dinner")
 
-É FUNDAMENTAL que cada alimento na lista "foods" contenha instruções detalhadas de preparo no campo "details", explicando como o alimento deve ser preparado, cozido ou consumido. Tudo em Português do Brasil.
+2. Os dias da semana DEVEM ser exatamente:
+   - "segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo"
 
-IMPORTANTE: Respeite rigorosamente a categorização dos alimentos por tipo de refeição:
-- Alimentos categorizados como 'cafeDaManha' devem ser colocados APENAS na refeição do café da manhã
-- Alimentos categorizados como 'lancheDaManha' devem ser colocados APENAS no lanche da manhã
-- Alimentos categorizados como 'almoco' devem ser colocados APENAS no almoço
-- Alimentos categorizados como 'lancheDaTarde' devem ser colocados APENAS no lanche da tarde
-- Alimentos categorizados como 'jantar' devem ser colocados APENAS no jantar
+3. Cada alimento na lista "foods" DEVE conter as seguintes propriedades:
+   - "name": Nome do alimento em português
+   - "portion": Valor numérico (sem aspas)
+   - "unit": Unidade de medida em português (g, ml, etc.)
+   - "details": Instruções de preparo em português
 
-As recomendações devem incluir:
-{
-  "general": "Conselho geral de nutrição em Português",
-  "preworkout": "Conselho de nutrição pré-treino em Português",
-  "postworkout": "Conselho de nutrição pós-treino em Português",
-  "timing": ["Conselho específico de tempo de refeição em Português", "Outro conselho de timing em Português"]
-}
-
-IMPORTANTE:
-1. Todos os valores de macronutrientes e calorias DEVEM ser números inteiros, não strings. 
-2. NUNCA adicione 'g' ou qualquer unidade como sufixo aos valores numéricos.
-3. Exemplo correto: "protein": 30, "carbs": 40 (não "protein": "30g", "carbs": "40g")
-4. Isso é crucial para que o JSON seja validado corretamente.
-
-IMPORTANTE: Devido a limitações técnicas, sua resposta NÃO pode exceder 8000 tokens. Se necessário, simplifique as descrições de preparo dos alimentos, mas NUNCA omita informações essenciais como calorias, macronutrientes ou items requeridos.`;
+4. Todos os valores numéricos (calories, protein, carbs, fats, fiber) devem ser números inteiros SEM ASPAS e SEM SUFIXOS como "g" ou "kcal".`;
 
     // Construct user message with all relevant data
     const userMessage = `Crie um plano alimentar semanal personalizado em Português do Brasil com base nestes dados:
@@ -222,29 +225,28 @@ Por favor, crie um plano de 7 dias que:
 7. Calcule as calorias e macros para cada refeição e dia
 8. Forneça detalhes de preparo para cada alimento
 9. MUITO IMPORTANTE: Use a nomenclatura correta para as refeições em português: "cafeDaManha", "lancheDaManha", "almoco", "lancheDaTarde", "jantar"
-10. MUITO IMPORTANTE: Todos os valores de macronutrientes e calorias devem ser números inteiros, NÃO inclua 'g' como sufixo nos valores
-11. NÃO utilize nomes em inglês (como "breakfast", "lunch", "dinner", "morning", "snack", etc)
-12. Use os seguintes nomes para os dias da semana: "segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo"`;
+10. MUITO IMPORTANTE: Todos os valores de macronutrientes e calorias devem ser números inteiros sem unidades
+11. MUITO IMPORTANTE: Os dias da semana devem ser: "segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo"`;
 
     // Track time for API call preparation
     console.log(`[NUTRI+] Preparando chamada de API às ${new Date().toISOString()}`);
 
     // Get model settings from request or use defaults
     const modelName = modelConfig?.model || "llama3-8b-8192";
-    const temperature = modelConfig?.temperature || 0.3;
+    const temperature = modelConfig?.temperature || 0.2; // Reduced temperature for more predictable output
     
     console.log(`[NUTRI+] Usando modelo: ${modelName} com temperatura: ${temperature}`);
 
-    // Prepare the API call to Groq
+    // Prepare the API call to Groq with improved parameters
     const groqPayload = {
       model: modelName,
       messages: [
         { role: "system", content: systemMessage },
         { role: "user", content: userMessage }
       ],
-      temperature: temperature, // Lower temperature for more consistent output
-      max_tokens: 7000, 
-      top_p: 0.9,
+      temperature: temperature,
+      max_tokens: 6000, // Reduced to leave room for processing
+      top_p: 0.95,
       response_format: { type: "json_object" } // Request JSON format response
     };
 
@@ -264,12 +266,28 @@ Por favor, crie um plano de 7 dias que:
       const errorText = await response.text();
       console.error(`[NUTRI+] Erro da API Groq (${response.status}):`, errorText);
       
+      // Try with a simpler format if we get a JSON validation error
+      if (response.status === 400 && errorText.includes("json_validate_failed")) {
+        console.log("[NUTRI+] Tentando novamente com formato simplificado devido a erro de validação JSON");
+        
+        // Switch to alternative model if specified model failed
+        const alternativeModel = modelName === "llama3-8b-8192" ? "llama3-70b-8192" : "llama3-8b-8192";
+        
+        return new Response(
+          JSON.stringify({ 
+            error: "Erro de validação JSON na resposta da API", 
+            details: errorText.substring(0, 500),
+            suggestedModel: alternativeModel
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        );
+      }
+      
       // Return the error to the client
       return new Response(
         JSON.stringify({ 
           error: `Erro da API: ${response.status}`, 
-          details: errorText,
-          // Try alternative model next time
+          details: errorText.substring(0, 500),
           suggestedModel: modelName === "llama3-8b-8192" ? "llama3-70b-8192" : "llama3-8b-8192"
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
@@ -301,11 +319,47 @@ Por favor, crie um plano de 7 dias que:
       // Parse and validate the JSON response
       const mealPlanJson = JSON.parse(mealPlanContent);
       
-      // For backwards compatibility, we add a mealPlan wrapper if needed
-      const finalResponse = mealPlanJson.mealPlan ? mealPlanJson : { mealPlan: mealPlanJson };
+      // Validate the structure to make sure it matches our expected format
+      if (!mealPlanJson.weeklyPlan) {
+        console.error("[NUTRI+] Estrutura JSON inválida: weeklyPlan não encontrado");
+        return new Response(
+          JSON.stringify({ 
+            error: "Estrutura JSON inválida", 
+            details: "weeklyPlan não encontrado na resposta" 
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        );
+      }
+      
+      // Map meal plan days to ensure they use the correct property names
+      const fixedMealPlan = {
+        weeklyPlan: {},
+        weeklyTotals: mealPlanJson.weeklyTotals || {
+          averageCalories: 0,
+          averageProtein: 0,
+          averageCarbs: 0,
+          averageFats: 0,
+          averageFiber: 0
+        },
+        recommendations: mealPlanJson.recommendations || {
+          general: "Mantenha uma alimentação balanceada e variada.",
+          preworkout: "Consuma carboidratos antes do treino para energia.",
+          postworkout: "Consuma proteínas após o treino para recuperação muscular.",
+          timing: ["Distribua as refeições a cada 3-4 horas."]
+        }
+      };
+      
+      // Transfer and fix the meal plan structure if needed
+      Object.entries(mealPlanJson.weeklyPlan).forEach(([day, dayPlan]) => {
+        // Ensure the day plan has the correct structure
+        if (dayPlan && dayPlan.meals) {
+          fixedMealPlan.weeklyPlan[day] = dayPlan;
+        }
+      });
       
       // Add metadata to the response
-      finalResponse.modelUsed = modelName;
+      fixedMealPlan.modelUsed = modelName;
+      fixedMealPlan.generatedAt = new Date().toISOString();
       
       // Log success
       console.log(`[NUTRI+] Plano alimentar gerado com sucesso às ${new Date().toISOString()}`);
@@ -313,7 +367,7 @@ Por favor, crie um plano de 7 dias que:
       
       // Return the successful response
       return new Response(
-        JSON.stringify(finalResponse),
+        JSON.stringify(fixedMealPlan),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
       

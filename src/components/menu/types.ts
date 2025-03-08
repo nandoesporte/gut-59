@@ -60,11 +60,11 @@ export interface DailyNutrition {
 export interface DayPlan {
   dayName: string;
   meals: {
-    breakfast: Meal;
-    morningSnack: Meal;
-    lunch: Meal;
-    afternoonSnack: Meal;
-    dinner: Meal;
+    cafeDaManha: Meal;
+    lancheDaManha: Meal;
+    almoco: Meal;
+    lancheDaTarde: Meal;
+    jantar: Meal;
   };
   dailyTotals: DailyNutrition;
 }
@@ -86,13 +86,13 @@ export interface Recommendations {
 
 export interface MealPlan {
   weeklyPlan: {
-    monday: DayPlan;
-    tuesday: DayPlan;
-    wednesday: DayPlan;
-    thursday: DayPlan;
-    friday: DayPlan;
-    saturday: DayPlan;
-    sunday: DayPlan;
+    segunda: DayPlan;
+    terca: DayPlan;
+    quarta: DayPlan;
+    quinta: DayPlan;
+    sexta: DayPlan;
+    sabado: DayPlan;
+    domingo: DayPlan;
   };
   weeklyTotals: WeeklyTotals;
   recommendations: Recommendations;

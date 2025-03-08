@@ -19,18 +19,18 @@ interface MealPlanDisplayProps {
 }
 
 const dayNameMap: Record<string, string> = {
-  monday: "Segunda-feira",
-  tuesday: "Terça-feira",
-  wednesday: "Quarta-feira",
-  thursday: "Quinta-feira",
-  friday: "Sexta-feira",
-  saturday: "Sábado",
-  sunday: "Domingo"
+  segunda: "Segunda-feira",
+  terca: "Terça-feira",
+  quarta: "Quarta-feira",
+  quinta: "Quinta-feira",
+  sexta: "Sexta-feira",
+  sabado: "Sábado",
+  domingo: "Domingo"
 };
 
 export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) => {
   const planRef = useRef<HTMLDivElement>(null);
-  const [selectedDay, setSelectedDay] = useState<string>("monday");
+  const [selectedDay, setSelectedDay] = useState<string>("segunda");
   const [viewMode, setViewMode] = useState<"daily" | "table">("daily");
   const [weeklyAverages, setWeeklyAverages] = useState({
     calories: 0,
@@ -120,43 +120,43 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
           </p>
         </div>
 
-        {dayPlan.meals.breakfast && (
+        {dayPlan.meals.cafeDaManha && (
           <MealSection
             title="Café da Manhã"
             icon={<div className="w-5 h-5 text-primary">☀️</div>}
-            meal={dayPlan.meals.breakfast}
+            meal={dayPlan.meals.cafeDaManha}
           />
         )}
 
-        {dayPlan.meals.morningSnack && (
+        {dayPlan.meals.lancheDaManha && (
           <MealSection
             title="Lanche da Manhã"
             icon={<div className="w-5 h-5 text-primary">🥪</div>}
-            meal={dayPlan.meals.morningSnack}
+            meal={dayPlan.meals.lancheDaManha}
           />
         )}
 
-        {dayPlan.meals.lunch && (
+        {dayPlan.meals.almoco && (
           <MealSection
             title="Almoço"
             icon={<div className="w-5 h-5 text-primary">🍽️</div>}
-            meal={dayPlan.meals.lunch}
+            meal={dayPlan.meals.almoco}
           />
         )}
 
-        {dayPlan.meals.afternoonSnack && (
+        {dayPlan.meals.lancheDaTarde && (
           <MealSection
             title="Lanche da Tarde"
             icon={<div className="w-5 h-5 text-primary">🍎</div>}
-            meal={dayPlan.meals.afternoonSnack}
+            meal={dayPlan.meals.lancheDaTarde}
           />
         )}
 
-        {dayPlan.meals.dinner && (
+        {dayPlan.meals.jantar && (
           <MealSection
             title="Jantar"
             icon={<div className="w-5 h-5 text-primary">🌙</div>}
-            meal={dayPlan.meals.dinner}
+            meal={dayPlan.meals.jantar}
           />
         )}
 
