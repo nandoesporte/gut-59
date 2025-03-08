@@ -48,7 +48,18 @@ serve(async (req) => {
 3. Todos os nomes de refeições, alimentos e descrições DEVEM ser em português.
 4. Use nomes como "café da manhã", "lanche da manhã", "almoço", "lanche da tarde", "jantar" para as refeições.
 5. As propriedades do JSON (weeklyPlan, meals, macros, etc.) permanecem em inglês, mas TODO o conteúdo textual deve ser em português.
-6. Os dias da semana devem ser em português: "segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo".`
+6. Os dias da semana devem ser em português: "segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo".
+7. O formato do JSON deve seguir exatamente este modelo:
+{
+  "weeklyPlan": {
+    "segunda": { ... },
+    "terça": { ... },
+    ...
+  },
+  "weeklyTotals": { ... },
+  "recommendations": { ... }
+}
+8. NUNCA aninhe o plano dentro de outro objeto como "mealPlan" ou similar.`
             },
             {
               role: 'user',
@@ -103,7 +114,18 @@ serve(async (req) => {
 3. Todos os nomes de refeições, alimentos e descrições DEVEM ser em português.
 4. Use nomes como "café da manhã", "lanche da manhã", "almoço", "lanche da tarde", "jantar" para as refeições.
 5. As propriedades do JSON (weeklyPlan, meals, macros, etc.) permanecem em inglês, mas TODO o conteúdo textual deve ser em português.
-6. Os dias da semana devem ser em português: "segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo".`
+6. Os dias da semana devem ser em português: "segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo".
+7. O formato do JSON deve seguir exatamente este modelo:
+{
+  "weeklyPlan": {
+    "segunda": { ... },
+    "terça": { ... },
+    ...
+  },
+  "weeklyTotals": { ... },
+  "recommendations": { ... }
+}
+8. NUNCA aninhe o plano dentro de outro objeto como "mealPlan" ou similar.`
               },
               {
                 role: 'user',

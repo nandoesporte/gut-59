@@ -195,10 +195,24 @@ export const generateMealPlan = async ({
       return null;
     }
     
-    // Se não houver weeklyPlan, tente procurar dentro de um objeto aninhado
-    if (!mealPlan.weeklyPlan && mealPlan.mealPlan && mealPlan.mealPlan.weeklyPlan) {
-      console.log("⚠️ Estrutura aninhada detectada, extraindo o plano alimentar");
-      mealPlan = mealPlan.mealPlan;
+    // Verificar se a estrutura contém weeklyPlan - correção do problema anterior
+    if (!mealPlan.weeklyPlan) {
+      // Se não houver weeklyPlan diretamente, verificar se existe uma estrutura aninhada
+      if (Object.keys(mealPlan).length === 1 && typeof mealPlan[Object.keys(mealPlan)[0]] === 'object') {
+        // Temos uma estrutura aninhada, vamos tentar extrair o plano real
+        const potentialPlan = mealPlan[Object.keys(mealPlan)[0]];
+        if (potentialPlan && potentialPlan.weeklyPlan) {
+          console.log("⚠️ Estrutura aninhada detectada, extraindo o plano alimentar");
+          mealPlan = potentialPlan;
+        }
+      }
+      
+      // Se ainda não temos weeklyPlan, o formato está incorreto
+      if (!mealPlan.weeklyPlan) {
+        console.error("❌ Formato de plano sem weeklyPlan:", Object.keys(mealPlan));
+        toast.error("O plano alimentar gerado tem formato inválido (sem weeklyPlan). Por favor, tente novamente.");
+        return null;
+      }
     }
     
     console.log("✅ Plano alimentar estruturado:", Object.keys(mealPlan));
