@@ -228,7 +228,6 @@ export const generateMealPlan = async ({
   }
 };
 
-// Nova função auxiliar para garantir que a estrutura do plano alimentar está completa e válida
 function ensureMealPlanStructure(mealPlan: any, userCalories: number): MealPlan {
   // Garantir que weeklyPlan existe
   if (!mealPlan.weeklyPlan) {
@@ -263,32 +262,37 @@ function ensureMealPlanStructure(mealPlan: any, userCalories: number): MealPlan 
     
     const weeklyPlan = mealPlan.weeklyPlan || {};
     const days = Object.values(weeklyPlan);
-    const dayCount = days.length || 1; // Evitar divisão por zero
+    const dayCount = Math.max(days.length || 1, 1); // Evitar divisão por zero
     
     mealPlan.weeklyTotals = {
       averageCalories: Math.round(days.reduce((sum: number, day: any) => {
-        const calories = day?.dailyTotals?.calories;
-        return sum + (Number(calories) || 0);
+        const dayTotal = day?.dailyTotals;
+        const calories = dayTotal?.calories;
+        return sum + (Number.isFinite(Number(calories)) ? Number(calories) : 0);
       }, 0) / dayCount),
       
       averageProtein: Math.round(days.reduce((sum: number, day: any) => {
-        const protein = day?.dailyTotals?.protein;
-        return sum + (Number(protein) || 0);
+        const dayTotal = day?.dailyTotals;
+        const protein = dayTotal?.protein;
+        return sum + (Number.isFinite(Number(protein)) ? Number(protein) : 0);
       }, 0) / dayCount),
       
       averageCarbs: Math.round(days.reduce((sum: number, day: any) => {
-        const carbs = day?.dailyTotals?.carbs;
-        return sum + (Number(carbs) || 0);
+        const dayTotal = day?.dailyTotals;
+        const carbs = dayTotal?.carbs;
+        return sum + (Number.isFinite(Number(carbs)) ? Number(carbs) : 0);
       }, 0) / dayCount),
       
       averageFats: Math.round(days.reduce((sum: number, day: any) => {
-        const fats = day?.dailyTotals?.fats;
-        return sum + (Number(fats) || 0);
+        const dayTotal = day?.dailyTotals;
+        const fats = dayTotal?.fats;
+        return sum + (Number.isFinite(Number(fats)) ? Number(fats) : 0);
       }, 0) / dayCount),
       
       averageFiber: Math.round(days.reduce((sum: number, day: any) => {
-        const fiber = day?.dailyTotals?.fiber;
-        return sum + (Number(fiber) || 0);
+        const dayTotal = day?.dailyTotals;
+        const fiber = dayTotal?.fiber;
+        return sum + (Number.isFinite(Number(fiber)) ? Number(fiber) : 0);
       }, 0) / dayCount)
     };
   }
@@ -316,7 +320,6 @@ function ensureMealPlanStructure(mealPlan: any, userCalories: number): MealPlan 
   return mealPlan as MealPlan;
 }
 
-// Função para criar um dia padrão para o plano alimentar
 function createDefaultDayPlan(dayName: string, totalCalories: number): DayPlan {
   const caloriesPerMeal = Math.round(totalCalories / 5); // 5 refeições
   const protein = Math.round((totalCalories * 0.3) / 4); // 30% das calorias de proteínas
@@ -365,7 +368,6 @@ function createDefaultDayPlan(dayName: string, totalCalories: number): DayPlan {
   };
 }
 
-// Verifica se a estrutura do dia está completa
 function ensureDayStructureComplete(day: any, dayName: string, userCalories: number) {
   if (!day.dayName) {
     day.dayName = dayName;
@@ -460,7 +462,6 @@ function ensureDayStructureComplete(day: any, dayName: string, userCalories: num
   }
 }
 
-// Processa todos os valores numéricos para garantir que são inteiros
 function processNumericValues(obj: any): void {
   if (!obj || typeof obj !== 'object') return;
   
