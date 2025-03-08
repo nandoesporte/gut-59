@@ -103,10 +103,11 @@ REGRAS IMPORTANTES PARA GERAÇÃO DE JSON VÁLIDO:
 3. Não use notação científica como 1e5 para números.
 4. Garanta que o JSON não tenha vírgulas extras no final dos objetos e arrays.
 5. Garanta que cada propriedade de objeto tenha um valor.
-6. Todos os valores numéricos devem ser números (sem aspas).
+6. Todos os valores numéricos devem ser números inteiros (sem casas decimais e sem aspas).
 7. Não inclua comentários no JSON.
 8. Não deixe o JSON truncado ou incompleto.
 9. Incluir recomendações completas, mas concisas.
+10. IMPORTANTE: Para números decimais, arredonde para inteiros. Ex: 10.5 deve ser apenas 10, 7.8 deve ser apenas 8.
 
 ESTRUTURA DO JSON:
 {
@@ -183,11 +184,13 @@ MUITO IMPORTANTE:
 
 3. Cada alimento na lista "foods" DEVE conter as seguintes propriedades:
    - "name": Nome do alimento em português
-   - "portion": Valor numérico (sem aspas)
+   - "portion": Valor numérico INTEIRO (sem aspas)
    - "unit": Unidade de medida em português (g, ml, etc.)
    - "details": Instruções de preparo em português
 
-4. Todos os valores numéricos (calories, protein, carbs, fats, fiber) devem ser números inteiros SEM ASPAS e SEM SUFIXOS como "g" ou "kcal".`;
+4. Todos os valores numéricos (calories, protein, carbs, fats, fiber) devem ser números inteiros SEM ASPAS e SEM SUFIXOS como "g" ou "kcal".
+
+5. Arredonde todos os números decimais para inteiros. Ex: 10.5 deve ser 10, 7.8 deve ser 8.`;
 
     // Construct user message with all relevant data
     const userMessage = `Crie um plano alimentar semanal personalizado em Português do Brasil com base nestes dados:
@@ -226,7 +229,8 @@ Por favor, crie um plano de 7 dias que:
 8. Forneça detalhes de preparo para cada alimento
 9. MUITO IMPORTANTE: Use a nomenclatura correta para as refeições em português: "cafeDaManha", "lancheDaManha", "almoco", "lancheDaTarde", "jantar"
 10. MUITO IMPORTANTE: Todos os valores de macronutrientes e calorias devem ser números inteiros sem unidades
-11. MUITO IMPORTANTE: Os dias da semana devem ser: "segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo"`;
+11. MUITO IMPORTANTE: Os dias da semana devem ser: "segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo"
+12. MUITO IMPORTANTE: Todos os números decimais devem ser arredondados para inteiros: 10.5 para 10, 7.8 para 8, etc.`;
 
     // Track time for API call preparation
     console.log(`[NUTRI+] Preparando chamada de API às ${new Date().toISOString()}`);
@@ -245,7 +249,7 @@ Por favor, crie um plano de 7 dias que:
         { role: "user", content: userMessage }
       ],
       temperature: temperature,
-      max_tokens: 6000, // Reduced to leave room for processing
+      max_tokens: 4000, // Reduced token count to help with completion
       top_p: 0.95,
       response_format: { type: "json_object" } // Request JSON format response
     };
@@ -266,18 +270,86 @@ Por favor, crie um plano de 7 dias que:
       const errorText = await response.text();
       console.error(`[NUTRI+] Erro da API Groq (${response.status}):`, errorText);
       
-      // Try with a simpler format if we get a JSON validation error
+      // Handle json validation errors specifically
       if (response.status === 400 && errorText.includes("json_validate_failed")) {
-        console.log("[NUTRI+] Tentando novamente com formato simplificado devido a erro de validação JSON");
+        console.log("[NUTRI+] Erro de validação JSON na resposta da API");
         
-        // Switch to alternative model if specified model failed
-        const alternativeModel = modelName === "llama3-8b-8192" ? "llama3-70b-8192" : "llama3-8b-8192";
+        // For json validation errors, try to extract and fix the partial JSON
+        let mealPlanData = null;
         
+        try {
+          // Extract the JSON content from the error message
+          const failedGenerationMatch = errorText.match(/"failed_generation"\s*:\s*"([\s\S]*)"/);
+          if (failedGenerationMatch && failedGenerationMatch[1]) {
+            // Clean the extracted content by replacing escaped newlines and quotes
+            const jsonContent = failedGenerationMatch[1]
+              .replace(/\\n/g, '')
+              .replace(/\\"/g, '"')
+              .replace(/\\\\/g, '\\');
+            
+            console.log("[NUTRI+] Tentando recuperar dados parciais do JSON");
+            
+            // Try to parse the extracted JSON
+            try {
+              const fixedJson = JSON.parse(`{${jsonContent.split('{')[1]}`);
+              if (fixedJson.weeklyPlan) {
+                console.log("[NUTRI+] Recuperação parcial do JSON bem-sucedida");
+                mealPlanData = fixedJson;
+              }
+            } catch (jsonParseError) {
+              console.error("[NUTRI+] Não foi possível recuperar dados parciais:", jsonParseError);
+            }
+          }
+        } catch (extractError) {
+          console.error("[NUTRI+] Erro ao extrair dados do JSON:", extractError);
+        }
+        
+        // If we successfully recovered partial data, return it
+        if (mealPlanData) {
+          console.log("[NUTRI+] Retornando dados recuperados parcialmente");
+          
+          // Ensure basic structure is complete
+          if (!mealPlanData.recommendations) {
+            mealPlanData.recommendations = {
+              general: "Mantenha uma alimentação balanceada e variada.",
+              preworkout: "Consuma carboidratos antes do treino para energia.",
+              postworkout: "Consuma proteínas após o treino para recuperação muscular.",
+              timing: ["Distribua as refeições a cada 3-4 horas."]
+            };
+          }
+          
+          if (!mealPlanData.weeklyTotals) {
+            // Calculate weeklyTotals from available days
+            const days = Object.values(mealPlanData.weeklyPlan);
+            const validDays = days.filter(day => day && day.dailyTotals);
+            const dayCount = validDays.length || 1;
+            
+            mealPlanData.weeklyTotals = {
+              averageCalories: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals.calories || 0), 0) / dayCount),
+              averageProtein: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals.protein || 0), 0) / dayCount),
+              averageCarbs: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals.carbs || 0), 0) / dayCount),
+              averageFats: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals.fats || 0), 0) / dayCount),
+              averageFiber: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals.fiber || 0), 0) / dayCount)
+            };
+          }
+          
+          // Add metadata
+          mealPlanData.modelUsed = modelName;
+          mealPlanData.generatedAt = new Date().toISOString();
+          mealPlanData.recovered = true;
+          
+          return new Response(
+            JSON.stringify(mealPlanData),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        
+        // If recovery failed, try with a different approach
         return new Response(
           JSON.stringify({ 
             error: "Erro de validação JSON na resposta da API", 
             details: errorText.substring(0, 500),
-            suggestedModel: alternativeModel
+            suggestedModel: "llama3-70b-8192"
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
         );
@@ -288,7 +360,7 @@ Por favor, crie um plano de 7 dias que:
         JSON.stringify({ 
           error: `Erro da API: ${response.status}`, 
           details: errorText.substring(0, 500),
-          suggestedModel: modelName === "llama3-8b-8192" ? "llama3-70b-8192" : "llama3-8b-8192"
+          suggestedModel: "llama3-70b-8192"
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
       );
@@ -331,35 +403,77 @@ Por favor, crie um plano de 7 dias que:
         );
       }
       
-      // Map meal plan days to ensure they use the correct property names
-      const fixedMealPlan = {
-        weeklyPlan: {},
-        weeklyTotals: mealPlanJson.weeklyTotals || {
-          averageCalories: 0,
-          averageProtein: 0,
-          averageCarbs: 0,
-          averageFats: 0,
-          averageFiber: 0
-        },
-        recommendations: mealPlanJson.recommendations || {
-          general: "Mantenha uma alimentação balanceada e variada.",
-          preworkout: "Consuma carboidratos antes do treino para energia.",
-          postworkout: "Consuma proteínas após o treino para recuperação muscular.",
-          timing: ["Distribua as refeições a cada 3-4 horas."]
-        }
+      // Process all numeric values to ensure they're integers
+      const processNumericValues = (obj) => {
+        if (!obj || typeof obj !== 'object') return obj;
+        
+        Object.keys(obj).forEach(key => {
+          if (typeof obj[key] === 'number') {
+            // Round to integer
+            obj[key] = Math.round(obj[key]);
+          } else if (Array.isArray(obj[key])) {
+            obj[key].forEach(item => {
+              if (typeof item === 'object') processNumericValues(item);
+            });
+          } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+            processNumericValues(obj[key]);
+          }
+        });
+        return obj;
       };
       
-      // Transfer and fix the meal plan structure if needed
-      Object.entries(mealPlanJson.weeklyPlan).forEach(([day, dayPlan]) => {
-        // Ensure the day plan has the correct structure
-        if (dayPlan && dayPlan.meals) {
-          fixedMealPlan.weeklyPlan[day] = dayPlan;
-        }
-      });
+      // Process all numeric values to integers
+      processNumericValues(mealPlanJson);
+      
+      // Ensure the meal plan uses the user's specified daily calories
+      if (userData.dailyCalories) {
+        mealPlanJson.userCalories = userData.dailyCalories;
+      }
+      
+      // Make sure weeklyTotals are valid numbers
+      if (mealPlanJson.weeklyTotals) {
+        const totals = mealPlanJson.weeklyTotals;
+        Object.keys(totals).forEach(key => {
+          if (typeof totals[key] === 'number' && isNaN(totals[key])) {
+            totals[key] = 0;
+          }
+        });
+      } else {
+        // Calculate weeklyTotals if missing
+        console.log("Recalculando médias semanais");
+        
+        // Convert weeklyPlan to array of day plans, with validation
+        const weeklyPlan = mealPlanJson.weeklyPlan || {};
+        const days = Object.values(weeklyPlan);
+        
+        // Define a proper type guard function to ensure day has properly typed dailyTotals
+        const isDayPlanWithValidTotals = (day) => {
+          return (
+            !!day && 
+            typeof day === 'object' &&
+            'dailyTotals' in day &&
+            !!day.dailyTotals &&
+            typeof day.dailyTotals === 'object' &&
+            'calories' in day.dailyTotals
+          );
+        };
+        
+        // Filter days to only include valid days with proper dailyTotals
+        const validDays = days.filter(isDayPlanWithValidTotals);
+        const dayCount = validDays.length || 1; // Prevent division by zero
+        
+        mealPlanJson.weeklyTotals = {
+          averageCalories: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.calories, 0) / dayCount),
+          averageProtein: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.protein, 0) / dayCount),
+          averageCarbs: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.carbs, 0) / dayCount),
+          averageFats: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.fats, 0) / dayCount),
+          averageFiber: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.fiber, 0) / dayCount)
+        };
+      }
       
       // Add metadata to the response
-      fixedMealPlan.modelUsed = modelName;
-      fixedMealPlan.generatedAt = new Date().toISOString();
+      mealPlanJson.modelUsed = modelName;
+      mealPlanJson.generatedAt = new Date().toISOString();
       
       // Log success
       console.log(`[NUTRI+] Plano alimentar gerado com sucesso às ${new Date().toISOString()}`);
@@ -367,7 +481,7 @@ Por favor, crie um plano de 7 dias que:
       
       // Return the successful response
       return new Response(
-        JSON.stringify(fixedMealPlan),
+        JSON.stringify(mealPlanJson),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
       
@@ -376,11 +490,38 @@ Por favor, crie um plano de 7 dias que:
       console.error("[NUTRI+] Erro ao analisar JSON:", jsonError.message);
       console.error("[NUTRI+] Resposta JSON inválida:", mealPlanContent.substring(0, 500));
       
+      try {
+        // Attempt to fix common JSON issues
+        const fixedContent = mealPlanContent
+          .replace(/,\s*}/g, '}') // Remove trailing commas in objects
+          .replace(/,\s*\]/g, ']') // Remove trailing commas in arrays
+          .replace(/([0-9]+)\.([0-9]+)/g, (match, p1, p2) => Math.round(parseFloat(`${p1}.${p2}`)).toString()); // Round decimals
+        
+        console.log("[NUTRI+] Tentando corrigir JSON");
+        const mealPlanJson = JSON.parse(fixedContent);
+        
+        if (mealPlanJson.weeklyPlan) {
+          console.log("[NUTRI+] Correção do JSON bem-sucedida");
+          
+          // Add metadata
+          mealPlanJson.modelUsed = modelName;
+          mealPlanJson.generatedAt = new Date().toISOString();
+          mealPlanJson.fixed = true;
+          
+          return new Response(
+            JSON.stringify(mealPlanJson),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      } catch (fixError) {
+        console.error("[NUTRI+] Falha na correção do JSON:", fixError.message);
+      }
+      
       return new Response(
         JSON.stringify({ 
           error: "Falha ao analisar JSON do plano alimentar",
           details: jsonError.message,
-          rawContent: mealPlanContent.substring(0, 500) + "..." 
+          suggestedModel: "llama3-70b-8192"
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
       );
