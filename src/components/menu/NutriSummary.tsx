@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { supabase } from '@/integrations/supabase/client';
@@ -47,7 +46,13 @@ export const NutriSummary = () => {
 
         if (data) {
           console.log("Found last meal plan:", data);
-          setLastPlan(data as LastMealPlanData);
+          const typedData: LastMealPlanData = {
+            id: data.id,
+            created_at: data.created_at,
+            calories: data.calories,
+            plan_data: data.plan_data as MealPlan
+          };
+          setLastPlan(typedData);
         }
       } catch (error) {
         console.error('Error fetching last meal plan:', error);

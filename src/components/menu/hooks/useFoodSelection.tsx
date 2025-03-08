@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react';
 import { ProtocolFood } from '../types';
 import { FOOD_GROUP_MAP } from './useProtocolFoods';
 
-// Define os mapeamentos de food_group_id para refeições
+// Define the meal type mapping
 const FOOD_GROUP_TO_MEAL_TYPE = {
   1: 'breakfast',      // Café da Manhã
   2: 'morning_snack',  // Lanche da Manhã
@@ -16,14 +16,14 @@ export const useFoodSelection = () => {
   const [selectedFoods, setSelectedFoods] = useState<string[]>([]);
   const [totalCalories, setTotalCalories] = useState<number>(0);
   
-  // Estrutura para armazenar alimentos categorizados por refeição
-  const [foodsByMealType, setFoodsByMealType] = useState<Record<string, string[]>>({
+  // Structure to store foods categorized by meal type
+  const [foodsByMealType, setFoodsByMealType] = useState<Record<string, ProtocolFood[]>>({
     breakfast: [],
     morning_snack: [],
     lunch: [],
     afternoon_snack: [],
     dinner: [],
-    uncategorized: [] // Alimentos sem grupo definido
+    uncategorized: []
   });
 
   // Add food to selection
@@ -51,13 +51,13 @@ export const useFoodSelection = () => {
         ? prevSelected.filter(id => id !== foodId)
         : [...prevSelected, foodId];
       
-      // Se temos o objeto de alimento completo, vamos categorizá-lo por refeição
+      // If we have the food object, categorize it by meal type
       if (food) {
         let mealType = 'uncategorized';
         
-        // Verifica se há um food_group_id válido
+        // Check if there's a valid food_group_id
         if (food.food_group_id !== null && food.food_group_id !== undefined) {
-          // Certifica-se de que o food_group_id é um número entre 1 e 5
+          // Ensure the food_group_id is a number between 1 and 5
           const groupId = Number(food.food_group_id);
           if (!isNaN(groupId) && groupId >= 1 && groupId <= 5) {
             mealType = FOOD_GROUP_TO_MEAL_TYPE[groupId as keyof typeof FOOD_GROUP_TO_MEAL_TYPE] || 'uncategorized';
@@ -67,13 +67,15 @@ export const useFoodSelection = () => {
         setFoodsByMealType(prev => {
           const updatedMeals = { ...prev };
           
-          // Se o alimento foi selecionado, adiciona à refeição correspondente
+          // If the food was selected, add to the corresponding meal type
           if (!prevSelected.includes(foodId)) {
-            updatedMeals[mealType] = [...updatedMeals[mealType], foodId];
+            updatedMeals[mealType] = [...(updatedMeals[mealType] || []), food];
           } 
-          // Se foi desselecionado, remove da refeição correspondente
+          // If deselected, remove from the meal type
           else {
-            updatedMeals[mealType] = updatedMeals[mealType].filter(id => id !== foodId);
+            updatedMeals[mealType] = (updatedMeals[mealType] || []).filter(
+              item => item.id !== foodId
+            );
           }
           
           return updatedMeals;
@@ -91,9 +93,9 @@ export const useFoodSelection = () => {
     return total;
   }, [selectedFoods]);
 
-  // Função para organizar alimentos já selecionados por tipo de refeição
+  // Function to organize selected foods by meal type
   const categorizeFoodsByMealType = useCallback((foods: ProtocolFood[]) => {
-    const mealTypeMap: Record<string, string[]> = {
+    const mealTypeMap: Record<string, ProtocolFood[]> = {
       breakfast: [],
       morning_snack: [],
       lunch: [],
@@ -107,16 +109,16 @@ export const useFoodSelection = () => {
       if (food) {
         let mealType = 'uncategorized';
         
-        // Verifica se há um food_group_id válido
+        // Check if there's a valid food_group_id
         if (food.food_group_id !== null && food.food_group_id !== undefined) {
-          // Certifica-se de que o food_group_id é um número entre 1 e 5
+          // Ensure the food_group_id is a number between 1 and 5
           const groupId = Number(food.food_group_id);
           if (!isNaN(groupId) && groupId >= 1 && groupId <= 5) {
             mealType = FOOD_GROUP_TO_MEAL_TYPE[groupId as keyof typeof FOOD_GROUP_TO_MEAL_TYPE] || 'uncategorized';
           }
         }
 
-        mealTypeMap[mealType].push(foodId);
+        mealTypeMap[mealType].push(food);
       }
     });
     

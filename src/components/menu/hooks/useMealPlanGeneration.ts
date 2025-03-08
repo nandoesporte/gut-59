@@ -15,7 +15,7 @@ interface GenerateMealPlanParams {
     dailyCalories: number;
   };
   selectedFoods: ProtocolFood[];
-  foodsByMealType: Record<string, ProtocolFood[]>; // Changed from string[]
+  foodsByMealType: Record<string, ProtocolFood[]>; 
   preferences: DietaryPreferences;
   addTransaction?: (params: any) => Promise<void>;
 }
