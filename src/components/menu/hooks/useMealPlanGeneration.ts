@@ -1,387 +1,340 @@
 
-import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import type { DietaryPreferences, MealPlan, ProtocolFood, DayPlan } from "../types";
+import { DietaryPreferences, MealPlan, ProtocolFood } from "../types";
+import { useMemo } from "react";
+import { toast } from "sonner";
 
-interface GenerateMealPlanParams {
-  userData: {
-    id?: string;
-    weight: number;
-    height: number;
-    age: number;
-    gender: string;
-    activityLevel: string;
-    goal?: string;
-    dailyCalories: number;
-  };
-  selectedFoods: ProtocolFood[];
-  foodsByMealType: Record<string, string[]>;
-  preferences: DietaryPreferences;
-  addTransaction?: (params: any) => Promise<void>;
+export interface UserData {
+  id: string;
+  weight: number;
+  height: number;
+  age: number;
+  gender: string;
+  activityLevel: string;
+  goal: string;
+  dailyCalories: number;
 }
 
-export const generateMealPlan = async ({
-  userData,
-  selectedFoods,
-  foodsByMealType,
-  preferences,
-  addTransaction
-}: GenerateMealPlanParams): Promise<MealPlan | null> => {
-  console.log("🚀 Iniciando geração do plano alimentar com o agente Nutri+");
-  console.log(`👤 Dados do usuário: ${userData.weight}kg, ${userData.height}cm, ${userData.age} anos, ${userData.gender}`);
-  console.log(`🥅 Meta: ${userData.goal}, Calorias diárias: ${userData.dailyCalories}kcal`);
-  console.log(`🍎 Alimentos selecionados: ${selectedFoods.length}`);
-  console.log(`🥗 Preferências alimentares:`, preferences);
+interface TransactionParams {
+  amount: number;
+  description: string;
+  transactionType: "purchase" | "reward" | "admin";
+}
+
+export interface MealPlanGenerationParams {
+  userData: UserData;
+  selectedFoods: ProtocolFood[];
+  foodsByMealType?: { [key: string]: ProtocolFood[] };
+  preferences: DietaryPreferences;
+  addTransaction?: (params: TransactionParams) => Promise<void>;
+}
+
+// Utility function to standardize meal plan format from different sources
+const standardizeMealPlanFormat = (rawData: any): MealPlan => {
+  console.log("Standardizing meal plan format from raw data:", typeof rawData);
   
-  try {
-    console.log("📡 Chamando função edge do Supabase - nutri-plus-agent (Llama3-8b)");
-    
-    // Try first with the primary nutri-plus-agent
-    try {
-      const { data, error } = await supabase.functions.invoke('nutri-plus-agent', {
-        body: {
-          userData,
-          selectedFoods,
-          foodsByMealType,
-          dietaryPreferences: preferences,
-          modelConfig: {
-            model: "llama3-8b-8192",
-            temperature: 0.3
-          }
-        }
-      });
-
-      if (!error && data?.mealPlan) {
-        console.log("✅ Plano alimentar recebido com sucesso do agente Nutri+");
-        console.log("📋 Dados do plano:", JSON.stringify(data.mealPlan).substring(0, 200) + "...");
-        console.log("🧠 Modelo utilizado:", data.modelUsed || "llama3-8b-8192");
-        
-        // Process the meal plan data
-        const mealPlan = processMealPlanData(data.mealPlan, userData);
-        
-        // Save the meal plan to the database if user is authenticated
-        await saveMealPlanToDatabase(mealPlan, userData, preferences, data.modelUsed, addTransaction);
-        
-        return mealPlan;
-      }
-      
-      // If we got an error or no meal plan, throw to try the fallback
-      if (error) {
-        console.warn("⚠️ Erro ao chamar o agente Nutri+, tentando método alternativo:", error);
-        throw new Error("Fallback to secondary method");
-      }
-    } catch (primaryError) {
-      console.warn("⚠️ Usando método alternativo (generate-meal-plan-groq) devido a erro:", primaryError);
-      
-      // Fall back to the generate-meal-plan-groq endpoint
-      const { data, error } = await supabase.functions.invoke('generate-meal-plan-groq', {
-        body: {
-          userInput: {
-            userData,
-            selectedFoods,
-            dietaryPreferences: preferences
-          },
-          user_id: userData.id
-        }
-      });
-
-      if (error) {
-        console.error("❌ Erro ao chamar o endpoint alternativo:", error);
-        toast.error("Erro ao gerar plano alimentar. Por favor, tente novamente.");
-        return null;
-      }
-
-      if (!data?.mealPlan) {
-        console.error("❌ Nenhum plano alimentar retornado pelo método alternativo");
-        console.error("Resposta completa:", data);
-        toast.error("Não foi possível gerar o plano alimentar. Por favor, tente novamente.");
-        return null;
-      }
-      
-      console.log("✅ Plano alimentar recebido com sucesso do método alternativo");
-      console.log("📋 Dados do plano:", JSON.stringify(data.mealPlan).substring(0, 200) + "...");
-      
-      // Convert the groq format to our internal format
-      const convertedMealPlan = convertGroqFormatToInternal(data.mealPlan, userData);
-      
-      // Save the converted meal plan to the database
-      await saveMealPlanToDatabase(convertedMealPlan, userData, preferences, "groq-llama3-70b", addTransaction);
-      
-      return convertedMealPlan;
-    }
-    
-    console.error("❌ Nenhum plano alimentar gerado por nenhum método");
-    return null;
-  } catch (error) {
-    console.error("❌ Erro inesperado em generateMealPlan:", error);
-    toast.error("Erro ao gerar plano alimentar. Por favor, tente novamente.");
-    return null;
+  // Check if the data already has the expected MealPlan structure
+  if (rawData && rawData.weeklyPlan && typeof rawData.weeklyPlan === 'object') {
+    console.log("Data already has weeklyPlan structure");
+    return rawData as MealPlan;
   }
-};
-
-// Helper function to process and standardize meal plan data
-const processMealPlanData = (mealPlan: MealPlan, userData: any): MealPlan => {
-  console.log("🔄 Processando dados do plano alimentar");
   
-  // Ensure the meal plan uses the user's specified daily calories
-  if (mealPlan && userData.dailyCalories) {
-    mealPlan.userCalories = userData.dailyCalories;
-    
-    // If weeklyTotals is missing or has NaN values, recalculate it
-    if (!mealPlan.weeklyTotals || 
-        isNaN(mealPlan.weeklyTotals.averageCalories) || 
-        isNaN(mealPlan.weeklyTotals.averageProtein)) {
-      
-      console.log("⚠️ Recalculando médias semanais devido a valores ausentes ou NaN");
-      
-      // Convert weeklyPlan to array of day plans, with validation
-      const weeklyPlan = mealPlan.weeklyPlan || {};
-      const days = Object.values(weeklyPlan);
-      
-      // Define a proper type guard function to ensure day has properly typed dailyTotals
-      const isDayPlanWithValidTotals = (day: unknown): day is DayPlan => {
-        return (
-          !!day && 
-          typeof day === 'object' &&
-          'dailyTotals' in day &&
-          !!day.dailyTotals &&
-          typeof day.dailyTotals === 'object' &&
-          'calories' in day.dailyTotals && typeof day.dailyTotals.calories === 'number' &&
-          'protein' in day.dailyTotals && typeof day.dailyTotals.protein === 'number' &&
-          'carbs' in day.dailyTotals && typeof day.dailyTotals.carbs === 'number' &&
-          'fats' in day.dailyTotals && typeof day.dailyTotals.fats === 'number' &&
-          'fiber' in day.dailyTotals && typeof day.dailyTotals.fiber === 'number'
-        );
+  // If the data has a mealPlan or meal_plan property, extract it
+  if (rawData?.mealPlan?.weeklyPlan) {
+    console.log("Data has mealPlan.weeklyPlan structure");
+    return rawData.mealPlan as MealPlan;
+  }
+  
+  if (rawData?.meal_plan?.weeklyPlan) {
+    console.log("Data has meal_plan.weeklyPlan structure");
+    return {
+      weeklyPlan: rawData.meal_plan.weeklyPlan,
+      weeklyTotals: rawData.meal_plan.weeklyTotals,
+      recommendations: rawData.meal_plan.recommendations || { 
+        general: "", 
+        preworkout: "", 
+        postworkout: "", 
+        timing: [] 
+      }
+    };
+  }
+  
+  // Groq API response format may be different
+  if (rawData?.meal_plan?.daily_meals || rawData?.meal_plan?.meals) {
+    console.log("Converting from Groq format to internal format");
+    // Convert from Groq format to our internal format
+    try {
+      const weeklyPlan = {
+        monday: createDayPlan("Segunda-feira", rawData.meal_plan),
+        tuesday: createDayPlan("Terça-feira", rawData.meal_plan),
+        wednesday: createDayPlan("Quarta-feira", rawData.meal_plan),
+        thursday: createDayPlan("Quinta-feira", rawData.meal_plan),
+        friday: createDayPlan("Sexta-feira", rawData.meal_plan),
+        saturday: createDayPlan("Sábado", rawData.meal_plan),
+        sunday: createDayPlan("Domingo", rawData.meal_plan)
       };
       
-      // Filter days to only include valid days with proper dailyTotals
-      const validDays = days.filter(isDayPlanWithValidTotals);
-      const dayCount = validDays.length || 1; // Prevent division by zero
-      
-      mealPlan.weeklyTotals = {
-        averageCalories: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.calories, 0) / dayCount),
-        averageProtein: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.protein, 0) / dayCount),
-        averageCarbs: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.carbs, 0) / dayCount),
-        averageFats: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.fats, 0) / dayCount),
-        averageFiber: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.fiber, 0) / dayCount)
-      };
-      
-      console.log("🔄 Novos valores de médias semanais:", mealPlan.weeklyTotals);
-    }
-  }
-  
-  // Ensure the meal plan has all required properties
-  if (!mealPlan.generatedBy) {
-    mealPlan.generatedBy = "nutri-plus-agent";
-  }
-  
-  return mealPlan;
-};
-
-// Function to save meal plan to database
-const saveMealPlanToDatabase = async (
-  mealPlan: MealPlan, 
-  userData: any, 
-  preferences: DietaryPreferences, 
-  modelUsed: string = "nutri-plus-agent-llama3",
-  addTransaction?: (params: any) => Promise<void>
-) => {
-  // Only save if we have a user ID
-  if (userData.id) {
-    try {
-      console.log("💾 Tentando salvar plano alimentar para o usuário:", userData.id);
-      
-      // Fix: Convert MealPlan to JSON before inserting
-      const { error: saveError } = await supabase
-        .from('meal_plans')
-        .insert({
-          user_id: userData.id,
-          plan_data: JSON.parse(JSON.stringify(mealPlan)), // Convert to JSON compatible format
-          calories: userData.dailyCalories,
-          generated_by: modelUsed || "nutri-plus-agent-llama3",
-          preferences: preferences // Save the user preferences with the meal plan
-        });
-
-      if (saveError) {
-        console.error("❌ Erro ao salvar plano alimentar:", saveError);
-        toast.error("Erro ao salvar o plano no histórico: " + saveError.message);
-      } else {
-        console.log("💾 Plano alimentar salvo no banco de dados com sucesso");
-        toast.success("Plano alimentar salvo no histórico");
-        
-        // Add transaction if wallet function is available
-        if (addTransaction) {
-          await addTransaction({
-            amount: 10,
-            type: 'expense',
-            description: 'Geração de plano alimentar',
-            category: 'meal_plan'
-          });
-          console.log("💰 Transação adicionada para geração do plano alimentar");
-        }
-      }
-    } catch (dbError) {
-      console.error("❌ Erro ao salvar plano alimentar no banco de dados:", dbError);
-      toast.error("Erro ao salvar plano no histórico. Verifique a conexão e tente novamente.");
-    }
-  } else {
-    console.warn("⚠️ Usuário não está autenticado, plano não será salvo no histórico");
-    toast.warning("Faça login para salvar o plano no histórico");
-  }
-};
-
-// Function to convert Groq format to our internal format
-const convertGroqFormatToInternal = (groqMealPlan: any, userData: any): MealPlan => {
-  console.log("🔄 Convertendo formato Groq para formato interno");
-  
-  // Create a weekly plan structure
-  const weeklyPlan: any = {
-    monday: createDayPlan("Monday", groqMealPlan.meal_plan.meals),
-    tuesday: createDayPlan("Tuesday", groqMealPlan.meal_plan.meals),
-    wednesday: createDayPlan("Wednesday", groqMealPlan.meal_plan.meals),
-    thursday: createDayPlan("Thursday", groqMealPlan.meal_plan.meals),
-    friday: createDayPlan("Friday", groqMealPlan.meal_plan.meals),
-    saturday: createDayPlan("Saturday", groqMealPlan.meal_plan.meals),
-    sunday: createDayPlan("Sunday", groqMealPlan.meal_plan.meals)
-  };
-  
-  // Calculate weekly totals
-  const dailyCalories = groqMealPlan.meal_plan.daily_calories;
-  const proteinPct = groqMealPlan.meal_plan.macro_distribution?.protein_percentage || 25;
-  const carbsPct = groqMealPlan.meal_plan.macro_distribution?.carbs_percentage || 50;
-  const fatsPct = groqMealPlan.meal_plan.macro_distribution?.fat_percentage || 25;
-  
-  // Calculate macros in grams based on percentages
-  const proteinGrams = Math.round((dailyCalories * (proteinPct / 100)) / 4); // 4 calories per gram of protein
-  const carbsGrams = Math.round((dailyCalories * (carbsPct / 100)) / 4); // 4 calories per gram of carbs
-  const fatsGrams = Math.round((dailyCalories * (fatsPct / 100)) / 9); // 9 calories per gram of fat
-  
-  const weeklyTotals = {
-    averageCalories: dailyCalories,
-    averageProtein: proteinGrams,
-    averageCarbs: carbsGrams,
-    averageFats: fatsGrams,
-    averageFiber: Math.round(carbsGrams * 0.2) // Estimate fiber as 20% of carbs
-  };
-  
-  // Create recommendations
-  const recommendations = {
-    general: groqMealPlan.recommendations?.[0] || "Mantenha uma alimentação balanceada e variada.",
-    preworkout: groqMealPlan.recommendations?.[1] || "Consuma carboidratos e proteínas antes do treino.",
-    postworkout: groqMealPlan.recommendations?.[2] || "Reponha proteínas e carboidratos após o treino.",
-    timing: groqMealPlan.recommendations?.slice(3) || [
-      "Faça refeições a cada 3-4 horas.",
-      "Beba água ao longo do dia.",
-      "Evite refeições pesadas antes de dormir.",
-      "Consuma proteínas em todas as refeições.",
-      "Priorize alimentos integrais."
-    ]
-  };
-  
-  return {
-    weeklyPlan,
-    weeklyTotals,
-    recommendations,
-    userCalories: userData.dailyCalories,
-    generatedBy: "groq-llama3-70b"
-  };
-};
-
-// Helper function to create a day plan from Groq's meals array
-const createDayPlan = (dayName: string, meals: any[]): DayPlan => {
-  // Group meals by type
-  const mealsByType: Record<string, any[]> = {
-    breakfast: [],
-    morningSnack: [],
-    lunch: [],
-    afternoonSnack: [],
-    dinner: []
-  };
-  
-  // Map meal types from Groq format to our internal format
-  const typeMapping: Record<string, string> = {
-    'breakfast': 'breakfast',
-    'morning snack': 'morningSnack',
-    'lunch': 'lunch',
-    'afternoon snack': 'afternoonSnack',
-    'dinner': 'dinner',
-    'snack': 'afternoonSnack'
-  };
-  
-  // Categorize meals by type
-  if (Array.isArray(meals)) {
-    meals.forEach(meal => {
-      if (meal && meal.type) {
-        const type = typeMapping[meal.type.toLowerCase()] || 'morningSnack';
-        if (!mealsByType[type]) {
-          mealsByType[type] = [];
-        }
-        mealsByType[type].push(meal);
-      }
-    });
-  } else {
-    console.warn("⚠️ Meals is not an array:", meals);
-  }
-  
-  // Create meal objects for each type
-  const createMeal = (mealType: string, groqMeals: any[]): any => {
-    if (!groqMeals || groqMeals.length === 0) {
-      // Default empty meal
       return {
-        description: `${mealType} meal`,
-        foods: [],
-        calories: 0,
-        macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+        weeklyPlan,
+        weeklyTotals: rawData.meal_plan.macro_distribution ? {
+          averageCalories: rawData.meal_plan.daily_calories || 0,
+          averageProtein: rawData.meal_plan.macro_distribution.protein_percentage || 0,
+          averageCarbs: rawData.meal_plan.macro_distribution.carbs_percentage || 0,
+          averageFats: rawData.meal_plan.macro_distribution.fat_percentage || 0,
+          averageFiber: 0
+        } : {
+          averageCalories: 0,
+          averageProtein: 0,
+          averageCarbs: 0,
+          averageFats: 0,
+          averageFiber: 0
+        },
+        recommendations: rawData.recommendations ? {
+          general: "",
+          preworkout: "",
+          postworkout: "",
+          timing: Array.isArray(rawData.recommendations) ? rawData.recommendations : []
+        } : {
+          general: "",
+          preworkout: "",
+          postworkout: "",
+          timing: []
+        }
       };
+    } catch (error) {
+      console.error("Error converting from Groq format:", error);
+      // Return a minimal valid meal plan to avoid breaking the UI
+      return createMinimalValidMealPlan();
     }
-    
-    const meal = groqMeals[0]; // Take the first meal of this type
+  }
+  
+  console.error("Unknown meal plan format:", rawData);
+  // Return a minimal valid meal plan to avoid breaking the UI
+  return createMinimalValidMealPlan();
+};
+
+// Helper function to create a day plan from Groq API format
+const createDayPlan = (dayName: string, mealPlanData: any) => {
+  const createMeal = (mealData: any) => {
+    if (!mealData) return {
+      description: "Refeição não especificada",
+      foods: [],
+      calories: 0,
+      macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+    };
     
     return {
-      description: meal.name || `${mealType} meal`,
-      foods: Array.isArray(meal.foods) ? meal.foods.map((food: any) => ({
-        name: food.name || "Unknown food",
-        portion: parseFloat(food.portion) || 100,
+      description: mealData.name || "Refeição",
+      foods: Array.isArray(mealData.foods) ? mealData.foods.map((food: any) => ({
+        name: food.name || "Alimento não especificado",
+        portion: food.portion || 0,
         unit: food.unit || "g",
-        details: `${food.portion || "100"} ${food.unit || "g"} de ${food.name || "Unknown food"}`
+        details: food.details || ""
       })) : [],
-      calories: meal.total_calories || 0,
+      calories: mealData.total_calories || 0,
       macros: {
-        protein: meal.total_protein || 0,
-        carbs: meal.total_carbs || 0,
-        fats: meal.total_fat || 0,
-        fiber: Math.round((meal.total_carbs || 0) * 0.2) // Estimate fiber as 20% of carbs
+        protein: mealData.total_protein || 0,
+        carbs: mealData.total_carbs || 0,
+        fats: mealData.total_fat || 0,
+        fiber: 0
       }
     };
   };
   
-  // Create the day plan object
-  const dayPlan: DayPlan = {
-    dayName,
-    meals: {
-      breakfast: createMeal('Breakfast', mealsByType.breakfast),
-      morningSnack: createMeal('Morning Snack', mealsByType.morningSnack),
-      lunch: createMeal('Lunch', mealsByType.lunch),
-      afternoonSnack: createMeal('Afternoon Snack', mealsByType.afternoonSnack),
-      dinner: createMeal('Dinner', mealsByType.dinner)
-    },
-    dailyTotals: {
-      calories: 0,
-      protein: 0,
-      carbs: 0,
-      fats: 0,
-      fiber: 0
+  let meals = null;
+  
+  // Handle different possible meal structures
+  if (mealPlanData.daily_meals) {
+    // If daily_meals contains an array of meals
+    const daily = mealPlanData.daily_meals.find((day: any) => 
+      day.day?.toLowerCase() === dayName.toLowerCase());
+    
+    if (daily && daily.meals) {
+      meals = {
+        breakfast: createMeal(daily.meals.find((m: any) => m.type === "breakfast")),
+        morningSnack: createMeal(daily.meals.find((m: any) => m.type === "morning_snack")),
+        lunch: createMeal(daily.meals.find((m: any) => m.type === "lunch")),
+        afternoonSnack: createMeal(daily.meals.find((m: any) => m.type === "afternoon_snack")),
+        dinner: createMeal(daily.meals.find((m: any) => m.type === "dinner"))
+      };
     }
+  } else if (mealPlanData.meals) {
+    // Direct meals object
+    meals = {
+      breakfast: createMeal(mealPlanData.meals.find((m: any) => m.type === "breakfast")),
+      morningSnack: createMeal(mealPlanData.meals.find((m: any) => m.type === "morning_snack")),
+      lunch: createMeal(mealPlanData.meals.find((m: any) => m.type === "lunch")),
+      afternoonSnack: createMeal(mealPlanData.meals.find((m: any) => m.type === "afternoon_snack")),
+      dinner: createMeal(mealPlanData.meals.find((m: any) => m.type === "dinner"))
+    };
+  }
+  
+  if (!meals) {
+    // Default empty meals
+    meals = {
+      breakfast: createMeal(null),
+      morningSnack: createMeal(null),
+      lunch: createMeal(null),
+      afternoonSnack: createMeal(null),
+      dinner: createMeal(null)
+    };
+  }
+  
+  // Calculate totals from meals
+  const dailyTotals = {
+    calories: Object.values(meals).reduce((sum, meal) => sum + (meal.calories || 0), 0),
+    protein: Object.values(meals).reduce((sum, meal) => sum + (meal.macros.protein || 0), 0),
+    carbs: Object.values(meals).reduce((sum, meal) => sum + (meal.macros.carbs || 0), 0),
+    fats: Object.values(meals).reduce((sum, meal) => sum + (meal.macros.fats || 0), 0),
+    fiber: Object.values(meals).reduce((sum, meal) => sum + (meal.macros.fiber || 0), 0)
   };
   
-  // Calculate daily totals
-  Object.values(dayPlan.meals).forEach(meal => {
-    dayPlan.dailyTotals.calories += meal.calories;
-    dayPlan.dailyTotals.protein += meal.macros.protein;
-    dayPlan.dailyTotals.carbs += meal.macros.carbs;
-    dayPlan.dailyTotals.fats += meal.macros.fats;
-    dayPlan.dailyTotals.fiber += meal.macros.fiber;
-  });
+  return { dayName, meals, dailyTotals };
+};
+
+// Create a minimal valid meal plan to avoid UI errors
+const createMinimalValidMealPlan = (): MealPlan => {
+  const emptyMeal = {
+    description: "Refeição não disponível",
+    foods: [],
+    calories: 0,
+    macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+  };
   
-  return dayPlan;
+  const emptyDayPlan = {
+    dayName: "",
+    meals: {
+      breakfast: emptyMeal,
+      morningSnack: emptyMeal,
+      lunch: emptyMeal,
+      afternoonSnack: emptyMeal,
+      dinner: emptyMeal
+    },
+    dailyTotals: { calories: 0, protein: 0, carbs: 0, fats: 0, fiber: 0 }
+  };
+  
+  return {
+    weeklyPlan: {
+      monday: { ...emptyDayPlan, dayName: "Segunda-feira" },
+      tuesday: { ...emptyDayPlan, dayName: "Terça-feira" },
+      wednesday: { ...emptyDayPlan, dayName: "Quarta-feira" },
+      thursday: { ...emptyDayPlan, dayName: "Quinta-feira" },
+      friday: { ...emptyDayPlan, dayName: "Sexta-feira" },
+      saturday: { ...emptyDayPlan, dayName: "Sábado" },
+      sunday: { ...emptyDayPlan, dayName: "Domingo" }
+    },
+    weeklyTotals: {
+      averageCalories: 0,
+      averageProtein: 0,
+      averageCarbs: 0,
+      averageFats: 0,
+      averageFiber: 0
+    },
+    recommendations: {
+      general: "Não foi possível gerar recomendações",
+      preworkout: "",
+      postworkout: "",
+      timing: []
+    },
+    generatedBy: "fallback"
+  };
+};
+
+export const generateMealPlan = async (params: MealPlanGenerationParams): Promise<MealPlan | null> => {
+  const { userData, selectedFoods, preferences } = params;
+  
+  try {
+    console.log("Generating meal plan with Groq...");
+    
+    // Prepare input data for Groq
+    const userInput = {
+      userData: {
+        ...userData,
+        dailyCalories: userData.dailyCalories || 2000
+      },
+      selectedFoods: selectedFoods.map(food => ({
+        name: food.name,
+        calories: food.calories,
+        protein: food.protein,
+        carbs: food.carbs,
+        fats: food.fats,
+        fiber: food.fiber || 0
+      })),
+      dietaryPreferences: preferences
+    };
+    
+    console.log("Sending data to Groq API:", JSON.stringify(userInput).substring(0, 300) + "...");
+    
+    // Make the request to our Supabase Edge Function
+    const response = await supabase.functions.invoke('generate-meal-plan-groq', {
+      body: { userInput, user_id: userData.id }
+    });
+    
+    console.log("Response from generate-meal-plan-groq:", response);
+    
+    if (response.error) {
+      console.error("Error from Groq API:", response.error);
+      throw new Error(`Erro ao gerar plano alimentar: ${response.error.message || "Erro desconhecido"}`);
+    }
+    
+    if (!response.data) {
+      throw new Error("Resposta vazia do servidor");
+    }
+    
+    // Add transaction if provided and successful
+    if (params.addTransaction) {
+      try {
+        await params.addTransaction({
+          amount: -10,
+          description: "Geração de plano alimentar",
+          transactionType: "purchase"
+        });
+        console.log("Transaction added for meal plan generation");
+      } catch (txError) {
+        console.error("Failed to add transaction:", txError);
+      }
+    }
+    
+    console.log("Response data format:", response.data);
+    
+    // Standardize the meal plan format and add user calories
+    const standardizedPlan = standardizeMealPlanFormat(response.data.mealPlan || response.data);
+    standardizedPlan.userCalories = userData.dailyCalories;
+    standardizedPlan.generatedBy = "groq";
+    
+    console.log("Standardized meal plan has weeklyPlan:", !!standardizedPlan.weeklyPlan);
+    
+    try {
+      // Save the standardized plan to the database (optional, as the edge function already does this)
+      // Convert to JSON to ensure it can be stored properly
+      const planJson = JSON.parse(JSON.stringify(standardizedPlan));
+      
+      // Check if the plan is already in the database (by ID from response)
+      if (!response.data.id) {
+        const { error } = await supabase
+          .from('meal_plans')
+          .insert({
+            user_id: userData.id,
+            plan_data: planJson,
+            calories: userData.dailyCalories,
+            dietary_preferences: preferences
+          });
+          
+        if (error) {
+          console.error("Error storing meal plan in database:", error);
+        } else {
+          console.log("Meal plan saved to database");
+        }
+      }
+    } catch (dbError) {
+      console.error("Error saving meal plan to database:", dbError);
+      // Continue execution even if database save fails
+    }
+    
+    return standardizedPlan;
+  } catch (error) {
+    console.error("Error generating meal plan:", error);
+    toast.error(error instanceof Error ? error.message : "Erro ao gerar plano alimentar");
+    return null;
+  }
 };

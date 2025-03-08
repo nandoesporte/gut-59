@@ -34,7 +34,7 @@ serve(async (req) => {
     console.log(`Received meal plan generation request for user: ${user_id}`);
     console.log(`User input: ${JSON.stringify(userInput)}`);
 
-    // Improved prompt with clearer JSON format instructions
+    // Structured prompt with clear JSON format instructions
     const prompt = `
     Create a detailed meal plan based on the following user preferences:
     
@@ -51,43 +51,61 @@ serve(async (req) => {
     The response format MUST be a valid JSON object with the following structure:
 
     {
-      "meal_plan": {
-        "daily_calories": number,
-        "macro_distribution": {
-          "protein_percentage": number,
-          "carbs_percentage": number,
-          "fat_percentage": number
-        },
-        "meals": [
-          {
-            "name": string,
-            "type": string,
-            "foods": [
-              {
-                "name": string,
-                "portion": string,
-                "calories": number,
+      "weeklyPlan": {
+        "monday": {
+          "dayName": "Segunda-feira",
+          "meals": {
+            "breakfast": {
+              "description": "string",
+              "foods": [
+                {
+                  "name": "string",
+                  "portion": number,
+                  "unit": "string",
+                  "details": "string"
+                }
+              ],
+              "calories": number,
+              "macros": {
                 "protein": number,
                 "carbs": number,
-                "fat": number
+                "fats": number,
+                "fiber": number
               }
-            ],
-            "total_calories": number,
-            "total_protein": number,
-            "total_carbs": number,
-            "total_fat": number
+            },
+            "morningSnack": {},
+            "lunch": {},
+            "afternoonSnack": {},
+            "dinner": {}
+          },
+          "dailyTotals": {
+            "calories": number,
+            "protein": number,
+            "carbs": number,
+            "fats": number,
+            "fiber": number
           }
-        ]
+        },
+        "tuesday": {},
+        "wednesday": {},
+        "thursday": {},
+        "friday": {},
+        "saturday": {},
+        "sunday": {}
       },
-      "shopping_list": {
-        "categories": [
-          {
-            "name": string,
-            "items": string[]
-          }
-        ]
+      "weeklyTotals": {
+        "averageCalories": number,
+        "averageProtein": number,
+        "averageCarbs": number,
+        "averageFats": number,
+        "averageFiber": number
       },
-      "recommendations": string[]
+      "recommendations": {
+        "general": "string",
+        "preworkout": "string",
+        "postworkout": "string",
+        "timing": ["string"]
+      }
     }`;
 
     // Make request to Groq API with explicit JSON response format
@@ -130,87 +148,81 @@ serve(async (req) => {
 
     console.log('Successfully received response from Groq');
     
-    // Enhanced JSON parsing with better error handling
+    // Robust JSON parsing with detailed error handling
     let mealPlanJson;
     try {
-      // First, try direct parsing as it should be a valid JSON response
+      // Handle both string and object responses
       if (typeof mealPlanContent === 'string') {
         mealPlanJson = JSON.parse(mealPlanContent);
       } else {
-        // If it's already an object, use it directly
         mealPlanJson = mealPlanContent;
       }
       console.log('Successfully parsed JSON response');
     } catch (jsonError) {
       console.error('Failed to parse JSON directly:', jsonError);
-      
-      try {
-        // If direct parsing fails, try cleaning up possible markdown formatting
-        if (typeof mealPlanContent === 'string') {
-          const cleanedContent = mealPlanContent
-            .replace(/```json|```/g, '')  // Remove markdown code block markers
-            .trim();
-          
-          mealPlanJson = JSON.parse(cleanedContent);
-          console.log('Parsed JSON after cleaning markdown formatting');
-        } else {
-          throw new Error('Content is not a string and cannot be parsed as JSON');
-        }
-      } catch (cleaningError) {
-        console.error('Failed to parse JSON after cleaning:', cleaningError);
-        console.log('Raw content:', typeof mealPlanContent === 'string' ? mealPlanContent.substring(0, 500) : 'Not a string');
-        throw new Error('Failed to parse meal plan JSON from Groq response');
-      }
+      throw new Error('Failed to parse meal plan JSON from Groq response');
     }
 
-    // Validate meal plan structure
-    if (!mealPlanJson || !mealPlanJson.meal_plan) {
-      console.error('Invalid meal plan structure:', mealPlanJson);
+    // Create a wrapper object if necessary to standardize format
+    const standardizedMealPlan = mealPlanJson.weeklyPlan ? 
+      mealPlanJson : 
+      { mealPlan: mealPlanJson };
+    
+    console.log('Standardized meal plan format:', Object.keys(standardizedMealPlan));
+    
+    // Check for required properties to validate response structure
+    if (!standardizedMealPlan.weeklyPlan && 
+        !standardizedMealPlan.mealPlan?.weeklyPlan) {
+      console.error('Invalid meal plan structure - missing weeklyPlan:', standardizedMealPlan);
       throw new Error('Invalid meal plan structure returned by Groq API');
     }
 
     // Store the generated meal plan in the database
-    const { data: insertData, error: insertError } = await supabase
-      .from('meal_plans')
-      .insert({
-        user_id: user_id,
-        plan_data: mealPlanJson,
-        calories: mealPlanJson.meal_plan.daily_calories,
-        generated_at: new Date().toISOString()
-      })
-      .select('id')
-      .single();
-
-    if (insertError) {
-      console.error('Error storing meal plan:', insertError);
-      throw new Error('Failed to store the generated meal plan');
-    }
-
-    // Increment the meal plan generation count for this user
     try {
-      await supabase.rpc('increment_nutrition_count', { user_id });
-      console.log('Incremented nutrition count for user:', user_id);
-    } catch (countError) {
-      console.error('Error incrementing nutrition count:', countError);
-      // Continue execution even if this fails
-    }
-
-    console.log(`Meal plan generated and stored with ID: ${insertData.id}`);
-
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        mealPlan: mealPlanJson,
-        id: insertData.id
-      }),
-      { 
-        headers: { 
-          ...corsHeaders,
-          'Content-Type': 'application/json' 
-        }
+      const { data: insertData, error: insertError } = await supabase
+        .from('meal_plans')
+        .insert({
+          user_id: user_id,
+          plan_data: standardizedMealPlan,
+          calories: userInput.dailyCalories || 0,
+          generated_at: new Date().toISOString()
+        })
+        .select('id')
+        .single();
+        
+      if (insertError) {
+        console.error('Error storing meal plan:', insertError);
+        throw new Error('Failed to store the generated meal plan');
       }
-    );
+      
+      console.log(`Meal plan generated and stored with ID: ${insertData?.id}`);
 
+      // Increment the meal plan generation count for this user
+      try {
+        await supabase.rpc('increment_nutrition_count', { user_id });
+        console.log('Incremented nutrition count for user:', user_id);
+      } catch (countError) {
+        console.error('Error incrementing nutrition count:', countError);
+        // Continue execution even if this fails
+      }
+
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          mealPlan: standardizedMealPlan,
+          id: insertData?.id
+        }),
+        { 
+          headers: { 
+            ...corsHeaders,
+            'Content-Type': 'application/json' 
+          }
+        }
+      );
+    } catch (dbError) {
+      console.error('Database error:', dbError);
+      throw new Error('Failed to store meal plan in database');
+    }
   } catch (error) {
     console.error('Error:', error);
     
