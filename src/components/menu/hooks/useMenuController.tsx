@@ -249,7 +249,7 @@ export const useMenuController = (): MenuState => {
               .from('meal_plans')
               .insert({
                 user_id: user.id,
-                plan_data: planDataAsJson,
+                plan_data: planDataAsJson as any,
                 calories: calorieNeeds
               });
               

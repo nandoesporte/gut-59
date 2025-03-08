@@ -132,8 +132,8 @@ export const generateMealPlan = async ({
         // This removes any special prototypes or non-serializable properties
         const mealPlanForStorage = JSON.parse(JSON.stringify(data.mealPlan));
         
-        // The issue is here - we need to explicitly cast the meal plan as Json type
-        // that Supabase expects
+        // We need to explicitly cast the meal plan to any to bypass TypeScript checking
+        // because Supabase expects a specific Json type that doesn't match our MealPlan type
         const { error: saveError } = await supabase
           .from('meal_plans')
           .insert({
