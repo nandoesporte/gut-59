@@ -44,7 +44,7 @@ serve(async (req) => {
           messages: [
             {
               role: 'system',
-              content: 'Você é um assistente especializado em nutrição e planejamento alimentar, capaz de gerar planos alimentares personalizados em formato JSON. É MUITO IMPORTANTE que todos os valores de macros (protein, carbs, fats, fiber) sejam numéricos, SEM "g" no final.'
+              content: 'Você é um assistente especializado em nutrição e planejamento alimentar brasileiro, capaz de gerar planos alimentares personalizados em formato JSON. Você SEMPRE responde em Português do Brasil. É MUITO IMPORTANTE que todos os valores de macros (protein, carbs, fats, fiber) sejam numéricos, SEM "g" no final e que os nomes de todas as refeições e alimentos estejam em Português do Brasil.'
             },
             {
               role: 'user',
@@ -85,7 +85,7 @@ serve(async (req) => {
             messages: [
               {
                 role: 'system',
-                content: 'Você é um assistente especializado em nutrição e planejamento alimentar, capaz de gerar planos alimentares personalizados em formato JSON. É MUITO IMPORTANTE que todos os valores de macros (protein, carbs, fats, fiber) sejam numéricos, SEM "g" no final.'
+                content: 'Você é um assistente especializado em nutrição e planejamento alimentar brasileiro, capaz de gerar planos alimentares personalizados em formato JSON. Você SEMPRE responde em Português do Brasil. É MUITO IMPORTANTE que todos os valores de macros (protein, carbs, fats, fiber) sejam numéricos, SEM "g" no final e que os nomes de todas as refeições e alimentos estejam em Português do Brasil.'
               },
               {
                 role: 'user',

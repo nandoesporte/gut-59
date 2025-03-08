@@ -34,7 +34,7 @@ export const generateMealPlan = async ({
   console.log(`🥗 Preferências alimentares:`, preferences);
   
   try {
-    console.log("📡 Chamando função edge do Supabase - nutri-plus-agent (Llama3-8b)");
+    console.log("📡 Chamando função llama-completion para gerar plano alimentar em português");
     
     // Convert foodsByMealType from ProtocolFood[] to expected format for edge function
     const simplifiedFoodsByMealType: Record<string, string[]> = {};
@@ -42,18 +42,58 @@ export const generateMealPlan = async ({
       simplifiedFoodsByMealType[mealType] = foods.map(food => food.name);
     });
     
-    // Call the Nutri+ agent edge function
-    const { data, error } = await supabase.functions.invoke('nutri-plus-agent', {
+    // Create a translated meal type mapping
+    const mealTypeTranslations = {
+      breakfast: "café da manhã",
+      morningSnack: "lanche da manhã",
+      lunch: "almoço",
+      afternoonSnack: "lanche da tarde",
+      dinner: "jantar"
+    };
+
+    // Translate meal types for the prompt
+    const translatedFoodsByMealType: Record<string, string[]> = {};
+    Object.entries(simplifiedFoodsByMealType).forEach(([mealType, foods]) => {
+      const translatedMealType = mealTypeTranslations[mealType as keyof typeof mealTypeTranslations] || mealType;
+      translatedFoodsByMealType[translatedMealType] = foods;
+    });
+    
+    // Prepare a meal plan prompt in Portuguese
+    const prompt = `
+    Crie um plano alimentar semanal personalizado para as seguintes características:
+    
+    Peso: ${userData.weight}kg
+    Altura: ${userData.height}cm
+    Idade: ${userData.age} anos
+    Gênero: ${userData.gender === 'male' ? 'Masculino' : 'Feminino'}
+    Nível de Atividade: ${userData.activityLevel}
+    Objetivo: ${userData.goal || 'Manutenção'}
+    Calorias Diárias: ${userData.dailyCalories}kcal
+    
+    Preferências alimentares: ${JSON.stringify(preferences)}
+    
+    Alimentos disponíveis por tipo de refeição: ${JSON.stringify(translatedFoodsByMealType)}
+    
+    O plano deve seguir estes critérios:
+    1. Distribuir as calorias diárias adequadamente entre as refeições.
+    2. Incluir café da manhã, lanche da manhã, almoço, lanche da tarde e jantar.
+    3. Usar apenas os alimentos listados.
+    4. Criar um plano variado para 7 dias da semana.
+    5. Incluir macronutrientes para cada refeição (proteínas, carboidratos, gorduras e fibras) em formato numérico.
+    
+    Responda apenas com o objeto JSON do plano alimentar, sem texto adicional, contendo:
+    - weeklyPlan: com os dias da semana e suas refeições
+    - weeklyTotals: com médias semanais de calorias e macronutrientes
+    - recommendations: com recomendações nutricionais
+    
+    Formate os nomes dos dias em português (Segunda-feira, Terça-feira, etc).
+    `;
+
+    // Call the llama-completion edge function
+    const { data, error } = await supabase.functions.invoke('llama-completion', {
       body: {
-        userData,
-        selectedFoods,
-        foodsByMealType: simplifiedFoodsByMealType, // Send simplified version
-        dietaryPreferences: preferences,
-        modelConfig: {
-          // Explicitly specify model to use
-          model: "llama3-8b-8192",
-          temperature: 0.3
-        }
+        prompt,
+        temperature: 0.5 // More deterministic responses
       }
     });
 
@@ -63,7 +103,7 @@ export const generateMealPlan = async ({
       return null;
     }
 
-    if (!data?.mealPlan) {
+    if (!data?.completion) {
       console.error("❌ Nenhum plano alimentar retornado pelo agente Nutri+");
       console.error("Resposta completa:", data);
       toast.error("Não foi possível gerar o plano alimentar. Por favor, tente novamente.");
@@ -71,54 +111,91 @@ export const generateMealPlan = async ({
     }
 
     console.log("✅ Plano alimentar recebido com sucesso do agente Nutri+");
-    console.log("📋 Dados do plano:", JSON.stringify(data.mealPlan).substring(0, 200) + "...");
-    console.log("🧠 Modelo utilizado:", data.modelUsed || "llama3-8b-8192");
     
-    // Ensure the meal plan uses the user's specified daily calories
-    if (data.mealPlan && userData.dailyCalories) {
-      data.mealPlan.userCalories = userData.dailyCalories;
+    // Parse the completion to get the JSON
+    let mealPlanData;
+    try {
+      // Extract JSON from the response
+      const jsonString = data.completion;
       
-      // If weeklyTotals is missing or has NaN values, recalculate it here
-      if (!data.mealPlan.weeklyTotals || 
-          isNaN(data.mealPlan.weeklyTotals.averageCalories) || 
-          isNaN(data.mealPlan.weeklyTotals.averageProtein)) {
-        
-        console.log("⚠️ Recalculando médias semanais devido a valores ausentes ou NaN");
-        
-        // Convert weeklyPlan to array of day plans, with validation
-        const weeklyPlan = data.mealPlan.weeklyPlan || {};
-        const days = Object.values(weeklyPlan);
-        
-        // Define a proper type guard function to ensure day has properly typed dailyTotals
-        const isDayPlanWithValidTotals = (day: unknown): day is DayPlan => {
-          return (
-            !!day && 
-            typeof day === 'object' &&
-            'dailyTotals' in day &&
-            !!day.dailyTotals &&
-            typeof day.dailyTotals === 'object' &&
-            'calories' in day.dailyTotals && typeof day.dailyTotals.calories === 'number' &&
-            'protein' in day.dailyTotals && typeof day.dailyTotals.protein === 'number' &&
-            'carbs' in day.dailyTotals && typeof day.dailyTotals.carbs === 'number' &&
-            'fats' in day.dailyTotals && typeof day.dailyTotals.fats === 'number' &&
-            'fiber' in day.dailyTotals && typeof day.dailyTotals.fiber === 'number'
-          );
-        };
-        
-        // Filter days to only include valid days with proper dailyTotals
-        const validDays = days.filter(isDayPlanWithValidTotals);
-        const dayCount = validDays.length || 1; // Prevent division by zero
-        
-        data.mealPlan.weeklyTotals = {
-          averageCalories: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.calories, 0) / dayCount),
-          averageProtein: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.protein, 0) / dayCount),
-          averageCarbs: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.carbs, 0) / dayCount),
-          averageFats: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.fats, 0) / dayCount),
-          averageFiber: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.fiber, 0) / dayCount)
-        };
-        
-        console.log("🔄 Novos valores de médias semanais:", data.mealPlan.weeklyTotals);
+      // Try to parse the JSON directly
+      try {
+        mealPlanData = JSON.parse(jsonString);
+      } catch (parseError) {
+        // If direct parsing fails, try to extract JSON from a markdown code block
+        const jsonMatch = jsonString.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (jsonMatch && jsonMatch[1]) {
+          mealPlanData = JSON.parse(jsonMatch[1].trim());
+        } else {
+          // If still no match, look for { } pattern
+          const braceMatch = jsonString.match(/\{[\s\S]*\}/);
+          if (braceMatch) {
+            mealPlanData = JSON.parse(braceMatch[0]);
+          } else {
+            throw new Error("Não foi possível extrair JSON válido da resposta");
+          }
+        }
       }
+      
+      // Check if we have a direct mealPlan object or if it's nested under a mealPlan property
+      if (mealPlanData.mealPlan) {
+        mealPlanData = mealPlanData.mealPlan;
+      }
+      
+      // Ensure the meal plan uses the user's specified daily calories
+      if (mealPlanData && userData.dailyCalories) {
+        mealPlanData.userCalories = userData.dailyCalories;
+        
+        // Ensure weeklyTotals exists and has valid values
+        if (!mealPlanData.weeklyTotals || 
+            isNaN(mealPlanData.weeklyTotals.averageCalories) || 
+            isNaN(mealPlanData.weeklyTotals.averageProtein)) {
+          
+          console.log("⚠️ Recalculando médias semanais devido a valores ausentes ou NaN");
+          
+          // Convert weeklyPlan to array of day plans with validation
+          const weeklyPlan = mealPlanData.weeklyPlan || {};
+          const days = Object.values(weeklyPlan);
+          
+          // Define a proper type guard function to ensure day has properly typed dailyTotals
+          const isDayPlanWithValidTotals = (day: unknown): day is DayPlan => {
+            return (
+              !!day && 
+              typeof day === 'object' &&
+              'dailyTotals' in day &&
+              !!day.dailyTotals &&
+              typeof day.dailyTotals === 'object' &&
+              'calories' in day.dailyTotals && typeof day.dailyTotals.calories === 'number' &&
+              'protein' in day.dailyTotals && typeof day.dailyTotals.protein === 'number' &&
+              'carbs' in day.dailyTotals && typeof day.dailyTotals.carbs === 'number' &&
+              'fats' in day.dailyTotals && typeof day.dailyTotals.fats === 'number' &&
+              'fiber' in day.dailyTotals && typeof day.dailyTotals.fiber === 'number'
+            );
+          };
+          
+          // Filter days to only include valid days with proper dailyTotals
+          const validDays = days.filter(isDayPlanWithValidTotals);
+          const dayCount = validDays.length || 1; // Prevent division by zero
+          
+          mealPlanData.weeklyTotals = {
+            averageCalories: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.calories, 0) / dayCount),
+            averageProtein: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.protein, 0) / dayCount),
+            averageCarbs: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.carbs, 0) / dayCount),
+            averageFats: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.fats, 0) / dayCount),
+            averageFiber: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.fiber, 0) / dayCount)
+          };
+        }
+      }
+      
+      // Add generatedBy property to track which service generated the plan
+      mealPlanData.generatedBy = "llama-completion-pt-BR";
+      
+      console.log("📋 Dados do plano processados:", JSON.stringify(mealPlanData).substring(0, 200) + "...");
+    } catch (jsonError) {
+      console.error("❌ Erro ao processar JSON do plano alimentar:", jsonError);
+      console.error("Resposta completa:", data.completion);
+      toast.error("Erro ao processar o plano alimentar. Por favor, tente novamente.");
+      return null;
     }
     
     // Save the meal plan to the database if user is authenticated
@@ -130,7 +207,7 @@ export const generateMealPlan = async ({
         // Create a clean version of the meal plan for database storage
         // Using JSON.stringify and then JSON.parse to ensure we have a plain JavaScript object
         // This removes any special prototypes or non-serializable properties
-        const mealPlanForStorage = JSON.parse(JSON.stringify(data.mealPlan));
+        const mealPlanForStorage = JSON.parse(JSON.stringify(mealPlanData));
         
         // We need to explicitly cast the meal plan to any to bypass TypeScript checking
         // because Supabase expects a specific Json type that doesn't match our MealPlan type
@@ -140,7 +217,7 @@ export const generateMealPlan = async ({
             user_id: userData.id,
             plan_data: mealPlanForStorage as any, // Cast to any to bypass TypeScript checking
             calories: userData.dailyCalories,
-            generated_by: data.modelUsed || "nutri-plus-agent-llama3",
+            generated_by: "llama-completion-pt-BR",
             preferences: preferences // Save the user preferences with the meal plan
           });
 
@@ -171,8 +248,8 @@ export const generateMealPlan = async ({
       toast.warning("Faça login para salvar o plano no histórico");
     }
 
-    // Return the meal plan exactly as generated by the AI
-    return data.mealPlan as MealPlan;
+    // Return the meal plan 
+    return mealPlanData as MealPlan;
   } catch (error) {
     console.error("❌ Erro inesperado em generateMealPlan:", error);
     toast.error("Erro ao gerar plano alimentar. Por favor, tente novamente.");
