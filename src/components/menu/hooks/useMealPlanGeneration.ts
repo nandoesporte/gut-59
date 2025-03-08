@@ -1,5 +1,6 @@
+
 import { supabase } from "@/integrations/supabase/client";
-import { DietaryPreferences, MealPlan, ProtocolFood } from "../types";
+import { DietaryPreferences, MealPlan, ProtocolFood, TransactionParams } from "../types";
 import { toast } from "sonner";
 import { TransactionInput } from "@/hooks/wallet/types";
 
@@ -12,12 +13,6 @@ export interface UserData {
   activityLevel: string;
   goal: string;
   dailyCalories: number;
-}
-
-interface TransactionParams {
-  amount: number;
-  description: string;
-  transactionType: "purchase" | "reward" | "admin";
 }
 
 export interface MealPlanGenerationParams {
@@ -68,8 +63,17 @@ const standardizeMealPlanFormat = (rawData: any): MealPlan => {
         sunday: createDayPlan("Domingo", rawData.meal_plan)
       };
       
+      // Cast the weeklyPlan to DayPlan type to fix type compatibility issues
       return {
-        weeklyPlan,
+        weeklyPlan: weeklyPlan as {
+          monday: DayPlan;
+          tuesday: DayPlan;
+          wednesday: DayPlan;
+          thursday: DayPlan;
+          friday: DayPlan;
+          saturday: DayPlan;
+          sunday: DayPlan;
+        },
         weeklyTotals: rawData.meal_plan.macro_distribution ? {
           averageCalories: Number(rawData.meal_plan.daily_calories || 0),
           averageProtein: Number(rawData.meal_plan.macro_distribution.protein_percentage || 0),
@@ -167,12 +171,13 @@ const createDayPlan = (dayName: string, mealPlanData: any) => {
     };
   }
   
+  // Use explicit number casting to avoid unknown type issues
   const dailyTotals = {
-    calories: Object.values(meals).reduce((sum, meal) => sum + (meal.calories || 0), 0),
-    protein: Object.values(meals).reduce((sum, meal) => sum + (meal.macros.protein || 0), 0),
-    carbs: Object.values(meals).reduce((sum, meal) => sum + (meal.macros.carbs || 0), 0),
-    fats: Object.values(meals).reduce((sum, meal) => sum + (meal.macros.fats || 0), 0),
-    fiber: Object.values(meals).reduce((sum, meal) => sum + (meal.macros.fiber || 0), 0)
+    calories: Object.values(meals).reduce((sum, meal) => sum + Number(meal.calories || 0), 0),
+    protein: Object.values(meals).reduce((sum, meal) => sum + Number(meal.macros?.protein || 0), 0),
+    carbs: Object.values(meals).reduce((sum, meal) => sum + Number(meal.macros?.carbs || 0), 0),
+    fats: Object.values(meals).reduce((sum, meal) => sum + Number(meal.macros?.fats || 0), 0),
+    fiber: Object.values(meals).reduce((sum, meal) => sum + Number(meal.macros?.fiber || 0), 0)
   };
   
   return { dayName, meals, dailyTotals };
@@ -289,6 +294,7 @@ export const generateMealPlan = async (params: MealPlanGenerationParams): Promis
       const planJson = JSON.parse(JSON.stringify(standardizedPlan));
       
       if (!response.data.id) {
+        // Convert DietaryPreferences to a string for storage
         const preferencesJson = JSON.stringify(preferences);
         
         const { error } = await supabase

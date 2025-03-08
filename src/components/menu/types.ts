@@ -1,3 +1,4 @@
+
 export interface ProtocolFood {
   id: string;
   name: string;
@@ -98,4 +99,11 @@ export interface MealPlan {
   recommendations: Recommendations;
   userCalories?: number;
   generatedBy?: string;
+}
+
+// Add this interface to match the expected parameter structure in useMealPlanGeneration.ts
+export interface TransactionParams {
+  amount: number;
+  description: string;
+  transactionType: "purchase" | "reward" | "admin";
 }

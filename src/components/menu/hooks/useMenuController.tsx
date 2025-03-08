@@ -1,10 +1,9 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { useProtocolFoods } from "./useProtocolFoods";
 import { useCalorieCalculator, Goal } from "./useCalorieCalculator";
 import { useFoodSelection } from "./useFoodSelection";
 import { generateMealPlan } from "./useMealPlanGeneration";
-import { DietaryPreferences, MealPlan, ProtocolFood } from "../types";
+import { DietaryPreferences, MealPlan, ProtocolFood, TransactionParams } from "../types";
 import { useWallet } from "@/hooks/useWallet";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -230,19 +229,17 @@ export const useMenuController = (): MenuState => {
       
       if (foodsByMealType) {
         Object.keys(foodsByMealType).forEach(mealType => {
-          typedFoodsByMealType[mealType] = protocolFoods.filter(food => 
-            selectedFoods.includes(food.id) && 
-            (food.meal_type?.includes(mealType) || food.meal_type?.includes('any'))
-          );
+          typedFoodsByMealType[mealType] = foodsByMealType[mealType]
+            ? protocolFoods.filter(food => 
+                selectedFoods.includes(food.id) && 
+                (food.meal_type?.includes(mealType) || food.meal_type?.includes('any'))
+              )
+            : [];
         });
       }
       
       // Create transaction adapter that maps from our internal parameter format to wallet's expected format
-      const addWalletTransaction = wallet ? async (params: {
-        amount: number; 
-        description: string; 
-        transactionType: "purchase" | "reward" | "admin"
-      }) => {
+      const addWalletTransaction = wallet ? async (params: TransactionParams) => {
         try {
           const txInput: TransactionInput = {
             amount: params.amount,
@@ -287,10 +284,9 @@ export const useMenuController = (): MenuState => {
     }
   }, [formData, calorieNeeds, selectedFoods, protocolFoods, foodsByMealType, wallet]);
 
-  // Helper function to map our transaction types to system transaction types
   const mapTransactionType = (type: "purchase" | "reward" | "admin"): 'meal_plan_generation' | 'workout_plan_generation' | 'rehab_plan_generation' => {
     if (type === "purchase") return "meal_plan_generation";
-    // Default to meal_plan_generation for all other cases
+    if (type === "reward") return "workout_plan_generation";
     return "meal_plan_generation";
   };
 
