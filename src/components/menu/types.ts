@@ -1,4 +1,3 @@
-
 export interface ProtocolFood {
   id: string;
   name: string;
@@ -101,16 +100,13 @@ export interface MealPlan {
   generatedBy?: string;
 }
 
-// Transaction types for wallet functionality
-// Using TransactionType from wallet.ts for better compatibility
 import { TransactionType } from "@/types/wallet";
 
 export interface TransactionParams {
   amount: number;
   description: string;
   category?: string;
-  type: TransactionType; // Updated to TransactionType for compatibility
+  type: TransactionType;
 }
 
-// MenuStep type for the menu workflow
 export type MenuStep = 'initial' | 'calculator' | 'foods' | 'preferences' | 'result';
