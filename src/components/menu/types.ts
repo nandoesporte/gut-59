@@ -57,15 +57,14 @@ export interface DailyNutrition {
   fiber: number;
 }
 
-// Portuguese meal type names used throughout the application
 export interface DayPlan {
   dayName: string;
   meals: {
-    cafeDaManha: Meal;    // breakfast
-    lancheDaManha: Meal;  // morning snack
-    almoco: Meal;         // lunch
-    lancheDaTarde: Meal;  // afternoon snack
-    jantar: Meal;         // dinner
+    breakfast: Meal;
+    morningSnack: Meal;
+    lunch: Meal;
+    afternoonSnack: Meal;
+    dinner: Meal;
   };
   dailyTotals: DailyNutrition;
 }
@@ -85,16 +84,15 @@ export interface Recommendations {
   timing: string[];
 }
 
-// Portuguese day names used in the weekly plan
 export interface MealPlan {
   weeklyPlan: {
-    segunda: DayPlan;   // Monday
-    terca: DayPlan;     // Tuesday
-    quarta: DayPlan;    // Wednesday
-    quinta: DayPlan;    // Thursday
-    sexta: DayPlan;     // Friday
-    sabado: DayPlan;    // Saturday
-    domingo: DayPlan;   // Sunday
+    monday: DayPlan;
+    tuesday: DayPlan;
+    wednesday: DayPlan;
+    thursday: DayPlan;
+    friday: DayPlan;
+    saturday: DayPlan;
+    sunday: DayPlan;
   };
   weeklyTotals: WeeklyTotals;
   recommendations: Recommendations;

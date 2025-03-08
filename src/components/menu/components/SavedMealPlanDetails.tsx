@@ -1,12 +1,15 @@
+
 import { useState } from "react";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ChevronRight, X } from "lucide-react";
-import { MealPlan } from "../types";
-import { CalendarIcon } from "lucide-react";
-import { generateMealPlanPDF } from "../utils/pdf-generator";
+import { toast } from "sonner";
+import { MealSection } from "./MealSection";
+import { DailyTotals } from "./DailyTotals";
+import { Recommendations } from "./Recommendations";
+import { MealPlan, MealFood } from "../types";
+import { supabase } from "@/integrations/supabase/client";
+import { FoodReplacementDialog } from "./FoodReplacementDialog";
 
 interface SavedMealPlanDetailsProps {
   planId: string;
@@ -16,21 +19,195 @@ interface SavedMealPlanDetailsProps {
 }
 
 const dayNameMap: Record<string, string> = {
-  segunda: "Segunda-feira",
-  terca: "Terça-feira",
-  quarta: "Quarta-feira",
-  quinta: "Quinta-feira",
-  sexta: "Sexta-feira",
-  sabado: "Sábado",
-  domingo: "Domingo"
+  monday: "Segunda-feira",
+  tuesday: "Terça-feira",
+  wednesday: "Quarta-feira",
+  thursday: "Quinta-feira",
+  friday: "Sexta-feira",
+  saturday: "Sábado",
+  sunday: "Domingo"
 };
 
 export const SavedMealPlanDetails = ({ planId, planData, isOpen, onClose }: SavedMealPlanDetailsProps) => {
-  const [selectedDay, setSelectedDay] = useState<string>("segunda");
+  const [selectedDay, setSelectedDay] = useState<string>("monday");
+  const [replaceFoodDialogOpen, setReplaceFoodDialogOpen] = useState(false);
+  const [selectedFood, setSelectedFood] = useState<{
+    food: MealFood;
+    dayKey: string;
+    mealType: string;
+    index: number;
+  } | null>(null);
 
-  const handleDownloadPDF = async () => {
-    if (!planData) return;
-    await generateMealPlanPDF(planData);
+  const handleReplaceFood = (food: MealFood, dayKey: string, mealType: string, index: number) => {
+    setSelectedFood({ food, dayKey, mealType, index });
+    setReplaceFoodDialogOpen(true);
+  };
+
+  const handleFoodReplaced = async (originalFood: MealFood, newFood: MealFood, dayKey: string, mealType: string, foodIndex: number) => {
+    try {
+      // Create a deep copy of the plan data
+      const updatedPlanData = JSON.parse(JSON.stringify(planData)) as MealPlan;
+      
+      // Update the specific food item
+      if (updatedPlanData.weeklyPlan[dayKey as keyof typeof updatedPlanData.weeklyPlan]?.meals) {
+        const dayPlan = updatedPlanData.weeklyPlan[dayKey as keyof typeof updatedPlanData.weeklyPlan];
+        const meal = dayPlan.meals[mealType as keyof typeof dayPlan.meals];
+        
+        if (meal && meal.foods && meal.foods[foodIndex]) {
+          meal.foods[foodIndex] = newFood;
+          
+          // Update the meal plan in the database
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) {
+            toast.error("Usuário não autenticado");
+            return;
+          }
+
+          // Cast the MealPlan to a compatible JSON structure for Supabase
+          const { error } = await supabase
+            .from('meal_plans')
+            .update({ 
+              plan_data: updatedPlanData as unknown as Record<string, any> 
+            })
+            .eq('id', planId);
+
+          if (error) {
+            console.error("Erro ao atualizar plano:", error);
+            toast.error("Erro ao atualizar o alimento");
+            return;
+          }
+
+          toast.success("Alimento substituído com sucesso!");
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao substituir alimento:", error);
+      toast.error("Erro ao substituir o alimento");
+    } finally {
+      setReplaceFoodDialogOpen(false);
+    }
+  };
+
+  const renderDayPlan = (dayKey: string) => {
+    const dayPlan = planData.weeklyPlan[dayKey as keyof typeof planData.weeklyPlan];
+    if (!dayPlan) return null;
+
+    return (
+      <div className="space-y-6">
+        <div className="p-4 bg-muted rounded-md mb-6">
+          <h2 className="text-xl font-bold">📅 {dayNameMap[dayKey]} – Plano Alimentar</h2>
+        </div>
+
+        {dayPlan.meals.breakfast && (
+          <div className="relative">
+            <MealSection
+              title="Café da Manhã"
+              icon={<div className="w-5 h-5 text-primary">☀️</div>}
+              meal={dayPlan.meals.breakfast}
+            />
+            {dayPlan.meals.breakfast.foods.map((food, index) => (
+              <Button 
+                key={`breakfast-${index}`}
+                variant="outline" 
+                size="sm" 
+                className="absolute top-2 right-2"
+                onClick={() => handleReplaceFood(food, dayKey, "breakfast", index)}
+              >
+                Substituir
+              </Button>
+            ))}
+          </div>
+        )}
+
+        {dayPlan.meals.morningSnack && (
+          <div className="relative">
+            <MealSection
+              title="Lanche da Manhã"
+              icon={<div className="w-5 h-5 text-primary">🥪</div>}
+              meal={dayPlan.meals.morningSnack}
+            />
+            {dayPlan.meals.morningSnack.foods.map((food, index) => (
+              <Button 
+                key={`morningSnack-${index}`}
+                variant="outline" 
+                size="sm" 
+                className="absolute top-2 right-2"
+                onClick={() => handleReplaceFood(food, dayKey, "morningSnack", index)}
+              >
+                Substituir
+              </Button>
+            ))}
+          </div>
+        )}
+
+        {dayPlan.meals.lunch && (
+          <div className="relative">
+            <MealSection
+              title="Almoço"
+              icon={<div className="w-5 h-5 text-primary">🍽️</div>}
+              meal={dayPlan.meals.lunch}
+            />
+            {dayPlan.meals.lunch.foods.map((food, index) => (
+              <Button 
+                key={`lunch-${index}`}
+                variant="outline" 
+                size="sm" 
+                className="absolute top-2 right-2"
+                onClick={() => handleReplaceFood(food, dayKey, "lunch", index)}
+              >
+                Substituir
+              </Button>
+            ))}
+          </div>
+        )}
+
+        {dayPlan.meals.afternoonSnack && (
+          <div className="relative">
+            <MealSection
+              title="Lanche da Tarde"
+              icon={<div className="w-5 h-5 text-primary">🍎</div>}
+              meal={dayPlan.meals.afternoonSnack}
+            />
+            {dayPlan.meals.afternoonSnack.foods.map((food, index) => (
+              <Button 
+                key={`afternoonSnack-${index}`}
+                variant="outline" 
+                size="sm" 
+                className="absolute top-2 right-2"
+                onClick={() => handleReplaceFood(food, dayKey, "afternoonSnack", index)}
+              >
+                Substituir
+              </Button>
+            ))}
+          </div>
+        )}
+
+        {dayPlan.meals.dinner && (
+          <div className="relative">
+            <MealSection
+              title="Jantar"
+              icon={<div className="w-5 h-5 text-primary">🌙</div>}
+              meal={dayPlan.meals.dinner}
+            />
+            {dayPlan.meals.dinner.foods.map((food, index) => (
+              <Button 
+                key={`dinner-${index}`}
+                variant="outline" 
+                size="sm" 
+                className="absolute top-2 right-2"
+                onClick={() => handleReplaceFood(food, dayKey, "dinner", index)}
+              >
+                Substituir
+              </Button>
+            ))}
+          </div>
+        )}
+
+        {dayPlan.dailyTotals && (
+          <DailyTotals totalNutrition={dayPlan.dailyTotals} />
+        )}
+      </div>
+    );
   };
 
   if (!planData || !planData.weeklyPlan) {
@@ -38,26 +215,24 @@ export const SavedMealPlanDetails = ({ planId, planData, isOpen, onClose }: Save
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader className="flex flex-row items-center justify-between">
-          <DialogTitle>Detalhes do Plano Alimentar</DialogTitle>
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
-        </DialogHeader>
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Detalhes do Plano Alimentar</DialogTitle>
+            <DialogDescription>
+              Visualize os detalhes do seu plano e faça substituições de alimentos se necessário
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="mb-4">
-          <Button onClick={handleDownloadPDF} className="w-full sm:w-auto">
-            Baixar PDF
-          </Button>
-        </div>
-
-        {planData.weeklyPlan && (
           <Tabs value={selectedDay} onValueChange={setSelectedDay} className="w-full">
-            <TabsList className="mb-4 w-full flex overflow-x-auto justify-start gap-1">
+            <TabsList className="mb-6 w-full flex flex-nowrap overflow-x-auto pb-2 justify-start sm:justify-center gap-1 sm:gap-2">
               {Object.entries(dayNameMap).map(([day, dayName]) => (
-                <TabsTrigger key={day} value={day} className="whitespace-nowrap">
+                <TabsTrigger 
+                  key={day} 
+                  value={day}
+                  className="whitespace-nowrap text-sm sm:text-base px-2 sm:px-4"
+                >
                   <span className="hidden sm:inline">{dayName}</span>
                   <span className="sm:hidden">{dayName.split('-')[0]}</span>
                 </TabsTrigger>
@@ -66,169 +241,28 @@ export const SavedMealPlanDetails = ({ planId, planData, isOpen, onClose }: Save
 
             {Object.keys(dayNameMap).map(day => (
               <TabsContent key={day} value={day}>
-                {planData.weeklyPlan[day as keyof typeof planData.weeklyPlan] && (
-                  <div className="space-y-6">
-                    <div className="p-4 bg-muted rounded-md">
-                      <h2 className="text-xl font-bold flex items-center">
-                        <CalendarIcon className="mr-2 h-5 w-5" />
-                        {dayNameMap[day]} – Plano Alimentar
-                      </h2>
-                    </div>
-
-                    {planData.weeklyPlan[day as keyof typeof planData.weeklyPlan]?.meals.cafeDaManha && (
-                      <Card className="p-4">
-                        <h3 className="text-lg font-semibold mb-2">☀️ Café da Manhã</h3>
-                        <p className="text-sm text-gray-600 mb-2">
-                          {planData.weeklyPlan[day as keyof typeof planData.weeklyPlan]?.meals.cafeDaManha.description}
-                        </p>
-                        <div className="space-y-2">
-                          {planData.weeklyPlan[day as keyof typeof planData.weeklyPlan]?.meals.cafeDaManha.foods.map((food, idx) => (
-                            <div key={idx} className="flex items-start">
-                              <ChevronRight className="h-4 w-4 mt-1 mr-1 text-primary" />
-                              <div>
-                                <span className="font-medium">{food.name}</span>
-                                <span className="text-gray-600"> - {food.portion} {food.unit}</span>
-                                <p className="text-xs text-gray-500">{food.details}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="mt-3 pt-3 border-t text-sm">
-                          <p><span className="font-medium">Calorias:</span> {planData.weeklyPlan[day as keyof typeof planData.weeklyPlan]?.meals.cafeDaManha.calories} kcal</p>
-                        </div>
-                      </Card>
-                    )}
-
-                    {planData.weeklyPlan[day as keyof typeof planData.weeklyPlan]?.meals.lancheDaManha && (
-                      <Card className="p-4">
-                        <h3 className="text-lg font-semibold mb-2">🥪 Lanche da Manhã</h3>
-                        <p className="text-sm text-gray-600 mb-2">
-                          {planData.weeklyPlan[day as keyof typeof planData.weeklyPlan]?.meals.lancheDaManha.description}
-                        </p>
-                        <div className="space-y-2">
-                          {planData.weeklyPlan[day as keyof typeof planData.weeklyPlan]?.meals.lancheDaManha.foods.map((food, idx) => (
-                            <div key={idx} className="flex items-start">
-                              <ChevronRight className="h-4 w-4 mt-1 mr-1 text-primary" />
-                              <div>
-                                <span className="font-medium">{food.name}</span>
-                                <span className="text-gray-600"> - {food.portion} {food.unit}</span>
-                                <p className="text-xs text-gray-500">{food.details}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="mt-3 pt-3 border-t text-sm">
-                          <p><span className="font-medium">Calorias:</span> {planData.weeklyPlan[day as keyof typeof planData.weeklyPlan]?.meals.lancheDaManha.calories} kcal</p>
-                        </div>
-                      </Card>
-                    )}
-
-                    {planData.weeklyPlan[day as keyof typeof planData.weeklyPlan]?.meals.almoco && (
-                      <Card className="p-4">
-                        <h3 className="text-lg font-semibold mb-2">🍽️ Almoço</h3>
-                        <p className="text-sm text-gray-600 mb-2">
-                          {planData.weeklyPlan[day as keyof typeof planData.weeklyPlan]?.meals.almoco.description}
-                        </p>
-                        <div className="space-y-2">
-                          {planData.weeklyPlan[day as keyof typeof planData.weeklyPlan]?.meals.almoco.foods.map((food, idx) => (
-                            <div key={idx} className="flex items-start">
-                              <ChevronRight className="h-4 w-4 mt-1 mr-1 text-primary" />
-                              <div>
-                                <span className="font-medium">{food.name}</span>
-                                <span className="text-gray-600"> - {food.portion} {food.unit}</span>
-                                <p className="text-xs text-gray-500">{food.details}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="mt-3 pt-3 border-t text-sm">
-                          <p><span className="font-medium">Calorias:</span> {planData.weeklyPlan[day as keyof typeof planData.weeklyPlan]?.meals.almoco.calories} kcal</p>
-                        </div>
-                      </Card>
-                    )}
-
-                    {planData.weeklyPlan[day as keyof typeof planData.weeklyPlan]?.meals.lancheDaTarde && (
-                      <Card className="p-4">
-                        <h3 className="text-lg font-semibold mb-2">🍎 Lanche da Tarde</h3>
-                        <p className="text-sm text-gray-600 mb-2">
-                          {planData.weeklyPlan[day as keyof typeof planData.weeklyPlan]?.meals.lancheDaTarde.description}
-                        </p>
-                        <div className="space-y-2">
-                          {planData.weeklyPlan[day as keyof typeof planData.weeklyPlan]?.meals.lancheDaTarde.foods.map((food, idx) => (
-                            <div key={idx} className="flex items-start">
-                              <ChevronRight className="h-4 w-4 mt-1 mr-1 text-primary" />
-                              <div>
-                                <span className="font-medium">{food.name}</span>
-                                <span className="text-gray-600"> - {food.portion} {food.unit}</span>
-                                <p className="text-xs text-gray-500">{food.details}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="mt-3 pt-3 border-t text-sm">
-                          <p><span className="font-medium">Calorias:</span> {planData.weeklyPlan[day as keyof typeof planData.weeklyPlan]?.meals.lancheDaTarde.calories} kcal</p>
-                        </div>
-                      </Card>
-                    )}
-
-                    {planData.weeklyPlan[day as keyof typeof planData.weeklyPlan]?.meals.jantar && (
-                      <Card className="p-4">
-                        <h3 className="text-lg font-semibold mb-2">🌙 Jantar</h3>
-                        <p className="text-sm text-gray-600 mb-2">
-                          {planData.weeklyPlan[day as keyof typeof planData.weeklyPlan]?.meals.jantar.description}
-                        </p>
-                        <div className="space-y-2">
-                          {planData.weeklyPlan[day as keyof typeof planData.weeklyPlan]?.meals.jantar.foods.map((food, idx) => (
-                            <div key={idx} className="flex items-start">
-                              <ChevronRight className="h-4 w-4 mt-1 mr-1 text-primary" />
-                              <div>
-                                <span className="font-medium">{food.name}</span>
-                                <span className="text-gray-600"> - {food.portion} {food.unit}</span>
-                                <p className="text-xs text-gray-500">{food.details}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="mt-3 pt-3 border-t text-sm">
-                          <p><span className="font-medium">Calorias:</span> {planData.weeklyPlan[day as keyof typeof planData.weeklyPlan]?.meals.jantar.calories} kcal</p>
-                        </div>
-                      </Card>
-                    )}
-
-                    {planData.weeklyPlan[day as keyof typeof planData.weeklyPlan]?.dailyTotals && (
-                      <Card className="p-4">
-                        <h3 className="text-lg font-semibold mb-2">📊 Totais do Dia</h3>
-                        <div className="grid grid-cols-5 gap-4 text-center">
-                          <div>
-                            <p className="text-sm text-gray-500">Calorias</p>
-                            <p className="font-semibold">{planData.weeklyPlan[day as keyof typeof planData.weeklyPlan]?.dailyTotals.calories} kcal</p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-500">Proteínas</p>
-                            <p className="font-semibold">{planData.weeklyPlan[day as keyof typeof planData.weeklyPlan]?.dailyTotals.protein}g</p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-500">Carboidratos</p>
-                            <p className="font-semibold">{planData.weeklyPlan[day as keyof typeof planData.weeklyPlan]?.dailyTotals.carbs}g</p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-500">Gorduras</p>
-                            <p className="font-semibold">{planData.weeklyPlan[day as keyof typeof planData.weeklyPlan]?.dailyTotals.fats}g</p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-500">Fibras</p>
-                            <p className="font-semibold">{planData.weeklyPlan[day as keyof typeof planData.weeklyPlan]?.dailyTotals.fiber}g</p>
-                          </div>
-                        </div>
-                      </Card>
-                    )}
-                  </div>
-                )}
+                {renderDayPlan(day)}
               </TabsContent>
             ))}
           </Tabs>
-        )}
-      </DialogContent>
-    </Dialog>
+
+          {planData.recommendations && (
+            <Recommendations recommendations={planData.recommendations} />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {selectedFood && (
+        <FoodReplacementDialog
+          open={replaceFoodDialogOpen}
+          onOpenChange={setReplaceFoodDialogOpen}
+          originalFood={selectedFood.food}
+          dayKey={selectedFood.dayKey}
+          mealType={selectedFood.mealType}
+          foodIndex={selectedFood.index}
+          onFoodReplaced={handleFoodReplaced}
+        />
+      )}
+    </>
   );
 };

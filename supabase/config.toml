@@ -48,6 +48,3 @@ verify_jwt = true
 
 [functions.generate-workout-plan-llama]
 verify_jwt = true
-
-[functions.nutri-plus-agent]
-verify_jwt = true

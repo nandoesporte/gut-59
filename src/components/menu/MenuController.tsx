@@ -1,367 +1,766 @@
-import React, { useState } from "react";
-import { MealPlan, DayPlan, Meal, MealFood, MealMacros, DailyNutrition, Recommendations, WeeklyTotals } from "./types";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { generateMealPlanPDF } from "./utils/pdf-generator";
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import type { DietaryPreferences, MealPlan } from "./types";
+import { CalorieCalculatorForm, activityLevels } from "./CalorieCalculator";
+import { useProtocolFoods } from "./hooks/useProtocolFoods";
+import { useCalorieCalculator } from "./hooks/useCalorieCalculator";
+import { useFoodSelection } from "./hooks/useFoodSelection";
+import { useWallet } from "@/hooks/useWallet";
+import { generateMealPlan } from "./hooks/useMealPlanGeneration";
 
-interface MenuControllerProps {
-  initialMealPlan?: MealPlan;
-  onRefresh?: () => Promise<void>;
+const mapGoalToDbValue = (goal: string | undefined): "maintain" | "lose_weight" | "gain_mass" => {
+  if (!goal) return "maintain";
+  
+  switch (goal) {
+    case "lose":
+      return "lose_weight";
+    case "gain":
+      return "gain_mass";
+    case "maintain":
+      return "maintain";
+    default:
+      return "maintain";
+  }
+};
+
+interface NutritionPreferences {
+  id?: string;
+  selected_foods?: string[];
+  food_by_meal_type?: Record<string, string[]>;
 }
 
-export const MenuController: React.FC<MenuControllerProps> = ({ initialMealPlan, onRefresh }) => {
-  const [mealPlan, setMealPlan] = useState<MealPlan | null>(initialMealPlan || null);
-  const [selectedDay, setSelectedDay] = useState<string>("segunda");
+export const useMenuController = () => {
+  const [currentStep, setCurrentStep] = useState<number>(1);
+  const [dietaryPreferences, setDietaryPreferences] = useState<DietaryPreferences | null>(null);
+  const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState<CalorieCalculatorForm>({
+    weight: "",
+    height: "",
+    age: "",
+    gender: "male",
+    activityLevel: "",
+    goal: undefined,
+  });
 
-  const handleDownloadPDF = async () => {
-    if (!mealPlan) return;
-    await generateMealPlanPDF(mealPlan);
+  const { protocolFoods, loading: foodsLoading, error: foodsError } = useProtocolFoods();
+  const { calorieNeeds, calculateCalories } = useCalorieCalculator();
+  const { selectedFoods, foodsByMealType, totalCalories, handleFoodSelection, calculateTotalCalories, categorizeFoodsByMealType } = useFoodSelection();
+  const wallet = useWallet();
+
+  const addTransactionAsync = async (params: Parameters<typeof wallet.addTransaction>[0]) => {
+    return new Promise<void>((resolve, reject) => {
+      try {
+        wallet.addTransaction(params);
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    });
   };
 
-  const handleRefresh = async () => {
-    if (onRefresh) {
-      await onRefresh();
-    }
-  };
+  useEffect(() => {
+    calculateTotalCalories(protocolFoods);
+  }, [selectedFoods, protocolFoods, calculateTotalCalories]);
 
-  const createEmptyMealPlan = (): MealPlan => {
-    // Create an empty meal structure
-    const emptyMeal: Meal = {
-      description: "",
-      foods: [],
-      calories: 0,
-      macros: {
-        protein: 0,
-        carbs: 0,
-        fats: 0,
-        fiber: 0
+  useEffect(() => {
+    const loadSavedPreferences = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: nutritionPrefs, error } = await supabase
+          .from('nutrition_preferences')
+          .select('selected_foods')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (error) {
+          console.error('Erro ao carregar preferências alimentares:', error);
+          return;
+        }
+
+        if (nutritionPrefs?.selected_foods && Array.isArray(nutritionPrefs.selected_foods)) {
+          nutritionPrefs.selected_foods.forEach(foodId => {
+            if (typeof foodId === 'string' && !selectedFoods.includes(foodId)) {
+              handleFoodSelection(foodId);
+            }
+          });
+          
+          if (nutritionPrefs.selected_foods.length > 0) {
+            categorizeFoodsByMealType(protocolFoods);
+          }
+        }
+      } catch (err) {
+        console.error('Erro ao carregar preferências:', err);
       }
     };
 
-    // Create empty daily totals
-    const emptyDailyTotals: DailyNutrition = {
-      calories: 0,
-      protein: 0,
-      carbs: 0,
-      fats: 0,
-      fiber: 0
-    };
+    if (protocolFoods.length > 0) {
+      loadSavedPreferences();
+    }
+  }, [protocolFoods, selectedFoods, handleFoodSelection, categorizeFoodsByMealType]);
 
-    // Create an empty day plan
-    const emptyDayPlan: DayPlan = {
-      dayName: "",
-      meals: {
-        cafeDaManha: { ...emptyMeal },
-        lancheDaManha: { ...emptyMeal },
-        almoco: { ...emptyMeal },
-        lancheDaTarde: { ...emptyMeal },
-        jantar: { ...emptyMeal }
-      },
-      dailyTotals: { ...emptyDailyTotals }
-    };
+  const handleCalculateCalories = async () => {
+    const selectedLevel = activityLevels.find(level => level.value === formData.activityLevel);
+    if (!selectedLevel) {
+      toast.error("Por favor, selecione um nível de atividade");
+      return false;
+    }
 
-    // Create empty weekly totals
-    const emptyWeeklyTotals: WeeklyTotals = {
-      averageCalories: 0,
-      averageProtein: 0,
-      averageCarbs: 0,
-      averageFats: 0,
-      averageFiber: 0
-    };
-
-    // Create empty recommendations
-    const emptyRecommendations: Recommendations = {
-      general: "",
-      preworkout: "",
-      postworkout: "",
-      timing: []
-    };
-
-    // Create the empty meal plan with all days
-    return {
-      weeklyPlan: {
-        segunda: { ...emptyDayPlan, dayName: "Segunda-feira" },
-        terca: { ...emptyDayPlan, dayName: "Terça-feira" },
-        quarta: { ...emptyDayPlan, dayName: "Quarta-feira" },
-        quinta: { ...emptyDayPlan, dayName: "Quinta-feira" },
-        sexta: { ...emptyDayPlan, dayName: "Sexta-feira" },
-        sabado: { ...emptyDayPlan, dayName: "Sábado" },
-        domingo: { ...emptyDayPlan, dayName: "Domingo" }
-      },
-      weeklyTotals: emptyWeeklyTotals,
-      recommendations: emptyRecommendations
-    };
-  };
-
-  const addFoodToMeal = (dayKey: string, mealKey: keyof DayPlan["meals"], food: MealFood) => {
-    if (!mealPlan) return;
-
-    const updatedMealPlan = { ...mealPlan };
-    const day = updatedMealPlan.weeklyPlan[dayKey as keyof typeof updatedMealPlan.weeklyPlan];
-    
-    if (day && day.meals[mealKey]) {
-      day.meals[mealKey].foods.push(food);
+    try {
+      console.log("Calculating calories with form data:", formData);
+      const calories = await calculateCalories(formData, selectedLevel);
       
-      // Recalculate meal calories and macros
-      // This is a simplified calculation - in a real app you'd have more detailed logic
-      const additionalCalories = 100; // Example value
-      day.meals[mealKey].calories += additionalCalories;
+      if (!calories) {
+        console.error("No calories returned from calculation");
+        return false;
+      }
       
-      // Update daily totals
-      day.dailyTotals.calories += additionalCalories;
+      console.log("Calories calculated successfully:", calories);
+      toast.success("Calorias calculadas com sucesso!");
       
-      // Update weekly averages
-      const days = Object.values(updatedMealPlan.weeklyPlan);
-      updatedMealPlan.weeklyTotals.averageCalories = 
-        days.reduce((sum, d) => sum + d.dailyTotals.calories, 0) / days.length;
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          console.log("Saving preferences for user:", user.id);
+          await saveUserPreferences(user.id, calories);
+        } else {
+          console.log("User not authenticated, skipping preference save");
+        }
+      } catch (authError) {
+        console.warn("Error checking authentication, proceeding to next step anyway:", authError);
+      }
       
-      setMealPlan(updatedMealPlan);
+      console.log("Advancing to step 2 (food selection)");
+      setCurrentStep(2);
+      return true;
+    } catch (error) {
+      console.error('Error in handleCalculateCalories:', error);
+      toast.error("Erro ao calcular as calorias necessárias");
+      return false;
     }
   };
 
-  const dayNameMap: Record<string, string> = {
-    segunda: "Segunda-feira",
-    terca: "Terça-feira",
-    quarta: "Quarta-feira",
-    quinta: "Quinta-feira",
-    sexta: "Sexta-feira",
-    sabado: "Sábado",
-    domingo: "Domingo"
+  const saveUserPreferences = async (userId: string, calories: number) => {
+    try {
+      console.log("Saving form data:", formData);
+      
+      const { data: existingRecord, error: selectError } = await supabase
+        .from('nutrition_preferences')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle();
+      
+      if (selectError) {
+        console.error('Error checking existing preferences:', selectError);
+        return;
+      }
+      
+      const activityLevel = formData.activityLevel as "sedentary" | "light" | "moderate" | "intense";
+      const goal = mapGoalToDbValue(formData.goal);
+      
+      console.log("Goal mapping:", formData.goal, "->", goal);
+      
+      if (existingRecord) {
+        console.log("Updating existing record:", existingRecord.id);
+        const { error } = await supabase
+          .from('nutrition_preferences')
+          .update({
+            weight: Number(formData.weight),
+            height: Number(formData.height),
+            age: Number(formData.age),
+            gender: formData.gender,
+            activity_level: activityLevel,
+            goal: goal,
+            calories_needed: calories,
+            selected_foods: selectedFoods
+          })
+          .eq('id', existingRecord.id);
+        
+        if (error) {
+          console.error('Error updating nutrition preferences:', error);
+        } else {
+          console.log("Preferences updated successfully");
+        }
+      } else {
+        console.log("Creating new preferences record");
+        const { error } = await supabase
+          .from('nutrition_preferences')
+          .insert({
+            user_id: userId,
+            weight: Number(formData.weight),
+            height: Number(formData.height),
+            age: Number(formData.age),
+            gender: formData.gender,
+            activity_level: activityLevel,
+            goal: goal,
+            calories_needed: calories,
+            selected_foods: selectedFoods
+          });
+        
+        if (error) {
+          console.error('Error inserting nutrition preferences:', error);
+        } else {
+          console.log("New preferences created successfully");
+        }
+      }
+    } catch (dbError) {
+      console.error("Database error while saving preferences:", dbError);
+    }
   };
 
-  if (!mealPlan) {
-    return (
-      <div className="text-center p-6">
-        <p className="text-gray-500">Nenhum plano alimentar disponível</p>
-        <Button onClick={() => setMealPlan(createEmptyMealPlan())} className="mt-4">
-          Criar Plano Vazio
-        </Button>
-      </div>
-    );
-  }
+  const handleConfirmFoodSelection = async () => {
+    console.log("Iniciando confirmação de seleção de alimentos");
+    
+    if (selectedFoods.length === 0) {
+      console.warn("Nenhum alimento selecionado!");
+      toast.error("Por favor, selecione pelo menos um alimento antes de prosseguir");
+      return false;
+    }
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        console.log("Usuário não autenticado, avançando sem salvar preferências");
+        toast.success("Seleção de alimentos confirmada!");
+        setCurrentStep(3);
+        return true;
+      }
 
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-semibold">Plano Alimentar Semanal</h2>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleDownloadPDF}>
-            Baixar PDF
-          </Button>
-          {onRefresh && (
-            <Button variant="outline" onClick={handleRefresh}>
-              Atualizar
-            </Button>
-          )}
-        </div>
-      </div>
+      console.log("Confirmando seleção de alimentos para usuário:", user.id);
+      console.log("Alimentos selecionados:", selectedFoods);
+      console.log("Alimentos por tipo de refeição:", foodsByMealType);
 
-      <Tabs value={selectedDay} onValueChange={setSelectedDay}>
-        <TabsList className="mb-4">
-          {Object.entries(dayNameMap).map(([day, dayName]) => (
-            <TabsTrigger key={day} value={day}>
-              {dayName}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+      try {
+        const { data: recentPrefs, error: recentError } = await supabase
+          .from('nutrition_preferences')
+          .select('id')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-        {Object.keys(dayNameMap).map(day => (
-          <TabsContent key={day} value={day}>
-            {mealPlan.weeklyPlan[day as keyof typeof mealPlan.weeklyPlan] && (
-              <Card className="p-6">
-                <h3 className="text-xl font-bold mb-4">
-                  {mealPlan.weeklyPlan[day as keyof typeof mealPlan.weeklyPlan].dayName}
-                </h3>
-                
-                {/* Café da Manhã */}
-                <div className="mb-6">
-                  <h4 className="text-lg font-semibold mb-2">Café da Manhã</h4>
-                  <p className="text-gray-600 mb-2">
-                    {mealPlan.weeklyPlan[day as keyof typeof mealPlan.weeklyPlan].meals.cafeDaManha.description}
-                  </p>
-                  <ul className="list-disc pl-5 mb-2">
-                    {mealPlan.weeklyPlan[day as keyof typeof mealPlan.weeklyPlan].meals.cafeDaManha.foods.map((food, idx) => (
-                      <li key={idx}>
-                        {food.name} - {food.portion} {food.unit}
-                        <p className="text-sm text-gray-500">{food.details}</p>
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="text-sm">
-                    <span className="font-medium">Calorias:</span> {mealPlan.weeklyPlan[day as keyof typeof mealPlan.weeklyPlan].meals.cafeDaManha.calories} kcal
-                  </p>
-                </div>
-                
-                {/* Lanche da Manhã */}
-                <div className="mb-6">
-                  <h4 className="text-lg font-semibold mb-2">Lanche da Manhã</h4>
-                  <p className="text-gray-600 mb-2">
-                    {mealPlan.weeklyPlan[day as keyof typeof mealPlan.weeklyPlan].meals.lancheDaManha.description}
-                  </p>
-                  <ul className="list-disc pl-5 mb-2">
-                    {mealPlan.weeklyPlan[day as keyof typeof mealPlan.weeklyPlan].meals.lancheDaManha.foods.map((food, idx) => (
-                      <li key={idx}>
-                        {food.name} - {food.portion} {food.unit}
-                        <p className="text-sm text-gray-500">{food.details}</p>
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="text-sm">
-                    <span className="font-medium">Calorias:</span> {mealPlan.weeklyPlan[day as keyof typeof mealPlan.weeklyPlan].meals.lancheDaManha.calories} kcal
-                  </p>
-                </div>
-                
-                {/* Almoço */}
-                <div className="mb-6">
-                  <h4 className="text-lg font-semibold mb-2">Almoço</h4>
-                  <p className="text-gray-600 mb-2">
-                    {mealPlan.weeklyPlan[day as keyof typeof mealPlan.weeklyPlan].meals.almoco.description}
-                  </p>
-                  <ul className="list-disc pl-5 mb-2">
-                    {mealPlan.weeklyPlan[day as keyof typeof mealPlan.weeklyPlan].meals.almoco.foods.map((food, idx) => (
-                      <li key={idx}>
-                        {food.name} - {food.portion} {food.unit}
-                        <p className="text-sm text-gray-500">{food.details}</p>
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="text-sm">
-                    <span className="font-medium">Calorias:</span> {mealPlan.weeklyPlan[day as keyof typeof mealPlan.weeklyPlan].meals.almoco.calories} kcal
-                  </p>
-                </div>
-                
-                {/* Lanche da Tarde */}
-                <div className="mb-6">
-                  <h4 className="text-lg font-semibold mb-2">Lanche da Tarde</h4>
-                  <p className="text-gray-600 mb-2">
-                    {mealPlan.weeklyPlan[day as keyof typeof mealPlan.weeklyPlan].meals.lancheDaTarde.description}
-                  </p>
-                  <ul className="list-disc pl-5 mb-2">
-                    {mealPlan.weeklyPlan[day as keyof typeof mealPlan.weeklyPlan].meals.lancheDaTarde.foods.map((food, idx) => (
-                      <li key={idx}>
-                        {food.name} - {food.portion} {food.unit}
-                        <p className="text-sm text-gray-500">{food.details}</p>
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="text-sm">
-                    <span className="font-medium">Calorias:</span> {mealPlan.weeklyPlan[day as keyof typeof mealPlan.weeklyPlan].meals.lancheDaTarde.calories} kcal
-                  </p>
-                </div>
-                
-                {/* Jantar */}
-                <div className="mb-6">
-                  <h4 className="text-lg font-semibold mb-2">Jantar</h4>
-                  <p className="text-gray-600 mb-2">
-                    {mealPlan.weeklyPlan[day as keyof typeof mealPlan.weeklyPlan].meals.jantar.description}
-                  </p>
-                  <ul className="list-disc pl-5 mb-2">
-                    {mealPlan.weeklyPlan[day as keyof typeof mealPlan.weeklyPlan].meals.jantar.foods.map((food, idx) => (
-                      <li key={idx}>
-                        {food.name} - {food.portion} {food.unit}
-                        <p className="text-sm text-gray-500">{food.details}</p>
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="text-sm">
-                    <span className="font-medium">Calorias:</span> {mealPlan.weeklyPlan[day as keyof typeof mealPlan.weeklyPlan].meals.jantar.calories} kcal
-                  </p>
-                </div>
-                
-                {/* Totais do Dia */}
-                <div className="mt-8 pt-4 border-t">
-                  <h4 className="text-lg font-semibold mb-3">Totais do Dia</h4>
-                  <div className="grid grid-cols-5 gap-4 text-center">
-                    <div>
-                      <p className="text-sm text-gray-500">Calorias</p>
-                      <p className="font-semibold">{mealPlan.weeklyPlan[day as keyof typeof mealPlan.weeklyPlan].dailyTotals.calories} kcal</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Proteínas</p>
-                      <p className="font-semibold">{mealPlan.weeklyPlan[day as keyof typeof mealPlan.weeklyPlan].dailyTotals.protein}g</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Carboidratos</p>
-                      <p className="font-semibold">{mealPlan.weeklyPlan[day as keyof typeof mealPlan.weeklyPlan].dailyTotals.carbs}g</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Gorduras</p>
-                      <p className="font-semibold">{mealPlan.weeklyPlan[day as keyof typeof mealPlan.weeklyPlan].dailyTotals.fats}g</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Fibras</p>
-                      <p className="font-semibold">{mealPlan.weeklyPlan[day as keyof typeof mealPlan.weeklyPlan].dailyTotals.fiber}g</p>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            )}
-          </TabsContent>
-        ))}
-      </Tabs>
+        if (recentError) {
+          console.error('Erro ao buscar preferência mais recente:', recentError);
+          console.log("Tentando criar um novo registro após erro na busca");
+        }
 
-      {/* Weekly Averages */}
-      <Card className="p-6 mt-6">
-        <h3 className="text-xl font-semibold mb-4">Médias Semanais</h3>
-        <div className="grid grid-cols-5 gap-4 text-center">
-          <div>
-            <p className="text-sm text-gray-500">Calorias</p>
-            <p className="font-semibold">{Math.round(mealPlan.weeklyTotals.averageCalories)} kcal</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">Proteínas</p>
-            <p className="font-semibold">{Math.round(mealPlan.weeklyTotals.averageProtein)}g</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">Carboidratos</p>
-            <p className="font-semibold">{Math.round(mealPlan.weeklyTotals.averageCarbs)}g</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">Gorduras</p>
-            <p className="font-semibold">{Math.round(mealPlan.weeklyTotals.averageFats)}g</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">Fibras</p>
-            <p className="font-semibold">{Math.round(mealPlan.weeklyTotals.averageFiber)}g</p>
-          </div>
-        </div>
-      </Card>
+        let updateSuccess = false;
+        
+        if (recentPrefs?.id) {
+          console.log("Encontrado registro existente. Atualizando ID:", recentPrefs.id);
+          const { error: updateError } = await supabase
+            .from('nutrition_preferences')
+            .update({ 
+              selected_foods: selectedFoods
+            })
+            .eq('id', recentPrefs.id);
 
-      {/* Recommendations */}
-      {mealPlan.recommendations && (
-        <Card className="p-6 mt-6">
-          <h3 className="text-xl font-semibold mb-4">Recomendações</h3>
+          if (updateError) {
+            console.error('Erro ao atualizar preferências:', updateError);
+          } else {
+            updateSuccess = true;
+            console.log("Preferências atualizadas com sucesso no registro existente");
+          }
+        } else {
+          console.log("Nenhum registro encontrado ou erro na busca. Criando novo...");
+          const { data: anyExisting } = await supabase
+            .from('nutrition_preferences')
+            .select('count')
+            .eq('user_id', user.id);
+            
+          const hasExisting = anyExisting && Array.isArray(anyExisting) && anyExisting.length > 0;
           
-          <div className="mb-4">
-            <h4 className="font-medium mb-2">Recomendações Gerais</h4>
-            <p className="text-gray-700">{mealPlan.recommendations.general}</p>
-          </div>
+          if (hasExisting) {
+            console.log("Já existem registros para este usuário. Tentando excluir registros antigos...");
+            await supabase
+              .from('nutrition_preferences')
+              .delete()
+              .eq('user_id', user.id);
+              
+            console.log("Registros antigos excluídos. Criando novo registro limpo.");
+          }
           
-          <div className="mb-4">
-            <h4 className="font-medium mb-2">Recomendações Pré-Treino</h4>
-            <p className="text-gray-700">{mealPlan.recommendations.preworkout}</p>
-          </div>
-          
-          <div className="mb-4">
-            <h4 className="font-medium mb-2">Recomendações Pós-Treino</h4>
-            <p className="text-gray-700">{mealPlan.recommendations.postworkout}</p>
-          </div>
-          
-          {mealPlan.recommendations.timing && mealPlan.recommendations.timing.length > 0 && (
-            <div>
-              <h4 className="font-medium mb-2">Horários Recomendados</h4>
-              <ul className="list-disc pl-5">
-                {mealPlan.recommendations.timing.map((item, idx) => (
-                  <li key={idx} className="text-gray-700">{item}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </Card>
-      )}
-    </div>
-  );
+          const { error: insertError } = await supabase
+            .from('nutrition_preferences')
+            .insert({
+              user_id: user.id,
+              selected_foods: selectedFoods,
+              weight: Number(formData.weight) || 70,
+              height: Number(formData.height) || 170,
+              age: Number(formData.age) || 30,
+              gender: formData.gender || 'male',
+              activity_level: (formData.activityLevel as "sedentary" | "light" | "moderate" | "intense") || 'moderate',
+              goal: mapGoalToDbValue(formData.goal) || 'maintain'
+            });
+
+          if (insertError) {
+            console.error('Erro ao inserir preferências:', insertError);
+          } else {
+            updateSuccess = true;
+            console.log("Novo registro de preferências criado com sucesso");
+          }
+        }
+
+        console.log("Processamento de preferências de alimentos concluído");
+        console.log("Avançando para a etapa 3 (restrições dietéticas)");
+        
+        setCurrentStep(3);
+        
+        if (updateSuccess) {
+          toast.success("Preferências de alimentos salvas! Agora informe suas restrições dietéticas.");
+        } else {
+          toast.success("Suas escolhas de alimentos foram confirmadas!");
+        }
+        
+        return true;
+      } catch (dbError) {
+        console.error("Erro de banco de dados:", dbError);
+        setCurrentStep(3);
+        toast.success("Preferências de alimentos confirmadas!");
+        return true;
+      }
+    } catch (error) {
+      console.error('Erro ao processar seleção de alimentos:', error);
+      toast.error("Ocorreu um erro ao processar sua seleção. Tente novamente.");
+      return false;
+    }
+  };
+
+  const handleDietaryPreferences = async (preferences: DietaryPreferences) => {    
+    console.log('Preferências alimentares recebidas:', preferences);
+    console.log('Alimentos selecionados:', selectedFoods);
+
+    setDietaryPreferences(preferences);
+
+    if (!calorieNeeds || calorieNeeds <= 0) {
+      toast.error("Necessidade calórica inválida");
+      return false;
+    }
+
+    if (!selectedFoods || selectedFoods.length === 0) {
+      toast.error("Selecione pelo menos um alimento");
+      return false;
+    }
+
+    if (!formData.goal || !formData.weight || !formData.height || !formData.age) {
+      toast.error("Dados do formulário incompletos");
+      return false;
+    }
+
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      
+      if (userData.user) {
+        const { error: prefsError } = await supabase
+          .from('dietary_preferences')
+          .upsert({
+            user_id: userData.user.id,
+            has_allergies: preferences.hasAllergies,
+            allergies: preferences.allergies,
+            dietary_restrictions: preferences.dietaryRestrictions,
+            training_time: preferences.trainingTime
+          }, { onConflict: 'user_id' });
+              
+        if (prefsError) {
+          console.error('Erro ao salvar preferências dietéticas:', prefsError);
+        }
+        
+        toast.loading("Gerando plano alimentar personalizado com Llama 3.2 1B...");
+        
+        try {
+          const generatedMealPlan = await generateMealPlan({
+            userData: {
+              id: userData.user.id,
+              weight: Number(formData.weight),
+              height: Number(formData.height),
+              age: Number(formData.age),
+              gender: formData.gender,
+              activityLevel: formData.activityLevel,
+              goal: formData.goal,
+              dailyCalories: calorieNeeds
+            },
+            selectedFoods: protocolFoods.filter(food => selectedFoods.includes(food.id)),
+            foodsByMealType,
+            preferences,
+            addTransaction: addTransactionAsync
+          });
+
+          if (generatedMealPlan) {
+            setMealPlan(generatedMealPlan);
+            console.log('Plano gerado:', generatedMealPlan);
+          } else {
+            console.error('Plano alimentar não foi gerado corretamente');
+            toast.error("Falha ao gerar plano alimentar. Tente novamente.");
+          }
+        } catch (error) {
+          console.error('Erro ao gerar plano alimentar:', error);
+          toast.error("Erro ao gerar o plano alimentar. Tente novamente.");
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        console.log("Usuário não autenticado. Criando plano básico.");
+        
+        const basicMealPlan: MealPlan = {
+          userCalories: calorieNeeds,
+          weeklyPlan: {
+            monday: {
+              dayName: "Segunda",
+              meals: {
+                breakfast: {
+                  description: "Café da Manhã",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                morningSnack: {
+                  description: "Lanche da Manhã",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                lunch: {
+                  description: "Almoço",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                afternoonSnack: {
+                  description: "Lanche da Tarde",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                dinner: {
+                  description: "Jantar",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                }
+              },
+              dailyTotals: {
+                calories: 0,
+                protein: 0,
+                carbs: 0,
+                fats: 0,
+                fiber: 0
+              }
+            },
+            tuesday: {
+              dayName: "Terça",
+              meals: {
+                breakfast: {
+                  description: "Café da Manhã",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                morningSnack: {
+                  description: "Lanche da Manhã",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                lunch: {
+                  description: "Almoço",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                afternoonSnack: {
+                  description: "Lanche da Tarde",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                dinner: {
+                  description: "Jantar",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                }
+              },
+              dailyTotals: {
+                calories: 0,
+                protein: 0,
+                carbs: 0,
+                fats: 0,
+                fiber: 0
+              }
+            },
+            wednesday: {
+              dayName: "Quarta",
+              meals: {
+                breakfast: {
+                  description: "Café da Manhã",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                morningSnack: {
+                  description: "Lanche da Manhã",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                lunch: {
+                  description: "Almoço",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                afternoonSnack: {
+                  description: "Lanche da Tarde",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                dinner: {
+                  description: "Jantar",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                }
+              },
+              dailyTotals: {
+                calories: 0,
+                protein: 0,
+                carbs: 0,
+                fats: 0,
+                fiber: 0
+              }
+            },
+            thursday: {
+              dayName: "Quinta",
+              meals: {
+                breakfast: {
+                  description: "Café da Manhã",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                morningSnack: {
+                  description: "Lanche da Manhã",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                lunch: {
+                  description: "Almoço",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                afternoonSnack: {
+                  description: "Lanche da Tarde",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                dinner: {
+                  description: "Jantar",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                }
+              },
+              dailyTotals: {
+                calories: 0,
+                protein: 0,
+                carbs: 0,
+                fats: 0,
+                fiber: 0
+              }
+            },
+            friday: {
+              dayName: "Sexta",
+              meals: {
+                breakfast: {
+                  description: "Café da Manhã",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                morningSnack: {
+                  description: "Lanche da Manhã",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                lunch: {
+                  description: "Almoço",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                afternoonSnack: {
+                  description: "Lanche da Tarde",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                dinner: {
+                  description: "Jantar",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                }
+              },
+              dailyTotals: {
+                calories: 0,
+                protein: 0,
+                carbs: 0,
+                fats: 0,
+                fiber: 0
+              }
+            },
+            saturday: {
+              dayName: "Sábado",
+              meals: {
+                breakfast: {
+                  description: "Café da Manhã",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                morningSnack: {
+                  description: "Lanche da Manhã",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                lunch: {
+                  description: "Almoço",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                afternoonSnack: {
+                  description: "Lanche da Tarde",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                dinner: {
+                  description: "Jantar",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                }
+              },
+              dailyTotals: {
+                calories: 0,
+                protein: 0,
+                carbs: 0,
+                fats: 0,
+                fiber: 0
+              }
+            },
+            sunday: {
+              dayName: "Domingo",
+              meals: {
+                breakfast: {
+                  description: "Café da Manhã",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                morningSnack: {
+                  description: "Lanche da Manhã",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                lunch: {
+                  description: "Almoço",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                afternoonSnack: {
+                  description: "Lanche da Tarde",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                },
+                dinner: {
+                  description: "Jantar",
+                  foods: [{ name: "Escolha um dos alimentos selecionados", portion: 1, unit: "porção", details: "" }],
+                  calories: 0,
+                  macros: { protein: 0, carbs: 0, fats: 0, fiber: 0 }
+                }
+              },
+              dailyTotals: {
+                calories: 0,
+                protein: 0,
+                carbs: 0,
+                fats: 0,
+                fiber: 0
+              }
+            }
+          },
+          weeklyTotals: {
+            averageCalories: 0,
+            averageProtein: 0,
+            averageCarbs: 0,
+            averageFats: 0,
+            averageFiber: 0
+          },
+          recommendations: {
+            general: "Para um plano personalizado completo, faça login na plataforma.",
+            preworkout: "Consuma carboidratos de fácil digestão 30-60 minutos antes do treino.",
+            postworkout: "Consuma proteínas e carboidratos até 30 minutos após o treino para melhor recuperação.",
+            timing: [
+              "Mantenha uma alimentação balanceada com proteínas, carboidratos e gorduras boas.",
+              "Beba pelo menos 2 litros de água por dia."
+            ]
+          }
+        };
+        
+        setMealPlan(basicMealPlan);
+        toast.success("Plano básico criado! Para um plano personalizado completo, faça login.");
+      }
+      
+      console.log("Avançando para a etapa 4 (exibição do plano alimentar)");
+      setCurrentStep(4);
+      return true;
+    } catch (error) {
+      console.error('Erro completo:', error);
+      toast.error("Erro ao processar suas preferências. Tente novamente.");
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (mealPlan) {
+      console.log("MEAL PLAN UPDATED:", mealPlan);
+      console.log("Plan has weeklyPlan?", !!mealPlan.weeklyPlan);
+      console.log("Current step:", currentStep);
+    }
+  }, [mealPlan, currentStep]);
+
+  return {
+    currentStep,
+    setCurrentStep,
+    calorieNeeds,
+    selectedFoods,
+    foodsByMealType,
+    protocolFoods,
+    totalCalories,
+    mealPlan,
+    formData,
+    loading: loading || foodsLoading,
+    foodsError,
+    handleCalculateCalories,
+    handleFoodSelection,
+    handleConfirmFoodSelection,
+    handleDietaryPreferences,
+    setFormData,
+  };
 };
-
-export default MenuController;

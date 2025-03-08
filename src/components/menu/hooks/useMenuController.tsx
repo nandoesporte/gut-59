@@ -204,15 +204,25 @@ export const useMenuController = (): MenuState => {
     
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
-      const selectedProtocolFoods = protocolFoods.filter(food => selectedFoods.includes(food.id));
-      
-      const typedFoodsByMealType: Record<string, ProtocolFood[]> = {};
-      Object.keys(foodsByMealType).forEach(mealType => {
-        typedFoodsByMealType[mealType] = foodsByMealType[mealType].filter(food => 
-          selectedFoods.includes(food.id)
-        );
-      });
+      if (user) {
+        const { error } = await supabase.from('dietary_preferences').upsert({
+          user_id: user.id,
+          has_allergies: preferences.hasAllergies,
+          allergies: preferences.allergies,
+          dietary_restrictions: preferences.dietaryRestrictions,
+          training_time: preferences.trainingTime
+        });
+        
+        if (error) {
+          console.error("Error saving dietary preferences:", error);
+        }
+      }
+    } catch (error) {
+      console.error("Error saving dietary preferences:", error);
+    }
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
       
       const generatedPlan = await generateMealPlan({
         userData: {
@@ -225,8 +235,8 @@ export const useMenuController = (): MenuState => {
           goal: formData.goal,
           dailyCalories: calorieNeeds
         },
-        selectedFoods: selectedProtocolFoods,
-        foodsByMealType: typedFoodsByMealType,
+        selectedFoods: protocolFoods.filter(food => selectedFoods.includes(food.id)),
+        foodsByMealType,
         preferences,
         addTransaction: wallet ? async (params) => {
           try {
@@ -240,13 +250,29 @@ export const useMenuController = (): MenuState => {
       if (generatedPlan) {
         setMealPlan(generatedPlan);
         
+        // Save the meal plan to the database
         if (user) {
           try {
-            // If generateMealPlan already saved the plan, we don't need to do it again
-            // Just showing this was handled in the previous function
-            console.log("✅ Plano alimentar já foi salvo pela função generateMealPlan");
+            console.log("💾 Tentando salvar plano alimentar para o usuário:", user.id);
+            
+            // Convert the MealPlan object to a plain JSON object
+            const planDataAsJson = JSON.parse(JSON.stringify(generatedPlan));
+            
+            const { error } = await supabase
+              .from('meal_plans')
+              .insert({
+                user_id: user.id,
+                plan_data: planDataAsJson,
+                calories: calorieNeeds
+              });
+              
+            if (error) {
+              console.error("❌ Erro ao salvar plano alimentar:", error);
+            } else {
+              console.log("✅ Plano alimentar salvo com sucesso");
+            }
           } catch (error) {
-            console.error("❌ Erro ao processar plano alimentar:", error);
+            console.error("❌ Erro ao salvar plano alimentar:", error);
           }
         }
         
