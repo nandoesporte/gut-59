@@ -1,4 +1,3 @@
-
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 import { MealPlan } from "../types";
@@ -9,6 +8,9 @@ import { ptBR } from "date-fns/locale";
 declare module "jspdf" {
   interface jsPDF {
     autoTable: (options: any) => jsPDF;
+    lastAutoTable: {
+      finalY: number;
+    };
   }
 }
 
