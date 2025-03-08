@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { supabase } from '@/integrations/supabase/client';
@@ -46,13 +47,28 @@ export const NutriSummary = () => {
 
         if (data) {
           console.log("Found last meal plan:", data);
-          const typedData: LastMealPlanData = {
-            id: data.id,
-            created_at: data.created_at,
-            calories: data.calories,
-            plan_data: data.plan_data as MealPlan
-          };
-          setLastPlan(typedData);
+          
+          // Safely cast the JSON plan_data to MealPlan type with validation
+          const planData = data.plan_data as unknown;
+          
+          // Validate that planData contains the required MealPlan properties
+          if (
+            planData && 
+            typeof planData === 'object' &&
+            'weeklyPlan' in planData &&
+            'weeklyTotals' in planData &&
+            'recommendations' in planData
+          ) {
+            const typedData: LastMealPlanData = {
+              id: data.id,
+              created_at: data.created_at,
+              calories: data.calories,
+              plan_data: planData as MealPlan
+            };
+            setLastPlan(typedData);
+          } else {
+            console.error("Invalid meal plan data format:", planData);
+          }
         }
       } catch (error) {
         console.error('Error fetching last meal plan:', error);

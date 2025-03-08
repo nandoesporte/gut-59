@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { useProtocolFoods } from "./useProtocolFoods";
 import { useCalorieCalculator, Goal } from "./useCalorieCalculator";
@@ -204,25 +203,15 @@ export const useMenuController = (): MenuState => {
     
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { error } = await supabase.from('dietary_preferences').upsert({
-          user_id: user.id,
-          has_allergies: preferences.hasAllergies,
-          allergies: preferences.allergies,
-          dietary_restrictions: preferences.dietaryRestrictions,
-          training_time: preferences.trainingTime
-        });
-        
-        if (error) {
-          console.error("Error saving dietary preferences:", error);
-        }
-      }
-    } catch (error) {
-      console.error("Error saving dietary preferences:", error);
-    }
-    
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
+      
+      const selectedProtocolFoods = protocolFoods.filter(food => selectedFoods.includes(food.id));
+      
+      const typedFoodsByMealType: Record<string, ProtocolFood[]> = {};
+      Object.keys(foodsByMealType).forEach(mealType => {
+        typedFoodsByMealType[mealType] = foodsByMealType[mealType].filter(food => 
+          selectedFoods.includes(food.id)
+        );
+      });
       
       const generatedPlan = await generateMealPlan({
         userData: {
@@ -235,8 +224,8 @@ export const useMenuController = (): MenuState => {
           goal: formData.goal,
           dailyCalories: calorieNeeds
         },
-        selectedFoods: protocolFoods.filter(food => selectedFoods.includes(food.id)),
-        foodsByMealType,
+        selectedFoods: selectedProtocolFoods,
+        foodsByMealType: typedFoodsByMealType,
         preferences,
         addTransaction: wallet ? async (params) => {
           try {
@@ -250,12 +239,10 @@ export const useMenuController = (): MenuState => {
       if (generatedPlan) {
         setMealPlan(generatedPlan);
         
-        // Save the meal plan to the database
         if (user) {
           try {
             console.log("💾 Tentando salvar plano alimentar para o usuário:", user.id);
             
-            // Convert the MealPlan object to a plain JSON object
             const planDataAsJson = JSON.parse(JSON.stringify(generatedPlan));
             
             const { error } = await supabase
