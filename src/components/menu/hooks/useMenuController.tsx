@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { useProtocolFoods } from "./useProtocolFoods";
 import { useCalorieCalculator, Goal } from "./useCalorieCalculator";
@@ -224,6 +225,7 @@ export const useMenuController = (): MenuState => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
+      // Convert the foods array to ProtocolFood objects
       const typedFoodsByMealType: { [key: string]: ProtocolFood[] } = {};
       
       if (foodsByMealType) {
@@ -235,6 +237,7 @@ export const useMenuController = (): MenuState => {
         });
       }
       
+      // Create transaction adapter that maps from our internal parameter format to wallet's expected format
       const addWalletTransaction = wallet ? async (params: {
         amount: number; 
         description: string; 
@@ -244,7 +247,7 @@ export const useMenuController = (): MenuState => {
           const txInput: TransactionInput = {
             amount: params.amount,
             description: params.description,
-            type: params.transactionType,
+            type: mapTransactionType(params.transactionType),
           };
           wallet.addTransaction(txInput);
         } catch (e) {
@@ -283,6 +286,13 @@ export const useMenuController = (): MenuState => {
       setLoading(false);
     }
   }, [formData, calorieNeeds, selectedFoods, protocolFoods, foodsByMealType, wallet]);
+
+  // Helper function to map our transaction types to system transaction types
+  const mapTransactionType = (type: "purchase" | "reward" | "admin"): 'meal_plan_generation' | 'workout_plan_generation' | 'rehab_plan_generation' => {
+    if (type === "purchase") return "meal_plan_generation";
+    // Default to meal_plan_generation for all other cases
+    return "meal_plan_generation";
+  };
 
   return {
     currentStep,

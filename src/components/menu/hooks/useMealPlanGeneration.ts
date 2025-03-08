@@ -1,7 +1,7 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { DietaryPreferences, MealPlan, ProtocolFood } from "../types";
 import { toast } from "sonner";
+import { TransactionInput } from "@/hooks/wallet/types";
 
 export interface UserData {
   id: string;
@@ -28,17 +28,14 @@ export interface MealPlanGenerationParams {
   addTransaction?: (params: TransactionParams) => Promise<void>;
 }
 
-// Utility function to standardize meal plan format from different sources
 const standardizeMealPlanFormat = (rawData: any): MealPlan => {
   console.log("Standardizing meal plan format from raw data:", typeof rawData);
   
-  // Check if the data already has the expected MealPlan structure
   if (rawData && rawData.weeklyPlan && typeof rawData.weeklyPlan === 'object') {
     console.log("Data already has weeklyPlan structure");
     return rawData as MealPlan;
   }
   
-  // If the data has a mealPlan or meal_plan property, extract it
   if (rawData?.mealPlan?.weeklyPlan) {
     console.log("Data has mealPlan.weeklyPlan structure");
     return rawData.mealPlan as MealPlan;
@@ -58,10 +55,8 @@ const standardizeMealPlanFormat = (rawData: any): MealPlan => {
     };
   }
   
-  // Groq API response format may be different
   if (rawData?.meal_plan?.daily_meals || rawData?.meal_plan?.meals) {
     console.log("Converting from Groq format to internal format");
-    // Convert from Groq format to our internal format
     try {
       const weeklyPlan = {
         monday: createDayPlan("Segunda-feira", rawData.meal_plan),
@@ -102,17 +97,14 @@ const standardizeMealPlanFormat = (rawData: any): MealPlan => {
       };
     } catch (error) {
       console.error("Error converting from Groq format:", error);
-      // Return a minimal valid meal plan to avoid breaking the UI
       return createMinimalValidMealPlan();
     }
   }
   
   console.error("Unknown meal plan format:", rawData);
-  // Return a minimal valid meal plan to avoid breaking the UI
   return createMinimalValidMealPlan();
 };
 
-// Helper function to create a day plan from Groq API format
 const createDayPlan = (dayName: string, mealPlanData: any) => {
   const createMeal = (mealData: any) => {
     if (!mealData) return {
@@ -126,7 +118,7 @@ const createDayPlan = (dayName: string, mealPlanData: any) => {
       description: mealData.name || "Refeição",
       foods: Array.isArray(mealData.foods) ? mealData.foods.map((food: any) => ({
         name: food.name || "Alimento não especificado",
-        portion: food.portion || 0,
+        portion: Number(food.portion || 0),
         unit: food.unit || "g",
         details: food.details || ""
       })) : [],
@@ -142,9 +134,7 @@ const createDayPlan = (dayName: string, mealPlanData: any) => {
   
   let meals = null;
   
-  // Handle different possible meal structures
   if (mealPlanData.daily_meals) {
-    // If daily_meals contains an array of meals
     const daily = mealPlanData.daily_meals.find((day: any) => 
       day.day?.toLowerCase() === dayName.toLowerCase());
     
@@ -158,7 +148,6 @@ const createDayPlan = (dayName: string, mealPlanData: any) => {
       };
     }
   } else if (mealPlanData.meals) {
-    // Direct meals object
     meals = {
       breakfast: createMeal(mealPlanData.meals.find((m: any) => m.type === "breakfast")),
       morningSnack: createMeal(mealPlanData.meals.find((m: any) => m.type === "morning_snack")),
@@ -169,7 +158,6 @@ const createDayPlan = (dayName: string, mealPlanData: any) => {
   }
   
   if (!meals) {
-    // Default empty meals
     meals = {
       breakfast: createMeal(null),
       morningSnack: createMeal(null),
@@ -179,7 +167,6 @@ const createDayPlan = (dayName: string, mealPlanData: any) => {
     };
   }
   
-  // Calculate totals from meals
   const dailyTotals = {
     calories: Object.values(meals).reduce((sum, meal) => sum + (meal.calories || 0), 0),
     protein: Object.values(meals).reduce((sum, meal) => sum + (meal.macros.protein || 0), 0),
@@ -191,7 +178,6 @@ const createDayPlan = (dayName: string, mealPlanData: any) => {
   return { dayName, meals, dailyTotals };
 };
 
-// Create a minimal valid meal plan to avoid UI errors
 const createMinimalValidMealPlan = (): MealPlan => {
   const emptyMeal = {
     description: "Refeição não disponível",
@@ -245,7 +231,6 @@ export const generateMealPlan = async (params: MealPlanGenerationParams): Promis
   try {
     console.log("Generating meal plan with Groq...");
     
-    // Prepare input data for Groq
     const userInput = {
       userData: {
         ...userData,
@@ -264,7 +249,6 @@ export const generateMealPlan = async (params: MealPlanGenerationParams): Promis
     
     console.log("Sending data to Groq API:", JSON.stringify(userInput).substring(0, 300) + "...");
     
-    // Make the request to our Supabase Edge Function
     const response = await supabase.functions.invoke('generate-meal-plan-groq', {
       body: { userInput, user_id: userData.id }
     });
@@ -280,7 +264,6 @@ export const generateMealPlan = async (params: MealPlanGenerationParams): Promis
       throw new Error("Resposta vazia do servidor");
     }
     
-    // Add transaction if provided and successful
     if (params.addTransaction) {
       try {
         await params.addTransaction({
@@ -296,7 +279,6 @@ export const generateMealPlan = async (params: MealPlanGenerationParams): Promis
     
     console.log("Response data format:", response.data);
     
-    // Standardize the meal plan format and add user calories
     const standardizedPlan = standardizeMealPlanFormat(response.data.mealPlan || response.data);
     standardizedPlan.userCalories = userData.dailyCalories;
     standardizedPlan.generatedBy = "groq";
@@ -304,15 +286,11 @@ export const generateMealPlan = async (params: MealPlanGenerationParams): Promis
     console.log("Standardized meal plan has weeklyPlan:", !!standardizedPlan.weeklyPlan);
     
     try {
-      // Save the standardized plan to the database (optional, as the edge function already does this)
-      // Convert to JSON to ensure it can be stored properly
       const planJson = JSON.parse(JSON.stringify(standardizedPlan));
       
-      // Check if the plan is already in the database (by ID from response)
       if (!response.data.id) {
-        // Convert the preferences to a JSON-compatible object
-        const preferencesJson = JSON.parse(JSON.stringify(preferences));
-
+        const preferencesJson = JSON.stringify(preferences);
+        
         const { error } = await supabase
           .from('meal_plans')
           .insert({
@@ -330,7 +308,6 @@ export const generateMealPlan = async (params: MealPlanGenerationParams): Promis
       }
     } catch (dbError) {
       console.error("Error saving meal plan to database:", dbError);
-      // Continue execution even if database save fails
     }
     
     return standardizedPlan;
