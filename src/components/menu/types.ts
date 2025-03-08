@@ -105,13 +105,16 @@ export interface MealPlan {
 export interface TransactionParams {
   amount: number;
   description: string;
-  category: string;
+  category?: string;
   type: string;
 }
 
 export interface TransactionInput {
   amount: number;
   description: string;
-  category: string;
+  category?: string;
   type: string;
 }
+
+// MenuStep type for the menu workflow
+export type MenuStep = 'initial' | 'calculator' | 'foods' | 'preferences' | 'result';

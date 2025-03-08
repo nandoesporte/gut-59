@@ -1,7 +1,8 @@
 
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import type { DietaryPreferences, MealPlan, ProtocolFood, DayPlan, TransactionParams } from "../types";
+import type { DietaryPreferences, MealPlan, ProtocolFood, TransactionParams } from "../types";
+import { TransactionType } from "@/types/wallet";
 
 interface GenerateMealPlanParams {
   userData: {
@@ -127,7 +128,7 @@ export const generateMealPlan = async ({
           .from('meal_plans')
           .insert({
             user_id: userData.id,
-            plan_data: mealPlan,
+            plan_data: JSON.stringify(mealPlan),
             calories: userData.dailyCalories,
             generated_by: data.modelUsed || "nutri-plus-agent-llama3",
             dietary_preferences: JSON.stringify(preferences) // Convert to JSON string
@@ -144,9 +145,8 @@ export const generateMealPlan = async ({
           if (addTransaction) {
             await addTransaction({
               amount: 10,
-              type: 'expense',
-              description: 'Geração de plano alimentar',
-              category: 'meal_plan'
+              type: 'meal_plan_generation',
+              description: 'Geração de plano alimentar'
             });
             console.log("💰 Transação adicionada para geração do plano alimentar");
           }

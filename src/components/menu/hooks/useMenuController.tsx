@@ -2,17 +2,25 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import type { MealPlan, ProtocolFood, DietaryPreferences, TransactionInput, TransactionParams } from "../types";
-import { useCalorieCalculator } from "./useCalorieCalculator";
+import type { MealPlan, ProtocolFood, DietaryPreferences, TransactionParams, MenuStep } from "../types";
+import { useCalorieCalculator, Goal } from "./useCalorieCalculator";
 import { generateMealPlan } from "./useMealPlanGeneration";
 import { useProtocolFoods } from "./useProtocolFoods";
 import { usePaymentHandling } from "./usePaymentHandling";
-import { generateMealPlanPDF } from "../utils/pdf-generator";
 import { useWallet } from "@/hooks/useWallet";
 import { TransactionType } from "@/types/wallet";
+import { TransactionInput } from "@/hooks/wallet/types";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
-// Define types for menu workflow states
-type MenuStep = 'initial' | 'calculator' | 'foods' | 'preferences' | 'result';
+interface CalorieCalculatorForm {
+  weight: string;
+  height: string;
+  age: string;
+  gender: "male" | "female";
+  activityLevel: string;
+  goal: Goal;
+}
 
 interface UserCalorieData {
   userId?: string;
@@ -23,15 +31,6 @@ interface UserCalorieData {
   activityLevel: string;
   goal: string;
   dailyCalories: number;
-}
-
-interface CalorieCalculatorForm {
-  weight: string;
-  height: string;
-  age: string;
-  gender: "male" | "female";
-  activityLevel: string;
-  goal: string;
 }
 
 // Main hook for menu controller
@@ -78,7 +77,8 @@ export const useMenuController = () => {
     selectedFoodCount,
     isLoadingFoods,
     loading: loadingFoods,
-    error: foodsError
+    error: foodsError,
+    foodsByMealType
   } = useProtocolFoods();
   
   const [dietaryPreferences, setDietaryPreferences] = useState<DietaryPreferences>({
@@ -221,39 +221,6 @@ export const useMenuController = () => {
     handlePreferencesSubmitted(preferences);
   }, [handlePreferencesSubmitted]);
 
-  // Organize selected foods by meal type
-  const organizeFoodsByMealType = useCallback(() => {
-    // Create a mapping of foods to each meal type
-    const foodsByMealType: Record<string, ProtocolFood[]> = {
-      breakfast: [],
-      morning_snack: [],
-      lunch: [],
-      afternoon_snack: [],
-      dinner: []
-    };
-    
-    // For each selected food, assign it to appropriate meal types
-    selectedFoods.forEach(food => {
-      // If food has meal_type property, use it
-      if (food.meal_type && Array.isArray(food.meal_type)) {
-        food.meal_type.forEach(mealType => {
-          if (mealType in foodsByMealType) {
-            foodsByMealType[mealType].push(food);
-          }
-        });
-      } else {
-        // If no meal_type, assign to all meal types
-        foodsByMealType.breakfast.push(food);
-        foodsByMealType.morning_snack.push(food);
-        foodsByMealType.lunch.push(food);
-        foodsByMealType.afternoon_snack.push(food);
-        foodsByMealType.dinner.push(food);
-      }
-    });
-    
-    return foodsByMealType;
-  }, [selectedFoods]);
-
   // Handle meal plan generation
   const handleGenerateMealPlan = useCallback(async () => {
     setIsGenerating(true);
@@ -261,17 +228,14 @@ export const useMenuController = () => {
     toast.loading("Gerando plano alimentar personalizado...");
     
     try {
-      // Map foods to meal types
-      const foodsByMealType = organizeFoodsByMealType();
-      
       // Prepare transaction function for wallet
       const handleAddTransaction = async (params: TransactionParams) => {
         if (addTransaction) {
-          const transactionType = params.type as TransactionType;
+          const transactionType = params.type as unknown as TransactionType;
           await addTransaction({
             ...params,
             type: transactionType
-          } as TransactionInput);
+          } as unknown as TransactionInput);
         }
       };
       
@@ -303,7 +267,7 @@ export const useMenuController = () => {
       setLoading(false);
       toast.dismiss();
     }
-  }, [userData, selectedFoods, dietaryPreferences, goToStep, organizeFoodsByMealType, addTransaction]);
+  }, [userData, selectedFoods, dietaryPreferences, goToStep, foodsByMealType, addTransaction]);
 
   // Handle payment completion
   const handlePaymentCompleted = useCallback(async () => {
@@ -317,24 +281,29 @@ export const useMenuController = () => {
     if (!mealPlan) return;
     
     try {
-      const pdfBlob = await generateMealPlanPDF(mealPlan, userData.dailyCalories);
+      const element = document.getElementById('meal-plan-container');
+      if (!element) {
+        toast.error("Elemento do plano alimentar não encontrado");
+        return;
+      }
       
-      // Create download link and trigger download
-      const url = URL.createObjectURL(pdfBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'plano-alimentar.pdf';
-      link.click();
+      const canvas = await html2canvas(element);
+      const imgData = canvas.toDataURL('image/png');
       
-      // Clean up
-      setTimeout(() => URL.revokeObjectURL(url), 100);
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save('plano-alimentar.pdf');
       
       toast.success("PDF baixado com sucesso!");
     } catch (error) {
       console.error("Erro ao gerar PDF:", error);
       toast.error("Erro ao gerar PDF. Tente novamente.");
     }
-  }, [mealPlan, userData]);
+  }, [mealPlan]);
 
   // Reset the workflow
   const handleReset = useCallback(() => {

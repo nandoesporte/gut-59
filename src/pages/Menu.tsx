@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { useEffect, useRef } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/integrations/supabase/client";
+import { type MenuStep } from "@/components/menu/types";
 
 const Menu = () => {
   const mealPlanRef = useRef<HTMLDivElement>(null);
@@ -55,7 +56,7 @@ const Menu = () => {
   }, [mealPlan]);
   
   useEffect(() => {
-    if (currentStep === 3 && restrictionsCardRef.current) {
+    if (currentStep === 'preferences' && restrictionsCardRef.current) {
       console.log("Scrolling to restrictions section");
       restrictionsCardRef.current.scrollIntoView({
         behavior: 'smooth',
@@ -69,7 +70,7 @@ const Menu = () => {
     console.log("Protocol foods count:", protocolFoods.length);
     console.log("Selected foods count:", selectedFoods.length);
     
-    if (currentStep === 2) {
+    if (currentStep === 'foods') {
       console.log("Step 2 (food selection) is active");
       if (protocolFoods.length === 0) {
         console.log("Warning: No foods available for selection");
@@ -98,7 +99,7 @@ const Menu = () => {
       }
       
       // Reset to food selection step
-      setCurrentStep(2);
+      setCurrentStep('foods');
       
       toast.info("Voltando para seleção de alimentos. Você pode escolher novos alimentos para seu plano.");
       return Promise.resolve();
@@ -139,10 +140,10 @@ const Menu = () => {
           <div className="space-y-6 sm:space-y-8">
             <Card className="p-4 sm:p-6">
               <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center">
-                <span className={`bg-${Number(currentStep) >= 1 ? 'green' : 'gray'}-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2`}>1</span>
+                <span className={`bg-${currentStep === 'calculator' || currentStep === 'foods' || currentStep === 'preferences' || currentStep === 'result' ? 'green' : 'gray'}-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2`}>1</span>
                 Dados Básicos e Calorias
               </h2>
-              {currentStep === 1 && (
+              {currentStep === 'calculator' && (
                 <CalorieCalculatorStep
                   formData={formData}
                   onInputChange={(field, value) => {
@@ -155,11 +156,11 @@ const Menu = () => {
                   calorieNeeds={calorieNeeds}
                 />
               )}
-              {Number(currentStep) > 1 && (
+              {(currentStep === 'foods' || currentStep === 'preferences' || currentStep === 'result') && (
                 <div className="text-center py-2">
                   <p className="text-green-600 font-medium">✓ Calorias diárias calculadas: {calorieNeeds} kcal</p>
                   <button 
-                    onClick={() => setCurrentStep(1)} 
+                    onClick={() => setCurrentStep('calculator')} 
                     className="text-sm text-gray-500 underline mt-2 px-4 py-1 rounded-md hover:bg-gray-100 transition-colors"
                   >
                     Editar
@@ -168,12 +169,12 @@ const Menu = () => {
               )}
             </Card>
 
-            <Card className={`p-4 sm:p-6 ${Number(currentStep) < 2 ? 'opacity-70' : ''}`}>
+            <Card className={`p-4 sm:p-6 ${currentStep === 'initial' || currentStep === 'calculator' ? 'opacity-70' : ''}`}>
               <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center">
-                <span className={`bg-${Number(currentStep) >= 2 ? 'green' : 'gray'}-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2`}>2</span>
+                <span className={`bg-${currentStep === 'foods' || currentStep === 'preferences' || currentStep === 'result' ? 'green' : 'gray'}-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2`}>2</span>
                 Preferências Alimentares
               </h2>
-              {currentStep === 2 && (
+              {currentStep === 'foods' && (
                 <>
                   {foodsError ? (
                     <div className="p-6 text-center">
@@ -209,17 +210,17 @@ const Menu = () => {
                       selectedFoods={selectedFoods}
                       onFoodSelection={handleFoodSelection}
                       totalCalories={0}
-                      onBack={() => setCurrentStep(1)}
+                      onBack={() => setCurrentStep('calculator')}
                       onConfirm={handleConfirmFoodSelection}
                     />
                   )}
                 </>
               )}
-              {Number(currentStep) > 2 && (
+              {(currentStep === 'preferences' || currentStep === 'result') && (
                 <div className="text-center py-2">
                   <p className="text-green-600 font-medium">✓ {selectedFoods.length} alimentos selecionados</p>
                   <button 
-                    onClick={() => setCurrentStep(2)} 
+                    onClick={() => setCurrentStep('foods')} 
                     className="text-sm text-gray-500 underline mt-2 px-4 py-1 rounded-md hover:bg-gray-100 transition-colors"
                   >
                     Editar
@@ -229,22 +230,22 @@ const Menu = () => {
             </Card>
 
             <div ref={restrictionsCardRef}>
-              <Card id="dietary-restrictions-section" className={`p-4 sm:p-6 ${Number(currentStep) < 3 ? 'opacity-70' : ''}`}>
+              <Card id="dietary-restrictions-section" className={`p-4 sm:p-6 ${currentStep === 'initial' || currentStep === 'calculator' || currentStep === 'foods' ? 'opacity-70' : ''}`}>
                 <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center">
-                  <span className={`bg-${Number(currentStep) >= 3 ? 'green' : 'gray'}-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2`}>3</span>
+                  <span className={`bg-${currentStep === 'preferences' || currentStep === 'result' ? 'green' : 'gray'}-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2`}>3</span>
                   Restrições e Preferências
                 </h2>
-                {currentStep === 3 && (
+                {currentStep === 'preferences' && (
                   <DietaryPreferencesForm
                     onSubmit={handleDietaryPreferences}
-                    onBack={() => setCurrentStep(2)}
+                    onBack={() => setCurrentStep('foods')}
                   />
                 )}
-                {Number(currentStep) > 3 && (
+                {currentStep === 'result' && (
                   <div className="text-center py-2">
                     <p className="text-green-600 font-medium">✓ Preferências dietéticas registradas</p>
                     <button 
-                      onClick={() => setCurrentStep(3)} 
+                      onClick={() => setCurrentStep('preferences')} 
                       className="text-sm text-gray-500 underline mt-2 px-4 py-1 rounded-md hover:bg-gray-100 transition-colors"
                     >
                       Editar
@@ -254,7 +255,7 @@ const Menu = () => {
               </Card>
             </div>
 
-            {Number(currentStep) === 4 && mealPlan && (
+            {currentStep === 'result' && mealPlan && (
               <div ref={mealPlanRef}>
                 <Card className="p-4 sm:p-6">
                   <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center">
