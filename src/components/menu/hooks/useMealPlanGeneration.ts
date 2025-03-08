@@ -15,7 +15,7 @@ interface GenerateMealPlanParams {
     dailyCalories: number;
   };
   selectedFoods: ProtocolFood[];
-  foodsByMealType: Record<string, string[]>;
+  foodsByMealType: Record<string, ProtocolFood[]>; // Changed from string[]
   preferences: DietaryPreferences;
   addTransaction?: (params: any) => Promise<void>;
 }
@@ -35,12 +35,19 @@ export const generateMealPlan = async ({
   
   try {
     console.log("📡 Chamando função edge do Supabase - nutri-plus-agent (Llama3-8b)");
+    
+    // Convert foodsByMealType from ProtocolFood[] to expected format for edge function
+    const simplifiedFoodsByMealType: Record<string, string[]> = {};
+    Object.entries(foodsByMealType).forEach(([mealType, foods]) => {
+      simplifiedFoodsByMealType[mealType] = foods.map(food => food.name);
+    });
+    
     // Call the Nutri+ agent edge function
     const { data, error } = await supabase.functions.invoke('nutri-plus-agent', {
       body: {
         userData,
         selectedFoods,
-        foodsByMealType,
+        foodsByMealType: simplifiedFoodsByMealType, // Send simplified version
         dietaryPreferences: preferences,
         modelConfig: {
           // Explicitly specify model to use

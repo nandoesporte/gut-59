@@ -34,11 +34,28 @@ serve(async (req) => {
     }
 
     const { userData, selectedFoods, foodsByMealType, dietaryPreferences, modelConfig } = requestData;
-    console.log(`[NUTRI+] Dados recebidos para usuário: ${userData.id || 'anônimo'}`);
+    
+    // Enhanced logging with proper user identification
+    const userId = userData.id || 'não autenticado';
+    console.log(`[NUTRI+] Dados recebidos para usuário: ${userId}`);
     console.log(`[NUTRI+] Perfil do usuário: ${userData.age} anos, ${userData.gender}, ${userData.weight}kg, ${userData.height}cm`);
     console.log(`[NUTRI+] Objetivo: ${userData.goal}, Calorias diárias: ${userData.dailyCalories}kcal`);
     console.log(`[NUTRI+] Alimentos selecionados: ${selectedFoods?.length || 0}`);
-    console.log(`[NUTRI+] Preferências e restrições: ${JSON.stringify(dietaryPreferences)}`);
+    
+    // Safer logging of dietary preferences
+    if (dietaryPreferences) {
+      const allergiesLog = dietaryPreferences.hasAllergies && dietaryPreferences.allergies?.length > 0 
+        ? `Alergias: ${dietaryPreferences.allergies.join(', ')}` 
+        : 'Sem alergias';
+      
+      const restrictionsLog = dietaryPreferences.dietaryRestrictions?.length > 0 
+        ? `Restrições: ${dietaryPreferences.dietaryRestrictions.join(', ')}` 
+        : 'Sem restrições';
+      
+      console.log(`[NUTRI+] Preferências e restrições: ${allergiesLog}, ${restrictionsLog}`);
+    } else {
+      console.log('[NUTRI+] Nenhuma preferência alimentar especificada');
+    }
     
     if (!selectedFoods || selectedFoods.length === 0) {
       console.error("[NUTRI+] Erro: Nenhum alimento selecionado");
@@ -46,6 +63,13 @@ serve(async (req) => {
         JSON.stringify({ error: "Nenhum alimento selecionado" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
+    }
+
+    // Check for foodsByMealType structure
+    if (!foodsByMealType || typeof foodsByMealType !== 'object') {
+      console.warn("[NUTRI+] Aviso: foodsByMealType não está no formato esperado ou está ausente");
+    } else {
+      console.log(`[NUTRI+] Distribuição de alimentos por refeição: ${Object.keys(foodsByMealType).join(', ')}`);
     }
 
     // Check if GROQ API key is available
@@ -195,7 +219,7 @@ Por favor, crie um plano de 7 dias que:
         { role: "user", content: userMessage }
       ],
       temperature: temperature, // Lower temperature for more consistent output
-      max_tokens: 7000, // Aumentado de 4000 para 7000
+      max_tokens: 7000, 
       top_p: 0.9,
       response_format: { type: "json_object" } // Request JSON format response
     };
@@ -213,13 +237,13 @@ Por favor, crie um plano de 7 dias que:
     });
 
     if (!response.ok) {
-      const errorData = await response.text();
-      console.error(`[NUTRI+] Erro da API Groq (${response.status}):`, errorData);
+      const errorText = await response.text();
+      console.error(`[NUTRI+] Erro da API Groq (${response.status}):`, errorText);
       
       // If we received a JSON generation error, we'll try to fix the failed_generation content
-      if (response.status === 400 && errorData.includes('json_validate_failed')) {
+      if (response.status === 400 && errorText.includes('json_validate_failed')) {
         try {
-          const errorJson = JSON.parse(errorData);
+          const errorJson = JSON.parse(errorText);
           if (errorJson.error && errorJson.error.failed_generation) {
             console.log("[NUTRI+] Tentando corrigir JSON inválido...");
             
@@ -377,7 +401,7 @@ Por favor, crie um plano de 7 dias que:
       return new Response(
         JSON.stringify({ 
           error: `Erro da API: ${response.status}`, 
-          details: errorData,
+          details: errorText,
           // Try alternative model next time
           suggestedModel: modelName === "llama3-8b-8192" ? "llama3-70b-8192" : "llama3-8b-8192"
         }),
