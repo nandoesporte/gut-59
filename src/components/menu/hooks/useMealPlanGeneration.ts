@@ -1,4 +1,3 @@
-
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { DietaryPreferences, MealPlan, ProtocolFood, DayPlan } from "../types";
@@ -250,7 +249,6 @@ function ensureMealPlanStructure(mealPlan: any, userCalories: number): MealPlan 
       return isNaN(parsed) ? 0 : parsed;
     };
     
-    // Fix: Ensure we're working with numeric values for all calculations
     mealPlan.weeklyTotals = {
       averageCalories: Math.round(days.reduce((sum: number, day: any) => {
         const dayTotal = day?.dailyTotals || {};
