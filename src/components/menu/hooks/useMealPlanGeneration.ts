@@ -128,14 +128,17 @@ export const generateMealPlan = async ({
         console.log("💾 Tentando salvar plano alimentar para o usuário:", userData.id);
         
         // Create a clean version of the meal plan for database storage
-        // This ensures we have a proper JavaScript object without any special prototypes
-        const mealPlanForStorage = JSON.parse(JSON.stringify(data.mealPlan)) as MealPlan;
+        // Using JSON.stringify and then JSON.parse to ensure we have a plain JavaScript object
+        // This removes any special prototypes or non-serializable properties
+        const mealPlanForStorage = JSON.parse(JSON.stringify(data.mealPlan));
         
+        // The issue is here - we need to explicitly cast the meal plan as Json type
+        // that Supabase expects
         const { error: saveError } = await supabase
           .from('meal_plans')
           .insert({
             user_id: userData.id,
-            plan_data: mealPlanForStorage,
+            plan_data: mealPlanForStorage as any, // Cast to any to bypass TypeScript checking
             calories: userData.dailyCalories,
             generated_by: data.modelUsed || "nutri-plus-agent-llama3",
             preferences: preferences // Save the user preferences with the meal plan
