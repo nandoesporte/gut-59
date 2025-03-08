@@ -4,9 +4,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { PieChart, Utensils, Dumbbell, ArrowUpRight, Target, Calendar, Flame } from 'lucide-react';
+import { PieChart, BarChart, ArrowUpRight, Target, Calendar, Flame } from 'lucide-react';
 import { MealPlan } from './types';
-import { Progress } from "@/components/ui/progress";
 
 interface LastMealPlanData {
   id: string;
@@ -19,9 +18,6 @@ export const NutriSummary = () => {
   const [lastPlan, setLastPlan] = useState<LastMealPlanData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const navigate = useNavigate();
-
-  // Used calories (mocked for now, but could be integrated with food diary)
-  const [consumedCalories, setConsumedCalories] = useState<number>(0);
 
   useEffect(() => {
     const fetchLastMealPlan = async () => {
@@ -59,9 +55,6 @@ export const NutriSummary = () => {
             plan_data: JSON.parse(JSON.stringify(data.plan_data)) as MealPlan
           };
           setLastPlan(planDataWithTypes);
-          
-          // For demo purposes, set consumed calories to a random value between 0 and target calories
-          setConsumedCalories(Math.floor(Math.random() * data.calories * 0.7));
         }
       } catch (error) {
         console.error('Error fetching last meal plan:', error);
@@ -113,21 +106,11 @@ export const NutriSummary = () => {
     };
   };
 
-  const getRemainingCalories = () => {
-    if (!lastPlan) return 0;
-    return Math.max(0, lastPlan.calories - consumedCalories);
-  };
-
-  const getCaloriesProgress = () => {
-    if (!lastPlan) return 0;
-    return Math.min(100, Math.round((consumedCalories / lastPlan.calories) * 100));
-  };
-
   if (loading) {
     return (
-      <Card className="w-full h-[350px] animate-pulse">
+      <Card className="w-full h-[250px] animate-pulse">
         <CardContent className="p-6 flex items-center justify-center h-full">
-          <div className="h-32 w-32 rounded-full bg-gray-200 animate-pulse"></div>
+          <div className="h-24 w-24 rounded-full bg-gray-200 animate-pulse"></div>
         </CardContent>
       </Card>
     );
@@ -166,145 +149,82 @@ export const NutriSummary = () => {
 
   return (
     <Card className="w-full overflow-hidden shadow-md border-0">
-      <CardHeader className="bg-gradient-to-r from-blue-50 to-primary/5 border-b flex items-center justify-between flex-row pb-4">
-        <div>
-          <CardTitle className="flex items-center gap-2 text-primary">
-            <PieChart className="w-5 h-5" />
-            Nutri
-          </CardTitle>
-          <CardDescription>
-            Resumo do seu plano nutricional
-          </CardDescription>
-        </div>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => navigate('/menu')} 
-          className="border-primary text-primary hover:bg-primary/5"
-        >
-          Ver Detalhes
-          <ArrowUpRight className="ml-1 h-3 w-3" />
-        </Button>
+      <CardHeader className="bg-gradient-to-r from-blue-50 to-primary/5 border-b pb-4">
+        <CardTitle className="flex items-center gap-2 text-primary">
+          <PieChart className="w-5 h-5" />
+          Nutri
+        </CardTitle>
+        <CardDescription>
+          Resumo do seu plano nutricional
+        </CardDescription>
       </CardHeader>
-
       <CardContent className="p-0">
-        {/* Main Calories Section */}
-        <div className="p-4 border-b">
-          <h3 className="text-xl font-bold text-center text-primary mb-1">Calorias</h3>
-          <p className="text-sm text-gray-500 text-center mb-4">
-            Restantes = Meta - Alimentos + Exercícios
-          </p>
-          
-          <div className="flex justify-between items-center mb-2">
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 bg-primary rounded-full"></div>
-              <span className="text-xs font-medium">Meta base</span>
+        <div className="p-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="col-span-2 lg:col-span-1 flex flex-col p-4 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/10">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm font-medium text-primary/80">Calorias Diárias</span>
+              <Flame className="w-4 h-4 text-orange-500" />
             </div>
-            <span className="font-semibold">{lastPlan.calories}</span>
+            <div className="flex items-baseline">
+              <span className="text-3xl font-bold text-primary">{lastPlan.calories}</span>
+              <span className="ml-1 text-xs text-muted-foreground">kcal</span>
+            </div>
           </div>
           
-          <div className="flex justify-between items-center mb-2">
-            <div className="flex items-center gap-1">
-              <Utensils className="w-3 h-3 text-orange-500" />
-              <span className="text-xs font-medium">Alimentos</span>
+          <div className="flex flex-col p-4 rounded-xl bg-gradient-to-br from-green-100 to-green-50 border border-green-100">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm font-medium text-green-700">Objetivo</span>
+              <Target className="w-4 h-4 text-green-600" />
             </div>
-            <span className="font-semibold">-{consumedCalories}</span>
+            <div className="text-2xl font-bold text-green-800">
+              {getGoalText()}
+            </div>
           </div>
           
-          <div className="flex justify-between items-center mb-4">
-            <div className="flex items-center gap-1">
-              <Dumbbell className="w-3 h-3 text-green-500" />
-              <span className="text-xs font-medium">Exercícios</span>
+          <div className="flex flex-col p-4 rounded-xl bg-gradient-to-br from-blue-100 to-blue-50 border border-blue-100">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm font-medium text-blue-700">Gerado em</span>
+              <Calendar className="w-4 h-4 text-blue-600" />
             </div>
-            <span className="font-semibold">+0</span>
+            <div className="text-lg font-medium text-blue-800 truncate">
+              {formatDate(lastPlan.created_at)}
+            </div>
           </div>
-          
-          <div className="flex justify-center">
-            <div className="relative rounded-full w-32 h-32 border-8 border-gray-100 flex items-center justify-center">
-              <div className="text-center">
-                <div className="text-3xl font-bold">{getRemainingCalories()}</div>
-                <div className="text-xs text-gray-500">Restantes</div>
+        </div>
+        
+        <div className="px-5 pb-4">
+          <div className="flex flex-col p-4 rounded-xl bg-gradient-to-br from-purple-100 to-purple-50 border border-purple-100">
+            <div className="flex justify-between items-center mb-3">
+              <span className="text-sm font-medium text-purple-700">Distribuição de Macros</span>
+              <BarChart className="w-4 h-4 text-purple-600" />
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex-1 flex flex-col items-center">
+                <div className="text-xl font-bold text-blue-700">{macros.protein}%</div>
+                <div className="text-xs text-muted-foreground">Proteína</div>
+              </div>
+              <div className="flex-1 flex flex-col items-center">
+                <div className="text-xl font-bold text-green-700">{macros.carbs}%</div>
+                <div className="text-xs text-muted-foreground">Carboidratos</div>
+              </div>
+              <div className="flex-1 flex flex-col items-center">
+                <div className="text-xl font-bold text-yellow-700">{macros.fats}%</div>
+                <div className="text-xs text-muted-foreground">Gorduras</div>
               </div>
             </div>
-          </div>
-          
-          <div className="mt-4">
-            <Progress value={getCaloriesProgress()} className="h-2" />
-            <div className="flex justify-between mt-1">
-              <span className="text-xs text-gray-500">0</span>
-              <span className="text-xs text-gray-500">{lastPlan.calories}</span>
+            <div className="w-full h-3 bg-gray-100 rounded-full mt-3 flex overflow-hidden">
+              <div className="bg-blue-400 h-full" style={{ width: `${macros.protein}%` }}></div>
+              <div className="bg-green-400 h-full" style={{ width: `${macros.carbs}%` }}></div>
+              <div className="bg-yellow-400 h-full" style={{ width: `${macros.fats}%` }}></div>
             </div>
           </div>
         </div>
         
-        {/* Macronutrients Section */}
-        <div className="p-4 border-b">
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="text-lg font-semibold">Macronutrientes</h3>
-          </div>
-          
-          <div className="w-full h-4 bg-gray-100 rounded-full overflow-hidden flex">
-            <div 
-              className="h-full bg-blue-400" 
-              style={{ width: `${macros.protein}%` }}
-              title={`Proteína: ${macros.protein}%`}
-            ></div>
-            <div 
-              className="h-full bg-green-400" 
-              style={{ width: `${macros.carbs}%` }}
-              title={`Carboidratos: ${macros.carbs}%`}
-            ></div>
-            <div 
-              className="h-full bg-yellow-400" 
-              style={{ width: `${macros.fats}%` }}
-              title={`Gorduras: ${macros.fats}%`}
-            ></div>
-          </div>
-          
-          <div className="grid grid-cols-3 gap-2 mt-3">
-            <div className="flex flex-col items-center">
-              <span className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
-                <span className="text-xs">Proteína</span>
-              </span>
-              <span className="font-semibold">{macros.protein}%</span>
-            </div>
-            <div className="flex flex-col items-center">
-              <span className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-green-400 rounded-full"></div>
-                <span className="text-xs">Carbos</span>
-              </span>
-              <span className="font-semibold">{macros.carbs}%</span>
-            </div>
-            <div className="flex flex-col items-center">
-              <span className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
-                <span className="text-xs">Gorduras</span>
-              </span>
-              <span className="font-semibold">{macros.fats}%</span>
-            </div>
-          </div>
-        </div>
-        
-        {/* Additional Info */}
-        <div className="grid grid-cols-2 p-4 gap-4">
-          <div className="flex flex-col bg-primary/5 rounded-lg p-3">
-            <span className="text-xs text-gray-500 mb-1">Objetivo</span>
-            <div className="flex items-center gap-2">
-              <Target className="w-4 h-4 text-primary" />
-              <span className="font-medium text-sm">{getGoalText()}</span>
-            </div>
-          </div>
-          
-          <div className="flex flex-col bg-primary/5 rounded-lg p-3">
-            <span className="text-xs text-gray-500 mb-1">Data do plano</span>
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-primary" />
-              <span className="font-medium text-sm">
-                {formatDate(lastPlan.created_at).split(' ')[0]}
-              </span>
-            </div>
-          </div>
+        <div className="p-5 pt-2 flex justify-end">
+          <Button variant="outline" size="sm" onClick={() => navigate('/menu')} className="flex items-center gap-1 border-primary text-primary hover:bg-primary/5">
+            Ver detalhes completos
+            <ArrowUpRight className="w-3 h-3" />
+          </Button>
         </div>
       </CardContent>
     </Card>
