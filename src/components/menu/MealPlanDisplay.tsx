@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { MealPlan } from "./types";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { toast } from "sonner";
 
 interface MealPlanDisplayProps {
   mealPlan: MealPlan;
@@ -41,6 +42,18 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
   });
 
   useEffect(() => {
+    console.log("MealPlanDisplay - mealPlan received:", mealPlan);
+    if (!mealPlan) {
+      console.error("No meal plan provided to MealPlanDisplay");
+      return;
+    }
+    
+    if (!mealPlan.weeklyPlan) {
+      console.error("MealPlan is missing weeklyPlan property:", mealPlan);
+      toast.error("Erro ao exibir plano: dados incompletos");
+      return;
+    }
+
     if (mealPlan && mealPlan.weeklyPlan) {
       // Calculate weekly averages if not already provided by the API
       if (!mealPlan.weeklyTotals || 
@@ -108,8 +121,15 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
   }
 
   const renderDayPlan = (dayKey: string) => {
+    if (!mealPlan || !mealPlan.weeklyPlan) {
+      return null;
+    }
+    
     const dayPlan = mealPlan.weeklyPlan[dayKey as keyof typeof mealPlan.weeklyPlan];
-    if (!dayPlan) return null;
+    if (!dayPlan) {
+      console.error(`Day plan for ${dayKey} is undefined`);
+      return null;
+    }
 
     return (
       <div className="space-y-6">
@@ -120,7 +140,7 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
           </p>
         </div>
 
-        {dayPlan.meals.breakfast && (
+        {dayPlan.meals && dayPlan.meals.breakfast && (
           <MealSection
             title="Café da Manhã"
             icon={<div className="w-5 h-5 text-primary">☀️</div>}
@@ -128,7 +148,7 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
           />
         )}
 
-        {dayPlan.meals.morningSnack && (
+        {dayPlan.meals && dayPlan.meals.morningSnack && (
           <MealSection
             title="Lanche da Manhã"
             icon={<div className="w-5 h-5 text-primary">🥪</div>}
@@ -136,7 +156,7 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
           />
         )}
 
-        {dayPlan.meals.lunch && (
+        {dayPlan.meals && dayPlan.meals.lunch && (
           <MealSection
             title="Almoço"
             icon={<div className="w-5 h-5 text-primary">🍽️</div>}
@@ -144,7 +164,7 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
           />
         )}
 
-        {dayPlan.meals.afternoonSnack && (
+        {dayPlan.meals && dayPlan.meals.afternoonSnack && (
           <MealSection
             title="Lanche da Tarde"
             icon={<div className="w-5 h-5 text-primary">🍎</div>}
@@ -152,7 +172,7 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
           />
         )}
 
-        {dayPlan.meals.dinner && (
+        {dayPlan.meals && dayPlan.meals.dinner && (
           <MealSection
             title="Jantar"
             icon={<div className="w-5 h-5 text-primary">🌙</div>}

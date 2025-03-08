@@ -1,3 +1,4 @@
+
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { DietaryPreferences, MealPlan, ProtocolFood, DayPlan } from "../types";
@@ -98,12 +99,19 @@ export const generateMealPlan = async ({
       }
       
       console.log("✅ Plano alimentar recebido com sucesso do método alternativo");
+      console.log("📋 Dados do plano:", JSON.stringify(data.mealPlan).substring(0, 200) + "...");
       
       // Convert the groq format to our internal format
       const convertedMealPlan = convertGroqFormatToInternal(data.mealPlan, userData);
       
+      // Save the converted meal plan to the database
+      await saveMealPlanToDatabase(convertedMealPlan, userData, preferences, "groq-llama3-70b", addTransaction);
+      
       return convertedMealPlan;
     }
+    
+    console.error("❌ Nenhum plano alimentar gerado por nenhum método");
+    return null;
   } catch (error) {
     console.error("❌ Erro inesperado em generateMealPlan:", error);
     toast.error("Erro ao gerar plano alimentar. Por favor, tente novamente.");
@@ -113,6 +121,8 @@ export const generateMealPlan = async ({
 
 // Helper function to process and standardize meal plan data
 const processMealPlanData = (mealPlan: MealPlan, userData: any): MealPlan => {
+  console.log("🔄 Processando dados do plano alimentar");
+  
   // Ensure the meal plan uses the user's specified daily calories
   if (mealPlan && userData.dailyCalories) {
     mealPlan.userCalories = userData.dailyCalories;
@@ -158,6 +168,11 @@ const processMealPlanData = (mealPlan: MealPlan, userData: any): MealPlan => {
       
       console.log("🔄 Novos valores de médias semanais:", mealPlan.weeklyTotals);
     }
+  }
+  
+  // Ensure the meal plan has all required properties
+  if (!mealPlan.generatedBy) {
+    mealPlan.generatedBy = "nutri-plus-agent";
   }
   
   return mealPlan;
@@ -294,10 +309,19 @@ const createDayPlan = (dayName: string, meals: any[]): DayPlan => {
   };
   
   // Categorize meals by type
-  meals.forEach(meal => {
-    const type = typeMapping[meal.type.toLowerCase()] || 'morningSnack';
-    mealsByType[type].push(meal);
-  });
+  if (Array.isArray(meals)) {
+    meals.forEach(meal => {
+      if (meal && meal.type) {
+        const type = typeMapping[meal.type.toLowerCase()] || 'morningSnack';
+        if (!mealsByType[type]) {
+          mealsByType[type] = [];
+        }
+        mealsByType[type].push(meal);
+      }
+    });
+  } else {
+    console.warn("⚠️ Meals is not an array:", meals);
+  }
   
   // Create meal objects for each type
   const createMeal = (mealType: string, groqMeals: any[]): any => {
@@ -315,12 +339,12 @@ const createDayPlan = (dayName: string, meals: any[]): DayPlan => {
     
     return {
       description: meal.name || `${mealType} meal`,
-      foods: meal.foods.map((food: any) => ({
-        name: food.name,
+      foods: Array.isArray(meal.foods) ? meal.foods.map((food: any) => ({
+        name: food.name || "Unknown food",
         portion: parseFloat(food.portion) || 100,
-        unit: "g",
-        details: `${food.portion} de ${food.name}`
-      })),
+        unit: food.unit || "g",
+        details: `${food.portion || "100"} ${food.unit || "g"} de ${food.name || "Unknown food"}`
+      })) : [],
       calories: meal.total_calories || 0,
       macros: {
         protein: meal.total_protein || 0,

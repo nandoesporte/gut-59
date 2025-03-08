@@ -163,6 +163,12 @@ serve(async (req) => {
       }
     }
 
+    // Validate meal plan structure
+    if (!mealPlanJson || !mealPlanJson.meal_plan) {
+      console.error('Invalid meal plan structure:', mealPlanJson);
+      throw new Error('Invalid meal plan structure returned by Groq API');
+    }
+
     // Store the generated meal plan in the database
     const { data: insertData, error: insertError } = await supabase
       .from('meal_plans')
@@ -181,7 +187,13 @@ serve(async (req) => {
     }
 
     // Increment the meal plan generation count for this user
-    await supabase.rpc('increment_nutrition_count', { user_id });
+    try {
+      await supabase.rpc('increment_nutrition_count', { user_id });
+      console.log('Incremented nutrition count for user:', user_id);
+    } catch (countError) {
+      console.error('Error incrementing nutrition count:', countError);
+      // Continue execution even if this fails
+    }
 
     console.log(`Meal plan generated and stored with ID: ${insertData.id}`);
 
