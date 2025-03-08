@@ -19,7 +19,6 @@ export interface ProtocolFood {
   carbs_per_100g?: number;
   fats_per_100g?: number;
   fiber_per_100g?: number;
-  meal_type?: string[];
 }
 
 export interface DietaryPreferences {
@@ -99,11 +98,4 @@ export interface MealPlan {
   recommendations: Recommendations;
   userCalories?: number;
   generatedBy?: string;
-}
-
-// Add this interface to match the expected parameter structure in useMealPlanGeneration.ts
-export interface TransactionParams {
-  amount: number;
-  description: string;
-  transactionType: "purchase" | "reward" | "admin";
 }

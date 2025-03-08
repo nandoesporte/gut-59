@@ -12,7 +12,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { MealPlan } from "./types";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { toast } from "sonner";
 
 interface MealPlanDisplayProps {
   mealPlan: MealPlan;
@@ -42,79 +41,56 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
   });
 
   useEffect(() => {
-    console.log("MealPlanDisplay - mealPlan received:", mealPlan);
-    
-    // Validate received meal plan
-    if (!mealPlan) {
-      console.error("No meal plan provided to MealPlanDisplay");
-      toast.error("Erro ao exibir plano: dados ausentes");
-      return;
-    }
-    
-    if (!mealPlan.weeklyPlan) {
-      console.error("MealPlan is missing weeklyPlan property:", mealPlan);
-      toast.error("Erro ao exibir plano: dados incompletos");
-      return;
-    }
-
-    // Check for required data structures
-    const hasMissingDays = !Object.keys(dayNameMap).every(day => 
-      mealPlan.weeklyPlan && mealPlan.weeklyPlan[day as keyof typeof mealPlan.weeklyPlan]
-    );
-    
-    if (hasMissingDays) {
-      console.warn("Meal plan is missing some day entries:", 
-        Object.keys(mealPlan.weeklyPlan || {}));
-    }
-
-    // Calculate weekly averages if not already provided or are NaN
-    if (!mealPlan.weeklyTotals || 
-        isNaN(mealPlan.weeklyTotals.averageCalories) || 
-        isNaN(mealPlan.weeklyTotals.averageProtein) ||
-        isNaN(mealPlan.weeklyTotals.averageCarbs) ||
-        isNaN(mealPlan.weeklyTotals.averageFats) ||
-        isNaN(mealPlan.weeklyTotals.averageFiber)) {
-      
-      console.log("Recalculating weekly averages due to NaN values");
-      
-      const days = Object.values(mealPlan.weeklyPlan);
-      const validDays = days.filter(day => day && day.dailyTotals);
-      const dayCount = validDays.length || 1; // Avoid division by zero
-      
-      const totals = {
-        calories: 0,
-        protein: 0,
-        carbs: 0,
-        fats: 0,
-        fiber: 0
-      };
-      
-      validDays.forEach(day => {
-        if (day.dailyTotals) {
-          totals.calories += day.dailyTotals.calories || 0;
-          totals.protein += day.dailyTotals.protein || 0;
-          totals.carbs += day.dailyTotals.carbs || 0;
-          totals.fats += day.dailyTotals.fats || 0;
-          totals.fiber += day.dailyTotals.fiber || 0;
-        }
-      });
-      
-      setWeeklyAverages({
-        calories: Math.round(totals.calories / dayCount),
-        protein: Math.round(totals.protein / dayCount),
-        carbs: Math.round(totals.carbs / dayCount),
-        fats: Math.round(totals.fats / dayCount),
-        fiber: Math.round(totals.fiber / dayCount)
-      });
-    } else {
-      // Use the API-provided weekly totals
-      setWeeklyAverages({
-        calories: Math.round(mealPlan.weeklyTotals.averageCalories) || 0,
-        protein: Math.round(mealPlan.weeklyTotals.averageProtein) || 0,
-        carbs: Math.round(mealPlan.weeklyTotals.averageCarbs) || 0,
-        fats: Math.round(mealPlan.weeklyTotals.averageFats) || 0,
-        fiber: Math.round(mealPlan.weeklyTotals.averageFiber) || 0
-      });
+    if (mealPlan && mealPlan.weeklyPlan) {
+      // Calculate weekly averages if not already provided by the API
+      if (!mealPlan.weeklyTotals || 
+          isNaN(mealPlan.weeklyTotals.averageCalories) || 
+          isNaN(mealPlan.weeklyTotals.averageProtein) ||
+          isNaN(mealPlan.weeklyTotals.averageCarbs) ||
+          isNaN(mealPlan.weeklyTotals.averageFats) ||
+          isNaN(mealPlan.weeklyTotals.averageFiber)) {
+        
+        console.log("Recalculating weekly averages due to NaN values");
+        
+        const days = Object.values(mealPlan.weeklyPlan);
+        const validDays = days.filter(day => day && day.dailyTotals);
+        const dayCount = validDays.length || 1; // Avoid division by zero
+        
+        const totals = {
+          calories: 0,
+          protein: 0,
+          carbs: 0,
+          fats: 0,
+          fiber: 0
+        };
+        
+        validDays.forEach(day => {
+          if (day.dailyTotals) {
+            totals.calories += day.dailyTotals.calories || 0;
+            totals.protein += day.dailyTotals.protein || 0;
+            totals.carbs += day.dailyTotals.carbs || 0;
+            totals.fats += day.dailyTotals.fats || 0;
+            totals.fiber += day.dailyTotals.fiber || 0;
+          }
+        });
+        
+        setWeeklyAverages({
+          calories: Math.round(totals.calories / dayCount),
+          protein: Math.round(totals.protein / dayCount),
+          carbs: Math.round(totals.carbs / dayCount),
+          fats: Math.round(totals.fats / dayCount),
+          fiber: Math.round(totals.fiber / dayCount)
+        });
+      } else {
+        // Use the API-provided weekly totals
+        setWeeklyAverages({
+          calories: Math.round(mealPlan.weeklyTotals.averageCalories) || 0,
+          protein: Math.round(mealPlan.weeklyTotals.averageProtein) || 0,
+          carbs: Math.round(mealPlan.weeklyTotals.averageCarbs) || 0,
+          fats: Math.round(mealPlan.weeklyTotals.averageFats) || 0,
+          fiber: Math.round(mealPlan.weeklyTotals.averageFiber) || 0
+        });
+      }
     }
   }, [mealPlan]);
 
@@ -123,33 +99,17 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
     await generateMealPlanPDF(mealPlan);
   };
 
-  // Provide fallback UI for invalid data
   if (!mealPlan || !mealPlan.weeklyPlan) {
     return (
       <div className="text-center p-6">
         <p className="text-gray-500">Nenhum plano alimentar disponível</p>
-        <Button onClick={onRefresh} className="mt-4">
-          <RefreshCcw className="w-4 h-4 mr-2" />
-          Tentar Novamente
-        </Button>
       </div>
     );
   }
 
   const renderDayPlan = (dayKey: string) => {
-    if (!mealPlan || !mealPlan.weeklyPlan) {
-      return null;
-    }
-    
     const dayPlan = mealPlan.weeklyPlan[dayKey as keyof typeof mealPlan.weeklyPlan];
-    if (!dayPlan) {
-      console.error(`Day plan for ${dayKey} is undefined`);
-      return (
-        <div className="p-6 text-center">
-          <p className="text-gray-500">Dados para este dia não disponíveis</p>
-        </div>
-      );
-    }
+    if (!dayPlan) return null;
 
     return (
       <div className="space-y-6">
@@ -160,7 +120,7 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
           </p>
         </div>
 
-        {dayPlan.meals && dayPlan.meals.breakfast && (
+        {dayPlan.meals.breakfast && (
           <MealSection
             title="Café da Manhã"
             icon={<div className="w-5 h-5 text-primary">☀️</div>}
@@ -168,7 +128,7 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
           />
         )}
 
-        {dayPlan.meals && dayPlan.meals.morningSnack && (
+        {dayPlan.meals.morningSnack && (
           <MealSection
             title="Lanche da Manhã"
             icon={<div className="w-5 h-5 text-primary">🥪</div>}
@@ -176,7 +136,7 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
           />
         )}
 
-        {dayPlan.meals && dayPlan.meals.lunch && (
+        {dayPlan.meals.lunch && (
           <MealSection
             title="Almoço"
             icon={<div className="w-5 h-5 text-primary">🍽️</div>}
@@ -184,7 +144,7 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
           />
         )}
 
-        {dayPlan.meals && dayPlan.meals.afternoonSnack && (
+        {dayPlan.meals.afternoonSnack && (
           <MealSection
             title="Lanche da Tarde"
             icon={<div className="w-5 h-5 text-primary">🍎</div>}
@@ -192,7 +152,7 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
           />
         )}
 
-        {dayPlan.meals && dayPlan.meals.dinner && (
+        {dayPlan.meals.dinner && (
           <MealSection
             title="Jantar"
             icon={<div className="w-5 h-5 text-primary">🌙</div>}
