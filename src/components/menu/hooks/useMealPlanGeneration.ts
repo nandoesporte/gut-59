@@ -1,4 +1,3 @@
-
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { DietaryPreferences, MealPlan, ProtocolFood, DayPlan } from "../types";
@@ -254,11 +253,11 @@ function ensureMealPlanStructure(mealPlan: any, userCalories: number): MealPlan 
   
   // Garantir que weeklyTotals existe e é válido
   if (!mealPlan.weeklyTotals || 
-      isNaN(mealPlan.weeklyTotals.averageCalories) || 
-      isNaN(mealPlan.weeklyTotals.averageProtein) ||
-      isNaN(mealPlan.weeklyTotals.averageCarbs) ||
-      isNaN(mealPlan.weeklyTotals.averageFats) ||
-      isNaN(mealPlan.weeklyTotals.averageFiber)) {
+      isNaN(Number(mealPlan.weeklyTotals.averageCalories)) || 
+      isNaN(Number(mealPlan.weeklyTotals.averageProtein)) ||
+      isNaN(Number(mealPlan.weeklyTotals.averageCarbs)) ||
+      isNaN(Number(mealPlan.weeklyTotals.averageFats)) ||
+      isNaN(Number(mealPlan.weeklyTotals.averageFiber))) {
     
     console.warn("⚠️ Recalculando médias semanais devido a valores inválidos");
     
@@ -267,11 +266,11 @@ function ensureMealPlanStructure(mealPlan: any, userCalories: number): MealPlan 
     const dayCount = days.length || 1; // Evitar divisão por zero
     
     mealPlan.weeklyTotals = {
-      averageCalories: Math.round(days.reduce((sum: number, day: any) => sum + (day.dailyTotals?.calories || 0), 0) / dayCount),
-      averageProtein: Math.round(days.reduce((sum: number, day: any) => sum + (day.dailyTotals?.protein || 0), 0) / dayCount),
-      averageCarbs: Math.round(days.reduce((sum: number, day: any) => sum + (day.dailyTotals?.carbs || 0), 0) / dayCount),
-      averageFats: Math.round(days.reduce((sum: number, day: any) => sum + (day.dailyTotals?.fats || 0), 0) / dayCount),
-      averageFiber: Math.round(days.reduce((sum: number, day: any) => sum + (day.dailyTotals?.fiber || 0), 0) / dayCount)
+      averageCalories: Math.round(days.reduce((sum: number, day: any) => sum + Number(day.dailyTotals?.calories || 0), 0) / dayCount),
+      averageProtein: Math.round(days.reduce((sum: number, day: any) => sum + Number(day.dailyTotals?.protein || 0), 0) / dayCount),
+      averageCarbs: Math.round(days.reduce((sum: number, day: any) => sum + Number(day.dailyTotals?.carbs || 0), 0) / dayCount),
+      averageFats: Math.round(days.reduce((sum: number, day: any) => sum + Number(day.dailyTotals?.fats || 0), 0) / dayCount),
+      averageFiber: Math.round(days.reduce((sum: number, day: any) => sum + Number(day.dailyTotals?.fiber || 0), 0) / dayCount)
     };
   }
   
