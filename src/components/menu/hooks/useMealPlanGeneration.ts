@@ -1,3 +1,4 @@
+
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { DietaryPreferences, MealPlan, ProtocolFood, DayPlan } from "../types";
@@ -238,6 +239,7 @@ function ensureMealPlanStructure(mealPlan: any, userCalories: number): MealPlan 
     const days = Object.values(weeklyPlan);
     const dayCount = Math.max(days.length || 1, 1);
     
+    // Helper function to ensure we're working with numeric values
     const getNumericValue = (value: any): number => {
       if (typeof value === 'number' && !isNaN(value)) {
         return value;
@@ -253,27 +255,27 @@ function ensureMealPlanStructure(mealPlan: any, userCalories: number): MealPlan 
       averageCalories: Math.round(days.reduce((sum: number, day: any) => {
         const dayTotal = day?.dailyTotals || {};
         return sum + getNumericValue(dayTotal.calories);
-      }, 0) / (dayCount || 1)),
+      }, 0) / dayCount),
       
       averageProtein: Math.round(days.reduce((sum: number, day: any) => {
         const dayTotal = day?.dailyTotals || {};
         return sum + getNumericValue(dayTotal.protein);
-      }, 0) / (dayCount || 1)),
+      }, 0) / dayCount),
       
       averageCarbs: Math.round(days.reduce((sum: number, day: any) => {
         const dayTotal = day?.dailyTotals || {};
         return sum + getNumericValue(dayTotal.carbs);
-      }, 0) / (dayCount || 1)),
+      }, 0) / dayCount),
       
       averageFats: Math.round(days.reduce((sum: number, day: any) => {
         const dayTotal = day?.dailyTotals || {};
         return sum + getNumericValue(dayTotal.fats);
-      }, 0) / (dayCount || 1)),
+      }, 0) / dayCount),
       
       averageFiber: Math.round(days.reduce((sum: number, day: any) => {
         const dayTotal = day?.dailyTotals || {};
         return sum + getNumericValue(dayTotal.fiber);
-      }, 0) / (dayCount || 1))
+      }, 0) / dayCount)
     };
   }
   
