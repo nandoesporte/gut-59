@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { useProtocolFoods } from "./useProtocolFoods";
 import { useCalorieCalculator, Goal } from "./useCalorieCalculator";
@@ -241,25 +242,11 @@ export const useMenuController = (): MenuState => {
         
         if (user) {
           try {
-            console.log("💾 Tentando salvar plano alimentar para o usuário:", user.id);
-            
-            const planDataAsJson = JSON.parse(JSON.stringify(generatedPlan));
-            
-            const { error } = await supabase
-              .from('meal_plans')
-              .insert({
-                user_id: user.id,
-                plan_data: planDataAsJson as any,
-                calories: calorieNeeds
-              });
-              
-            if (error) {
-              console.error("❌ Erro ao salvar plano alimentar:", error);
-            } else {
-              console.log("✅ Plano alimentar salvo com sucesso");
-            }
+            // If generateMealPlan already saved the plan, we don't need to do it again
+            // Just showing this was handled in the previous function
+            console.log("✅ Plano alimentar já foi salvo pela função generateMealPlan");
           } catch (error) {
-            console.error("❌ Erro ao salvar plano alimentar:", error);
+            console.error("❌ Erro ao processar plano alimentar:", error);
           }
         }
         
