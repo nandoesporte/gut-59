@@ -266,11 +266,26 @@ function ensureMealPlanStructure(mealPlan: any, userCalories: number): MealPlan 
     const dayCount = days.length || 1; // Evitar divisão por zero
     
     mealPlan.weeklyTotals = {
-      averageCalories: Math.round(days.reduce((sum: number, day: any) => sum + Number(day.dailyTotals?.calories || 0), 0) / dayCount),
-      averageProtein: Math.round(days.reduce((sum: number, day: any) => sum + Number(day.dailyTotals?.protein || 0), 0) / dayCount),
-      averageCarbs: Math.round(days.reduce((sum: number, day: any) => sum + Number(day.dailyTotals?.carbs || 0), 0) / dayCount),
-      averageFats: Math.round(days.reduce((sum: number, day: any) => sum + Number(day.dailyTotals?.fats || 0), 0) / dayCount),
-      averageFiber: Math.round(days.reduce((sum: number, day: any) => sum + Number(day.dailyTotals?.fiber || 0), 0) / dayCount)
+      averageCalories: Math.round(days.reduce((sum: number, day: any) => {
+        const calories = day.dailyTotals?.calories;
+        return sum + (typeof calories === 'number' ? calories : Number(calories || 0));
+      }, 0) / dayCount),
+      averageProtein: Math.round(days.reduce((sum: number, day: any) => {
+        const protein = day.dailyTotals?.protein;
+        return sum + (typeof protein === 'number' ? protein : Number(protein || 0));
+      }, 0) / dayCount),
+      averageCarbs: Math.round(days.reduce((sum: number, day: any) => {
+        const carbs = day.dailyTotals?.carbs;
+        return sum + (typeof carbs === 'number' ? carbs : Number(carbs || 0));
+      }, 0) / dayCount),
+      averageFats: Math.round(days.reduce((sum: number, day: any) => {
+        const fats = day.dailyTotals?.fats;
+        return sum + (typeof fats === 'number' ? fats : Number(fats || 0));
+      }, 0) / dayCount),
+      averageFiber: Math.round(days.reduce((sum: number, day: any) => {
+        const fiber = day.dailyTotals?.fiber;
+        return sum + (typeof fiber === 'number' ? fiber : Number(fiber || 0));
+      }, 0) / dayCount)
     };
   }
   
