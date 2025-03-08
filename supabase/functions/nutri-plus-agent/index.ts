@@ -93,21 +93,18 @@ serve(async (req) => {
       );
     }
 
-    // Prepare system message with updated instructions for Nutri+ agent
+    // Updated system message with simpler instructions for better JSON formatting
     const systemMessage = `Você é Nutri+, um agente especialista em nutrição que cria planos alimentares personalizados em Português do Brasil.
-Sua tarefa é analisar os dados do usuário e criar um plano alimentar semanal detalhado e cientificamente fundamentado.
+Sua tarefa é analisar os dados do usuário e criar um plano alimentar semanal detalhado.
 
-REGRAS IMPORTANTES PARA GERAÇÃO DE JSON VÁLIDO:
-1. Sua resposta DEVE ser um JSON válido que possa ser processado com JSON.parse().
-2. Nunca use aspas simples (') para strings, use APENAS aspas duplas (").
-3. Não use notação científica como 1e5 para números.
-4. Garanta que o JSON não tenha vírgulas extras no final dos objetos e arrays.
-5. Garanta que cada propriedade de objeto tenha um valor.
-6. Todos os valores numéricos devem ser números (sem aspas).
-7. Não inclua comentários no JSON.
-8. Não deixe o JSON truncado ou incompleto.
-9. Incluir recomendações completas, mas concisas.
-10. REDUZA O TAMANHO DA RESPOSTA - seja conciso nas descrições, nosso modelo tem limites de tokens.
+REGRAS PARA GERAÇÃO DE JSON VÁLIDO:
+1. Responda APENAS com JSON válido - sem texto adicional.
+2. Use apenas aspas duplas (").
+3. Números devem ser números inteiros (sem casas decimais, sem aspas).
+4. Evite comentários no JSON.
+5. Seja breve e conciso nas descrições.
+6. Evite estruturas muito aninhadas.
+7. REDUZA O TAMANHO DA RESPOSTA ao máximo.
 
 ESTRUTURA DO JSON:
 {
@@ -116,42 +113,26 @@ ESTRUTURA DO JSON:
       "dayName": "Segunda-feira",
       "meals": {
         "cafeDaManha": {
-          "description": "Descrição breve",
+          "description": "Breve descrição",
           "foods": [
-            {
-              "name": "Nome do alimento",
-              "portion": 100,
-              "unit": "g",
-              "details": "Detalhes breves"
-            }
+            {"name": "Alimento", "portion": 100, "unit": "g", "details": "Breve preparo"}
           ],
           "calories": 500,
-          "macros": {
-            "protein": 30,
-            "carbs": 40,
-            "fats": 15,
-            "fiber": 5
-          }
+          "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
         },
-        "lancheDaManha": { /* mesma estrutura */ },
-        "almoco": { /* mesma estrutura */ },
-        "lancheDaTarde": { /* mesma estrutura */ },
-        "jantar": { /* mesma estrutura */ }
+        "lancheDaManha": {},
+        "almoco": {},
+        "lancheDaTarde": {},
+        "jantar": {}
       },
-      "dailyTotals": {
-        "calories": 2000,
-        "protein": 120,
-        "carbs": 180,
-        "fats": 60,
-        "fiber": 25
-      }
+      "dailyTotals": {"calories": 2000, "protein": 120, "carbs": 180, "fats": 60, "fiber": 25}
     },
-    "terca": { /* mesma estrutura */ },
-    "quarta": { /* mesma estrutura */ },
-    "quinta": { /* mesma estrutura */ },
-    "sexta": { /* mesma estrutura */ },
-    "sabado": { /* mesma estrutura */ },
-    "domingo": { /* mesma estrutura */ }
+    "terca": {},
+    "quarta": {},
+    "quinta": {},
+    "sexta": {},
+    "sabado": {},
+    "domingo": {}
   },
   "weeklyTotals": {
     "averageCalories": 2000,
@@ -161,73 +142,33 @@ ESTRUTURA DO JSON:
     "averageFiber": 25
   },
   "recommendations": {
-    "general": "Recomendação geral concisa",
-    "preworkout": "Recomendação pré-treino concisa",
-    "postworkout": "Recomendação pós-treino concisa",
-    "timing": [
-      "Recomendação 1",
-      "Recomendação 2"
-    ]
+    "general": "Recomendação geral",
+    "preworkout": "Recomendação pré-treino",
+    "postworkout": "Recomendação pós-treino",
+    "timing": ["Recomendação 1", "Recomendação 2"]
   }
-}
+}`;
 
-MUITO IMPORTANTE:
-1. Use os nomes EXATOS das propriedades como especificado acima:
-   - cafeDaManha (não "café da manhã" ou "breakfast")
-   - lancheDaManha (não "lanche da manhã" ou "morningSnack")
-   - almoco (não "almoço" ou "lunch")
-   - lancheDaTarde (não "lanche da tarde" ou "afternoonSnack")
-   - jantar (não "dinner")
+    // Construct user message with all relevant data but more concise
+    const userMessage = `Crie um plano alimentar semanal personalizado com base nestes dados:
 
-2. Os dias da semana DEVEM ser exatamente:
-   - "segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo"
+PERFIL: ${userData.age} anos, ${userData.gender}, ${userData.weight}kg, ${userData.height}cm, Nível: ${userData.activityLevel}
+OBJETIVO: ${userData.goal}, META: ${userData.dailyCalories}kcal diárias
 
-3. Cada alimento na lista "foods" DEVE conter as seguintes propriedades:
-   - "name": Nome do alimento em português
-   - "portion": Valor numérico (sem aspas)
-   - "unit": Unidade de medida em português (g, ml, etc.)
-   - "details": Instruções breves de preparo
+${dietaryPreferences.hasAllergies ? `ALERGIAS: ${dietaryPreferences.allergies.join(', ')}` : 'SEM ALERGIAS'}
+${dietaryPreferences.dietaryRestrictions?.length > 0 ? `RESTRIÇÕES: ${dietaryPreferences.dietaryRestrictions.join(', ')}` : 'SEM RESTRIÇÕES'}
+${dietaryPreferences.trainingTime ? `TREINO: ${dietaryPreferences.trainingTime}` : ''}
 
-4. Todos os valores numéricos (calories, protein, carbs, fats, fiber) devem ser números inteiros SEM ASPAS e SEM SUFIXOS como "g" ou "kcal".
+ALIMENTOS DISPONÍVEIS (${selectedFoods.length}):
+${selectedFoods.slice(0, 10).map(food => `${food.name} (${food.calories}kcal, P:${food.protein}g, C:${food.carbs}g, G:${food.fats}g)`).join('; ')}
+${selectedFoods.length > 10 ? `... e mais ${selectedFoods.length - 10} alimentos.` : ''}
 
-5. SEJA BREVE E CONCISO EM TODAS AS DESCRIÇÕES PARA REDUZIR O TAMANHO DA RESPOSTA.`;
-
-    // Construct user message with all relevant data
-    const userMessage = `Crie um plano alimentar semanal personalizado em Português do Brasil com base nestes dados:
-
-PERFIL DO USUÁRIO:
-- Idade: ${userData.age}
-- Gênero: ${userData.gender}
-- Peso: ${userData.weight}kg
-- Altura: ${userData.height}cm
-- Nível de Atividade: ${userData.activityLevel}
-- Objetivo: ${userData.goal}
-- Meta de Calorias Diárias: ${userData.dailyCalories}kcal
-
-PREFERÊNCIAS ALIMENTARES:
-${dietaryPreferences.hasAllergies ? `- Alergias: ${dietaryPreferences.allergies.join(', ')}` : '- Sem alergias conhecidas'}
-${dietaryPreferences.dietaryRestrictions && dietaryPreferences.dietaryRestrictions.length > 0 ? `- Restrições Alimentares: ${dietaryPreferences.dietaryRestrictions.join(', ')}` : '- Sem restrições alimentares'}
-${dietaryPreferences.trainingTime ? `- Horário de Treino: ${dietaryPreferences.trainingTime}` : '- Sem horário específico de treino'}
-
-ALIMENTOS DISPONÍVEIS (${selectedFoods.length} no total):
-${selectedFoods.slice(0, 15).map(food => `- ${food.name} (${food.calories} kcal, P:${food.protein}g, C:${food.carbs}g, G:${food.fats}g)`).join('\n')}
-${selectedFoods.length > 15 ? `\n... e mais ${selectedFoods.length - 15} alimentos.` : ''}
-
-${foodsByMealType ? `ALIMENTOS CATEGORIZADOS POR REFEIÇÃO:
-${Object.entries(foodsByMealType).map(([mealType, foods]) => 
-  `- ${mealType}: ${Array.isArray(foods) ? foods.length : 0} alimentos`
-).join('\n')}` : ''}
-
-Por favor, crie um plano de 7 dias que:
-1. Atenda à meta de ${userData.dailyCalories} calorias diárias (com margem de +/- 100 kcal)
+Crie um plano de 7 dias que:
+1. Atenda à meta de ${userData.dailyCalories} calorias/dia (±100 kcal)
 2. Distribua adequadamente os macronutrientes
 3. Use os alimentos disponíveis fornecidos
-4. Respeite as preferências e restrições alimentares
-5. Forneça variedade ao longo da semana
-6. Seja BREVE E CONCISO nas descrições para evitar que a resposta fique muito grande
-7. Calcule as calorias e macros para cada refeição e dia
-8. MUITO IMPORTANTE: Use os nomes corretos em português para refeições e dias da semana
-9. MUITO IMPORTANTE: Todos os valores numéricos devem ser números inteiros sem unidades`;
+4. Seja MUITO BREVE E CONCISO nas descrições
+5. Reduza ao máximo o tamanho do JSON gerado`;
 
     // Track time for API call preparation
     console.log(`[NUTRI+] Preparando chamada de API às ${new Date().toISOString()}`);
@@ -246,7 +187,7 @@ Por favor, crie um plano de 7 dias que:
         { role: "user", content: userMessage }
       ],
       temperature: temperature,
-      max_tokens: 4096, // Reduced to leave room for processing
+      max_tokens: 3072, // Reduced to leave room for processing
       top_p: 0.95,
       response_format: { type: "json_object" } // Request JSON format response
     };
@@ -269,25 +210,29 @@ Por favor, crie um plano de 7 dias que:
       
       // Try with a simpler format if we get a JSON validation error
       if (response.status === 400 && errorText.includes("json_validate_failed")) {
-        console.log("[NUTRI+] Tentando novamente com modelo alternativo devido a erro de validação JSON");
+        console.log("[NUTRI+] Tentando novamente com abordagem simplificada devido a erro de validação JSON");
         
-        // Try with the backup model
+        // Try with a different approach - using a template-based generation
         try {
-          // Attempt with llama3-70b if we were using 8b, or vice versa
-          const backupModel = modelName === "llama3-8b-8192" ? "llama3-70b-8192" : "llama3-8b-8192";
-          console.log(`[NUTRI+] Tentando com modelo alternativo: ${backupModel}`);
+          // Create a minimal system prompt
+          const minimalSystemPrompt = `Você é um assistente de nutrição. Gere APENAS um JSON válido com um plano alimentar básico. Seja extremamente conciso.`;
           
+          // Create a minimal user prompt
+          const minimalUserPrompt = `Crie um plano alimentar semanal para ${userData.gender}, ${userData.age} anos, ${userData.weight}kg, com meta de ${userData.dailyCalories} calorias. Use alimentos simples. Forneça apenas 3 dias de plano para reduzir o tamanho da resposta. RESPONDA APENAS COM JSON VÁLIDO.`;
+          
+          // Attempt with the simplified prompt
           const backupPayload = {
-            ...groqPayload,
-            model: backupModel,
-            max_tokens: 2048, // Reduce tokens even further
+            model: "llama3-70b-8192", // Try with more capable model
+            messages: [
+              { role: "system", content: minimalSystemPrompt },
+              { role: "user", content: minimalUserPrompt }
+            ],
+            temperature: 0.1, // Very low temperature for more predictable output
+            max_tokens: 2048,
+            response_format: { type: "json_object" }
           };
           
-          // Simplify the system message for backup attempt
-          backupPayload.messages[0].content = backupPayload.messages[0].content
-            .replace(/REGRAS IMPORTANTES.*?ESTRUTURA DO JSON:/s, "ESTRUTURA DO JSON:")
-            .replace(/\n[0-9]+\..+/g, "") // Remove numbered rules
-            .replace(/MUITO IMPORTANTE:.*$/s, ""); // Remove the final section
+          console.log(`[NUTRI+] Tentando com prompt simplificado e modelo llama3-70b-8192`);
           
           // Make the backup API call
           const backupResponse = await fetch(GROQ_API_URL, {
@@ -303,8 +248,9 @@ Por favor, crie um plano de 7 dias que:
             throw new Error(`Backup call failed with status ${backupResponse.status}`);
           }
           
-          // Get response from backup model
+          // Get response from backup
           const backupApiResponse = await backupResponse.json();
+          console.log(`[NUTRI+] Resposta do modelo de backup recebida`);
           
           if (!backupApiResponse.choices || !backupApiResponse.choices[0]) {
             throw new Error("Invalid response format from backup model");
@@ -312,41 +258,47 @@ Por favor, crie um plano de 7 dias que:
           
           // Parse backup model content
           const backupContent = backupApiResponse.choices[0].message.content;
-          const backupMealPlan = JSON.parse(backupContent);
+          let backupMealPlan = null;
           
-          console.log(`[NUTRI+] Sucesso com modelo de backup ${backupModel}`);
+          try {
+            backupMealPlan = JSON.parse(backupContent);
+            console.log(`[NUTRI+] JSON do modelo de backup analisado com sucesso`);
+          } catch (jsonError) {
+            console.error("[NUTRI+] Erro ao analisar JSON do modelo de backup:", jsonError.message);
+            throw new Error("Failed to parse JSON from backup model");
+          }
           
-          // Return the meal plan from backup model
           return new Response(
             JSON.stringify({ 
-              ...backupMealPlan,
-              modelUsed: backupModel,
-              note: "Generated using backup model due to JSON validation issues with primary model"
+              mealPlan: backupMealPlan,
+              modelUsed: "llama3-70b-8192",
+              note: "Plano gerado com modelo de backup devido a problemas de validação JSON"
             }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
           
         } catch (backupError) {
-          console.error("[NUTRI+] Tentativa com modelo alternativo também falhou:", backupError);
+          console.error("[NUTRI+] Tentativa com abordagem simplificada também falhou:", backupError);
           
-          // Attempt with a hardcoded fallback structure
+          // Use the fallback hardcoded structure as a last resort
+          const fallbackMealPlan = generateFallbackMealPlan(userData, selectedFoods);
+          
           return new Response(
             JSON.stringify({ 
-              error: "Erro de validação JSON. Tentamos com modelos alternativos sem sucesso.",
-              details: errorText.substring(0, 500),
-              suggestedModel: modelName === "llama3-8b-8192" ? "llama3-70b-8192" : "llama3-8b-8192"
+              mealPlan: fallbackMealPlan,
+              modelUsed: "fallback-template",
+              note: "Plano gerado a partir de template de fallback devido a erros de API"
             }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
       }
       
-      // Return the error to the client
+      // If not a JSON validation error or we couldn't recover, return general error
       return new Response(
         JSON.stringify({ 
           error: `Erro da API: ${response.status}`, 
-          details: errorText.substring(0, 500),
-          suggestedModel: modelName === "llama3-8b-8192" ? "llama3-70b-8192" : "llama3-8b-8192"
+          details: errorText.substring(0, 500)
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
       );
@@ -377,47 +329,9 @@ Por favor, crie um plano de 7 dias que:
       // Parse and validate the JSON response
       const mealPlanJson = JSON.parse(mealPlanContent);
       
-      // Validate the structure to make sure it matches our expected format
-      if (!mealPlanJson.weeklyPlan) {
-        console.error("[NUTRI+] Estrutura JSON inválida: weeklyPlan não encontrado");
-        return new Response(
-          JSON.stringify({ 
-            error: "Estrutura JSON inválida", 
-            details: "weeklyPlan não encontrado na resposta" 
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-        );
-      }
-      
-      // Map meal plan days to ensure they use the correct property names
-      const fixedMealPlan = {
-        weeklyPlan: {},
-        weeklyTotals: mealPlanJson.weeklyTotals || {
-          averageCalories: 0,
-          averageProtein: 0,
-          averageCarbs: 0,
-          averageFats: 0,
-          averageFiber: 0
-        },
-        recommendations: mealPlanJson.recommendations || {
-          general: "Mantenha uma alimentação balanceada e variada.",
-          preworkout: "Consuma carboidratos antes do treino para energia.",
-          postworkout: "Consuma proteínas após o treino para recuperação muscular.",
-          timing: ["Distribua as refeições a cada 3-4 horas."]
-        }
-      };
-      
-      // Transfer and fix the meal plan structure if needed
-      Object.entries(mealPlanJson.weeklyPlan).forEach(([day, dayPlan]) => {
-        // Ensure the day plan has the correct structure
-        if (dayPlan && dayPlan.meals) {
-          fixedMealPlan.weeklyPlan[day] = dayPlan;
-        }
-      });
-      
       // Add metadata to the response
-      fixedMealPlan.modelUsed = modelName;
-      fixedMealPlan.generatedAt = new Date().toISOString();
+      mealPlanJson.generatedBy = "nutri-plus-agent";
+      mealPlanJson.userCalories = userData.dailyCalories;
       
       // Log success
       console.log(`[NUTRI+] Plano alimentar gerado com sucesso às ${new Date().toISOString()}`);
@@ -425,114 +339,26 @@ Por favor, crie um plano de 7 dias que:
       
       // Return the successful response
       return new Response(
-        JSON.stringify(fixedMealPlan),
+        JSON.stringify({ mealPlan: mealPlanJson }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
       
     } catch (jsonError) {
-      // If the response is not valid JSON, log the error and return error response
+      // If the response is not valid JSON, log the error and try to recover
       console.error("[NUTRI+] Erro ao analisar JSON:", jsonError.message);
       console.error("[NUTRI+] Resposta JSON inválida:", mealPlanContent.substring(0, 500));
       
-      // Try again with a simplified fallback approach
-      try {
-        console.log("[NUTRI+] Tentando recuperar a resposta com abordagem alternativa...");
+      // Generate fallback plan
+      const fallbackMealPlan = generateFallbackMealPlan(userData, selectedFoods);
         
-        // Create a baseline meal plan structure
-        const fallbackMealPlan = {
-          weeklyPlan: {
-            segunda: { 
-              dayName: "Segunda-feira",
-              meals: {
-                cafeDaManha: {
-                  description: "Café da manhã simples",
-                  foods: [{ name: "Opções variadas", portion: 1, unit: "porção", details: "Alimentos disponíveis" }],
-                  calories: Math.round(userData.dailyCalories * 0.25),
-                  macros: { protein: 20, carbs: 30, fats: 10, fiber: 5 }
-                },
-                lancheDaManha: {
-                  description: "Lanche da manhã simples",
-                  foods: [{ name: "Opções variadas", portion: 1, unit: "porção", details: "Alimentos disponíveis" }],
-                  calories: Math.round(userData.dailyCalories * 0.15),
-                  macros: { protein: 10, carbs: 15, fats: 5, fiber: 3 }
-                },
-                almoco: {
-                  description: "Almoço balanceado",
-                  foods: [{ name: "Opções variadas", portion: 1, unit: "porção", details: "Alimentos disponíveis" }],
-                  calories: Math.round(userData.dailyCalories * 0.3),
-                  macros: { protein: 30, carbs: 40, fats: 15, fiber: 8 }
-                },
-                lancheDaTarde: {
-                  description: "Lanche da tarde simples",
-                  foods: [{ name: "Opções variadas", portion: 1, unit: "porção", details: "Alimentos disponíveis" }],
-                  calories: Math.round(userData.dailyCalories * 0.15),
-                  macros: { protein: 10, carbs: 15, fats: 5, fiber: 3 }
-                },
-                jantar: {
-                  description: "Jantar balanceado",
-                  foods: [{ name: "Opções variadas", portion: 1, unit: "porção", details: "Alimentos disponíveis" }],
-                  calories: Math.round(userData.dailyCalories * 0.15),
-                  macros: { protein: 20, carbs: 25, fats: 10, fiber: 5 }
-                }
-              },
-              dailyTotals: {
-                calories: userData.dailyCalories,
-                protein: Math.round(userData.dailyCalories * 0.3 / 4), // 30% das calorias como proteína
-                carbs: Math.round(userData.dailyCalories * 0.4 / 4),   // 40% das calorias como carbs
-                fats: Math.round(userData.dailyCalories * 0.3 / 9),    // 30% das calorias como gorduras
-                fiber: 25
-              }
-            }
-          },
-          weeklyTotals: {
-            averageCalories: userData.dailyCalories,
-            averageProtein: Math.round(userData.dailyCalories * 0.3 / 4),
-            averageCarbs: Math.round(userData.dailyCalories * 0.4 / 4),
-            averageFats: Math.round(userData.dailyCalories * 0.3 / 9),
-            averageFiber: 25
-          },
-          recommendations: {
-            general: "Mantenha uma alimentação balanceada e variada. Devido a limitações técnicas, gerou-se um plano simples. Considere tentar novamente mais tarde.",
-            preworkout: "Consuma carboidratos antes do treino para energia.",
-            postworkout: "Consuma proteínas após o treino para recuperação muscular.",
-            timing: ["Distribua as refeições a cada 3-4 horas."]
-          },
-          modelUsed: modelName,
-          generatedAt: new Date().toISOString(),
-          fallbackMode: true
-        };
-        
-        // Copy the day plan to other days
-        const days = ["terca", "quarta", "quinta", "sexta", "sabado", "domingo"];
-        const dayNames = ["Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"];
-        
-        days.forEach((day, index) => {
-          fallbackMealPlan.weeklyPlan[day] = {
-            ...JSON.parse(JSON.stringify(fallbackMealPlan.weeklyPlan.segunda)),
-            dayName: dayNames[index]
-          };
-        });
-        
-        console.log("[NUTRI+] Plano de contingência gerado com sucesso");
-        
-        return new Response(
-          JSON.stringify(fallbackMealPlan),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-        
-      } catch (fallbackError) {
-        console.error("[NUTRI+] Erro na abordagem de contingência:", fallbackError);
-        
-        return new Response(
-          JSON.stringify({ 
-            error: "Falha ao gerar plano alimentar",
-            details: jsonError.message,
-            rawPreview: mealPlanContent.substring(0, 500) + "...",
-            fallbackError: fallbackError.message
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-        );
-      }
+      return new Response(
+        JSON.stringify({ 
+          mealPlan: fallbackMealPlan,
+          modelUsed: "fallback-generator",
+          note: "Plano gerado a partir de template devido a erros de parsing JSON"
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
     
   } catch (error) {
@@ -544,3 +370,104 @@ Por favor, crie um plano de 7 dias que:
     );
   }
 });
+
+// Helper function to generate a fallback meal plan when API fails
+function generateFallbackMealPlan(userData: any, selectedFoods: any[]) {
+  const caloriesPerDay = userData.dailyCalories || 2000;
+  const proteinGrams = Math.round((caloriesPerDay * 0.3) / 4); // 30% of calories from protein
+  const carbsGrams = Math.round((caloriesPerDay * 0.4) / 4);   // 40% of calories from carbs
+  const fatsGrams = Math.round((caloriesPerDay * 0.3) / 9);    // 30% of calories from fats
+  
+  // Create sample foods from the selected foods or use defaults
+  const sampleFoods = selectedFoods.length > 0 
+    ? selectedFoods.slice(0, 20)
+    : [
+        { name: "Frango grelhado", calories: 165, protein: 31, carbs: 0, fats: 3.6 },
+        { name: "Arroz", calories: 130, protein: 2.7, carbs: 28, fats: 0.3 },
+        { name: "Feijão", calories: 127, protein: 8.7, carbs: 22.8, fats: 0.5 },
+        { name: "Batata", calories: 77, protein: 2, carbs: 17, fats: 0.1 },
+        { name: "Ovo", calories: 155, protein: 12.6, carbs: 0.6, fats: 10.6 }
+      ];
+  
+  // Function to create a simple meal
+  const createMeal = (name: string, caloriePercentage: number) => {
+    const mealCalories = Math.round(caloriesPerDay * caloriePercentage);
+    
+    // Select 1-3 random foods
+    const numFoods = Math.floor(Math.random() * 2) + 1;
+    const mealFoods = [];
+    
+    for (let i = 0; i < numFoods; i++) {
+      const randomFood = sampleFoods[Math.floor(Math.random() * sampleFoods.length)];
+      mealFoods.push({
+        name: randomFood.name,
+        portion: Math.round(100 * (mealCalories / (numFoods * randomFood.calories))),
+        unit: "g",
+        details: "Preparar de acordo com preferência"
+      });
+    }
+    
+    return {
+      description: `${name} balanceado`,
+      foods: mealFoods,
+      calories: mealCalories,
+      macros: {
+        protein: Math.round(proteinGrams * caloriePercentage),
+        carbs: Math.round(carbsGrams * caloriePercentage),
+        fats: Math.round(fatsGrams * caloriePercentage),
+        fiber: Math.round(25 * caloriePercentage)
+      }
+    };
+  };
+  
+  // Create a single day template
+  const createDayPlan = (dayName: string) => {
+    return {
+      dayName,
+      meals: {
+        cafeDaManha: createMeal("Café da manhã", 0.25),
+        lancheDaManha: createMeal("Lanche da manhã", 0.15),
+        almoco: createMeal("Almoço", 0.30),
+        lancheDaTarde: createMeal("Lanche da tarde", 0.15),
+        jantar: createMeal("Jantar", 0.15)
+      },
+      dailyTotals: {
+        calories: caloriesPerDay,
+        protein: proteinGrams,
+        carbs: carbsGrams,
+        fats: fatsGrams,
+        fiber: 25
+      }
+    };
+  };
+  
+  // Create the fallback meal plan
+  const fallbackPlan = {
+    weeklyPlan: {
+      segunda: createDayPlan("Segunda-feira"),
+      terca: createDayPlan("Terça-feira"),
+      quarta: createDayPlan("Quarta-feira"),
+      quinta: createDayPlan("Quinta-feira"),
+      sexta: createDayPlan("Sexta-feira"),
+      sabado: createDayPlan("Sábado"),
+      domingo: createDayPlan("Domingo")
+    },
+    weeklyTotals: {
+      averageCalories: caloriesPerDay,
+      averageProtein: proteinGrams,
+      averageCarbs: carbsGrams,
+      averageFats: fatsGrams,
+      averageFiber: 25
+    },
+    recommendations: {
+      general: "Mantenha uma alimentação balanceada e variada.",
+      preworkout: "Consuma carboidratos antes do treino para energia.",
+      postworkout: "Consuma proteínas após o treino para recuperação muscular.",
+      timing: ["Distribua as refeições a cada 3-4 horas.", "Beba pelo menos 2 litros de água por dia."]
+    },
+    generatedBy: "fallback-generator",
+    userCalories: caloriesPerDay
+  };
+  
+  return fallbackPlan;
+}
