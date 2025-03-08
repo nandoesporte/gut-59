@@ -134,7 +134,7 @@ export const generateMealPlan = async ({
           if (addTransaction) {
             await addTransaction({
               amount: 10,
-              type: 'meal_plan_generation',
+              type: 'meal_plan_generation' as TransactionType,
               description: 'Geração de plano alimentar'
             });
             console.log("💰 Transação adicionada para geração do plano alimentar");
