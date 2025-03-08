@@ -1,11 +1,7 @@
 
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { corsHeaders } from "../_shared/cors.ts";
 
 const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY');
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
@@ -18,7 +14,7 @@ serve(async (req) => {
 
   try {
     console.log("Recebendo solicitação para llama-completion");
-    const { prompt, max_tokens = 4000, temperature = 0.7 } = await req.json();
+    const { prompt, max_tokens = 4000, temperature = 0.7, language = "pt-BR" } = await req.json();
 
     if (!prompt) {
       throw new Error("Prompt é obrigatório");
@@ -44,7 +40,15 @@ serve(async (req) => {
           messages: [
             {
               role: 'system',
-              content: 'Você é um assistente especializado em nutrição e planejamento alimentar, capaz de gerar planos alimentares personalizados em formato JSON. É MUITO IMPORTANTE que todos os valores de macros (protein, carbs, fats, fiber) sejam numéricos, SEM "g" no final.'
+              content: `Você é um assistente especializado em nutrição e planejamento alimentar, capaz de gerar planos alimentares personalizados em formato JSON.
+              
+É MUITO IMPORTANTE:
+1. Todos os valores de macros (protein, carbs, fats, fiber) DEVEM ser numéricos, SEM "g" no final.
+2. TODAS as respostas devem ser em português do Brasil.
+3. Todos os nomes de refeições, alimentos e descrições DEVEM ser em português.
+4. Use nomes como "café da manhã", "lanche da manhã", "almoço", "lanche da tarde", "jantar" para as refeições.
+5. As propriedades do JSON (weeklyPlan, meals, macros, etc.) permanecem em inglês, mas TODO o conteúdo textual deve ser em português.
+6. Os dias da semana devem ser em português: "segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo".`
             },
             {
               role: 'user',
@@ -58,13 +62,19 @@ serve(async (req) => {
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error(`Erro na API do Groq: ${response.status} ${response.statusText}`);
+        console.error("Detalhes do erro:", errorText);
         throw new Error(`Erro na API do Groq: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
       const completion = data.choices[0].message.content;
+      
+      // Log para debug - ver se o conteúdo está em português
+      console.log("Resposta da API Groq recebida com sucesso");
+      console.log("Primeiros 200 caracteres:", completion.substring(0, 200));
 
-      return new Response(JSON.stringify({ completion }), {
+      return new Response(JSON.stringify({ completion, modelUsed: 'groq-llama3-8b' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     } catch (groqError) {
@@ -85,7 +95,15 @@ serve(async (req) => {
             messages: [
               {
                 role: 'system',
-                content: 'Você é um assistente especializado em nutrição e planejamento alimentar, capaz de gerar planos alimentares personalizados em formato JSON. É MUITO IMPORTANTE que todos os valores de macros (protein, carbs, fats, fiber) sejam numéricos, SEM "g" no final.'
+                content: `Você é um assistente especializado em nutrição e planejamento alimentar, capaz de gerar planos alimentares personalizados em formato JSON.
+                
+É MUITO IMPORTANTE:
+1. Todos os valores de macros (protein, carbs, fats, fiber) DEVEM ser numéricos, SEM "g" no final.
+2. TODAS as respostas devem ser em português do Brasil.
+3. Todos os nomes de refeições, alimentos e descrições DEVEM ser em português.
+4. Use nomes como "café da manhã", "lanche da manhã", "almoço", "lanche da tarde", "jantar" para as refeições.
+5. As propriedades do JSON (weeklyPlan, meals, macros, etc.) permanecem em inglês, mas TODO o conteúdo textual deve ser em português.
+6. Os dias da semana devem ser em português: "segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo".`
               },
               {
                 role: 'user',
@@ -99,13 +117,19 @@ serve(async (req) => {
 
         if (!openaiResponse.ok) {
           const errorText = await openaiResponse.text();
+          console.error(`Erro na API do OpenAI: ${openaiResponse.status} ${openaiResponse.statusText}`);
+          console.error("Detalhes do erro:", errorText);
           throw new Error(`Erro na API do OpenAI: ${openaiResponse.status} ${openaiResponse.statusText}`);
         }
 
         const openaiData = await openaiResponse.json();
         const completion = openaiData.choices[0].message.content;
+        
+        // Log para debug - ver se o conteúdo está em português
+        console.log("Resposta da API OpenAI recebida com sucesso");
+        console.log("Primeiros 200 caracteres:", completion.substring(0, 200));
 
-        return new Response(JSON.stringify({ completion }), {
+        return new Response(JSON.stringify({ completion, modelUsed: 'openai-gpt-4o-mini' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       } else {
