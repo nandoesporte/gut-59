@@ -1,5 +1,6 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+// Use a more recent version of Deno standard library
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
 const ASAAS_API_KEY = Deno.env.get('ASAAS_API_KEY');

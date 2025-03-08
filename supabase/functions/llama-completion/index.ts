@@ -1,6 +1,6 @@
 
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -44,7 +44,7 @@ serve(async (req) => {
           messages: [
             {
               role: 'system',
-              content: 'Você é um assistente especializado em nutrição e planejamento alimentar, capaz de gerar planos alimentares personalizados em formato JSON.'
+              content: 'Você é um assistente especializado em nutrição e planejamento alimentar, capaz de gerar planos alimentares personalizados em formato JSON. É MUITO IMPORTANTE que todos os valores de macros (protein, carbs, fats, fiber) sejam numéricos, SEM "g" no final.'
             },
             {
               role: 'user',
@@ -85,7 +85,7 @@ serve(async (req) => {
             messages: [
               {
                 role: 'system',
-                content: 'Você é um assistente especializado em nutrição e planejamento alimentar, capaz de gerar planos alimentares personalizados em formato JSON.'
+                content: 'Você é um assistente especializado em nutrição e planejamento alimentar, capaz de gerar planos alimentares personalizados em formato JSON. É MUITO IMPORTANTE que todos os valores de macros (protein, carbs, fats, fiber) sejam numéricos, SEM "g" no final.'
               },
               {
                 role: 'user',
