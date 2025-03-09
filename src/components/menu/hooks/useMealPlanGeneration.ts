@@ -144,7 +144,7 @@ export const useMealPlanGeneration = () => {
             user_id: userData.id,
             plan_data: JSON.parse(JSON.stringify(data.mealPlan)), // Ensure the data is JSON serializable
             calories: userData.dailyCalories,
-            dietary_preferences: JSON.stringify(preferences)
+            dietary_preferences: JSON.stringify(preferences) // Convert DietaryPreferences to JSON string
           };
           
           if (data.modelUsed) {
@@ -166,16 +166,16 @@ export const useMealPlanGeneration = () => {
             console.error("Erro ao salvar plano alimentar:", saveError);
             console.error("Detalhes do erro:", JSON.stringify(saveError, null, 2));
             
-            // If the error is related to JSON serialization, try stringifying the plan_data first
-            console.log("Tentando salvar novamente com conversão explícita para JSON");
+            // If the error is related to JSON serialization, try a different approach
+            console.log("Tentando salvar novamente com abordagem alternativa");
             
             const { error: retryError } = await supabase
               .from('meal_plans')
               .insert({
                 user_id: userData.id,
-                plan_data: data.mealPlan,  // Let Supabase handle the JSON conversion
+                plan_data: data.mealPlan, // Let Supabase handle the conversion
                 calories: userData.dailyCalories,
-                dietary_preferences: preferences
+                dietary_preferences: JSON.stringify(preferences) // Convert DietaryPreferences to JSON string
               });
               
             if (retryError) {
