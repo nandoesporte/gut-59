@@ -46,6 +46,7 @@ export const useMealPlanHistory = () => {
         return;
       }
 
+      // Update table name from 'meal_plans' to match your database
       const { data, error } = await supabase
         .from('meal_plans')
         .select('*')
