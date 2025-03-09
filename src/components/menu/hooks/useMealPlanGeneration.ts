@@ -139,7 +139,7 @@ export const useMealPlanGeneration = () => {
         try {
           console.log("Tentando salvar plano alimentar no banco de dados");
           
-          // Fix: Create a serializable plan object for database storage
+          // Create a serializable plan object for database storage
           const planData = {
             user_id: userData.id,
             plan_data: JSON.parse(JSON.stringify(data.mealPlan)), // Ensure the data is JSON serializable
@@ -173,7 +173,7 @@ export const useMealPlanGeneration = () => {
               .from('meal_plans')
               .insert({
                 user_id: userData.id,
-                plan_data: data.mealPlan, // Let Supabase handle the conversion
+                plan_data: JSON.parse(JSON.stringify(data.mealPlan)), // Explicitly convert to JSON
                 calories: userData.dailyCalories,
                 dietary_preferences: JSON.stringify(preferences) // Convert DietaryPreferences to JSON string
               });
