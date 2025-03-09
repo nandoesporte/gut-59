@@ -1,15 +1,103 @@
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BrainCircuit, BookOpen, Heart, ArrowRight } from "lucide-react";
+import { BrainCircuit, BookOpen, Heart, ArrowRight, Smile, SmilePlus, Frown, Meh, Angry } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 export const MentalHealthSummary = () => {
   const navigate = useNavigate();
+  const [latestEmotion, setLatestEmotion] = useState<{emotion: string, date: Date} | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchLatestEmotion = async () => {
+      try {
+        setLoading(true);
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) {
+          console.log("Usuário não autenticado");
+          setLoading(false);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('emotion_logs')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (error) {
+          if (error.code !== 'PGRST116') { // PGRST116 is "no rows returned" which is normal for new users
+            console.log("Erro ao buscar última emoção:", error);
+          }
+          setLoading(false);
+          return;
+        }
+
+        if (data) {
+          setLatestEmotion({
+            emotion: data.emotion,
+            date: new Date(data.created_at)
+          });
+        }
+      } catch (error) {
+        console.error("Erro ao buscar última emoção:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLatestEmotion();
+  }, []);
 
   const handleNavigate = (path: string) => {
     navigate(path);
+  };
+
+  const getEmotionIcon = (emotion: string) => {
+    switch (emotion) {
+      case 'happy':
+        return <SmilePlus className="h-5 w-5 text-green-600" />;
+      case 'good':
+        return <Smile className="h-5 w-5 text-blue-600" />;
+      case 'neutral':
+        return <Meh className="h-5 w-5 text-yellow-600" />;
+      case 'sad':
+        return <Frown className="h-5 w-5 text-pink-600" />;
+      case 'angry':
+        return <Angry className="h-5 w-5 text-orange-600" />;
+      default:
+        return null;
+    }
+  };
+
+  const getEmotionLabel = (emotion: string) => {
+    switch (emotion) {
+      case 'happy': return 'Muito Feliz';
+      case 'good': return 'Bem';
+      case 'neutral': return 'Neutro';
+      case 'sad': return 'Triste';
+      case 'angry': return 'Irritado';
+      default: return '';
+    }
+  };
+
+  const getEmotionBgColor = (emotion: string) => {
+    switch (emotion) {
+      case 'happy': return 'bg-[#F2FCE2]';
+      case 'good': return 'bg-[#D3E4FD]';
+      case 'neutral': return 'bg-[#FEF7CD]';
+      case 'sad': return 'bg-[#FFDEE2]';
+      case 'angry': return 'bg-[#FEC6A1]';
+      default: return 'bg-gray-100';
+    }
   };
 
   return (
@@ -37,6 +125,21 @@ export const MentalHealthSummary = () => {
               Acessar <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
           </div>
+
+          {latestEmotion && (
+            <div className={`${getEmotionBgColor(latestEmotion.emotion)} rounded-xl p-3 mb-3 flex justify-between items-center`}>
+              <div className="flex items-center gap-2">
+                {getEmotionIcon(latestEmotion.emotion)}
+                <div>
+                  <p className="text-sm font-medium">Seu humor hoje</p>
+                  <p className="text-md font-semibold">{getEmotionLabel(latestEmotion.emotion)}</p>
+                </div>
+              </div>
+              <p className="text-xs text-gray-600">
+                {format(latestEmotion.date, "dd 'de' MMMM", { locale: ptBR })}
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2">
             <div 
