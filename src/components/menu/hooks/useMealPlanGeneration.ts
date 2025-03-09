@@ -144,60 +144,19 @@ export const useMealPlanGeneration = () => {
       // Save the meal plan to the database if user is authenticated
       if (userData.id) {
         try {
-          // Create meal plan insert payload, omitting the generated_by field if it causes problems
-          const mealPlanData = {
-            user_id: userData.id,
-            plan_data: data.mealPlan,
-            calories: userData.dailyCalories,
-            dietary_preferences: JSON.stringify(preferences) // Convert preferences to JSON string
-          };
-          
-          // Only add generated_by if it exists in data
-          if (data.modelUsed) {
-            mealPlanData['generated_by'] = data.modelUsed;
-          }
-          
           const { error: saveError } = await supabase
             .from('meal_plans')
-            .insert(mealPlanData);
+            .insert({
+              user_id: userData.id,
+              plan_data: data.mealPlan,
+              calories: userData.dailyCalories,
+              generated_by: data.modelUsed || "nutri-plus-agent-llama3",
+              dietary_preferences: JSON.stringify(preferences) // Convert preferences to JSON string
+            });
 
           if (saveError) {
             console.error("Erro ao salvar plano alimentar:", saveError);
-            
-            // If the error is related to the generated_by column, try again without it
-            if (saveError.message?.includes('generated_by')) {
-              console.log("Tentando salvar plano sem o campo generated_by");
-              
-              const { error: retryError } = await supabase
-                .from('meal_plans')
-                .insert({
-                  user_id: userData.id,
-                  plan_data: data.mealPlan,
-                  calories: userData.dailyCalories,
-                  dietary_preferences: JSON.stringify(preferences)
-                });
-                
-              if (retryError) {
-                console.error("Erro ao salvar plano alimentar (segunda tentativa):", retryError);
-                toast.error("Erro ao salvar plano alimentar no banco de dados");
-              } else {
-                console.log("Plano alimentar salvo no banco de dados (segunda tentativa)");
-                
-                // Add transaction if wallet function is available
-                if (addTransaction) {
-                  await addTransaction({
-                    amount: REWARDS.MEAL_PLAN || 10,
-                    type: 'meal_plan',
-                    description: 'Geração de plano alimentar'
-                  });
-                  console.log("Transação adicionada para geração do plano alimentar");
-                }
-                
-                toast.success("Plano alimentar gerado e salvo com sucesso!");
-              }
-            } else {
-              toast.error("Erro ao salvar plano alimentar no banco de dados");
-            }
+            toast.error("Erro ao salvar plano alimentar no banco de dados");
           } else {
             console.log("Plano alimentar salvo no banco de dados");
             
