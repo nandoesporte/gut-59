@@ -10,8 +10,8 @@ import { GoalCards } from "./GoalCards";
 import { SelectCard } from "@/components/workout/components/SelectCard";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-// Export the Goal type so it can be used in other components
-export type Goal = "lose_weight" | "maintain" | "gain_muscle";
+// Import the Goal type from GoalCards to ensure consistency
+import type { Goal } from "./GoalCards";
 
 export interface CalorieCalculatorForm {
   weight: string;
