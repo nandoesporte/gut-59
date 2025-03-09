@@ -27,3 +27,4 @@ verify_jwt = false
 
 [functions.nutri-plus-agent]
 verify_jwt = false
+

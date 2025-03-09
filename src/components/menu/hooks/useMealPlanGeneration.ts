@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -240,23 +241,44 @@ export const useMealPlanGeneration = () => {
       console.log(`Meta: ${userData.goal}, Calorias diárias: ${userData.dailyCalories}kcal`);
       console.log(`Alimentos selecionados: ${selectedFoods.length}`);
       
-      const { data, error } = await supabase.functions.invoke('nutri-plus-agent', {
-        body: {
-          userData,
-          selectedFoods,
-          foodsByMealType,
-          dietaryPreferences: preferences,
-          modelConfig: {
-            model: "llama3-8b-8192",
-            temperature: 0.3
+      // Set a timeout in case the function takes too long
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Tempo limite excedido ao chamar o serviço Nutri+")), 60000)
+      );
+      
+      // API call with timeout
+      const { data, error } = await Promise.race([
+        supabase.functions.invoke('nutri-plus-agent', {
+          body: {
+            userData,
+            selectedFoods,
+            foodsByMealType,
+            dietaryPreferences: preferences,
+            modelConfig: {
+              model: "llama3-8b-8192",
+              temperature: 0.3
+            }
           }
-        }
-      });
+        }),
+        timeoutPromise
+      ]) as {data?: any, error?: any};
 
       if (error) {
         console.error("Erro ao chamar o agente Nutri+:", error);
+        
+        // Check for specific error types and provide helpful messages
+        let errorMessage = "Erro ao gerar plano alimentar. Por favor, tente novamente.";
+        
+        if (error.message?.includes("502") || error.message?.includes("Bad Gateway")) {
+          errorMessage = "Erro de conexão com o serviço Nutri+. Nossos servidores estão ocupados. Por favor, tente novamente em alguns minutos.";
+          console.error("Erro de gateway detectado:", error);
+        } else if (error.message?.includes("timeout") || error.message?.includes("Tempo limite")) {
+          errorMessage = "O serviço Nutri+ demorou muito para responder. Por favor, tente novamente.";
+          console.error("Timeout detectado:", error);
+        }
+        
         setError(`Erro ao gerar plano alimentar: ${error.message}`);
-        toast.error("Erro ao gerar plano alimentar. Por favor, tente novamente.");
+        toast.error(errorMessage);
         return null;
       }
 
@@ -417,7 +439,16 @@ export const useMealPlanGeneration = () => {
     } catch (error: any) {
       console.error("Erro inesperado em generateMealPlan:", error);
       setError(`Erro ao gerar plano alimentar: ${error.message}`);
-      toast.error("Erro ao gerar plano alimentar. Por favor, tente novamente.");
+      
+      // Provide a more user-friendly error message based on error type
+      if (error.message?.includes("AbortError") || error.message?.includes("timeout")) {
+        toast.error("O serviço Nutri+ demorou muito para responder. Por favor, tente novamente em alguns minutos.");
+      } else if (error.message?.includes("fetch")) {
+        toast.error("Erro de conexão com o serviço Nutri+. Verifique sua conexão e tente novamente.");
+      } else {
+        toast.error("Erro ao gerar plano alimentar. Por favor, tente novamente.");
+      }
+      
       return null;
     } finally {
       setLoading(false);
@@ -438,3 +469,4 @@ export const useMealPlanGeneration = () => {
     generationAttempted
   };
 };
+

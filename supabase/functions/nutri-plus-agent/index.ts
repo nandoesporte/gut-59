@@ -217,65 +217,105 @@ Please create a 7-day plan that:
 
     console.log(`[NUTRI+] Calling Groq API with model: ${groqPayload.model}`);
 
-    // Call the Groq API
-    const response = await fetch(GROQ_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${GROQ_API_KEY}`
-      },
-      body: JSON.stringify(groqPayload)
-    });
+    // Add retry logic for API calls
+    const MAX_RETRIES = 3;
+    let retries = 0;
+    let response;
+    let apiError = null;
 
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error(`[NUTRI+] Groq API Error (${response.status}):`, errorData);
-      
-      // If we received a JSON generation error, we'll try to create a fallback meal plan
-      if (response.status === 400 && errorData.includes('json_validate_failed')) {
-        console.log("[NUTRI+] JSON validation failed. Creating fallback meal plan...");
+    while (retries < MAX_RETRIES) {
+      try {
+        console.log(`[NUTRI+] API call attempt ${retries + 1} of ${MAX_RETRIES}`);
         
-        try {
-          // Create a basic fallback meal plan structure
-          const fallbackMealPlan = createFallbackMealPlan(userData, selectedFoods);
-          
-          console.log("[NUTRI+] Fallback meal plan created successfully");
-          
-          return new Response(
-            JSON.stringify({
-              mealPlan: fallbackMealPlan,
-              modelUsed: modelName,
-              isFallback: true
-            }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        } catch (fallbackError) {
-          console.error("[NUTRI+] Error creating fallback meal plan:", fallbackError);
+        // Set timeout for fetch (30 seconds)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        
+        response = await fetch(GROQ_API_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${GROQ_API_KEY}`
+          },
+          body: JSON.stringify(groqPayload),
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          break; // Success, exit retry loop
+        }
+        
+        // If we get here, response was not ok
+        const errorText = await response.text();
+        console.error(`[NUTRI+] Groq API Error (${response.status}):`, errorText);
+        apiError = { status: response.status, message: errorText };
+        
+        // For certain errors, don't retry
+        if (response.status === 400) {
+          break; // Don't retry bad requests
+        }
+        
+        retries++;
+        if (retries < MAX_RETRIES) {
+          // Exponential backoff: 1s, 2s, 4s...
+          const backoffMs = Math.pow(2, retries) * 1000;
+          console.log(`[NUTRI+] Retrying in ${backoffMs}ms...`);
+          await new Promise(resolve => setTimeout(resolve, backoffMs));
+        }
+      } catch (fetchError) {
+        console.error(`[NUTRI+] Fetch error: ${fetchError.message}`);
+        apiError = { status: 0, message: fetchError.message };
+        
+        // Check if it's an abort error (timeout)
+        if (fetchError.name === 'AbortError') {
+          console.error('[NUTRI+] Request timed out after 30 seconds');
+        }
+        
+        retries++;
+        if (retries < MAX_RETRIES) {
+          const backoffMs = Math.pow(2, retries) * 1000;
+          console.log(`[NUTRI+] Retrying in ${backoffMs}ms...`);
+          await new Promise(resolve => setTimeout(resolve, backoffMs));
         }
       }
+    }
+
+    // If all retries failed, create fallback meal plan
+    if (!response || !response.ok) {
+      console.log("[NUTRI+] All API retries failed, falling back to local meal plan generation");
       
-      // Return the error to the client if recovery failed
+      // Create and return fallback meal plan
+      const fallbackMealPlan = createFallbackMealPlan(userData, selectedFoods);
+      
       return new Response(
-        JSON.stringify({ 
-          error: `API Error: ${response.status}`, 
-          details: errorData,
-          // Suggest alternative model next time
-          suggestedModel: "llama3-70b-8192"
+        JSON.stringify({
+          mealPlan: fallbackMealPlan,
+          modelUsed: "fallback-generator",
+          apiError: apiError
         }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Get the API response
+    // If we get here, the API call was successful
     const apiResponse = await response.json();
     console.log(`[NUTRI+] Response received from Groq API at ${new Date().toISOString()}`);
     
     // Check for valid response content
     if (!apiResponse.choices || !apiResponse.choices[0] || !apiResponse.choices[0].message) {
       console.error("[NUTRI+] Invalid API response format:", JSON.stringify(apiResponse).substring(0, 200));
+      
+      // Return fallback meal plan
+      const fallbackMealPlan = createFallbackMealPlan(userData, selectedFoods);
       return new Response(
-        JSON.stringify({ error: "Invalid API response format" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        JSON.stringify({
+          mealPlan: fallbackMealPlan,
+          modelUsed: "fallback-generator",
+          apiError: { status: 'format-error', message: 'Invalid API response format' }
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -914,3 +954,4 @@ function createFallbackMealPlan(userData, selectedFoods) {
     generatedBy: "fallback-generator"
   };
 }
+
