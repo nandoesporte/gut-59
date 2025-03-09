@@ -1,5 +1,6 @@
+
 import * as React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { WorkoutPreferences } from '@/components/workout/types';
 import { PreferencesForm } from '@/components/workout/PreferencesForm';
 import { WorkoutPlanDisplay } from '@/components/workout/WorkoutPlanDisplay';
@@ -7,18 +8,22 @@ import WorkoutHistory from '@/components/workout/components/WorkoutHistory';
 import { Dumbbell } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import type { WorkoutPlan } from '@/components/workout/types/workout-plan';
+import { toast } from 'sonner';
 
 const Workout = () => {
   const [preferences, setPreferences] = useState<WorkoutPreferences | null>(null);
   const [historyPlans, setHistoryPlans] = useState<WorkoutPlan[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
 
-  const fetchWorkoutHistory = async () => {
+  const fetchWorkoutHistory = useCallback(async () => {
     try {
       setIsLoadingHistory(true);
       const { data: { user } } = await supabase.auth.getUser();
       
-      if (!user) return;
+      if (!user) {
+        setHistoryPlans([]);
+        return;
+      }
 
       const { data: plans, error } = await supabase
         .from('workout_plans')
@@ -35,7 +40,11 @@ const Workout = () => {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching workout history:', error);
+        toast.error('Erro ao carregar o histórico de treinos');
+        throw error;
+      }
       
       setHistoryPlans(plans || []);
     } catch (error) {
@@ -43,16 +52,21 @@ const Workout = () => {
     } finally {
       setIsLoadingHistory(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchWorkoutHistory();
-  }, []);
+  }, [fetchWorkoutHistory]);
 
   const handlePreferencesSubmit = (prefs: WorkoutPreferences) => {
     console.log('Preferências submetidas no componente Workout:', prefs);
     setPreferences(prefs);
   }
+
+  const handleWorkoutPlanGenerated = () => {
+    // Refresh history after a new plan is generated
+    fetchWorkoutHistory();
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
@@ -77,13 +91,16 @@ const Workout = () => {
           ) : (
             <WorkoutPlanDisplay 
               preferences={preferences} 
-              onReset={() => setPreferences(null)} 
+              onReset={() => setPreferences(null)}
+              onPlanGenerated={handleWorkoutPlanGenerated}
             />
           )}
 
           <div className="mt-8">
             <WorkoutHistory
               plans={historyPlans}
+              isLoading={isLoadingHistory}
+              onRefresh={fetchWorkoutHistory}
             />
           </div>
         </div>

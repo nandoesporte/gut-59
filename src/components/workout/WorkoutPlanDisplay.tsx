@@ -10,11 +10,13 @@ import { CurrentWorkoutPlan } from "./components/CurrentWorkoutPlan";
 interface WorkoutPlanDisplayProps {
   preferences: WorkoutPreferences;
   onReset: () => void;
+  onPlanGenerated?: () => void;
 }
 
 export const WorkoutPlanDisplay = ({
   preferences,
   onReset,
+  onPlanGenerated,
 }: WorkoutPlanDisplayProps) => {
   const {
     loading,
@@ -25,7 +27,7 @@ export const WorkoutPlanDisplay = ({
     loadingPhase,
     loadingMessage,
     planGenerationCount,
-  } = useWorkoutPlanGeneration(preferences);
+  } = useWorkoutPlanGeneration(preferences, onPlanGenerated);
 
   if (loading) {
     return (

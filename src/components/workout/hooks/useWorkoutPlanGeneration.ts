@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { WorkoutPreferences } from "../types";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,7 +27,10 @@ const activityLevelDescriptions = {
   intense: "Intenso (Segunda a Sábado)"
 };
 
-export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
+export const useWorkoutPlanGeneration = (
+  preferences: WorkoutPreferences,
+  onPlanGenerated?: () => void
+) => {
   const [loading, setLoading] = useState(false);
   const [workoutPlan, setWorkoutPlan] = useState<WorkoutPlan | null>(null);
   const [progressData, setProgressData] = useState(mockProgressData);
@@ -94,7 +97,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
     }
   };
 
-  const generatePlan = async () => {
+  const generatePlan = useCallback(async () => {
     if (generationInProgress.current) {
       console.log("Workout plan generation already in progress, skipping...");
       return;
@@ -200,6 +203,11 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       toast.success(`Plano de treino ${activityDesc} gerado com sucesso!`);
       console.log("Workout plan generation and saving completed successfully");
       
+      // Call the callback if provided
+      if (onPlanGenerated) {
+        onPlanGenerated();
+      }
+      
       retryCount.current = 0;
       setLoadingTime(0);
     } catch (err: any) {
@@ -268,7 +276,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
       setLoading(false);
       generationInProgress.current = false;
     }
-  };
+  }, [preferences, onPlanGenerated]);
 
   useEffect(() => {
     if (!workoutPlan && !loading && !error && !generationInProgress.current && !generationAttempted.current) {
@@ -297,7 +305,7 @@ export const useWorkoutPlanGeneration = (preferences: WorkoutPreferences) => {
     };
     
     fetchGenerationCount();
-  }, []);
+  }, [generatePlan]);
 
   return { 
     loading, 
