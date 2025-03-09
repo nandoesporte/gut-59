@@ -1,15 +1,8 @@
 
-import { Card } from "@/components/ui/card";
+import { MacroDistributionBar } from "./MacroDistributionBar";
 
 interface DailyTotalsProps {
-  dailyTotals?: {
-    calories: number;
-    protein: number;
-    carbs: number;
-    fats: number;
-    fiber: number;
-  };
-  totalNutrition?: {
+  totalNutrition: {
     calories: number;
     protein: number;
     carbs: number;
@@ -18,38 +11,35 @@ interface DailyTotalsProps {
   };
 }
 
-export const DailyTotals = ({ dailyTotals, totalNutrition }: DailyTotalsProps) => {
-  // Use totalNutrition if provided, otherwise use dailyTotals, or default to empty values
-  const nutritionData = totalNutrition || dailyTotals || {
-    calories: 0,
-    protein: 0,
-    carbs: 0,
-    fats: 0,
-    fiber: 0
-  };
-  
-  const stats = [
-    { name: "Calorias", value: nutritionData.calories || 0, unit: "kcal" },
-    { name: "Proteínas", value: nutritionData.protein || 0, unit: "g" },
-    { name: "Carboidratos", value: nutritionData.carbs || 0, unit: "g" },
-    { name: "Gorduras", value: nutritionData.fats || 0, unit: "g" },
-    { name: "Fibras", value: nutritionData.fiber || 0, unit: "g" },
-  ];
-
+export const DailyTotals = ({ totalNutrition }: DailyTotalsProps) => {
   return (
-    <Card className="p-4">
-      <h3 className="text-lg font-medium mb-3">Totais Diários</h3>
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        {stats.map((stat) => (
-          <div 
-            key={stat.name} 
-            className="bg-gray-50 rounded-lg p-3 text-center"
-          >
-            <p className="text-sm text-gray-500">{stat.name}</p>
-            <p className="text-lg font-semibold">{stat.value} {stat.unit}</p>
+    <div className="py-6 border-t mt-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h3 className="font-semibold text-lg text-green-700">Totais Diários</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-2 text-sm text-gray-600">
+            <div>Proteínas: {totalNutrition.protein}g</div>
+            <div>Carboidratos: {totalNutrition.carbs}g</div>
+            <div>Gorduras: {totalNutrition.fats}g</div>
+            <div>Fibras: {totalNutrition.fiber}g</div>
           </div>
-        ))}
+          <div className="mt-4">
+            <MacroDistributionBar
+              macros={{
+                protein: totalNutrition.protein,
+                carbs: totalNutrition.carbs,
+                fats: totalNutrition.fats
+              }}
+            />
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-2xl font-bold text-green-600">
+            {totalNutrition.calories}
+          </div>
+          <div className="text-sm text-gray-600">kcal totais</div>
+        </div>
       </div>
-    </Card>
+    </div>
   );
 };

@@ -1,107 +1,268 @@
 
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { MealPlanTable } from "./MealPlanTable";
-import { X } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
+import { MealSection } from "./MealSection";
 import { DailyTotals } from "./DailyTotals";
-import { MacroDistributionBar } from "./MacroDistributionBar";
+import { Recommendations } from "./Recommendations";
+import { MealPlan, MealFood } from "../types";
+import { supabase } from "@/integrations/supabase/client";
+import { FoodReplacementDialog } from "./FoodReplacementDialog";
 
 interface SavedMealPlanDetailsProps {
-  plan: any;
+  planId: string;
+  planData: MealPlan;
+  isOpen: boolean;
   onClose: () => void;
 }
 
-export const SavedMealPlanDetails = ({ plan, onClose }: SavedMealPlanDetailsProps) => {
-  const [selectedDay, setSelectedDay] = useState<string>("monday");
-  
-  if (!plan || !plan.plan_data || !plan.plan_data.weeklyPlan) {
-    return (
-      <Dialog open onOpenChange={() => onClose()}>
-        <DialogContent className="max-w-4xl h-[90vh] overflow-auto">
-          <DialogHeader>
-            <DialogTitle>Plano Alimentar</DialogTitle>
-            <DialogClose asChild>
-              <Button variant="ghost" size="icon" onClick={onClose} className="absolute right-4 top-4">
-                <X className="h-4 w-4" />
-              </Button>
-            </DialogClose>
-          </DialogHeader>
-          <div className="p-6 text-center">
-            <p>Dados do plano alimentar incompletos ou inválidos.</p>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
+const dayNameMap: Record<string, string> = {
+  monday: "Segunda-feira",
+  tuesday: "Terça-feira",
+  wednesday: "Quarta-feira",
+  thursday: "Quinta-feira",
+  friday: "Sexta-feira",
+  saturday: "Sábado",
+  sunday: "Domingo"
+};
 
-  const { weeklyPlan, weeklyTotals } = plan.plan_data;
-  const dayNames = {
-    monday: "Segunda-feira",
-    tuesday: "Terça-feira",
-    wednesday: "Quarta-feira",
-    thursday: "Quinta-feira",
-    friday: "Sexta-feira",
-    saturday: "Sábado",
-    sunday: "Domingo"
+export const SavedMealPlanDetails = ({ planId, planData, isOpen, onClose }: SavedMealPlanDetailsProps) => {
+  const [selectedDay, setSelectedDay] = useState<string>("monday");
+  const [replaceFoodDialogOpen, setReplaceFoodDialogOpen] = useState(false);
+  const [selectedFood, setSelectedFood] = useState<{
+    food: MealFood;
+    dayKey: string;
+    mealType: string;
+    index: number;
+  } | null>(null);
+
+  const handleReplaceFood = (food: MealFood, dayKey: string, mealType: string, index: number) => {
+    setSelectedFood({ food, dayKey, mealType, index });
+    setReplaceFoodDialogOpen(true);
   };
 
-  return (
-    <Dialog open onOpenChange={() => onClose()}>
-      <DialogContent className="max-w-4xl h-[90vh] overflow-auto">
-        <DialogHeader>
-          <DialogTitle>Plano Alimentar • {plan.calories} kcal</DialogTitle>
-          <DialogClose asChild>
-            <Button variant="ghost" size="icon" onClick={onClose} className="absolute right-4 top-4">
-              <X className="h-4 w-4" />
-            </Button>
-          </DialogClose>
-        </DialogHeader>
+  const handleFoodReplaced = async (originalFood: MealFood, newFood: MealFood, dayKey: string, mealType: string, foodIndex: number) => {
+    try {
+      // Create a deep copy of the plan data
+      const updatedPlanData = JSON.parse(JSON.stringify(planData)) as MealPlan;
+      
+      // Update the specific food item
+      if (updatedPlanData.weeklyPlan[dayKey as keyof typeof updatedPlanData.weeklyPlan]?.meals) {
+        const dayPlan = updatedPlanData.weeklyPlan[dayKey as keyof typeof updatedPlanData.weeklyPlan];
+        const meal = dayPlan.meals[mealType as keyof typeof dayPlan.meals];
+        
+        if (meal && meal.foods && meal.foods[foodIndex]) {
+          meal.foods[foodIndex] = newFood;
+          
+          // Update the meal plan in the database
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) {
+            toast.error("Usuário não autenticado");
+            return;
+          }
 
-        <div className="space-y-4">
-          {/* Macro distribution overview */}
-          <div className="p-4 bg-white rounded-md shadow-sm border">
-            <h3 className="text-lg font-medium mb-3">Distribuição de Macronutrientes</h3>
-            <MacroDistributionBar 
-              protein={weeklyTotals?.averageProtein || 0} 
-              carbs={weeklyTotals?.averageCarbs || 0} 
-              fats={weeklyTotals?.averageFats || 0} 
+          // Cast the MealPlan to a compatible JSON structure for Supabase
+          const { error } = await supabase
+            .from('meal_plans')
+            .update({ 
+              plan_data: updatedPlanData as unknown as Record<string, any> 
+            })
+            .eq('id', planId);
+
+          if (error) {
+            console.error("Erro ao atualizar plano:", error);
+            toast.error("Erro ao atualizar o alimento");
+            return;
+          }
+
+          toast.success("Alimento substituído com sucesso!");
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao substituir alimento:", error);
+      toast.error("Erro ao substituir o alimento");
+    } finally {
+      setReplaceFoodDialogOpen(false);
+    }
+  };
+
+  const renderDayPlan = (dayKey: string) => {
+    const dayPlan = planData.weeklyPlan[dayKey as keyof typeof planData.weeklyPlan];
+    if (!dayPlan) return null;
+
+    return (
+      <div className="space-y-6">
+        <div className="p-4 bg-muted rounded-md mb-6">
+          <h2 className="text-xl font-bold">📅 {dayNameMap[dayKey]} – Plano Alimentar</h2>
+        </div>
+
+        {dayPlan.meals.breakfast && (
+          <div className="relative">
+            <MealSection
+              title="Café da Manhã"
+              icon={<div className="w-5 h-5 text-primary">☀️</div>}
+              meal={dayPlan.meals.breakfast}
             />
+            {dayPlan.meals.breakfast.foods.map((food, index) => (
+              <Button 
+                key={`breakfast-${index}`}
+                variant="outline" 
+                size="sm" 
+                className="absolute top-2 right-2"
+                onClick={() => handleReplaceFood(food, dayKey, "breakfast", index)}
+              >
+                Substituir
+              </Button>
+            ))}
           </div>
+        )}
 
-          {/* Weekly tabs */}
-          <Tabs value={selectedDay} onValueChange={setSelectedDay}>
-            <TabsList className="w-full bg-gray-100 p-1 overflow-x-auto flex flex-nowrap">
-              {Object.entries(dayNames).map(([day, name]) => (
+        {dayPlan.meals.morningSnack && (
+          <div className="relative">
+            <MealSection
+              title="Lanche da Manhã"
+              icon={<div className="w-5 h-5 text-primary">🥪</div>}
+              meal={dayPlan.meals.morningSnack}
+            />
+            {dayPlan.meals.morningSnack.foods.map((food, index) => (
+              <Button 
+                key={`morningSnack-${index}`}
+                variant="outline" 
+                size="sm" 
+                className="absolute top-2 right-2"
+                onClick={() => handleReplaceFood(food, dayKey, "morningSnack", index)}
+              >
+                Substituir
+              </Button>
+            ))}
+          </div>
+        )}
+
+        {dayPlan.meals.lunch && (
+          <div className="relative">
+            <MealSection
+              title="Almoço"
+              icon={<div className="w-5 h-5 text-primary">🍽️</div>}
+              meal={dayPlan.meals.lunch}
+            />
+            {dayPlan.meals.lunch.foods.map((food, index) => (
+              <Button 
+                key={`lunch-${index}`}
+                variant="outline" 
+                size="sm" 
+                className="absolute top-2 right-2"
+                onClick={() => handleReplaceFood(food, dayKey, "lunch", index)}
+              >
+                Substituir
+              </Button>
+            ))}
+          </div>
+        )}
+
+        {dayPlan.meals.afternoonSnack && (
+          <div className="relative">
+            <MealSection
+              title="Lanche da Tarde"
+              icon={<div className="w-5 h-5 text-primary">🍎</div>}
+              meal={dayPlan.meals.afternoonSnack}
+            />
+            {dayPlan.meals.afternoonSnack.foods.map((food, index) => (
+              <Button 
+                key={`afternoonSnack-${index}`}
+                variant="outline" 
+                size="sm" 
+                className="absolute top-2 right-2"
+                onClick={() => handleReplaceFood(food, dayKey, "afternoonSnack", index)}
+              >
+                Substituir
+              </Button>
+            ))}
+          </div>
+        )}
+
+        {dayPlan.meals.dinner && (
+          <div className="relative">
+            <MealSection
+              title="Jantar"
+              icon={<div className="w-5 h-5 text-primary">🌙</div>}
+              meal={dayPlan.meals.dinner}
+            />
+            {dayPlan.meals.dinner.foods.map((food, index) => (
+              <Button 
+                key={`dinner-${index}`}
+                variant="outline" 
+                size="sm" 
+                className="absolute top-2 right-2"
+                onClick={() => handleReplaceFood(food, dayKey, "dinner", index)}
+              >
+                Substituir
+              </Button>
+            ))}
+          </div>
+        )}
+
+        {dayPlan.dailyTotals && (
+          <DailyTotals totalNutrition={dayPlan.dailyTotals} />
+        )}
+      </div>
+    );
+  };
+
+  if (!planData || !planData.weeklyPlan) {
+    return null;
+  }
+
+  return (
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Detalhes do Plano Alimentar</DialogTitle>
+            <DialogDescription>
+              Visualize os detalhes do seu plano e faça substituições de alimentos se necessário
+            </DialogDescription>
+          </DialogHeader>
+
+          <Tabs value={selectedDay} onValueChange={setSelectedDay} className="w-full">
+            <TabsList className="mb-6 w-full flex flex-nowrap overflow-x-auto pb-2 justify-start sm:justify-center gap-1 sm:gap-2">
+              {Object.entries(dayNameMap).map(([day, dayName]) => (
                 <TabsTrigger 
                   key={day} 
                   value={day}
-                  className="flex-grow whitespace-nowrap"
-                  disabled={!weeklyPlan[day]}
+                  className="whitespace-nowrap text-sm sm:text-base px-2 sm:px-4"
                 >
-                  {name}
+                  <span className="hidden sm:inline">{dayName}</span>
+                  <span className="sm:hidden">{dayName.split('-')[0]}</span>
                 </TabsTrigger>
               ))}
             </TabsList>
 
-            {Object.keys(dayNames).map((day) => (
-              <TabsContent key={day} value={day} className="space-y-4">
-                {weeklyPlan[day] ? (
-                  <>
-                    <DailyTotals dailyTotals={weeklyPlan[day].dailyTotals} />
-                    <MealPlanTable dayPlan={weeklyPlan[day]} />
-                  </>
-                ) : (
-                  <div className="text-center p-8">
-                    <p className="text-gray-500">Plano não disponível para este dia.</p>
-                  </div>
-                )}
+            {Object.keys(dayNameMap).map(day => (
+              <TabsContent key={day} value={day}>
+                {renderDayPlan(day)}
               </TabsContent>
             ))}
           </Tabs>
-        </div>
-      </DialogContent>
-    </Dialog>
+
+          {planData.recommendations && (
+            <Recommendations recommendations={planData.recommendations} />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {selectedFood && (
+        <FoodReplacementDialog
+          open={replaceFoodDialogOpen}
+          onOpenChange={setReplaceFoodDialogOpen}
+          originalFood={selectedFood.food}
+          dayKey={selectedFood.dayKey}
+          mealType={selectedFood.mealType}
+          foodIndex={selectedFood.index}
+          onFoodReplaced={handleFoodReplaced}
+        />
+      )}
+    </>
   );
 };

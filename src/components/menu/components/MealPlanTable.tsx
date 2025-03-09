@@ -1,60 +1,101 @@
 
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { MealSection } from "./MealSection";
-import type { DayPlan, MealPlan } from "../types";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import type { MealPlan } from "../types";
 
 interface MealPlanTableProps {
-  dayPlan?: DayPlan;
-  mealPlan?: MealPlan;
+  mealPlan: MealPlan;
 }
 
-export const MealPlanTable = ({ dayPlan, mealPlan }: MealPlanTableProps) => {
-  // Handle the case where mealPlan is provided instead of dayPlan
-  if (mealPlan && !dayPlan) {
-    // Display the first day's plan when mealPlan is provided
-    const firstDayKey = Object.keys(mealPlan.weeklyPlan)[0] as keyof typeof mealPlan.weeklyPlan;
-    dayPlan = mealPlan.weeklyPlan[firstDayKey];
+const dayNameMap: Record<string, string> = {
+  monday: "Segunda-feira",
+  tuesday: "Terça-feira",
+  wednesday: "Quarta-feira",
+  thursday: "Quinta-feira",
+  friday: "Sexta-feira",
+  saturday: "Sábado",
+  sunday: "Domingo"
+};
+
+const mealNameMap: Record<string, string> = {
+  breakfast: "Café da manhã",
+  morningSnack: "Lanche da manhã",
+  lunch: "Almoço",
+  afternoonSnack: "Lanche da tarde",
+  dinner: "Jantar"
+};
+
+export const MealPlanTable = ({ mealPlan }: MealPlanTableProps) => {
+  if (!mealPlan || !mealPlan.weeklyPlan) {
+    return <div className="text-center p-4">Nenhum plano alimentar disponível</div>;
   }
 
-  if (!dayPlan || !dayPlan.meals) {
-    return (
-      <div className="text-center p-4">
-        <p className="text-gray-500">Dados do plano indisponíveis.</p>
-      </div>
-    );
-  }
+  const tableRows: Array<{
+    day: string;
+    meal: string;
+    description: string;
+    foods: string;
+    quantities: string;
+    details: string;
+  }> = [];
 
-  const mealTypes = {
-    breakfast: "Café da Manhã",
-    morningSnack: "Lanche da Manhã",
-    lunch: "Almoço",
-    afternoonSnack: "Lanche da Tarde",
-    dinner: "Jantar"
-  };
+  // Convert the meal plan data to the table format
+  Object.entries(mealPlan.weeklyPlan).forEach(([dayKey, dayPlan]) => {
+    const dayName = dayNameMap[dayKey] || dayKey;
+    
+    Object.entries(dayPlan.meals).forEach(([mealKey, meal]) => {
+      if (!meal) return;
+      
+      const mealName = mealNameMap[mealKey] || mealKey;
+      
+      // Join food names for the "Ingredientes" column
+      const foodNames = meal.foods.map(food => food.name).join(", ");
+      
+      // Create quantities string
+      const quantities = meal.foods.map(food => 
+        `${food.portion}${food.unit}`
+      ).join(", ");
+      
+      tableRows.push({
+        day: dayName,
+        meal: mealName,
+        description: meal.description,
+        foods: foodNames,
+        quantities: quantities,
+        details: meal.foods.map(food => 
+          food.details ? food.details : "Sem instruções específicas"
+        ).join(". ")
+      });
+    });
+  });
+
+  console.log("Generated table rows for meal plan:", tableRows.length);
 
   return (
-    <Accordion type="multiple" defaultValue={["breakfast", "lunch", "dinner"]} className="w-full">
-      {Object.entries(mealTypes).map(([mealType, mealName]) => {
-        const meal = dayPlan?.meals[mealType as keyof typeof dayPlan.meals];
-        if (!meal) return null;
-        
-        return (
-          <AccordionItem key={mealType} value={mealType}>
-            <AccordionTrigger className="hover:bg-gray-50 px-4 py-3 rounded-lg">
-              <div className="flex items-center justify-between w-full">
-                <div className="font-medium">{mealName}</div>
-                <div className="text-sm text-gray-500 mr-4">
-                  {meal.calories} kcal • 
-                  <span className="ml-1">{meal.macros?.protein || 0}g proteína</span>
-                </div>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="px-4 pt-2 pb-4">
-              <MealSection meal={meal} />
-            </AccordionContent>
-          </AccordionItem>
-        );
-      })}
-    </Accordion>
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Dia</TableHead>
+            <TableHead>Refeição</TableHead>
+            <TableHead>Prato</TableHead>
+            <TableHead>Ingredientes</TableHead>
+            <TableHead>Quantidade (g/ml/unidade)</TableHead>
+            <TableHead>Modo de Preparo</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {tableRows.map((row, idx) => (
+            <TableRow key={idx}>
+              <TableCell className="font-medium">{row.day}</TableCell>
+              <TableCell>{row.meal}</TableCell>
+              <TableCell>{row.description}</TableCell>
+              <TableCell>{row.foods}</TableCell>
+              <TableCell>{row.quantities}</TableCell>
+              <TableCell className="whitespace-pre-wrap">{row.details}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 };
