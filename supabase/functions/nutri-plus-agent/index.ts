@@ -9,7 +9,6 @@ const corsHeaders = {
 
 // Obter chaves de API dos ambientes
 const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-const llamaAPIKey = Deno.env.get('LLAMA_API_KEY');
 const groqAPIKey = Deno.env.get('GROQ_API_KEY');
 
 serve(async (req) => {
@@ -77,7 +76,7 @@ serve(async (req) => {
     console.log(`[NUTRI+] Modelo solicitado: ${modelConfig?.model || 'não especificado'}`);
     
     if (modelConfig?.model?.toLowerCase().includes('llama')) {
-      console.log("[NUTRI+] Usando modelo Llama para geração do plano alimentar");
+      console.log("[NUTRI+] Usando modelo Llama via Groq API para geração do plano alimentar");
       try {
         const llamaModel = modelConfig.model || 'llama3-8b-8192';
         console.log(`[NUTRI+] Chamando Groq API com modelo: ${llamaModel}`);
@@ -89,7 +88,21 @@ serve(async (req) => {
         console.log("[NUTRI+] Resposta da Groq API com modelo Llama recebida com sucesso");
       } catch (llamaError) {
         console.error("[NUTRI+] Erro ao gerar com Llama (via Groq):", llamaError);
-        throw new Error(`Erro ao gerar com modelo Llama (via Groq): ${llamaError.message}`);
+        
+        // Tentar com OpenAI como fallback
+        console.log("[NUTRI+] Tentando fallback para OpenAI após erro com Llama");
+        try {
+          const openaiModel = "gpt-4o-mini";
+          result = await generateWithOpenAI(userData, organizedFoodsByMealType, dietaryPreferences, {
+            model: openaiModel,
+            temperature: modelConfig?.temperature || 0.7
+          });
+          modelUsed = `${openaiModel} (fallback após erro em ${modelConfig?.model})`;
+          console.log("[NUTRI+] Fallback para OpenAI concluído com sucesso");
+        } catch (fallbackError) {
+          console.error("[NUTRI+] Erro também no fallback:", fallbackError);
+          throw new Error(`Erro ao gerar com Llama e no fallback: ${llamaError.message}. Erro no fallback: ${fallbackError.message}`);
+        }
       }
     } else if (modelConfig?.model?.toLowerCase().includes('groq') || modelConfig?.model?.toLowerCase().includes('mixtral')) {
       console.log("[NUTRI+] Usando modelo Groq para geração do plano alimentar");
@@ -104,7 +117,21 @@ serve(async (req) => {
         console.log("[NUTRI+] Resposta da Groq API recebida com sucesso");
       } catch (groqError) {
         console.error("[NUTRI+] Erro ao gerar com Groq:", groqError);
-        throw new Error(`Erro ao gerar com modelo Groq: ${groqError.message}`);
+        
+        // Tentar com OpenAI como fallback
+        console.log("[NUTRI+] Tentando fallback para OpenAI após erro com Groq");
+        try {
+          const openaiModel = "gpt-4o-mini";
+          result = await generateWithOpenAI(userData, organizedFoodsByMealType, dietaryPreferences, {
+            model: openaiModel,
+            temperature: modelConfig?.temperature || 0.7
+          });
+          modelUsed = `${openaiModel} (fallback após erro em ${modelConfig?.model})`;
+          console.log("[NUTRI+] Fallback para OpenAI concluído com sucesso");
+        } catch (fallbackError) {
+          console.error("[NUTRI+] Erro também no fallback:", fallbackError);
+          throw new Error(`Erro ao gerar com Groq e no fallback: ${groqError.message}. Erro no fallback: ${fallbackError.message}`);
+        }
       }
     } else {
       // Usar OpenAI como padrão
@@ -146,6 +173,17 @@ serve(async (req) => {
       }
     }
 
+    // Verificar que o plano tem a estrutura esperada
+    if (!result || !result.weeklyPlan) {
+      console.error("[NUTRI+] Plano gerado incompleto ou inválido", result);
+      throw new Error("O plano alimentar gerado está incompleto ou em formato inválido");
+    }
+
+    if (!result.weeklyTotals) {
+      console.warn("[NUTRI+] Plano sem totais semanais, calculando...");
+      result.weeklyTotals = calculateWeeklyTotals(result.weeklyPlan);
+    }
+
     console.log("[NUTRI+] Plano alimentar gerado com sucesso");
     console.log("[NUTRI+] Modelo utilizado:", modelUsed);
 
@@ -166,6 +204,53 @@ serve(async (req) => {
     });
   }
 });
+
+// Função para calcular totais semanais
+function calculateWeeklyTotals(weeklyPlan) {
+  console.log("[NUTRI+] Calculando totais semanais");
+  
+  if (!weeklyPlan || typeof weeklyPlan !== 'object') {
+    console.error("[NUTRI+] weeklyPlan inválido para cálculo de totais:", weeklyPlan);
+    return {
+      averageCalories: 0,
+      averageProtein: 0,
+      averageCarbs: 0,
+      averageFats: 0,
+      averageFiber: 0
+    };
+  }
+  
+  const days = Object.values(weeklyPlan);
+  const validDays = days.filter((day: any) => 
+    day && day.dailyTotals && 
+    !isNaN(Number(day.dailyTotals.calories)) && 
+    !isNaN(Number(day.dailyTotals.protein))
+  );
+  
+  const dayCount = validDays.length || 1;
+  
+  let caloriesTotal = 0;
+  let proteinTotal = 0;
+  let carbsTotal = 0;
+  let fatsTotal = 0;
+  let fiberTotal = 0;
+  
+  for (const day of validDays as any[]) {
+    caloriesTotal += Number(day.dailyTotals?.calories || 0);
+    proteinTotal += Number(day.dailyTotals?.protein || 0);
+    carbsTotal += Number(day.dailyTotals?.carbs || 0);
+    fatsTotal += Number(day.dailyTotals?.fats || 0);
+    fiberTotal += Number(day.dailyTotals?.fiber || 0);
+  }
+  
+  return {
+    averageCalories: Math.round(caloriesTotal / dayCount),
+    averageProtein: Math.round(proteinTotal / dayCount),
+    averageCarbs: Math.round(carbsTotal / dayCount),
+    averageFats: Math.round(fatsTotal / dayCount),
+    averageFiber: Math.round(fiberTotal / dayCount)
+  };
+}
 
 // Função para organizar alimentos por tipo de refeição
 function organizeFoodsByMealType(foods) {
@@ -294,53 +379,10 @@ async function generateWithOpenAI(userData, foodsByMealType, dietaryPreferences,
       console.log("[NUTRI+] Conteúdo da resposta bruta (OpenAI):", content.substring(0, 200) + "...");
       
       // Detectar e reparar problemas comuns de JSON
-      let jsonStr = content;
+      const jsonData = extractJSON(content, "OpenAI");
+      console.log("[NUTRI+] JSON parseado com sucesso (OpenAI)");
       
-      // Tentar encontrar o início do JSON
-      const jsonStart = content.indexOf('{');
-      if (jsonStart > 0) {
-        jsonStr = content.substring(jsonStart);
-        console.log("[NUTRI+] Removido texto antes do JSON:", content.substring(0, jsonStart));
-      }
-      
-      // Tentar encontrar o fim do JSON
-      const jsonEnd = jsonStr.lastIndexOf('}');
-      if (jsonEnd >= 0 && jsonEnd < jsonStr.length - 1) {
-        jsonStr = jsonStr.substring(0, jsonEnd + 1);
-        console.log("[NUTRI+] Removido texto após o JSON");
-      }
-      
-      // Verificar se o JSON possui chaves de abertura e fechamento
-      if (!jsonStr.trim().startsWith('{') || !jsonStr.trim().endsWith('}')) {
-        console.error("[NUTRI+] JSON inválido:", jsonStr);
-        throw new Error("O modelo não retornou um objeto JSON válido");
-      }
-      
-      console.log("[NUTRI+] JSON extraído (OpenAI):", jsonStr.substring(0, 200) + "...");
-      
-      try {
-        const mealPlan = JSON.parse(jsonStr);
-        console.log("[NUTRI+] JSON parseado com sucesso (OpenAI)");
-        return mealPlan;
-      } catch (parseError) {
-        console.error("[NUTRI+] Erro ao fazer parse do JSON (OpenAI):", parseError);
-        
-        // Tentativa adicional de reparo para problemas de escape
-        const repairedJson = jsonStr
-          .replace(/\\'/g, "'")
-          .replace(/\\"/g, '"')
-          .replace(/\\n/g, '\\n')
-          .replace(/\\r/g, '\\r')
-          .replace(/\\t/g, '\\t');
-        
-        try {
-          console.log("[NUTRI+] Tentando parsear JSON reparado");
-          return JSON.parse(repairedJson);
-        } catch (finalError) {
-          console.error("[NUTRI+] Falha final no parse do JSON (OpenAI):", finalError);
-          throw new Error("Erro ao processar a resposta do modelo: JSON inválido");
-        }
-      }
+      return jsonData;
     } catch (jsonError) {
       console.error("[NUTRI+] Erro ao processar JSON da resposta do OpenAI:", jsonError);
       throw new Error("Falha ao processar o JSON do plano alimentar do OpenAI");
@@ -349,16 +391,6 @@ async function generateWithOpenAI(userData, foodsByMealType, dietaryPreferences,
     console.error("[NUTRI+] Erro ao gerar com OpenAI:", error);
     throw error;
   }
-}
-
-// Função para gerar com Llama (via Groq)
-async function generateWithLlama(userData, foodsByMealType, dietaryPreferences, modelConfig) {
-  // Para compatibilidade, redirecionamos para Groq
-  console.log("[NUTRI+] Redirecionando chamada Llama para Groq com modelo llama3-8b-8192");
-  return generateWithGroq(userData, foodsByMealType, dietaryPreferences, {
-    ...modelConfig,
-    model: 'llama3-8b-8192' // Forçar o modelo Llama via Groq
-  });
 }
 
 // Função para gerar com Groq
@@ -426,73 +458,11 @@ async function generateWithGroq(userData, foodsByMealType, dietaryPreferences, m
       const content = data.choices[0].message.content;
       console.log("[NUTRI+] Conteúdo da resposta bruta (Groq):", content.substring(0, 200) + "...");
       
-      // Detectar e reparar problemas comuns de JSON
-      let jsonStr = content;
+      // Extrair e processar o JSON
+      const jsonData = extractJSON(content, "Groq");
+      console.log("[NUTRI+] JSON parseado com sucesso (Groq)");
       
-      // Tentar encontrar o início do JSON
-      const jsonStart = content.indexOf('{');
-      if (jsonStart > 0) {
-        jsonStr = content.substring(jsonStart);
-        console.log("[NUTRI+] Removido texto antes do JSON:", content.substring(0, jsonStart));
-      }
-      
-      // Tentar encontrar o fim do JSON
-      const jsonEnd = jsonStr.lastIndexOf('}');
-      if (jsonEnd >= 0 && jsonEnd < jsonStr.length - 1) {
-        jsonStr = jsonStr.substring(0, jsonEnd + 1);
-        console.log("[NUTRI+] Removido texto após o JSON");
-      }
-      
-      // Verificar se o JSON possui chaves de abertura e fechamento
-      if (!jsonStr.trim().startsWith('{') || !jsonStr.trim().endsWith('}')) {
-        console.error("[NUTRI+] Formato de resposta inesperado (Groq):", jsonStr);
-        throw new Error("O modelo não retornou um objeto JSON válido");
-      }
-      
-      console.log("[NUTRI+] JSON extraído (Groq):", jsonStr.substring(0, 200) + "...");
-      
-      try {
-        const mealPlan = JSON.parse(jsonStr);
-        console.log("[NUTRI+] JSON parseado com sucesso (Groq)");
-        return mealPlan;
-      } catch (parseError) {
-        console.error("[NUTRI+] Erro ao fazer parse do JSON (Groq):", parseError);
-        
-        // Tentativa adicional de reparo para problemas comuns em modelos Llama/Groq
-        // Remover aspas desbalanceadas, caracteres de controle, etc.
-        const repairedJson = jsonStr
-          .replace(/\\'/g, "'")
-          .replace(/\\"/g, '"')
-          .replace(/\\n/g, ' ')
-          .replace(/\\r/g, ' ')
-          .replace(/\\t/g, ' ')
-          .replace(/\n/g, ' ')
-          .replace(/\r/g, ' ')
-          .replace(/\t/g, ' ');
-        
-        try {
-          console.log("[NUTRI+] Tentando parsear JSON reparado (Groq)");
-          return JSON.parse(repairedJson);
-        } catch (secondError) {
-          console.error("[NUTRI+] Segunda tentativa falhou (Groq):", secondError);
-          
-          // Terceira tentativa: usar regex para extrair apenas o bloco JSON válido
-          try {
-            console.log("[NUTRI+] Tentando extrair bloco JSON usando regex (Groq)");
-            const jsonMatch = content.match(/{[\s\S]*}/);
-            if (jsonMatch && jsonMatch[0]) {
-              const extractedJson = jsonMatch[0];
-              console.log("[NUTRI+] JSON extraído via regex:", extractedJson.substring(0, 200) + "...");
-              return JSON.parse(extractedJson);
-            } else {
-              throw new Error("Não foi possível extrair bloco JSON usando regex");
-            }
-          } catch (finalError) {
-            console.error("[NUTRI+] Falha final no parse do JSON (Groq):", finalError);
-            throw new Error("Erro ao processar a resposta do modelo: JSON inválido");
-          }
-        }
-      }
+      return jsonData;
     } catch (jsonError) {
       console.error("[NUTRI+] Erro ao processar JSON da resposta da Groq:", jsonError);
       throw new Error("Falha ao processar o JSON do plano alimentar da Groq API");
@@ -500,6 +470,81 @@ async function generateWithGroq(userData, foodsByMealType, dietaryPreferences, m
   } catch (error) {
     console.error("[NUTRI+] Erro ao gerar com Groq:", error);
     throw error;
+  }
+}
+
+// Função para extrair e corrigir JSON da resposta do modelo
+function extractJSON(content, modelName) {
+  console.log(`[NUTRI+] Extraindo JSON da resposta do ${modelName}`);
+  
+  try {
+    // Primeiro, tenta parsear diretamente
+    try {
+      return JSON.parse(content);
+    } catch (e) {
+      console.log(`[NUTRI+] Parse direto falhou, tentando extrair JSON válido`);
+    }
+    
+    // Determinar o início e fim do JSON
+    let jsonStr = content;
+    
+    // Remover texto antes do primeiro '{'
+    const jsonStart = content.indexOf('{');
+    if (jsonStart > 0) {
+      jsonStr = content.substring(jsonStart);
+      console.log(`[NUTRI+] Removido ${jsonStart} caracteres antes do início do JSON`);
+    }
+    
+    // Remover texto após o último '}'
+    const jsonEnd = jsonStr.lastIndexOf('}');
+    if (jsonEnd >= 0 && jsonEnd < jsonStr.length - 1) {
+      jsonStr = jsonStr.substring(0, jsonEnd + 1);
+      console.log(`[NUTRI+] Removido texto após o final do JSON`);
+    }
+    
+    // Verificar se o JSON possui chaves de abertura e fechamento
+    if (!jsonStr.trim().startsWith('{') || !jsonStr.trim().endsWith('}')) {
+      console.error(`[NUTRI+] Formato de resposta inesperado (${modelName}):`, jsonStr);
+      
+      // Tentar extrair usando regex como último recurso
+      const jsonMatch = content.match(/{[\s\S]*}/);
+      if (jsonMatch && jsonMatch[0]) {
+        jsonStr = jsonMatch[0];
+        console.log(`[NUTRI+] Extraído JSON via regex: ${jsonStr.substring(0, 50)}...`);
+      } else {
+        throw new Error("Não foi possível extrair um objeto JSON válido da resposta");
+      }
+    }
+    
+    // Tentar reparar JSON
+    jsonStr = jsonStr
+      .replace(/\\'/g, "'")
+      .replace(/\\"/g, '"')
+      .replace(/\\n/g, ' ')
+      .replace(/\\r/g, ' ')
+      .replace(/\\t/g, ' ')
+      .replace(/\n/g, ' ')
+      .replace(/\r/g, ' ')
+      .replace(/\t/g, ' ');
+    
+    // Tentar parsear JSON reparado
+    try {
+      const result = JSON.parse(jsonStr);
+      return result;
+    } catch (parseError) {
+      console.error(`[NUTRI+] Erro ao parsear JSON reparado:`, parseError);
+      
+      // Logging mais detalhado para diagnóstico
+      for (let i = 0; i < jsonStr.length; i += 5000) {
+        const chunk = jsonStr.substring(i, i + 5000);
+        console.log(`[NUTRI+] Chunk ${i}-${i+5000} do JSON:`, chunk);
+      }
+      
+      throw new Error(`Falha ao parsear JSON: ${parseError.message}`);
+    }
+  } catch (error) {
+    console.error(`[NUTRI+] Erro ao extrair JSON:`, error);
+    throw new Error(`Erro ao extrair e processar JSON: ${error.message}`);
   }
 }
 
