@@ -1,215 +1,119 @@
-import { useEffect, useState } from 'react';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
+
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
-import { supabase } from '@/integrations/supabase/client';
-import { MealPlan } from './types';
-import { generateMealPlanPDF } from './utils/pdf-generator';
-import { toast } from 'sonner';
-import { Download, Eye, List, Trash2 } from 'lucide-react';
-import { SavedMealPlanDetails } from './components/SavedMealPlanDetails';
-
-interface StoredMealPlan {
-  id: string;
-  created_at: string;
-  plan_data: MealPlan;
-  calories: number;
-}
-
-interface RawMealPlan {
-  id: string;
-  created_at: string;
-  plan_data: unknown;
-  calories: number;
-}
-
-const validateMealPlan = (planData: unknown): planData is MealPlan => {
-  const plan = planData as MealPlan;
-  return !!(
-    plan &&
-    typeof plan === 'object' &&
-    'weeklyPlan' in plan &&
-    'weeklyTotals' in plan &&
-    'recommendations' in plan
-  );
-};
+import { Button } from "@/components/ui/button";
+import { Loader2, FileClock, ChevronRight } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { SavedMealPlanDetails } from "./components/SavedMealPlanDetails";
+import { toast } from "sonner";
 
 export const MealPlanHistory = () => {
-  const [plans, setPlans] = useState<StoredMealPlan[]>([]);
+  const [savedPlans, setSavedPlans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [viewPlanId, setViewPlanId] = useState<string | null>(null);
-  const [viewPlanData, setViewPlanData] = useState<MealPlan | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<any>(null);
+  const [showDetails, setShowDetails] = useState(false);
 
   useEffect(() => {
-    fetchPlans();
+    fetchSavedPlans();
   }, []);
 
-  const fetchPlans = async () => {
+  const fetchSavedPlans = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
+      console.log("Fetching saved meal plans from database...");
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data, error } = await supabase
+      
+      if (!user) {
+        console.log("No authenticated user found, skipping meal plan history fetch");
+        setLoading(false);
+        return;
+      }
+      
+      const { data: plans, error } = await supabase
         .from('meal_plans')
         .select('*')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      const validPlans = (data as RawMealPlan[]).reduce<StoredMealPlan[]>((acc, plan) => {
-        if (validateMealPlan(plan.plan_data)) {
-          acc.push({
-            id: plan.id,
-            created_at: plan.created_at,
-            plan_data: plan.plan_data as MealPlan,
-            calories: plan.calories,
-          });
-        } else {
-          console.error('Invalid meal plan data for plan:', plan.id);
-        }
-        return acc;
-      }, []);
-
-      setPlans(validPlans);
-    } catch (error) {
-      console.error('Error fetching meal plans:', error);
-      toast.error('Erro ao carregar histórico de planos');
+        .order('created_at', { ascending: false })
+        .limit(5);
+      
+      if (error) {
+        console.error("Error fetching meal plans:", error);
+        toast.error("Erro ao carregar histórico de planos alimentares");
+      } else {
+        console.log(`Fetched ${plans?.length || 0} saved meal plans`);
+        setSavedPlans(plans || []);
+      }
+    } catch (err) {
+      console.error("Unexpected error fetching meal plans:", err);
+      toast.error("Erro ao carregar histórico de planos alimentares");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from('meal_plans')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      setPlans(plans.filter(plan => plan.id !== id));
-      toast.success('Plano excluído com sucesso');
-    } catch (error) {
-      console.error('Error deleting meal plan:', error);
-      toast.error('Erro ao excluir plano');
-    }
-    setDeleteId(null);
+  const handleViewPlan = (plan: any) => {
+    setSelectedPlan(plan);
+    setShowDetails(true);
   };
 
-  const handleDownload = async (plan: StoredMealPlan) => {
-    try {
-      await generateMealPlanPDF(plan.plan_data);
-      toast.success('PDF gerado com sucesso!');
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      toast.error('Erro ao gerar PDF');
-    }
+  const handleClose = () => {
+    setShowDetails(false);
+    setSelectedPlan(null);
   };
 
-  const handleViewDetails = (plan: StoredMealPlan) => {
-    setViewPlanId(plan.id);
-    setViewPlanData(plan.plan_data);
-  };
+  if (loading) {
+    return (
+      <Card className="p-6 text-center">
+        <div className="flex items-center justify-center space-x-2">
+          <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
+          <span className="text-gray-500">Carregando histórico...</span>
+        </div>
+      </Card>
+    );
+  }
+
+  if (savedPlans.length === 0) {
+    return null; // Don't show anything if there are no saved plans
+  }
 
   return (
-    <div className="mt-12">
-      <h2 className="text-2xl font-semibold mb-6 flex items-center gap-2">
-        <List className="w-6 h-6" />
-        Histórico de Planos Alimentares
-      </h2>
-      
-      {loading ? (
-        <div className="text-center">Carregando histórico...</div>
-      ) : plans.length === 0 ? (
-        <Card className="p-6 text-center text-gray-500">
-          Nenhum plano alimentar gerado ainda
-        </Card>
-      ) : (
-        <div className="grid gap-4">
-          {plans.map((plan) => (
-            <Card key={plan.id} className="p-4 sm:p-6">
-              <div className="flex flex-col sm:flex-row justify-between gap-4 sm:items-center">
+    <>
+      <Card className="p-6">
+        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <FileClock className="h-5 w-5 text-green-600" />
+          Histórico de Planos Alimentares
+        </h2>
+        
+        <div className="space-y-3">
+          {savedPlans.map((plan) => (
+            <div key={plan.id} className="border rounded-lg p-3 hover:bg-gray-50 transition-colors">
+              <div className="flex justify-between items-center">
                 <div>
-                  <h3 className="font-semibold text-sm sm:text-base">
-                    Plano gerado em {format(new Date(plan.created_at), "d 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                  <h3 className="font-medium">
+                    Plano de {plan.calories} kcal
                   </h3>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Média diária: {Math.round(plan.calories)} kcal
+                  <p className="text-sm text-gray-500">
+                    Criado {formatDistanceToNow(new Date(plan.created_at), { addSuffix: true, locale: ptBR })}
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-2 w-full sm:w-auto justify-start">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleViewDetails(plan)}
-                    className="flex-1 sm:flex-initial justify-center min-w-[80px]"
-                  >
-                    <Eye className="w-4 h-4 mr-2" />
-                    <span className="sm:inline">Detalhes</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDownload(plan)}
-                    className="flex-1 sm:flex-initial justify-center min-w-[80px]"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    <span className="sm:inline">Baixar PDF</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setDeleteId(plan.id)}
-                    className="flex-1 sm:flex-initial justify-center min-w-[80px] text-red-500 hover:text-red-600"
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    <span className="sm:inline">Excluir</span>
-                  </Button>
-                </div>
+                <Button 
+                  variant="ghost" 
+                  onClick={() => handleViewPlan(plan)}
+                  className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                >
+                  Ver <ChevronRight className="ml-1 h-4 w-4" />
+                </Button>
               </div>
-            </Card>
+            </div>
           ))}
         </div>
-      )}
+      </Card>
 
-      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-        <AlertDialogContent className="max-w-[95%] sm:max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja excluir este plano alimentar? Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-            <AlertDialogCancel className="w-full sm:w-auto mt-0">Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteId && handleDelete(deleteId)}
-              className="bg-red-500 hover:bg-red-600 w-full sm:w-auto"
-            >
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {viewPlanData && (
-        <SavedMealPlanDetails
-          planId={viewPlanId || ""}
-          planData={viewPlanData}
-          isOpen={!!viewPlanId}
-          onClose={() => {
-            setViewPlanId(null);
-            setViewPlanData(null);
-            fetchPlans();
-          }}
-        />
+      {showDetails && selectedPlan && (
+        <SavedMealPlanDetails plan={selectedPlan} onClose={handleClose} />
       )}
-    </div>
+    </>
   );
 };

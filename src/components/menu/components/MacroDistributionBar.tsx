@@ -2,81 +2,82 @@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface MacroDistributionBarProps {
-  macros: {
-    protein: number;
-    carbs: number;
-    fats: number;
-  };
+  protein: number;
+  carbs: number;
+  fats: number;
 }
 
-export const MacroDistributionBar = ({ macros }: MacroDistributionBarProps) => {
-  const total = macros.protein + macros.carbs + macros.fats;
-  
-  // Avoid division by zero
-  if (total === 0) {
-    return <div className="w-full h-4 bg-gray-100 rounded-full"></div>;
-  }
+export const MacroDistributionBar = ({ protein, carbs, fats }: MacroDistributionBarProps) => {
+  const total = protein + carbs + fats;
+  const proteinPercentage = total > 0 ? Math.round((protein / total) * 100) : 0;
+  const carbsPercentage = total > 0 ? Math.round((carbs / total) * 100) : 0;
+  const fatsPercentage = total > 0 ? Math.round((fats / total) * 100) : 0;
 
-  const proteinPercentage = (macros.protein / total) * 100;
-  const carbsPercentage = (macros.carbs / total) * 100;
-  const fatsPercentage = (macros.fats / total) * 100;
+  // Ajuste para garantir que a soma seja 100%
+  const adjustedProteinPercentage = proteinPercentage;
+  const adjustedCarbsPercentage = carbsPercentage;
+  const adjustedFatsPercentage = 100 - proteinPercentage - carbsPercentage;
 
   return (
-    <TooltipProvider>
-      <div className="space-y-2">
-        <div className="flex justify-between text-xs text-gray-500">
-          <div>
-            <span className="inline-block w-3 h-3 bg-blue-500 rounded-full mr-1"></span>
-            Proteínas {Math.round(proteinPercentage)}%
-          </div>
-          <div>
-            <span className="inline-block w-3 h-3 bg-green-500 rounded-full mr-1"></span>
-            Carboidratos {Math.round(carbsPercentage)}%
-          </div>
-          <div>
-            <span className="inline-block w-3 h-3 bg-yellow-500 rounded-full mr-1"></span>
-            Gorduras {Math.round(fatsPercentage)}%
-          </div>
+    <div className="space-y-2">
+      <div className="flex h-6 w-full overflow-hidden rounded-full bg-gray-100">
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div
+                className="bg-blue-500 h-full transition-all duration-500"
+                style={{ width: `${adjustedProteinPercentage}%` }}
+              />
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="font-medium">Proteínas: {protein}g ({proteinPercentage}%)</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div
+                className="bg-green-500 h-full transition-all duration-500"
+                style={{ width: `${adjustedCarbsPercentage}%` }}
+              />
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="font-medium">Carboidratos: {carbs}g ({carbsPercentage}%)</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div
+                className="bg-amber-500 h-full transition-all duration-500"
+                style={{ width: `${adjustedFatsPercentage}%` }}
+              />
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="font-medium">Gorduras: {fats}g ({fatsPercentage}%)</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+
+      <div className="flex justify-between text-xs text-gray-500">
+        <div className="flex items-center">
+          <div className="w-3 h-3 bg-blue-500 rounded-full mr-1"></div>
+          <span>Proteínas ({proteinPercentage}%)</span>
         </div>
-        
-        <div className="w-full h-5 rounded-full overflow-hidden flex">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div 
-                className="bg-blue-500 h-full" 
-                style={{ width: `${proteinPercentage}%` }}
-              />
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Proteínas: {macros.protein}g ({Math.round(proteinPercentage)}%)</p>
-            </TooltipContent>
-          </Tooltip>
-          
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div 
-                className="bg-green-500 h-full" 
-                style={{ width: `${carbsPercentage}%` }}
-              />
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Carboidratos: {macros.carbs}g ({Math.round(carbsPercentage)}%)</p>
-            </TooltipContent>
-          </Tooltip>
-          
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div 
-                className="bg-yellow-500 h-full" 
-                style={{ width: `${fatsPercentage}%` }}
-              />
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Gorduras: {macros.fats}g ({Math.round(fatsPercentage)}%)</p>
-            </TooltipContent>
-          </Tooltip>
+        <div className="flex items-center">
+          <div className="w-3 h-3 bg-green-500 rounded-full mr-1"></div>
+          <span>Carboidratos ({carbsPercentage}%)</span>
+        </div>
+        <div className="flex items-center">
+          <div className="w-3 h-3 bg-amber-500 rounded-full mr-1"></div>
+          <span>Gorduras ({fatsPercentage}%)</span>
         </div>
       </div>
-    </TooltipProvider>
+    </div>
   );
 };

@@ -1,8 +1,8 @@
 
-import { MacroDistributionBar } from "./MacroDistributionBar";
+import { Card } from "@/components/ui/card";
 
 interface DailyTotalsProps {
-  totalNutrition: {
+  dailyTotals: {
     calories: number;
     protein: number;
     carbs: number;
@@ -11,35 +11,29 @@ interface DailyTotalsProps {
   };
 }
 
-export const DailyTotals = ({ totalNutrition }: DailyTotalsProps) => {
+export const DailyTotals = ({ dailyTotals }: DailyTotalsProps) => {
+  const stats = [
+    { name: "Calorias", value: dailyTotals.calories || 0, unit: "kcal" },
+    { name: "Proteínas", value: dailyTotals.protein || 0, unit: "g" },
+    { name: "Carboidratos", value: dailyTotals.carbs || 0, unit: "g" },
+    { name: "Gorduras", value: dailyTotals.fats || 0, unit: "g" },
+    { name: "Fibras", value: dailyTotals.fiber || 0, unit: "g" },
+  ];
+
   return (
-    <div className="py-6 border-t mt-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h3 className="font-semibold text-lg text-green-700">Totais Diários</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-2 text-sm text-gray-600">
-            <div>Proteínas: {totalNutrition.protein}g</div>
-            <div>Carboidratos: {totalNutrition.carbs}g</div>
-            <div>Gorduras: {totalNutrition.fats}g</div>
-            <div>Fibras: {totalNutrition.fiber}g</div>
+    <Card className="p-4">
+      <h3 className="text-lg font-medium mb-3">Totais Diários</h3>
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        {stats.map((stat) => (
+          <div 
+            key={stat.name} 
+            className="bg-gray-50 rounded-lg p-3 text-center"
+          >
+            <p className="text-sm text-gray-500">{stat.name}</p>
+            <p className="text-lg font-semibold">{stat.value} {stat.unit}</p>
           </div>
-          <div className="mt-4">
-            <MacroDistributionBar
-              macros={{
-                protein: totalNutrition.protein,
-                carbs: totalNutrition.carbs,
-                fats: totalNutrition.fats
-              }}
-            />
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="text-2xl font-bold text-green-600">
-            {totalNutrition.calories}
-          </div>
-          <div className="text-sm text-gray-600">kcal totais</div>
-        </div>
+        ))}
       </div>
-    </div>
+    </Card>
   );
 };
