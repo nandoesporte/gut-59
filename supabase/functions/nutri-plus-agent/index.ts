@@ -64,8 +64,8 @@ Sua tarefa é analisar os dados do usuário e criar um plano alimentar semanal d
 REGRAS IMPORTANTES DE FORMATO DE SAÍDA:
 1. Sua resposta DEVE ser um JSON válido que possa ser processado com JSON.parse().
 2. Sua resposta deve conter APENAS o objeto JSON sem explicações, narrativas ou texto adicional.
-3. IMPORTANTE: Todos os valores numéricos devem ser números, não strings. Por exemplo, use "protein": 26 em vez de "protein": "26g".
-4. Não adicione unidades (como "g" ou "kcal") após os valores numéricos no JSON. Esses valores devem ser apenas números.
+3. ABSOLUTAMENTE CRÍTICO: Todos os valores numéricos devem ser números, não strings. Por exemplo, use "protein": 26 em vez de "protein": "26g".
+4. NUNCA adicione unidades (como "g" ou "kcal") após os valores numéricos no JSON. Esses valores devem ser apenas números.
 5. A saída deve seguir exatamente esta estrutura:
 {
   "mealPlan": {
@@ -141,6 +141,8 @@ As recomendações devem incluir:
   "timing": ["Conselho específico de tempo de refeição", "Outro conselho de timing"]
 }
 
+LEMBRE-SE: TODOS OS VALORES NUMÉRICOS DEVEM SER NÚMEROS INTEIROS OU DECIMAIS, NÃO STRINGS COM UNIDADES. ESTE É UM REQUISITO CRÍTICO.
+
 IMPORTANTE: Devido a limitações técnicas, sua resposta NÃO pode exceder 8000 tokens. Se necessário, simplifique as descrições de preparo dos alimentos, mas NUNCA omita informações essenciais como calorias, macronutrientes ou items requeridos.`;
 
     // Construct user message with all relevant data
@@ -178,8 +180,8 @@ Por favor, crie um plano de 7 dias que:
 6. Inclua todos os tipos de refeições: café da manhã, lanche da manhã, almoço, lanche da tarde, jantar
 7. Calcule as calorias e macros para cada refeição e dia
 8. Forneça detalhes de preparo para cada alimento
-9. MUITO IMPORTANTE: Todos os valores numéricos devem ser números, não strings. Por exemplo, use "protein": 26 em vez de "protein": "26g".
-10. Não adicione unidades (como "g" ou "kcal") após os valores numéricos no JSON.
+9. CRÍTICO: Use apenas valores numéricos para quantidades, sem adicionar unidades como "g" ou "kcal"
+10. Por exemplo, use "protein": 26 em vez de "protein": "26g"
 11. Use a nomenclatura correta para as refeições em camelCase: "breakfast", "morningSnack", "lunch", "afternoonSnack", "dinner" - não use versões com underscore como "morning_snack" ou "afternoon_snack"`;
 
     // Track time for API call preparation
@@ -199,7 +201,7 @@ Por favor, crie um plano de 7 dias que:
         { role: "user", content: userMessage }
       ],
       temperature: temperature, // Lower temperature for more consistent output
-      max_tokens: 7000, // Aumentado de 4000 para 7000
+      max_tokens: 7000,
       top_p: 0.9,
       response_format: { type: "json_object" } // Request JSON format response
     };
@@ -236,6 +238,11 @@ Por favor, crie um plano de 7 dias que:
             failedJson = failedJson.replace(/"fats":\s*"?(\d+)g"?/g, '"fats": $1');
             failedJson = failedJson.replace(/"fiber":\s*"?(\d+)g"?/g, '"fiber": $1');
             failedJson = failedJson.replace(/"calories":\s*"?(\d+)kcal"?/g, '"calories": $1');
+            failedJson = failedJson.replace(/"calories":\s*"?(\d+)\s*kcal"?/g, '"calories": $1');
+            failedJson = failedJson.replace(/"protein":\s*"?(\d+)\s*g"?/g, '"protein": $1');
+            failedJson = failedJson.replace(/"carbs":\s*"?(\d+)\s*g"?/g, '"carbs": $1');
+            failedJson = failedJson.replace(/"fats":\s*"?(\d+)\s*g"?/g, '"fats": $1');
+            failedJson = failedJson.replace(/"fiber":\s*"?(\d+)\s*g"?/g, '"fiber": $1');
             
             // Fix common JSON format issues with meal types
             failedJson = failedJson
@@ -319,6 +326,19 @@ Por favor, crie um plano de 7 dias que:
                         }
                       }
                     });
+                  }
+                  
+                  // Also check for numbers in dailyTotals directly
+                  if (key === 'dailyTotals' && obj[key]) {
+                    for (const nutrient in obj[key]) {
+                      if (typeof obj[key][nutrient] === 'string') {
+                        // Remove any non-numeric characters (like 'g' or 'kcal')
+                        const numericValue = parseFloat(obj[key][nutrient].replace(/[^\d.]/g, ''));
+                        if (!isNaN(numericValue)) {
+                          obj[key][nutrient] = numericValue;
+                        }
+                      }
+                    }
                   }
                   
                   // Recursively process child objects and arrays
@@ -481,6 +501,11 @@ Por favor, crie um plano de 7 dias que:
         .replace(/"fats":\s*"?(\d+)g"?/g, '"fats": $1')
         .replace(/"fiber":\s*"?(\d+)g"?/g, '"fiber": $1')
         .replace(/"calories":\s*"?(\d+)kcal"?/g, '"calories": $1')
+        .replace(/"calories":\s*"?(\d+)\s*kcal"?/g, '"calories": $1')
+        .replace(/"protein":\s*"?(\d+)\s*g"?/g, '"protein": $1')
+        .replace(/"carbs":\s*"?(\d+)\s*g"?/g, '"carbs": $1')
+        .replace(/"fats":\s*"?(\d+)\s*g"?/g, '"fats": $1')
+        .replace(/"fiber":\s*"?(\d+)\s*g"?/g, '"fiber": $1')
         // Fix meal type naming
         .replace(/"morning_snack":/g, '"morningSnack":')
         .replace(/"afternoon_snack":/g, '"afternoonSnack":')
@@ -549,6 +574,19 @@ Por favor, crie um plano de 7 dias que:
                 }
               }
             });
+          }
+          
+          // Also check for numbers in dailyTotals directly
+          if (key === 'dailyTotals' && obj[key]) {
+            for (const nutrient in obj[key]) {
+              if (typeof obj[key][nutrient] === 'string') {
+                // Remove any non-numeric characters (like 'g' or 'kcal')
+                const numericValue = parseFloat(obj[key][nutrient].replace(/[^\d.]/g, ''));
+                if (!isNaN(numericValue)) {
+                  obj[key][nutrient] = numericValue;
+                }
+              }
+            }
           }
           
           // Recursively process child objects and arrays
@@ -693,7 +731,12 @@ Por favor, crie um plano de 7 dias que:
             .replace(/"carbs":\s*"?(\d+)g"?/g, '"carbs": $1')
             .replace(/"fats":\s*"?(\d+)g"?/g, '"fats": $1')
             .replace(/"fiber":\s*"?(\d+)g"?/g, '"fiber": $1')
-            .replace(/"calories":\s*"?(\d+)kcal"?/g, '"calories": $1');
+            .replace(/"calories":\s*"?(\d+)kcal"?/g, '"calories": $1')
+            .replace(/"calories":\s*"?(\d+)\s*kcal"?/g, '"calories": $1')
+            .replace(/"protein":\s*"?(\d+)\s*g"?/g, '"protein": $1')
+            .replace(/"carbs":\s*"?(\d+)\s*g"?/g, '"carbs": $1')
+            .replace(/"fats":\s*"?(\d+)\s*g"?/g, '"fats": $1')
+            .replace(/"fiber":\s*"?(\d+)\s*g"?/g, '"fiber": $1');
             
           try {
             const repairedJson = JSON.parse(repaired);
@@ -737,3 +780,4 @@ Por favor, crie um plano de 7 dias que:
     );
   }
 });
+

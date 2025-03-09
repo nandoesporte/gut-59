@@ -1,10 +1,10 @@
 
 import { Card } from "@/components/ui/card";
-import { CalorieCalculator, CalorieCalculatorForm } from "./CalorieCalculator";
+import { CalorieCalculator, CalorieCalculatorForm, Goal } from "./CalorieCalculator";
 
 interface CalorieCalculatorStepProps {
   formData: CalorieCalculatorForm;
-  onInputChange: (field: keyof CalorieCalculatorForm, value: string | number) => void;
+  onInputChange: (field: keyof CalorieCalculatorForm, value: string | Goal) => void;
   onCalculate: () => void;
   calorieNeeds: number | null;
 }
