@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { DietaryPreferences, MealPlan, ProtocolFood } from "../types";
+import { DietaryPreferences, MealPlan, ProtocolFood, DayPlan } from "../types";
 import { REWARDS } from "@/constants/rewards";
 import { useWallet } from "@/hooks/useWallet";
 
@@ -114,7 +114,8 @@ export const useMealPlanGeneration = () => {
           let fiberTotal = 0;
           
           // Iterate through days and sum up the nutrition values
-          for (const day of validDays) {
+          // Explicitly type the day variable as DayPlan to fix the TypeScript error
+          for (const day of validDays as DayPlan[]) {
             caloriesTotal += Number(day.dailyTotals?.calories || 0);
             proteinTotal += Number(day.dailyTotals?.protein || 0);
             carbsTotal += Number(day.dailyTotals?.carbs || 0);
