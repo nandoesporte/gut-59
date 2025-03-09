@@ -1,44 +1,51 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { useProtocolFoods } from "./useProtocolFoods";
-import { useCalorieCalculator, type CalorieCalculatorForm, type Goal } from "./useCalorieCalculator";
+import { useCalorieCalculator, Goal } from "./useCalorieCalculator";
 import { useFoodSelection } from "./useFoodSelection";
 import { generateMealPlan } from "./useMealPlanGeneration";
 import { DietaryPreferences, MealPlan, ProtocolFood } from "../types";
 import { useWallet } from "@/hooks/useWallet";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { CalorieCalculatorForm } from "../CalorieCalculator";
 
-// Types
 export interface FormData {
-  weight: string;
-  height: string;
-  age: string;
+  weight: number;
+  height: number;
+  age: number;
   gender: "male" | "female";
   activityLevel: string;
-  goal: Goal;
+  goal: string;
 }
 
 interface MenuState {
   currentStep: number;
   setCurrentStep: (step: number) => void;
   calorieNeeds: number;
-  selectedFoods: ProtocolFood[];
+  selectedFoods: string[];
   protocolFoods: ProtocolFood[];
   totalCalories: number; 
   mealPlan: MealPlan | null;
-  formData: FormData;
+  formData: CalorieCalculatorForm;
   loading: boolean;
   foodsError: Error | null;
-  setFormData: (data: FormData | ((prev: FormData) => FormData)) => void;
+  setFormData: (data: CalorieCalculatorForm) => void;
   handleCalculateCalories: () => void;
-  handleFoodSelection: (food: ProtocolFood) => void;
+  handleFoodSelection: (foodId: string, food?: ProtocolFood) => void;
   handleConfirmFoodSelection: () => void;
   handleDietaryPreferences: (preferences: DietaryPreferences) => void;
 }
 
+const mapGoalToDbEnum = (goal: Goal): Database['public']['Enums']['nutritional_goal'] => {
+  const goalMap: Record<Goal, Database['public']['Enums']['nutritional_goal']> = {
+    'lose': 'lose_weight',
+    'maintain': 'maintain',
+    'gain': 'gain_mass'
+  };
+  return goalMap[goal];
+};
+
 export const useMenuController = (): MenuState => {
-  // State
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [calorieNeeds, setCalorieNeeds] = useState<number>(0);
   const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
@@ -47,15 +54,15 @@ export const useMenuController = (): MenuState => {
     hasAllergies: false,
     allergies: [],
     dietaryRestrictions: [],
-    trainingTime: undefined,
+    trainingTime: null,
   });
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<CalorieCalculatorForm>({
     weight: "70",
     height: "170",
     age: "30",
     gender: "male",
     activityLevel: "moderate",
-    goal: "maintain",
+    goal: "maintain"
   });
   
   const { protocolFoods, error: foodsError, foodsByMealType } = useProtocolFoods();
@@ -63,14 +70,15 @@ export const useMenuController = (): MenuState => {
   const { 
     selectedFoods, 
     totalCalories, 
-    handleFoodSelection: handleFoodSelect,
+    handleFoodSelection, 
+    calculateTotalCalories, 
+    categorizeFoodsByMealType,
     addFood,
     resetSelection 
   } = useFoodSelection();
   
   const wallet = useWallet();
 
-  // Check for authenticated user
   useEffect(() => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -85,10 +93,8 @@ export const useMenuController = (): MenuState => {
     checkUser();
   }, []);
   
-  // Load saved preferences for authenticated users
   const loadSavedPreferences = async (userId: string) => {
     try {
-      // Fetch nutrition preferences
       const { data: nutritionPrefs, error: nutritionError } = await supabase
         .from('nutrition_preferences')
         .select('*')
@@ -99,18 +105,16 @@ export const useMenuController = (): MenuState => {
         console.error("Erro ao carregar preferências nutricionais:", nutritionError);
       } else if (nutritionPrefs) {
         console.log("Loaded nutrition preferences:", nutritionPrefs);
-        setFormData(prev => ({
-          ...prev,
-          weight: nutritionPrefs.weight ? nutritionPrefs.weight.toString() : prev.weight,
-          height: nutritionPrefs.height ? nutritionPrefs.height.toString() : prev.height,
-          age: nutritionPrefs.age ? nutritionPrefs.age.toString() : prev.age,
-          gender: nutritionPrefs.gender as "male" | "female" || prev.gender,
-          activityLevel: nutritionPrefs.activity_level || prev.activityLevel,
-          goal: nutritionPrefs.goal as Goal || prev.goal,
-        }));
+        setFormData({
+          weight: String(nutritionPrefs.weight || 70),
+          height: String(nutritionPrefs.height || 170),
+          age: String(nutritionPrefs.age || 30),
+          gender: (nutritionPrefs.gender === "female" ? "female" : "male"),
+          activityLevel: nutritionPrefs.activity_level || "moderate",
+          goal: nutritionPrefs.goal || "maintain",
+        });
       }
       
-      // Fetch dietary preferences
       const { data: dietaryPrefs, error: dietaryError } = await supabase
         .from('dietary_preferences')
         .select('*')
@@ -126,7 +130,7 @@ export const useMenuController = (): MenuState => {
           hasAllergies: dietaryPrefs.has_allergies || false,
           allergies: dietaryPrefs.allergies || [],
           dietaryRestrictions: dietaryPrefs.dietary_restrictions || [],
-          trainingTime: dietaryPrefs.training_time || undefined,
+          trainingTime: dietaryPrefs.training_time || null,
         }));
       }
     } catch (error) {
@@ -134,57 +138,44 @@ export const useMenuController = (): MenuState => {
     }
   };
 
-  // Handle Calorie Calculation
   const handleCalculateCalories = useCallback(() => {
-    const calculatedCalories = calculateCalories(
-      formData.weight,
-      formData.height,
-      formData.age,
-      formData.gender,
-      formData.activityLevel,
-      formData.goal
-    );
+    const selectedLevel = activityLevels.find(level => level.value === formData.activityLevel);
+    const calculatedCalories = calculateCalories(formData, selectedLevel || { multiplier: 1.2 });
     
-    setCalorieNeeds(calculatedCalories);
-    setCurrentStep(2);
-    
-    // Save nutrition preferences for authenticated users
-    const savePreferences = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { error } = await supabase
-            .from('nutrition_preferences')
-            .upsert({
+    if (calculatedCalories) {
+      setCalorieNeeds(calculatedCalories);
+      setCurrentStep(2);
+      
+      const savePreferences = async () => {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const dbGoal = mapGoalToDbEnum(formData.goal as Goal);
+            
+            const { error } = await supabase.from('nutrition_preferences').upsert({
               user_id: user.id,
               weight: parseFloat(formData.weight),
               height: parseFloat(formData.height),
-              age: parseInt(formData.age),
+              age: parseFloat(formData.age),
               gender: formData.gender,
-              activity_level: formData.activityLevel,
-              goal: formData.goal,
-              calories_needed: calculatedCalories,
-              selected_foods: [] // Empty array for selected foods initially
+              activity_level: formData.activityLevel as any,
+              goal: dbGoal,
+              calories_needed: calculatedCalories
             });
-          
-          if (error) {
-            console.error("Error saving nutrition preferences:", error);
+            
+            if (error) {
+              console.error("Error saving nutrition preferences:", error);
+            }
           }
+        } catch (error) {
+          console.error("Error saving nutrition preferences:", error);
         }
-      } catch (error) {
-        console.error("Error saving nutrition preferences:", error);
-      }
-    };
-    
-    savePreferences();
+      };
+      
+      savePreferences();
+    }
   }, [formData, calculateCalories]);
 
-  // Handle Food Selection
-  const handleFoodSelection = useCallback((food: ProtocolFood) => {
-    handleFoodSelect(food);
-  }, [handleFoodSelect]);
-
-  // Handle Confirm Food Selection
   const handleConfirmFoodSelection = useCallback(() => {
     if (selectedFoods.length === 0) {
       toast.error("Por favor, selecione pelo menos um alimento.");
@@ -193,24 +184,20 @@ export const useMenuController = (): MenuState => {
     setCurrentStep(3);
   }, [selectedFoods]);
 
-  // Handle Dietary Preferences
   const handleDietaryPreferences = useCallback(async (preferences: DietaryPreferences) => {
     setDietaryPreferences(preferences);
     setLoading(true);
     
-    // Save dietary preferences for authenticated users
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { error } = await supabase
-          .from('dietary_preferences')
-          .upsert({
-            user_id: user.id,
-            has_allergies: preferences.hasAllergies,
-            allergies: preferences.allergies,
-            dietary_restrictions: preferences.dietaryRestrictions,
-            training_time: preferences.trainingTime
-          });
+        const { error } = await supabase.from('dietary_preferences').upsert({
+          user_id: user.id,
+          has_allergies: preferences.hasAllergies,
+          allergies: preferences.allergies,
+          dietary_restrictions: preferences.dietaryRestrictions,
+          training_time: preferences.trainingTime
+        });
         
         if (error) {
           console.error("Error saving dietary preferences:", error);
@@ -221,22 +208,20 @@ export const useMenuController = (): MenuState => {
     }
     
     try {
-      // Get user data
       const { data: { user } } = await supabase.auth.getUser();
       
-      // Generate the meal plan
       const generatedPlan = await generateMealPlan({
         userData: {
           id: user?.id,
           weight: parseFloat(formData.weight),
           height: parseFloat(formData.height),
-          age: parseInt(formData.age),
+          age: parseFloat(formData.age),
           gender: formData.gender,
           activityLevel: formData.activityLevel,
           goal: formData.goal,
           dailyCalories: calorieNeeds
         },
-        selectedFoods,
+        selectedFoods: protocolFoods.filter(food => selectedFoods.includes(food.id)),
         foodsByMealType,
         preferences,
         addTransaction: wallet ? async (params) => {
@@ -260,7 +245,7 @@ export const useMenuController = (): MenuState => {
     } finally {
       setLoading(false);
     }
-  }, [formData, calorieNeeds, selectedFoods, foodsByMealType, wallet]);
+  }, [formData, calorieNeeds, selectedFoods, protocolFoods, foodsByMealType, wallet]);
 
   return {
     currentStep,
@@ -280,3 +265,10 @@ export const useMenuController = (): MenuState => {
     handleDietaryPreferences,
   };
 };
+
+const activityLevels = [
+  { value: "sedentary", multiplier: 1.2 },
+  { value: "light", multiplier: 1.375 },
+  { value: "moderate", multiplier: 1.55 },
+  { value: "intense", multiplier: 1.725 }
+];

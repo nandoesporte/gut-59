@@ -1,4 +1,3 @@
-
 import { Card } from "@/components/ui/card";
 import { InitialMenuContent } from "@/components/menu/InitialMenuContent";
 import { CalorieCalculatorStep } from "@/components/menu/CalorieCalculatorStep";
@@ -7,13 +6,12 @@ import { DietaryPreferencesForm } from "@/components/menu/DietaryPreferencesForm
 import { MealPlanDisplay } from "@/components/menu/MealPlanDisplay";
 import { MealPlanHistory } from "@/components/menu/MealPlanHistory";
 import { MenuHeader } from "@/components/menu/MenuHeader";
-import { useMenuController, FormData } from "@/components/menu/hooks/useMenuController";
+import { useMenuController } from "@/components/menu/hooks/useMenuController";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useRef } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/integrations/supabase/client";
-import { CalorieCalculatorForm } from "@/components/menu/hooks/useCalorieCalculator";
 
 const Menu = () => {
   const mealPlanRef = useRef<HTMLDivElement>(null);
@@ -138,8 +136,13 @@ const Menu = () => {
               </h2>
               {currentStep === 1 && (
                 <CalorieCalculatorStep
-                  formData={formData as CalorieCalculatorForm}
-                  onInputChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
+                  formData={formData}
+                  onInputChange={(field, value) => {
+                    setFormData({
+                      ...formData,
+                      [field]: value
+                    });
+                  }}
                   onCalculate={handleCalculateCalories}
                   calorieNeeds={calorieNeeds}
                 />

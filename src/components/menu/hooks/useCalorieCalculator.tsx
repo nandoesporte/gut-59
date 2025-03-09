@@ -3,20 +3,14 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import type { CalorieCalculatorForm } from "../CalorieCalculator";
 
+// Update Goal type to match the database enum values
 export type Goal = "lose" | "maintain" | "gain";
-
-export interface CalorieCalculatorForm {
-  weight: string;
-  height: string;
-  age: string;
-  gender: "male" | "female";
-  activityLevel: string;
-  goal: Goal;
-}
 
 type NutritionPreference = Database['public']['Tables']['nutrition_preferences']['Insert'];
 
+// This function maps our UI goals to the database enum values
 const mapGoalToEnum = (goal: string): Database['public']['Enums']['nutritional_goal'] => {
   const goalMap: Record<string, Database['public']['Enums']['nutritional_goal']> = {
     'lose': 'lose_weight',
@@ -30,53 +24,32 @@ export const useCalorieCalculator = () => {
   const [loading, setLoading] = useState(false);
   const [calorieNeeds, setCalorieNeeds] = useState<number | null>(null);
 
-  const calculateBMR = (weight: string | number, height: string | number, age: string | number, gender: string) => {
-    const weightNum = parseFloat(weight.toString());
-    const heightNum = parseFloat(height.toString());
-    const ageNum = parseFloat(age.toString());
+  const calculateBMR = (data: CalorieCalculatorForm) => {
+    const weight = parseFloat(data.weight);
+    const height = parseFloat(data.height);
+    const age = parseFloat(data.age);
 
-    if (gender === "male") {
-      return 88.36 + (13.4 * weightNum) + (4.8 * heightNum) - (5.7 * ageNum);
+    if (data.gender === "male") {
+      return 88.36 + (13.4 * weight) + (4.8 * height) - (5.7 * age);
     } else {
-      return 447.6 + (9.2 * weightNum) + (3.1 * heightNum) - (4.3 * ageNum);
+      return 447.6 + (9.2 * weight) + (3.1 * height) - (4.3 * age);
     }
   };
 
-  const calculateCalories = (
-    weight: string | number, 
-    height: string | number, 
-    age: string | number, 
-    gender: string, 
-    activityLevel: string, 
-    goal?: string
-  ): number => {
+  const calculateCalories = (formData: CalorieCalculatorForm, selectedLevel: { multiplier: number }) => {
     try {
       setLoading(true);
-      
-      // Map activity level to multiplier
-      let activityMultiplier = 1.2; // default to sedentary
-      
-      switch(activityLevel) {
-        case 'sedentary':
-          activityMultiplier = 1.2;
-          break;
-        case 'light':
-          activityMultiplier = 1.375;
-          break;
-        case 'moderate':
-          activityMultiplier = 1.55;
-          break;
-        case 'intense':
-          activityMultiplier = 1.725;
-          break;
-      }
-      
-      const bmr = calculateBMR(weight, height, age, gender);
+      const bmr = calculateBMR(formData);
+      const activityMultiplier = selectedLevel ? selectedLevel.multiplier : 1.2;
       const dailyCalories = Math.round(bmr * activityMultiplier);
 
-      if (!goal) {
+      // Don't require authentication for calculating calories
+      // This allows the calculator to work even if the user is not logged in
+      let userId = null;
+      
+      if (!formData.goal) {
         toast.error("Por favor, selecione um objetivo");
-        return 0;
+        return null;
       }
 
       setCalorieNeeds(dailyCalories);
@@ -84,7 +57,7 @@ export const useCalorieCalculator = () => {
     } catch (error) {
       console.error('Error calculating calories:', error);
       toast.error("Erro ao calcular necessidades calóricas");
-      return 0;
+      return null;
     } finally {
       setLoading(false);
     }
