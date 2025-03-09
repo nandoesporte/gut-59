@@ -1,3 +1,4 @@
+
 // nutri-plus-agent: Uses Groq API to analyze user data and generate personalized meal plans
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -123,6 +124,8 @@ IMPORTANT: Use exactly the property names specified above:
 - Use "afternoonSnack" for afternoon snack (not "afternoon_snack")
 - Use "dinner" for dinner
 
+VERY IMPORTANT: Each food in the "foods" list MUST contain the "unit" field, like "g", "ml", "unidade", etc. This is required and MUST NOT be omitted.
+
 It is ESSENTIAL that each food in the "foods" list contains detailed preparation instructions in the "details" field, explaining how the food should be prepared, cooked, or consumed.
 
 IMPORTANT: Strictly respect the categorization of foods by meal type:
@@ -140,9 +143,7 @@ Recommendations should include:
   "timing": ["Specific meal timing advice", "Another timing advice"]
 }
 
-REMEMBER: ALL NUMERICAL VALUES MUST BE INTEGERS OR DECIMALS, NOT STRINGS WITH UNITS. THIS IS A CRITICAL REQUIREMENT.
-
-IMPORTANT: Due to technical limitations, your response CANNOT exceed 8000 tokens. If necessary, simplify food preparation descriptions, but NEVER omit essential information like calories, macronutrients, or required items.`;
+REMEMBER: ALL NUMERICAL VALUES MUST BE INTEGERS OR DECIMALS, NOT STRINGS WITH UNITS. THIS IS A CRITICAL REQUIREMENT.`;
 
     // Construct user message with all relevant data
     const userMessage = `Create a personalized weekly meal plan based on this data:
@@ -181,13 +182,14 @@ Please create a 7-day plan that:
 8. Provides preparation details for each food
 9. CRITICAL: Uses only numerical values for quantities, without adding units like "g" or "kcal"
 10. For example, use "protein": 26 instead of "protein": "26g"
-11. Uses the correct meal nomenclature in camelCase: "breakfast", "morningSnack", "lunch", "afternoonSnack", "dinner" - don't use underscore versions like "morning_snack" or "afternoon_snack"`;
+11. Uses the correct meal nomenclature in camelCase: "breakfast", "morningSnack", "lunch", "afternoonSnack", "dinner" - don't use underscore versions like "morning_snack" or "afternoon_snack"
+12. CRITICAL: Each food item MUST include a "unit" field with values like "g", "ml", "unidade", etc.`;
 
     // Track time for API call preparation
     console.log(`[NUTRI+] Preparing API call at ${new Date().toISOString()}`);
 
-    // Get model settings from request or use defaults
-    const modelName = modelConfig?.model || "llama3-8b-8192";
+    // IMPORTANT: Force model to be llama3-8b-8192
+    const modelName = "llama3-8b-8192";
     const temperature = modelConfig?.temperature || 0.3;
     
     console.log(`[NUTRI+] Using model: ${modelName} with temperature: ${temperature}`);
@@ -199,7 +201,7 @@ Please create a 7-day plan that:
         { role: "system", content: systemMessage },
         { role: "user", content: userMessage }
       ],
-      temperature: temperature, // Lower temperature for more consistent output
+      temperature: temperature, 
       max_tokens: 7000,
       top_p: 0.9,
       response_format: { type: "json_object" } // Request JSON format response
@@ -221,244 +223,26 @@ Please create a 7-day plan that:
       const errorData = await response.text();
       console.error(`[NUTRI+] Groq API Error (${response.status}):`, errorData);
       
-      // If we received a JSON generation error, we'll try to fix the failed_generation content
+      // If we received a JSON generation error, we'll try to create a fallback meal plan
       if (response.status === 400 && errorData.includes('json_validate_failed')) {
+        console.log("[NUTRI+] JSON validation failed. Creating fallback meal plan...");
+        
         try {
-          const errorJson = JSON.parse(errorData);
-          if (errorJson.error && errorJson.error.failed_generation) {
-            console.log("[NUTRI+] Attempting to fix invalid JSON...");
-            
-            // Get the failed JSON generation
-            let failedJson = errorJson.error.failed_generation;
-            
-            // Fix values with unit suffixes (like "26g" -> 26)
-            failedJson = failedJson.replace(/"protein":\s*"?(\d+)g"?/g, '"protein": $1');
-            failedJson = failedJson.replace(/"carbs":\s*"?(\d+)g"?/g, '"carbs": $1');
-            failedJson = failedJson.replace(/"fats":\s*"?(\d+)g"?/g, '"fats": $1');
-            failedJson = failedJson.replace(/"fiber":\s*"?(\d+)g"?/g, '"fiber": $1');
-            failedJson = failedJson.replace(/"calories":\s*"?(\d+)kcal"?/g, '"calories": $1');
-            failedJson = failedJson.replace(/"calories":\s*"?(\d+)\s*kcal"?/g, '"calories": $1');
-            failedJson = failedJson.replace(/"protein":\s*"?(\d+)\s*g"?/g, '"protein": $1');
-            failedJson = failedJson.replace(/"carbs":\s*"?(\d+)\s*g"?/g, '"carbs": $1');
-            failedJson = failedJson.replace(/"fats":\s*"?(\d+)\s*g"?/g, '"fats": $1');
-            failedJson = failedJson.replace(/"fiber":\s*"?(\d+)\s*g"?/g, '"fiber": $1');
-            
-            // Fix common JSON format issues with meal types
-            failedJson = failedJson
-              .replace(/"morning_snack":/g, '"morningSnack":')
-              .replace(/"afternoon_snack":/g, '"afternoonSnack":')
-              .replace(/"evening_snack":/g, '"eveningSnack":')
-              .replace(/"pre_workout":/g, '"preWorkout":')
-              .replace(/"post_workout":/g, '"postWorkout":')
-              // Fix common issues with array commas
-              .replace(/,\s*\]/g, ']')         // Remove trailing commas in arrays
-              .replace(/,\s*\}/g, '}')         // Remove trailing commas in objects
-              .replace(/\.\.\.[\s\n]*\}/g, '}')  // Fix ellipsis in JSON
-              .replace(/\.\.\.[\s\n]*\]/g, ']'); // Fix ellipsis in JSON
-            
-            // Advanced fix for ... outros dias ... pattern which breaks the JSON
-            failedJson = failedJson.replace(/(\s*"[^"]+"\s*:\s*\{\s*\/\*[^*]*\*\/\s*\})(,\s*\/\*\s*\.\.\.\s*outros\s*dias\s*\.\.\.\s*\*\/)/g, 
-              (match, group1) => {
-                return group1;
-              }
-            );
-            
-            // Attempt to complete truncated JSON if necessary
-            if (!failedJson.endsWith('}')) {
-              // Count open and close braces to determine needed closing
-              const openBraces = (failedJson.match(/\{/g) || []).length;
-              const closeBraces = (failedJson.match(/\}/g) || []).length;
-              const missingCloseBraces = openBraces - closeBraces;
-              
-              if (missingCloseBraces > 0) {
-                failedJson = failedJson + '}'.repeat(missingCloseBraces);
-              }
-            }
-            
-            try {
-              // Try to parse the fixed JSON
-              const fixedMealPlan = JSON.parse(failedJson);
-              console.log("[NUTRI+] JSON successfully fixed!");
-              
-              // Process the meal plan to ensure all numerical values are actually numbers
-              const processNumericalValues = (obj) => {
-                if (!obj || typeof obj !== 'object') return obj;
-                
-                Object.keys(obj).forEach(key => {
-                  // If this is a macros object, ensure all values are numbers
-                  if (key === 'macros' && obj[key]) {
-                    ['protein', 'carbs', 'fats', 'fiber'].forEach(macro => {
-                      if (obj[key][macro] !== undefined) {
-                        // If it's a string potentially with unit (e.g. "26g"), convert to number
-                        if (typeof obj[key][macro] === 'string') {
-                          const numValue = parseInt(obj[key][macro].replace(/[^\d.]/g, ''), 10);
-                          if (!isNaN(numValue)) obj[key][macro] = numValue;
-                        }
-                      }
-                    });
-                  }
-                  
-                  // For calories and dailyTotals
-                  if ((key === 'calories' || key === 'dailyTotals') && obj[key] && typeof obj[key] === 'object') {
-                    ['calories', 'protein', 'carbs', 'fats', 'fiber'].forEach(nutrient => {
-                      if (obj[key][nutrient] !== undefined) {
-                        // If it's a string potentially with unit, convert to number
-                        if (typeof obj[key][nutrient] === 'string') {
-                          const numValue = parseInt(obj[key][nutrient].replace(/[^\d.]/g, ''), 10);
-                          if (!isNaN(numValue)) obj[key][nutrient] = numValue;
-                        }
-                      }
-                    });
-                  } else if (key === 'calories' && typeof obj[key] === 'string') {
-                    // Direct calories property as string (e.g., "500kcal")
-                    const numValue = parseInt(obj[key].replace(/[^\d.]/g, ''), 10);
-                    if (!isNaN(numValue)) obj[key] = numValue;
-                  }
-                  
-                  // Process weeklyTotals
-                  if (key === 'weeklyTotals' && obj[key]) {
-                    ['averageCalories', 'averageProtein', 'averageCarbs', 'averageFats', 'averageFiber'].forEach(avg => {
-                      if (obj[key][avg] !== undefined) {
-                        if (typeof obj[key][avg] === 'string') {
-                          const numValue = parseInt(obj[key][avg].replace(/[^\d.]/g, ''), 10);
-                          if (!isNaN(numValue)) obj[key][avg] = numValue;
-                        }
-                      }
-                    });
-                  }
-                  
-                  // Also check for numbers in dailyTotals directly
-                  if (key === 'dailyTotals' && obj[key]) {
-                    for (const nutrient in obj[key]) {
-                      if (typeof obj[key][nutrient] === 'string') {
-                        // Remove any non-numeric characters (like 'g' or 'kcal')
-                        const numericValue = parseFloat(obj[key][nutrient].replace(/[^\d.]/g, ''));
-                        if (!isNaN(numericValue)) {
-                          obj[key][nutrient] = numericValue;
-                        }
-                      }
-                    }
-                  }
-                  
-                  // Recursively process child objects and arrays
-                  if (obj[key] && typeof obj[key] === 'object') {
-                    processNumericalValues(obj[key]);
-                  }
-                });
-                
-                return obj;
-              };
-              
-              // Process all numerical values in the meal plan
-              const processedMealPlan = processNumericalValues(fixedMealPlan);
-              
-              // Final validation of meal plan structure
-              if (processedMealPlan.mealPlan && processedMealPlan.mealPlan.weeklyPlan) {
-                // Fix any remaining meal type inconsistencies in the weekly plan
-                Object.keys(processedMealPlan.mealPlan.weeklyPlan).forEach(day => {
-                  const dayPlan = processedMealPlan.mealPlan.weeklyPlan[day];
-                  if (dayPlan && dayPlan.meals) {
-                    // Create a new meals object with correct keys
-                    const correctedMeals = {};
-                    
-                    // Map different meal type formats to the correct format
-                    const mealTypeMap = {
-                      'breakfast': 'breakfast',
-                      'morning_snack': 'morningSnack',
-                      'morningSnack': 'morningSnack',
-                      'lunch': 'lunch',
-                      'afternoon_snack': 'afternoonSnack',
-                      'afternoonSnack': 'afternoonSnack',
-                      'dinner': 'dinner',
-                      'evening_snack': 'eveningSnack',
-                      'eveningSnack': 'eveningSnack'
-                    };
-                    
-                    // Copy and correct each meal
-                    Object.keys(dayPlan.meals).forEach(mealType => {
-                      const correctMealType = mealTypeMap[mealType] || mealType;
-                      if (dayPlan.meals[mealType]) {
-                        correctedMeals[correctMealType] = dayPlan.meals[mealType];
-                      }
-                    });
-                    
-                    // Replace the meals object with the corrected one
-                    dayPlan.meals = correctedMeals;
-                  }
-                });
-                
-                return new Response(
-                  JSON.stringify({
-                    mealPlan: processedMealPlan.mealPlan,
-                    modelUsed: modelName,
-                    recovered: true
-                  }),
-                  { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-                );
-              }
-            } catch (parseError) {
-              console.error("[NUTRI+] Unable to fix JSON:", parseError);
-              console.error("[NUTRI+] Incorrect JSON:", failedJson.substring(0, 500) + "...");
-              
-              // Try more aggressive JSON repair techniques
-              try {
-                // Replace problematic section with a placeholder structure
-                if (parseError.message.includes("position")) {
-                  const errorPosition = parseInt(parseError.message.match(/position (\d+)/)?.[1] || "0");
-                  const contextStart = Math.max(0, errorPosition - 100);
-                  const contextEnd = Math.min(failedJson.length, errorPosition + 100);
-                  const errorContext = failedJson.substring(contextStart, contextEnd);
-                  
-                  console.log(`[NUTRI+] Error context (position ${errorPosition}):`, errorContext);
-                  
-                  // Find the closest enclosing array or object
-                  let braceLevel = 0;
-                  let arrayLevel = 0;
-                  let lastArrayStart = -1;
-                  
-                  for (let i = 0; i < errorPosition; i++) {
-                    if (failedJson[i] === '{') braceLevel++;
-                    if (failedJson[i] === '}') braceLevel--;
-                    if (failedJson[i] === '[') {
-                      arrayLevel++;
-                      lastArrayStart = i;
-                    }
-                    if (failedJson[i] === ']') arrayLevel--;
-                  }
-                  
-                  // If error is in an array, try to fix it by closing the array
-                  if (arrayLevel > 0 && lastArrayStart !== -1) {
-                    const beforeError = failedJson.substring(0, lastArrayStart + 1);
-                    const afterError = failedJson.substring(errorPosition);
-                    
-                    // Create a simplified version with empty array
-                    const simplifiedJson = beforeError + "]" + afterError.substring(afterError.indexOf("]") + 1);
-                    
-                    try {
-                      const fixedMealPlan = JSON.parse(simplifiedJson);
-                      console.log("[NUTRI+] JSON successfully fixed after aggressive repair!");
-                      
-                      return new Response(
-                        JSON.stringify({
-                          mealPlan: fixedMealPlan.mealPlan,
-                          modelUsed: modelName,
-                          recovered: true,
-                          repaired: true
-                        }),
-                        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-                      );
-                    } catch (finalError) {
-                      console.error("[NUTRI+] All repair attempts failed:", finalError);
-                    }
-                  }
-                }
-              } catch (repairError) {
-                console.error("[NUTRI+] Error during aggressive repair:", repairError);
-              }
-            }
-          }
-        } catch (errorParseError) {
-          console.error("[NUTRI+] Error parsing API error:", errorParseError);
+          // Create a basic fallback meal plan structure
+          const fallbackMealPlan = createFallbackMealPlan(userData, selectedFoods);
+          
+          console.log("[NUTRI+] Fallback meal plan created successfully");
+          
+          return new Response(
+            JSON.stringify({
+              mealPlan: fallbackMealPlan,
+              modelUsed: modelName,
+              isFallback: true
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        } catch (fallbackError) {
+          console.error("[NUTRI+] Error creating fallback meal plan:", fallbackError);
         }
       }
       
@@ -468,7 +252,7 @@ Please create a 7-day plan that:
           error: `API Error: ${response.status}`, 
           details: errorData,
           // Suggest alternative model next time
-          suggestedModel: modelName === "llama3-8b-8192" ? "llama3-70b-8192" : "llama3-8b-8192"
+          suggestedModel: "llama3-70b-8192"
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
       );
@@ -516,12 +300,11 @@ Please create a 7-day plan that:
         .replace(/,\s*\}/g, '}')         // Remove trailing commas in objects
         .replace(/\.\.\.[\s\n]*\}/g, '}')  // Fix ellipsis in JSON
         .replace(/\.\.\.[\s\n]*\]/g, ']'); // Fix ellipsis in JSON
-      
-      // Advanced fix for ... outros dias ... pattern which breaks the JSON
-      formattedContent = formattedContent.replace(/(\s*"[^"]+"\s*:\s*\{\s*\/\*[^*]*\*\/\s*\})(,\s*\/\*\s*\.\.\.\s*outros\s*dias\s*\.\.\.\s*\*\/)/g, 
-        (match, group1) => {
-          return group1;
-        }
+        
+      // Add missing "unit" field to food items if needed
+      formattedContent = formattedContent.replace(
+        /"foods":\s*\[\s*{\s*"name":\s*"([^"]+)",\s*"portion":\s*(\d+),\s*"details":/g,
+        '"foods": [{"name": "$1", "portion": $2, "unit": "g", "details":'
       );
       
       // Log size and a preview of the content
@@ -588,6 +371,15 @@ Please create a 7-day plan that:
             }
           }
           
+          // Check for foods without unit and fix them
+          if (key === 'foods' && Array.isArray(obj[key])) {
+            obj[key].forEach(food => {
+              if (food && food.portion !== undefined && food.unit === undefined) {
+                food.unit = "g"; // Default unit if missing
+              }
+            });
+          }
+          
           // Recursively process child objects and arrays
           if (obj[key] && typeof obj[key] === 'object') {
             processNumericalValues(obj[key]);
@@ -606,9 +398,16 @@ Please create a 7-day plan that:
       // Validate the structure
       if (!processedMealPlan.mealPlan || !processedMealPlan.mealPlan.weeklyPlan) {
         console.error("[NUTRI+] API response missing required structure. Response:", formattedContent.substring(0, 500));
+        
+        // Create fallback meal plan
+        const fallbackMealPlan = createFallbackMealPlan(userData, selectedFoods);
         return new Response(
-          JSON.stringify({ error: "Invalid meal plan structure" }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+          JSON.stringify({
+            mealPlan: fallbackMealPlan,
+            modelUsed: modelName,
+            isFallback: true
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       
@@ -637,6 +436,15 @@ Please create a 7-day plan that:
             const correctMealType = mealTypeMap[mealType] || mealType;
             if (dayPlan.meals[mealType]) {
               correctedMeals[correctMealType] = dayPlan.meals[mealType];
+              
+              // Fix missing units in foods
+              if (correctedMeals[correctMealType].foods) {
+                correctedMeals[correctMealType].foods.forEach(food => {
+                  if (food && food.portion !== undefined && food.unit === undefined) {
+                    food.unit = "g"; // Default unit if missing
+                  }
+                });
+              }
             }
           });
           
@@ -664,6 +472,11 @@ Please create a 7-day plan that:
                 if (!food.details || food.details === "") {
                   food.details = "Prepare according to personal preference. Consume fresh when possible.";
                 }
+                
+                // Ensure each food has unit
+                if (!food.unit) {
+                  food.unit = "g";
+                }
               });
             }
           });
@@ -680,24 +493,14 @@ Please create a 7-day plan that:
         
         console.log("[NUTRI+] Recalculating weekly averages due to invalid values");
         
-        const days = Object.values(mealPlan.weeklyPlan);
-        const validDays = days.filter(day => day && day.dailyTotals);
-        const dayCount = validDays.length || 1; // Avoid division by zero
-        
-        mealPlan.weeklyTotals = {
-          averageCalories: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.calories || 0), 0) / dayCount),
-          averageProtein: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.protein || 0), 0) / dayCount),
-          averageCarbs: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.carbs || 0), 0) / dayCount),
-          averageFats: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.fats || 0), 0) / dayCount),
-          averageFiber: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.fiber || 0), 0) / dayCount)
-        };
+        // Calculate weekly totals
+        mealPlan.weeklyTotals = calculateWeeklyTotals(mealPlan.weeklyPlan);
       }
 
       console.log(`[NUTRI+] Meal plan successfully generated at ${new Date().toISOString()}`);
       console.log(`[NUTRI+] Process duration: ${(new Date().getTime() - new Date(startTime).getTime()) / 1000}s`);
       
       // Return the successful response with model info and ensure it's directly accessible
-      // Important: Make sure we're only returning the mealPlan without nesting it further
       const finalResponse = {
         mealPlan,
         modelUsed: modelName
@@ -712,67 +515,19 @@ Please create a 7-day plan that:
       );
       
     } catch (jsonError) {
-      // If the response is not valid JSON, log the error and return error response
       console.error("[NUTRI+] Error parsing JSON:", jsonError);
       console.error("[NUTRI+] Invalid JSON response:", mealPlanContent.substring(0, 1000));
       
-      // Try to repair JSON syntax
-      try {
-        // Locate the error
-        if (jsonError.message.includes("position")) {
-          const errorPosition = parseInt(jsonError.message.match(/position (\d+)/)?.[1] || "0");
-          const contextStart = Math.max(0, errorPosition - 100);
-          const contextEnd = Math.min(mealPlanContent.length, errorPosition + 100);
-          const errorContext = mealPlanContent.substring(contextStart, contextEnd);
-          
-          console.log(`[NUTRI+] Error context (position ${errorPosition}):`, errorContext);
-          
-          // Attempt to repair specific formatting issues in the response
-          let repaired = mealPlanContent;
-          
-          // Fix values with unit suffixes (like "26g" -> 26)
-          repaired = repaired
-            .replace(/"protein":\s*"?(\d+)g"?/g, '"protein": $1')
-            .replace(/"carbs":\s*"?(\d+)g"?/g, '"carbs": $1')
-            .replace(/"fats":\s*"?(\d+)g"?/g, '"fats": $1')
-            .replace(/"fiber":\s*"?(\d+)g"?/g, '"fiber": $1')
-            .replace(/"calories":\s*"?(\d+)kcal"?/g, '"calories": $1')
-            .replace(/"calories":\s*"?(\d+)\s*kcal"?/g, '"calories": $1')
-            .replace(/"protein":\s*"?(\d+)\s*g"?/g, '"protein": $1')
-            .replace(/"carbs":\s*"?(\d+)\s*g"?/g, '"carbs": $1')
-            .replace(/"fats":\s*"?(\d+)\s*g"?/g, '"fats": $1')
-            .replace(/"fiber":\s*"?(\d+)\s*g"?/g, '"fiber": $1');
-            
-          try {
-            const repairedJson = JSON.parse(repaired);
-            console.log("[NUTRI+] JSON repaired successfully!");
-            
-            // Return the repaired JSON if it was successfully parsed
-            if (repairedJson.mealPlan && repairedJson.mealPlan.weeklyPlan) {
-              return new Response(
-                JSON.stringify({ 
-                  mealPlan: repairedJson.mealPlan,
-                  modelUsed: modelName,
-                  repaired: true
-                }),
-                { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-              );
-            }
-          } catch (repairError) {
-            console.error("[NUTRI+] Repair attempt failed:", repairError);
-          }
-        }
-      } catch (repairAttemptError) {
-        console.error("[NUTRI+] Error in repair attempt:", repairAttemptError);
-      }
+      // Create a fallback meal plan
+      const fallbackMealPlan = createFallbackMealPlan(userData, selectedFoods);
       
       return new Response(
-        JSON.stringify({ 
-          error: "Failed to parse meal plan JSON",
-          details: jsonError.message,
-          rawContent: mealPlanContent.substring(0, 500) + "..." 
+        JSON.stringify({
+          mealPlan: fallbackMealPlan,
+          modelUsed: modelName,
+          isFallback: true
         }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
     
@@ -785,3 +540,152 @@ Please create a 7-day plan that:
     );
   }
 });
+
+// Function to calculate weekly totals from the meal plan
+function calculateWeeklyTotals(weeklyPlan) {
+  const days = Object.values(weeklyPlan);
+  const validDays = days.filter(day => day && day.dailyTotals);
+  const dayCount = validDays.length || 1; // Avoid division by zero
+  
+  return {
+    averageCalories: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.calories || 0), 0) / dayCount),
+    averageProtein: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.protein || 0), 0) / dayCount),
+    averageCarbs: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.carbs || 0), 0) / dayCount),
+    averageFats: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.fats || 0), 0) / dayCount),
+    averageFiber: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.fiber || 0), 0) / dayCount)
+  };
+}
+
+// Function to create a fallback meal plan when the API fails
+function createFallbackMealPlan(userData, selectedFoods) {
+  console.log("[NUTRI+] Creating fallback meal plan using selected foods");
+  
+  const dayOfWeek = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+  const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  
+  // Filter foods by meal type
+  const breakfastFoods = selectedFoods.filter(food => food.meal_type?.includes('breakfast') || !food.meal_type || food.meal_type.length === 0);
+  const lunchFoods = selectedFoods.filter(food => food.meal_type?.includes('lunch') || !food.meal_type || food.meal_type.length === 0);
+  const dinnerFoods = selectedFoods.filter(food => food.meal_type?.includes('dinner') || !food.meal_type || food.meal_type.length === 0);
+  const snackFoods = selectedFoods.filter(food => 
+    food.meal_type?.includes('morning_snack') || 
+    food.meal_type?.includes('afternoon_snack') || 
+    !food.meal_type || 
+    food.meal_type.length === 0
+  );
+  
+  // Helper function to get random items from array
+  const getRandomItems = (arr, count) => {
+    const result = [];
+    const available = [...arr];
+    for (let i = 0; i < count && available.length > 0; i++) {
+      const randomIndex = Math.floor(Math.random() * available.length);
+      result.push(available.splice(randomIndex, 1)[0]);
+    }
+    return result;
+  };
+  
+  // Helper function to create a meal from food items
+  const createMeal = (foods, mealType) => {
+    const foodItems = foods.map(food => ({
+      name: food.name,
+      portion: 100,
+      unit: "g",
+      details: `Prepare ${food.name} according to your preference. Consume fresh when possible.`
+    }));
+    
+    const calories = foods.reduce((sum, food) => sum + (food.calories || 0), 0);
+    const protein = foods.reduce((sum, food) => sum + (food.protein || 0), 0);
+    const carbs = foods.reduce((sum, food) => sum + (food.carbs || 0), 0);
+    const fats = foods.reduce((sum, food) => sum + (food.fats || 0), 0);
+    const fiber = foods.reduce((sum, food) => sum + (food.fiber || 0), 0);
+    
+    return {
+      description: `${mealType} meal`,
+      foods: foodItems,
+      calories: calories,
+      macros: {
+        protein: protein,
+        carbs: carbs,
+        fats: fats,
+        fiber: fiber
+      }
+    };
+  };
+  
+  // Create a weekly plan
+  const weeklyPlan = {};
+  
+  for (let i = 0; i < 7; i++) {
+    const breakfastItems = getRandomItems(breakfastFoods, 2);
+    const lunchItems = getRandomItems(lunchFoods, 2);
+    const dinnerItems = getRandomItems(dinnerFoods, 2);
+    const morningSnackItems = getRandomItems(snackFoods, 1);
+    const afternoonSnackItems = getRandomItems(snackFoods, 1);
+    
+    const breakfast = createMeal(breakfastItems, "Breakfast");
+    const lunch = createMeal(lunchItems, "Lunch");
+    const dinner = createMeal(dinnerItems, "Dinner");
+    const morningSnack = createMeal(morningSnackItems, "Morning Snack");
+    const afternoonSnack = createMeal(afternoonSnackItems, "Afternoon Snack");
+    
+    const dailyCalories = breakfast.calories + lunch.calories + dinner.calories + 
+                          morningSnack.calories + afternoonSnack.calories;
+    
+    const dailyProtein = breakfast.macros.protein + lunch.macros.protein + dinner.macros.protein + 
+                         morningSnack.macros.protein + afternoonSnack.macros.protein;
+    
+    const dailyCarbs = breakfast.macros.carbs + lunch.macros.carbs + dinner.macros.carbs + 
+                       morningSnack.macros.carbs + afternoonSnack.macros.carbs;
+    
+    const dailyFats = breakfast.macros.fats + lunch.macros.fats + dinner.macros.fats + 
+                      morningSnack.macros.fats + afternoonSnack.macros.fats;
+    
+    const dailyFiber = breakfast.macros.fiber + lunch.macros.fiber + dinner.macros.fiber + 
+                       morningSnack.macros.fiber + afternoonSnack.macros.fiber;
+    
+    weeklyPlan[dayOfWeek[i]] = {
+      dayName: dayNames[i],
+      meals: {
+        breakfast,
+        morningSnack,
+        lunch,
+        afternoonSnack,
+        dinner
+      },
+      dailyTotals: {
+        calories: dailyCalories,
+        protein: dailyProtein,
+        carbs: dailyCarbs,
+        fats: dailyFats,
+        fiber: dailyFiber
+      }
+    };
+  }
+  
+  // Calculate weekly totals
+  const weeklyTotals = calculateWeeklyTotals(weeklyPlan);
+  
+  // Create recommendations
+  const recommendations = {
+    general: "Consuma alimentos naturais e evite processados. Mantenha-se hidratado durante o dia.",
+    preworkout: "Consuma carboidratos de fácil digestão 1-2 horas antes do treino para energia.",
+    postworkout: "Após o treino, combine proteínas e carboidratos para recuperação muscular.",
+    timing: [
+      "Tome café da manhã até 1 hora após acordar",
+      "Mantenha intervalos de 3-4 horas entre as refeições",
+      "Consuma proteínas em todas as refeições",
+      "Hidrate-se com 30-40ml de água por kg de peso corporal",
+      "Evite refeições pesadas 2 horas antes de dormir"
+    ]
+  };
+  
+  return {
+    weeklyPlan,
+    weeklyTotals,
+    recommendations,
+    userCalories: userData.dailyCalories,
+    generatedBy: "fallback-generator"
+  };
+}
+
