@@ -1,4 +1,3 @@
-
 import { Card } from "@/components/ui/card";
 import { InitialMenuContent } from "@/components/menu/InitialMenuContent";
 import { CalorieCalculatorStep } from "@/components/menu/CalorieCalculatorStep";
@@ -81,6 +80,7 @@ const Menu = () => {
     }
   }, [currentStep, protocolFoods, selectedFoods, mealPlan]);
 
+  
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 py-4 sm:py-8">
       <div className="container mx-auto px-3 sm:px-4">

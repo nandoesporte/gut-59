@@ -125,7 +125,7 @@ export const useMealPlanGeneration = () => {
               plan_data: data.mealPlan,
               calories: userData.dailyCalories,
               generated_by: data.modelUsed || "nutri-plus-agent-llama3",
-              dietary_preferences: preferences
+              dietary_preferences: JSON.stringify(preferences) // Convert to JSON string for database storage
             });
 
           if (saveError) {

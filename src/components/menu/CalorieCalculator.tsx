@@ -10,17 +10,8 @@ import { GoalCards } from "./GoalCards";
 import { SelectCard } from "@/components/workout/components/SelectCard";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-// Import the Goal type from GoalCards to ensure consistency
-import type { Goal } from "./GoalCards";
-
-export interface CalorieCalculatorForm {
-  weight: string;
-  height: string;
-  age: string;
-  gender: "male" | "female";
-  activityLevel: string;
-  goal?: Goal;
-}
+// Import types from our types file for consistency
+import { CalorieCalculatorForm, Goal } from "./types";
 
 export const activityLevels = [
   {

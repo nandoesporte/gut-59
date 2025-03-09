@@ -2,26 +2,16 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { ProtocolFood, MealPlan, DietaryPreferences, Goal } from "../types";
+import { ProtocolFood, MealPlan, DietaryPreferences, Goal, CalorieCalculatorForm } from "../types";
 import { useCalorieCalculator } from "./useCalorieCalculator";
 import { useFoodSelection } from "./useFoodSelection";
 import { useMealPlanGeneration } from "./useMealPlanGeneration";
 import { useProtocolFoods } from "./useProtocolFoods";
 
-interface FormData {
-  age: number;
-  weight: number;
-  height: number;
-  gender: "male" | "female";
-  activity_level: string;
-  activityLevel: string;
-  goal: Goal;
-}
-
 export const useMenuController = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [user, setUser] = useState<{ id: string } | null>(null);
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<CalorieCalculatorForm>({
     age: 30,
     weight: 70,
     height: 170,
@@ -54,23 +44,25 @@ export const useMenuController = () => {
   }, []);
 
   // Handle step 1: Calculate calories
-  const handleCalculateCalories = () => {
+  const handleCalculateCalories = async () => {
     try {
-      const calculatedCalories = calculateCalories(
+      const calculatedCalories = await calculateCalories(
         {
           gender: formData.gender,
           age: formData.age,
           weight: formData.weight,
           height: formData.height,
           activity_level: formData.activity_level,
-          activityLevel: formData.activity_level,
+          activityLevel: formData.activityLevel,
           goal: formData.goal
         },
         { multiplier: 1.0 }
       );
       
-      setCalorieNeeds(calculatedCalories);
-      setCurrentStep(2);
+      if (calculatedCalories) {
+        setCalorieNeeds(calculatedCalories);
+        setCurrentStep(2);
+      }
     } catch (error) {
       toast.error("Erro ao calcular calorias. Verifique os dados informados.");
     }
