@@ -1,23 +1,13 @@
 
 import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Calendar, 
-  Utensils, 
-  Coffee, 
-  Apple, 
-  Download, 
-  RefreshCcw, 
-  Moon,
-  Sun
-} from "lucide-react";
-import { MealPlan, DailyNutrition } from "./types";
-import { MealSection } from "./components/MealSection";
-import { DailyTotals } from "./components/DailyTotals";
+import { MealPlan } from "./types";
+import { DayPlanContent } from "./components/DayPlanContent";
+import { MealPlanHeader } from "./components/MealPlanHeader";
+import { MealPlanActionButtons } from "./components/MealPlanActionButtons";
+import { WeeklyOverview } from "./components/WeeklyOverview";
 import { Recommendations } from "./components/Recommendations";
-import { MealPlanTable } from "./components/MealPlanTable";
 import { generateMealPlanPDF } from "./utils/pdf-generator";
 
 interface MealPlanDisplayProps {
@@ -110,53 +100,19 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
     "calories": "calorias"
   };
 
-  // Traduzir o nome do dia da semana
-  const translateDayName = (dayName: string): string => {
-    const translations: Record<string, string> = {
-      "Monday": "Segunda-feira",
-      "Tuesday": "Terça-feira",
-      "Wednesday": "Quarta-feira",
-      "Thursday": "Quinta-feira",
-      "Friday": "Sexta-feira",
-      "Saturday": "Sábado",
-      "Sunday": "Domingo"
-    };
-    
-    return translations[dayName] || dayName;
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold flex items-center">
-            <Calendar className="h-5 w-5 mr-2 text-green-600" />
-            Seu Plano Alimentar Personalizado
-          </h2>
-          <p className="text-sm text-gray-500 mt-1">
-            {mealPlan.userCalories} kcal diárias • {mealPlan.weeklyTotals.averageProtein}g proteína
-          </p>
-        </div>
+        <MealPlanHeader 
+          calories={mealPlan.userCalories} 
+          protein={mealPlan.weeklyTotals.averageProtein} 
+        />
         
-        <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-          >
-            <RefreshCcw className="h-4 w-4 mr-2" />
-            {isRefreshing ? "Atualizando..." : "Novo Plano"}
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={handleDownloadPDF}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            PDF
-          </Button>
-        </div>
+        <MealPlanActionButtons 
+          onRefresh={handleRefresh} 
+          onDownload={handleDownloadPDF} 
+          isRefreshing={isRefreshing} 
+        />
       </div>
       
       <Tabs defaultValue={days[0]} value={activeDay} onValueChange={setActiveDay}>
@@ -178,75 +134,13 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
           
           return (
             <TabsContent key={day} value={day} className="space-y-6">
-              <Card>
-                <CardContent className="p-4 sm:p-6">
-                  <h3 className="font-bold text-lg mb-4 flex items-center">
-                    <Calendar className="w-5 h-5 mr-2 text-blue-600" />
-                    {translateDayName(dayPlan.dayName) || dayLabels[day] || "Dia da Semana"}
-                  </h3>
-                  
-                  <div className="grid grid-cols-1 gap-6">
-                    {dayPlan.meals?.breakfast && (
-                      <MealSection
-                        title={mealTypeLabels["breakfast"] || "Café da Manhã"}
-                        icon={<Coffee className="h-5 w-5 text-amber-500" />}
-                        meal={dayPlan.meals.breakfast}
-                        unitLabels={unitLabels}
-                      />
-                    )}
-                    
-                    {dayPlan.meals?.morningSnack && (
-                      <MealSection
-                        title={mealTypeLabels["morningSnack"] || "Lanche da Manhã"}
-                        icon={<Apple className="h-5 w-5 text-red-500" />}
-                        meal={dayPlan.meals.morningSnack}
-                        unitLabels={unitLabels}
-                      />
-                    )}
-                    
-                    {dayPlan.meals?.lunch && (
-                      <MealSection
-                        title={mealTypeLabels["lunch"] || "Almoço"}
-                        icon={<Utensils className="h-5 w-5 text-green-600" />}
-                        meal={dayPlan.meals.lunch}
-                        unitLabels={unitLabels}
-                      />
-                    )}
-                    
-                    {dayPlan.meals?.afternoonSnack && (
-                      <MealSection
-                        title={mealTypeLabels["afternoonSnack"] || "Lanche da Tarde"}
-                        icon={<Apple className="h-5 w-5 text-orange-500" />}
-                        meal={dayPlan.meals.afternoonSnack}
-                        unitLabels={unitLabels}
-                      />
-                    )}
-                    
-                    {dayPlan.meals?.dinner && (
-                      <MealSection
-                        title={mealTypeLabels["dinner"] || "Jantar"}
-                        icon={<Moon className="h-5 w-5 text-indigo-500" />}
-                        meal={dayPlan.meals.dinner}
-                        unitLabels={unitLabels}
-                      />
-                    )}
-                    
-                    {dayPlan.meals?.eveningSnack && (
-                      <MealSection
-                        title={mealTypeLabels["eveningSnack"] || "Ceia"}
-                        icon={<Moon className="h-5 w-5 text-purple-500" />}
-                        meal={dayPlan.meals.eveningSnack}
-                        unitLabels={unitLabels}
-                      />
-                    )}
-                    
-                    <DailyTotals 
-                      totalNutrition={dayPlan.dailyTotals} 
-                      macroLabels={macroLabels}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
+              <DayPlanContent 
+                dayPlan={dayPlan}
+                dayLabel={dayLabels[day]}
+                mealTypeLabels={mealTypeLabels}
+                unitLabels={unitLabels}
+                macroLabels={macroLabels}
+              />
             </TabsContent>
           );
         })}
@@ -260,16 +154,11 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
         </Card>
       )}
       
-      <Card>
-        <CardContent className="p-4 sm:p-6">
-          <h3 className="font-bold text-lg mb-4">Visão Geral Semanal</h3>
-          <MealPlanTable 
-            mealPlan={mealPlan} 
-            mealTypeLabels={mealTypeLabels} 
-            macroLabels={macroLabels}
-          />
-        </CardContent>
-      </Card>
+      <WeeklyOverview 
+        mealPlan={mealPlan}
+        mealTypeLabels={mealTypeLabels}
+        macroLabels={macroLabels}
+      />
     </div>
   );
 };
