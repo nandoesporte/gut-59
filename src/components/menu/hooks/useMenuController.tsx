@@ -12,11 +12,10 @@ export const useMenuController = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [user, setUser] = useState<{ id: string } | null>(null);
   const [formData, setFormData] = useState<CalorieCalculatorForm>({
-    age: 30,
-    weight: 70,
-    height: 170,
+    age: "30",
+    weight: "70",
+    height: "170",
     gender: 'male',
-    activity_level: 'moderate',
     activityLevel: 'moderate',
     goal: 'maintain'
   });
@@ -52,7 +51,6 @@ export const useMenuController = () => {
           age: formData.age,
           weight: formData.weight,
           height: formData.height,
-          activity_level: formData.activity_level,
           activityLevel: formData.activityLevel,
           goal: formData.goal
         },
@@ -93,9 +91,9 @@ export const useMenuController = () => {
     // Prepare user data
     const userData = {
       id: user?.id,
-      weight: formData.weight,
-      height: formData.height,
-      age: formData.age,
+      weight: Number(formData.weight),
+      height: Number(formData.height),
+      age: Number(formData.age),
       gender: formData.gender,
       activityLevel: formData.activityLevel,
       goal: formData.goal,
@@ -136,11 +134,11 @@ export const useMenuController = () => {
     // Prepare user data
     const userData = {
       id: user?.id,
-      weight: formData.weight,
-      height: formData.height,
-      age: formData.age,
+      weight: Number(formData.weight),
+      height: Number(formData.height),
+      age: Number(formData.age),
       gender: formData.gender,
-      activityLevel: formData.activity_level,
+      activityLevel: formData.activityLevel,
       goal: formData.goal,
       dailyCalories: calorieNeeds
     };
