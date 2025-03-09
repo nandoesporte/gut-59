@@ -1,5 +1,5 @@
+
 import { useState } from "react";
-import { Goal } from "./hooks/useCalorieCalculator";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +16,7 @@ export interface CalorieCalculatorForm {
   age: string;
   gender: "male" | "female";
   activityLevel: string;
-  goal: Goal;
+  goal?: Goal;
 }
 
 export const activityLevels = [

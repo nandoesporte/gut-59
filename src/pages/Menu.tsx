@@ -11,7 +11,6 @@ import { Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useRef } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { supabase } from "@/integrations/supabase/client";
 
 const Menu = () => {
   const mealPlanRef = useRef<HTMLDivElement>(null);
@@ -78,21 +77,9 @@ const Menu = () => {
     }
   }, [currentStep, protocolFoods, selectedFoods, mealPlan]);
 
-  const handleRefreshMealPlan = async (): Promise<void> => {
+  const handleRefreshMealPlan = async () => {
     try {
-      console.log("Refreshing meal plan");
-      
-      // Check if user is authenticated
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast.warning("Faça login para gerar um novo plano");
-        return;
-      }
-      
-      // Reset to food selection step
-      setCurrentStep(2);
-      
-      toast.info("Voltando para seleção de alimentos. Você pode escolher novos alimentos para seu plano.");
+      toast.info("Funcionalidade de atualização em desenvolvimento");
       return Promise.resolve();
     } catch (error) {
       console.error('Erro ao atualizar cardápio:', error);
@@ -137,12 +124,7 @@ const Menu = () => {
               {currentStep === 1 && (
                 <CalorieCalculatorStep
                   formData={formData}
-                  onInputChange={(field, value) => {
-                    setFormData({
-                      ...formData,
-                      [field]: value
-                    });
-                  }}
+                  onInputChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
                   onCalculate={handleCalculateCalories}
                   calorieNeeds={calorieNeeds}
                 />

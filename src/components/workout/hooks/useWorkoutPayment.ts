@@ -12,7 +12,7 @@ export const useWorkoutPayment = () => {
     hasPaid,
     currentPrice,
     handlePaymentAndContinue
-  } = usePaymentHandling(); // Remove the 'workout' argument
+  } = usePaymentHandling('workout');
 
   useEffect(() => {
     checkPaymentSettings();

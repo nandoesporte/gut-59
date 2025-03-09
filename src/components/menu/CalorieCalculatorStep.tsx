@@ -4,7 +4,7 @@ import { CalorieCalculator, CalorieCalculatorForm } from "./CalorieCalculator";
 
 interface CalorieCalculatorStepProps {
   formData: CalorieCalculatorForm;
-  onInputChange: (field: keyof CalorieCalculatorForm, value: string) => void;
+  onInputChange: (field: keyof CalorieCalculatorForm, value: string | number) => void;
   onCalculate: () => void;
   calorieNeeds: number | null;
 }
