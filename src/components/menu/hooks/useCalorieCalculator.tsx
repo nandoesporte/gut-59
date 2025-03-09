@@ -3,7 +3,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
-import type { CalorieCalculatorForm } from "../CalorieCalculator";
+import type { CalorieCalculatorForm } from "../types";
 
 type NutritionPreference = Database['public']['Tables']['nutrition_preferences']['Insert'];
 
@@ -21,9 +21,9 @@ export const useCalorieCalculator = () => {
   const [calorieNeeds, setCalorieNeeds] = useState<number | null>(null);
 
   const calculateBMR = (data: CalorieCalculatorForm) => {
-    const weight = parseFloat(data.weight);
-    const height = parseFloat(data.height);
-    const age = parseFloat(data.age);
+    const weight = parseFloat(String(data.weight));
+    const height = parseFloat(String(data.height));
+    const age = parseFloat(String(data.age));
 
     if (data.gender === "male") {
       return 88.36 + (13.4 * weight) + (4.8 * height) - (5.7 * age);
@@ -57,9 +57,9 @@ export const useCalorieCalculator = () => {
       // Only save to database if user is logged in
       if (userId) {
         const nutritionPreference: NutritionPreference = {
-          weight: parseFloat(formData.weight),
-          height: parseFloat(formData.height),
-          age: parseFloat(formData.age),
+          weight: Number(formData.weight),
+          height: Number(formData.height),
+          age: Number(formData.age),
           gender: formData.gender,
           activity_level: formData.activityLevel as Database['public']['Enums']['activity_level'],
           goal: mapGoalToEnum(formData.goal),
