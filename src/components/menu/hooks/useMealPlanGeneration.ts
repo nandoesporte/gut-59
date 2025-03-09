@@ -105,23 +105,39 @@ export const useMealPlanGeneration = () => {
           
           const dayCount = validDays.length || 1; // Prevent division by zero
           
-          // Fix by ensuring all values are properly converted to numbers before arithmetic operations
+          // Fix the type issues by first creating numeric variables for the totals
+          const totalCalories = validDays.reduce((sum: number, day: any) => {
+            const calories = Number(day.dailyTotals?.calories || 0);
+            return sum + calories;
+          }, 0);
+          
+          const totalProtein = validDays.reduce((sum: number, day: any) => {
+            const protein = Number(day.dailyTotals?.protein || 0);
+            return sum + protein;
+          }, 0);
+          
+          const totalCarbs = validDays.reduce((sum: number, day: any) => {
+            const carbs = Number(day.dailyTotals?.carbs || 0);
+            return sum + carbs;
+          }, 0);
+          
+          const totalFats = validDays.reduce((sum: number, day: any) => {
+            const fats = Number(day.dailyTotals?.fats || 0);
+            return sum + fats;
+          }, 0);
+          
+          const totalFiber = validDays.reduce((sum: number, day: any) => {
+            const fiber = Number(day.dailyTotals?.fiber || 0);
+            return sum + fiber;
+          }, 0);
+          
+          // Now calculate the averages using the numeric totals
           data.mealPlan.weeklyTotals = {
-            averageCalories: Math.round(validDays.reduce((sum: number, day: any) => {
-              return sum + Number(day.dailyTotals?.calories || 0);
-            }, 0) / dayCount),
-            averageProtein: Math.round(validDays.reduce((sum: number, day: any) => {
-              return sum + Number(day.dailyTotals?.protein || 0);
-            }, 0) / dayCount),
-            averageCarbs: Math.round(validDays.reduce((sum: number, day: any) => {
-              return sum + Number(day.dailyTotals?.carbs || 0);
-            }, 0) / dayCount),
-            averageFats: Math.round(validDays.reduce((sum: number, day: any) => {
-              return sum + Number(day.dailyTotals?.fats || 0);
-            }, 0) / dayCount),
-            averageFiber: Math.round(validDays.reduce((sum: number, day: any) => {
-              return sum + Number(day.dailyTotals?.fiber || 0);
-            }, 0) / dayCount)
+            averageCalories: Math.round(totalCalories / dayCount),
+            averageProtein: Math.round(totalProtein / dayCount),
+            averageCarbs: Math.round(totalCarbs / dayCount),
+            averageFats: Math.round(totalFats / dayCount),
+            averageFiber: Math.round(totalFiber / dayCount)
           };
         }
       }
