@@ -15,13 +15,36 @@ export const Recommendations = ({ recommendations }: RecommendationsProps) => {
     if (typeof recs === 'string') {
       return { general: recs };
     } else if (Array.isArray(recs)) {
-      return { general: recs.join('\n') };
+      return { general: recs };
     }
     
     return recs as RecommendationsObject;
   };
 
   const formattedRecommendations = formatRecommendations(recommendations);
+
+  // Helper function to render recommendation items
+  const renderRecommendationItems = (items: string | string[] | undefined) => {
+    if (!items) return null;
+    
+    if (typeof items === 'string') {
+      return items.split('\n').map((item, index) => (
+        <p key={index} className="flex items-start">
+          <span className="mr-2">•</span>
+          <span>{item.trim()}</span>
+        </p>
+      ));
+    } else if (Array.isArray(items)) {
+      return items.map((item, index) => (
+        <p key={index} className="flex items-start">
+          <span className="mr-2">•</span>
+          <span>{item.trim()}</span>
+        </p>
+      ));
+    }
+    
+    return null;
+  };
 
   return (
     <div className="space-y-4">
@@ -34,21 +57,7 @@ export const Recommendations = ({ recommendations }: RecommendationsProps) => {
         <div className="bg-green-50 p-4 rounded-md">
           <h4 className="font-medium text-green-800 mb-2">Recomendações Gerais</h4>
           <div className="text-sm text-green-700 space-y-1">
-            {typeof formattedRecommendations.general === 'string' ? (
-              formattedRecommendations.general.split('\n').map((item, index) => (
-                <p key={index} className="flex items-start">
-                  <span className="mr-2">•</span>
-                  <span>{item.trim()}</span>
-                </p>
-              ))
-            ) : (
-              formattedRecommendations.general.map((item, index) => (
-                <p key={index} className="flex items-start">
-                  <span className="mr-2">•</span>
-                  <span>{item.trim()}</span>
-                </p>
-              ))
-            )}
+            {renderRecommendationItems(formattedRecommendations.general)}
           </div>
         </div>
       )}
@@ -57,21 +66,7 @@ export const Recommendations = ({ recommendations }: RecommendationsProps) => {
         <div className="bg-blue-50 p-4 rounded-md">
           <h4 className="font-medium text-blue-800 mb-2">Recomendações Pré-Treino</h4>
           <div className="text-sm text-blue-700 space-y-1">
-            {typeof formattedRecommendations.preworkout === 'string' ? (
-              formattedRecommendations.preworkout.split('\n').map((item, index) => (
-                <p key={index} className="flex items-start">
-                  <span className="mr-2">•</span>
-                  <span>{item.trim()}</span>
-                </p>
-              ))
-            ) : (
-              formattedRecommendations.preworkout.map((item, index) => (
-                <p key={index} className="flex items-start">
-                  <span className="mr-2">•</span>
-                  <span>{item.trim()}</span>
-                </p>
-              ))
-            )}
+            {renderRecommendationItems(formattedRecommendations.preworkout)}
           </div>
         </div>
       )}
@@ -80,21 +75,7 @@ export const Recommendations = ({ recommendations }: RecommendationsProps) => {
         <div className="bg-purple-50 p-4 rounded-md">
           <h4 className="font-medium text-purple-800 mb-2">Recomendações Pós-Treino</h4>
           <div className="text-sm text-purple-700 space-y-1">
-            {typeof formattedRecommendations.postworkout === 'string' ? (
-              formattedRecommendations.postworkout.split('\n').map((item, index) => (
-                <p key={index} className="flex items-start">
-                  <span className="mr-2">•</span>
-                  <span>{item.trim()}</span>
-                </p>
-              ))
-            ) : (
-              formattedRecommendations.postworkout.map((item, index) => (
-                <p key={index} className="flex items-start">
-                  <span className="mr-2">•</span>
-                  <span>{item.trim()}</span>
-                </p>
-              ))
-            )}
+            {renderRecommendationItems(formattedRecommendations.postworkout)}
           </div>
         </div>
       )}
@@ -106,21 +87,7 @@ export const Recommendations = ({ recommendations }: RecommendationsProps) => {
             Timing das Refeições
           </h4>
           <div className="text-sm text-amber-700 space-y-1">
-            {typeof formattedRecommendations.timing === 'string' ? (
-              formattedRecommendations.timing.split('\n').map((item, index) => (
-                <p key={index} className="flex items-start">
-                  <span className="mr-2">•</span>
-                  <span>{item.trim()}</span>
-                </p>
-              ))
-            ) : (
-              formattedRecommendations.timing.map((item, index) => (
-                <p key={index} className="flex items-start">
-                  <span className="mr-2">•</span>
-                  <span>{item.trim()}</span>
-                </p>
-              ))
-            )}
+            {renderRecommendationItems(formattedRecommendations.timing)}
           </div>
         </div>
       )}

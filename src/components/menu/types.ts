@@ -8,6 +8,12 @@ export interface Food {
 
 export interface MealFood extends Food {
   // Additional properties for foods that need to be replaced or modified
+  id?: string;
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fats?: number;
+  fiber?: number;
 }
 
 export interface Macros {
@@ -53,9 +59,9 @@ export interface WeeklyTotals {
 }
 
 export interface RecommendationsObject {
-  general?: string;
-  preworkout?: string;
-  postworkout?: string;
+  general?: string | string[];
+  preworkout?: string | string[];
+  postworkout?: string | string[];
   timing?: string | string[];
 }
 
@@ -83,6 +89,8 @@ export interface ProtocolFood {
   post_workout_compatible?: boolean;
   portion_size?: number;
   portion_unit?: string;
+  serving_size?: number;
+  serving_unit?: string;
 }
 
 export interface DietaryPreferences {
@@ -96,8 +104,10 @@ export interface CalorieCalculatorForm {
   age: number;
   weight: number;
   height: number;
-  gender: string;
+  gender: "male" | "female";
   activity_level: string;
   activityLevel: string;
   goal: string;
 }
+
+export type Goal = "lose" | "maintain" | "gain";

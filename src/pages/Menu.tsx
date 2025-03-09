@@ -1,4 +1,3 @@
-
 import { Card } from "@/components/ui/card";
 import { InitialMenuContent } from "@/components/menu/InitialMenuContent";
 import { CalorieCalculatorStep } from "@/components/menu/CalorieCalculatorStep";
@@ -98,7 +97,10 @@ const Menu = () => {
               </h2>
               {currentStep === 1 && (
                 <CalorieCalculatorStep
-                  formData={formData}
+                  formData={{
+                    ...formData,
+                    activityLevel: formData.activity_level,
+                  }}
                   onInputChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
                   onCalculate={handleCalculateCalories}
                   calorieNeeds={calorieNeeds}

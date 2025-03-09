@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -67,19 +66,6 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
       </div>
     );
   }
-
-  // Convert recommendations to the expected format if needed
-  const formatRecommendations = (recs: string | string[] | RecommendationsObject | undefined): RecommendationsObject | undefined => {
-    if (!recs) return undefined;
-    
-    if (typeof recs === 'string') {
-      return { general: recs };
-    } else if (Array.isArray(recs)) {
-      return { general: recs.join('\n') };
-    }
-    
-    return recs as RecommendationsObject;
-  };
 
   return (
     <div className="space-y-6">
@@ -185,9 +171,7 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
                       />
                     )}
                     
-                    <DailyTotals
-                      totalNutrition={dayPlan.dailyTotals as DailyNutrition}
-                    />
+                    <DailyTotals totalNutrition={dayPlan.dailyTotals} />
                   </div>
                 </CardContent>
               </Card>
@@ -199,7 +183,7 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
       {mealPlan.recommendations && (
         <Card>
           <CardContent className="p-4 sm:p-6">
-            <Recommendations recommendations={formatRecommendations(mealPlan.recommendations)} />
+            <Recommendations recommendations={mealPlan.recommendations} />
           </CardContent>
         </Card>
       )}
@@ -207,9 +191,7 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
       <Card>
         <CardContent className="p-4 sm:p-6">
           <h3 className="font-bold text-lg mb-4">Visão Geral Semanal</h3>
-          <MealPlanTable
-            mealPlan={mealPlan}
-          />
+          <MealPlanTable mealPlan={mealPlan} />
         </CardContent>
       </Card>
     </div>
