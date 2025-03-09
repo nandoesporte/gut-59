@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,10 +12,8 @@ export const useMealPlanGeneration = () => {
   const [loadingTime, setLoadingTime] = useState(0);
   const { addTransaction } = useWallet();
   
-  // Track generation attempts to handle retries
   const generationAttempted = useState(false);
   
-  // Timer to track loading time
   let loadingTimer: NodeJS.Timeout | null = null;
 
   const generatePlan = async (
@@ -38,12 +35,10 @@ export const useMealPlanGeneration = () => {
     setError(null);
     setLoadingTime(0);
     
-    // Clear any existing timer
     if (loadingTimer) {
       clearInterval(loadingTimer);
     }
     
-    // Start timer to track loading time
     loadingTimer = setInterval(() => {
       setLoadingTime(prev => prev + 1);
     }, 1000);
@@ -54,7 +49,6 @@ export const useMealPlanGeneration = () => {
       console.log(`Meta: ${userData.goal}, Calorias diárias: ${userData.dailyCalories}kcal`);
       console.log(`Alimentos selecionados: ${selectedFoods.length}`);
       
-      // Call the edge function to generate the meal plan
       const { data, error } = await supabase.functions.invoke('nutri-plus-agent', {
         body: {
           userData,
@@ -75,20 +69,24 @@ export const useMealPlanGeneration = () => {
         return null;
       }
 
+      console.log("Resposta do agente Nutri+:", data);
+      
       if (!data?.mealPlan) {
         console.error("Nenhum plano alimentar retornado pelo agente Nutri+");
+        console.error("Estrutura da resposta:", JSON.stringify(data).substring(0, 200) + "...");
         setError("Não foi possível gerar o plano alimentar");
         toast.error("Não foi possível gerar o plano alimentar. Por favor, tente novamente.");
         return null;
       }
 
       console.log("Plano alimentar recebido com sucesso");
+      console.log("Estrutura do plano:", Object.keys(data.mealPlan).join(', '));
+      console.log("weeklyPlan presente:", !!data.mealPlan.weeklyPlan);
+      console.log("weeklyTotals presente:", !!data.mealPlan.weeklyTotals);
       
-      // Ensure the meal plan uses the user's specified daily calories
       if (data.mealPlan) {
         data.mealPlan.userCalories = userData.dailyCalories;
         
-        // Process weeklyTotals if missing or has NaN values
         if (!data.mealPlan.weeklyTotals || 
             isNaN(Number(data.mealPlan.weeklyTotals.averageCalories)) || 
             isNaN(Number(data.mealPlan.weeklyTotals.averageProtein))) {
@@ -103,18 +101,14 @@ export const useMealPlanGeneration = () => {
             !isNaN(Number(day.dailyTotals.protein))
           );
           
-          // Safely calculate the number of days, defaulting to 1 if there are no valid days
           const dayCount = validDays.length || 1;
           
-          // Calculate each total nutrition value explicitly
           let caloriesTotal = 0;
           let proteinTotal = 0;
           let carbsTotal = 0;
           let fatsTotal = 0;
           let fiberTotal = 0;
           
-          // Iterate through days and sum up the nutrition values
-          // Explicitly type the day variable as DayPlan to fix the TypeScript error
           for (const day of validDays as DayPlan[]) {
             caloriesTotal += Number(day.dailyTotals?.calories || 0);
             proteinTotal += Number(day.dailyTotals?.protein || 0);
@@ -123,14 +117,12 @@ export const useMealPlanGeneration = () => {
             fiberTotal += Number(day.dailyTotals?.fiber || 0);
           }
           
-          // Calculate averages
           const averageCalories = Math.round(caloriesTotal / dayCount);
           const averageProtein = Math.round(proteinTotal / dayCount);
           const averageCarbs = Math.round(carbsTotal / dayCount);
           const averageFats = Math.round(fatsTotal / dayCount);
           const averageFiber = Math.round(fiberTotal / dayCount);
           
-          // Assign calculated values to the meal plan
           data.mealPlan.weeklyTotals = {
             averageCalories,
             averageProtein,
@@ -141,12 +133,10 @@ export const useMealPlanGeneration = () => {
         }
       }
       
-      // Save the meal plan to the database if user is authenticated
       if (userData.id) {
         try {
           console.log("Tentando salvar plano alimentar no banco de dados");
           
-          // Prepare data for insertion without potentially non-existent columns
           const planData = {
             user_id: userData.id,
             plan_data: data.mealPlan,
@@ -154,12 +144,15 @@ export const useMealPlanGeneration = () => {
             dietary_preferences: JSON.stringify(preferences)
           };
           
-          // If modelUsed exists in the response, include it
           if (data.modelUsed) {
             Object.assign(planData, { generated_by: data.modelUsed });
           }
           
-          console.log("Dados preparados para inserção na tabela meal_plans:", JSON.stringify(planData, null, 2));
+          console.log("Dados preparados para inserção na tabela meal_plans:", 
+            "user_id:", planData.user_id,
+            "plan_data structure:", Object.keys(planData.plan_data),
+            "calories:", planData.calories
+          );
           
           const { error: saveError, data: savedData } = await supabase
             .from('meal_plans')
@@ -170,44 +163,37 @@ export const useMealPlanGeneration = () => {
             console.error("Erro ao salvar plano alimentar:", saveError);
             console.error("Detalhes do erro:", JSON.stringify(saveError, null, 2));
             
-            // Tente salvar sem o campo generated_by se esse for o problema
-            if (saveError.message && saveError.message.includes('generated_by')) {
-              console.log("Tentando salvar sem o campo generated_by");
-              const { error: retryError } = await supabase
-                .from('meal_plans')
-                .insert({
-                  user_id: userData.id,
-                  plan_data: data.mealPlan,
-                  calories: userData.dailyCalories,
-                  dietary_preferences: JSON.stringify(preferences)
-                });
-                
-              if (retryError) {
-                console.error("Erro persistente ao tentar salvar o plano alimentar:", retryError);
-                toast.error("Erro ao salvar plano alimentar no banco de dados");
-              } else {
-                console.log("Plano alimentar salvo com sucesso após remover campo gerado_by");
-                
-                // Add transaction if wallet function is available
-                if (addTransaction) {
-                  await addTransaction({
-                    amount: REWARDS.MEAL_PLAN || 10,
-                    type: 'meal_plan',
-                    description: 'Geração de plano alimentar'
-                  });
-                  console.log("Transação adicionada para geração do plano alimentar");
-                }
-                
-                toast.success("Plano alimentar gerado e salvo com sucesso!");
-              }
-            } else {
+            console.log("Tentando salvar com plan_data como string JSON");
+            const stringifiedPlanData = {
+              ...planData,
+              plan_data: JSON.stringify(planData.plan_data)
+            };
+            
+            const { error: retryError } = await supabase
+              .from('meal_plans')
+              .insert(stringifiedPlanData);
+              
+            if (retryError) {
+              console.error("Erro persistente ao tentar salvar o plano alimentar:", retryError);
               toast.error("Erro ao salvar plano alimentar no banco de dados");
+            } else {
+              console.log("Plano alimentar salvo com sucesso após converter para string");
+              
+              if (addTransaction) {
+                await addTransaction({
+                  amount: REWARDS.MEAL_PLAN || 10,
+                  type: 'meal_plan',
+                  description: 'Geração de plano alimentar'
+                });
+                console.log("Transação adicionada para geração do plano alimentar");
+              }
+              
+              toast.success("Plano alimentar gerado e salvo com sucesso!");
             }
           } else {
             console.log("Plano alimentar salvo com sucesso no banco de dados");
             console.log("Dados salvos:", savedData);
             
-            // Add transaction if wallet function is available
             if (addTransaction) {
               await addTransaction({
                 amount: REWARDS.MEAL_PLAN || 10,
@@ -229,7 +215,6 @@ export const useMealPlanGeneration = () => {
         toast.warning("Plano alimentar gerado, mas não foi possível salvar porque o usuário não está autenticado");
       }
 
-      // Set the generated meal plan
       setMealPlan(data.mealPlan);
       return data.mealPlan;
     } catch (error: any) {

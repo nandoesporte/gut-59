@@ -7,6 +7,7 @@ import { MealPlanList } from './components/MealPlanList';
 import { DeleteConfirmationDialog } from './components/DeleteConfirmationDialog';
 import { SavedMealPlanDetails } from './components/SavedMealPlanDetails';
 import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
 
 export const MealPlanHistory = () => {
   const { plans, loading, fetchPlans, deletePlan } = useMealPlanHistory();
@@ -17,6 +18,7 @@ export const MealPlanHistory = () => {
 
   const handleDeleteConfirm = async () => {
     if (deleteId) {
+      console.log('Confirming deletion of plan:', deleteId);
       const success = await deletePlan(deleteId);
       if (success) {
         setDeleteId(null);
@@ -27,6 +29,14 @@ export const MealPlanHistory = () => {
   const handleViewDetails = (planId: string, planData: MealPlan) => {
     console.log('Viewing details for plan:', planId);
     console.log('Plan data structure:', Object.keys(planData));
+    
+    // Verify the data structure
+    if (!planData.weeklyPlan) {
+      console.error('Invalid plan data - missing weeklyPlan:', planData);
+      toast.error('Erro ao carregar detalhes do plano. Estrutura de dados inválida.');
+      return;
+    }
+    
     setViewPlanId(planId);
     setViewPlanData(planData);
   };
@@ -34,23 +44,32 @@ export const MealPlanHistory = () => {
   const handleCloseDetails = () => {
     setViewPlanId(null);
     setViewPlanData(null);
-    fetchPlans(); // Refresh plans after closing details in case changes were made
+    // Refresh plans after closing details in case changes were made
+    fetchPlans();
   };
 
   // Add an effect to refresh plans when the component mounts or user changes
   useEffect(() => {
     console.log('MealPlanHistory component mounted or user changed');
     if (user) {
-      console.log('User is authenticated, fetching plans');
+      console.log('User is authenticated, fetching plans...');
       fetchPlans();
     } else {
       console.log('No authenticated user');
     }
   }, [user]);
 
-  console.log('MealPlanHistory render - authenticated:', !!user);
-  console.log('Plans loaded:', plans.length);
-  console.log('Loading state:', loading);
+  // Add an additional effect to log whenever plans data changes
+  useEffect(() => {
+    console.log('Plans data updated, count:', plans.length);
+    if (plans.length > 0) {
+      console.log('First plan ID:', plans[0].id);
+      console.log('First plan data structure:',
+        Object.keys(plans[0].plan_data).join(', '),
+        'weeklyPlan days:', plans[0].plan_data.weeklyPlan ? Object.keys(plans[0].plan_data.weeklyPlan).length : 0
+      );
+    }
+  }, [plans]);
 
   return (
     <div className="mt-12">

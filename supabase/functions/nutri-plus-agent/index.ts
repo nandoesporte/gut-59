@@ -1,4 +1,3 @@
-
 // nutri-plus-agent: Uses Groq API to analyze user data and generate personalized meal plans
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -697,12 +696,18 @@ Please create a 7-day plan that:
       console.log(`[NUTRI+] Meal plan successfully generated at ${new Date().toISOString()}`);
       console.log(`[NUTRI+] Process duration: ${(new Date().getTime() - new Date(startTime).getTime()) / 1000}s`);
       
-      // Return the successful response with model info
+      // Return the successful response with model info and ensure it's directly accessible
+      // Important: Make sure we're only returning the mealPlan without nesting it further
+      const finalResponse = {
+        mealPlan,
+        modelUsed: modelName
+      };
+      
+      console.log(`[NUTRI+] Response structure:`, Object.keys(finalResponse));
+      console.log(`[NUTRI+] MealPlan structure:`, Object.keys(finalResponse.mealPlan));
+      
       return new Response(
-        JSON.stringify({ 
-          mealPlan,
-          modelUsed: modelName
-        }),
+        JSON.stringify(finalResponse),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
       

@@ -24,24 +24,22 @@ const validateMealPlan = (planData: unknown): planData is MealPlan => {
     return false;
   }
   
-  const plan = planData as MealPlan;
-  const isValid = !!(
+  const plan = planData as any;
+  const hasRequiredProps = !!(
     plan &&
     'weeklyPlan' in plan &&
-    'weeklyTotals' in plan &&
-    'recommendations' in plan
+    'weeklyTotals' in plan
   );
   
-  if (!isValid) {
+  if (!hasRequiredProps) {
     console.error('Invalid meal plan structure. Missing required properties:', 
       'weeklyPlan:', 'weeklyPlan' in plan,
-      'weeklyTotals:', 'weeklyTotals' in plan,
-      'recommendations:', 'recommendations' in plan
+      'weeklyTotals:', 'weeklyTotals' in plan
     );
-    console.log('Plan data:', JSON.stringify(plan).substring(0, 200) + '...');
+    console.log('Plan data preview:', JSON.stringify(plan).substring(0, 200) + '...');
   }
   
-  return isValid;
+  return hasRequiredProps;
 };
 
 export const useMealPlanHistory = () => {
@@ -85,7 +83,6 @@ export const useMealPlanHistory = () => {
       // Process each meal plan and log detailed information for debugging
       const validPlans = (data as RawMealPlan[]).reduce<StoredMealPlan[]>((acc, plan) => {
         console.log(`Processing plan ${plan.id}:`);
-        console.log('- Plan data type:', typeof plan.plan_data);
         
         if (!plan.plan_data) {
           console.error('- Plan data is empty or null');
@@ -94,7 +91,7 @@ export const useMealPlanHistory = () => {
         
         try {
           // Parse plan_data if it's a string
-          let parsedPlanData = plan.plan_data;
+          let parsedPlanData: any = plan.plan_data;
           if (typeof plan.plan_data === 'string') {
             console.log('- Plan data is a string, attempting to parse JSON');
             try {
@@ -102,9 +99,39 @@ export const useMealPlanHistory = () => {
               console.log('- Successfully parsed JSON string');
             } catch (parseError) {
               console.error('- Failed to parse plan_data string:', parseError);
-              return acc;
+              // Try to see if it's already a valid JSON but just as a string
+              if (typeof plan.plan_data === 'string' && plan.plan_data.includes('"weeklyPlan"')) {
+                console.log('- Plan data appears to be a JSON string with weeklyPlan, trying to extract mealPlan object');
+                // If the actual plan is in a mealPlan property
+                try {
+                  const jsonObj = JSON.parse(plan.plan_data);
+                  if (jsonObj.mealPlan && typeof jsonObj.mealPlan === 'object') {
+                    parsedPlanData = jsonObj.mealPlan;
+                    console.log('- Successfully extracted mealPlan from JSON string');
+                  }
+                } catch (nestedParseError) {
+                  console.error('- Failed to extract mealPlan object:', nestedParseError);
+                  return acc;
+                }
+              } else {
+                return acc;
+              }
+            }
+          } else if (typeof plan.plan_data === 'object' && plan.plan_data !== null) {
+            // If plan_data is already an object, check if it has a mealPlan property
+            const planDataObj = plan.plan_data as any;
+            if (planDataObj.mealPlan && typeof planDataObj.mealPlan === 'object') {
+              console.log('- Plan data is an object with mealPlan property, using that directly');
+              parsedPlanData = planDataObj.mealPlan;
             }
           }
+          
+          // Log the structure of the parsed data
+          console.log('- Parsed plan data structure:', 
+            Object.keys(parsedPlanData).join(', '),
+            'weeklyPlan present:', 'weeklyPlan' in parsedPlanData,
+            'weeklyTotals present:', 'weeklyTotals' in parsedPlanData
+          );
           
           // Validate the meal plan structure
           if (validateMealPlan(parsedPlanData)) {
@@ -126,7 +153,15 @@ export const useMealPlanHistory = () => {
       }, []);
 
       console.log('Valid plans after processing:', validPlans.length);
-      console.log('First valid plan:', validPlans[0] ? JSON.stringify(validPlans[0].id) : 'none');
+      if (validPlans.length > 0) {
+        console.log('First valid plan ID:', validPlans[0].id);
+        console.log('First valid plan creation date:', validPlans[0].created_at);
+        console.log('First valid plan calories:', validPlans[0].calories);
+        console.log('First valid plan structure:', 
+          Object.keys(validPlans[0].plan_data).join(', '),
+          'weeklyPlan days:', validPlans[0].plan_data.weeklyPlan ? Object.keys(validPlans[0].plan_data.weeklyPlan).length : 0
+        );
+      }
       
       setPlans(validPlans);
     } catch (error) {
@@ -162,13 +197,10 @@ export const useMealPlanHistory = () => {
     }
   };
 
+  // Initial fetch when component mounts
   useEffect(() => {
     fetchPlans();
   }, []);
-
-  useEffect(() => {
-    console.log('Plans state updated, count:', plans.length);
-  }, [plans]);
 
   return {
     plans,
