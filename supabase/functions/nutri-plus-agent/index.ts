@@ -33,12 +33,13 @@ serve(async (req) => {
       );
     }
 
-    const { userData, selectedFoods, foodsByMealType, dietaryPreferences, modelConfig } = requestData;
+    const { userData, selectedFoods, foodsByMealType, dietaryPreferences, modelConfig, retry } = requestData;
     console.log(`[NUTRI+] Data received for user: ${userData.id || 'anonymous'}`);
     console.log(`[NUTRI+] User profile: ${userData.age} years, ${userData.gender}, ${userData.weight}kg, ${userData.height}cm`);
     console.log(`[NUTRI+] Goal: ${userData.goal}, Daily calories: ${userData.dailyCalories}kcal`);
     console.log(`[NUTRI+] Selected foods: ${selectedFoods?.length || 0}`);
     console.log(`[NUTRI+] Preferences and restrictions: ${JSON.stringify(dietaryPreferences)}`);
+    console.log(`[NUTRI+] Is retry attempt: ${retry ? 'Yes' : 'No'}`);
     
     if (!selectedFoods || selectedFoods.length === 0) {
       console.error("[NUTRI+] Error: No foods selected");
@@ -57,8 +58,35 @@ serve(async (req) => {
       );
     }
 
-    // Prepare system message for Nutri+ agent
-    const systemMessage = `You are Nutri+, a nutrition expert agent that creates personalized meal plans. 
+    // Prepare system message for Nutri+ agent - adjusted for better JSON generation
+    const systemMessage = retry ? 
+      // Simplified system message for retry attempts
+      `You are Nutri+, a nutrition expert agent that creates personalized meal plans. 
+Your task is to analyze user data and create a detailed, clean, and simple weekly meal plan.
+
+IMPORTANT: Your response MUST be a valid JSON object. Do not include any extra text, commentary or markdown.
+
+The output must follow exactly this structure:
+{
+  "mealPlan": {
+    "weeklyPlan": {
+      "monday": { /* day plan */ },
+      "tuesday": { /* day plan */ },
+      /* other days */
+    },
+    "weeklyTotals": { /* weekly nutritional averages */ },
+    "recommendations": { /* personalized recommendations */ }
+  }
+}
+
+IMPORTANT: All numerical values must be numbers only, no units or strings.
+For example, use "protein": 25 instead of "protein": "25g".
+
+Keep the structures simple and correctly nested. Include calories, protein, carbs, fats, and fiber values for each meal.
+For each food, include name, portion, unit, and preparation details.` 
+      : 
+      // Regular system message
+      `You are Nutri+, a nutrition expert agent that creates personalized meal plans. 
 Your task is to analyze user data and create a detailed, scientifically-based weekly meal plan.
 
 IMPORTANT OUTPUT FORMAT RULES:
@@ -153,7 +181,32 @@ Recommendations should include:
 REMEMBER: ALL NUMERICAL VALUES MUST BE INTEGERS OR DECIMALS, NOT STRINGS WITH UNITS. THIS IS A CRITICAL REQUIREMENT.`;
 
     // Construct user message with all relevant data
-    const userMessage = `Create a personalized weekly meal plan based on this data:
+    const userMessage = retry ?
+      // Simplified user message for retry attempts
+      `Create a simple weekly meal plan based on this data:
+
+USER PROFILE:
+- Age: ${userData.age}
+- Gender: ${userData.gender}
+- Weight: ${userData.weight}kg
+- Height: ${userData.height}cm
+- Goal: ${userData.goal}
+- Daily Calorie Target: ${userData.dailyCalories}kcal
+
+Please create a 7-day plan that:
+1. Meets the ${userData.dailyCalories} daily calorie target
+2. Properly distributes macronutrients
+3. Uses the available foods
+4. Provides variety throughout the week
+5. Includes all meal types: breakfast, morning snack, lunch, afternoon snack, dinner
+
+IMPORTANT:
+- Keep all numerical values as numbers only (no units)
+- Include complete structure with all required fields
+- Make sure JSON is valid and properly formatted`
+      :
+      // Regular detailed user message
+      `Create a personalized weekly meal plan based on this data:
 
 USER PROFILE:
 - Age: ${userData.age}
@@ -196,9 +249,10 @@ Please create a 7-day plan that:
     // Track time for API call preparation
     console.log(`[NUTRI+] Preparing API call at ${new Date().toISOString()}`);
 
-    // IMPORTANT: Force model to be llama3-8b-8192
+    // FORCE model to be llama3-8b-8192 as requested
     const modelName = "llama3-8b-8192";
-    const temperature = modelConfig?.temperature || 0.3;
+    // Use lower temperature for retry attempts
+    const temperature = retry ? 0.1 : (modelConfig?.temperature || 0.3);
     
     console.log(`[NUTRI+] Using model: ${modelName} with temperature: ${temperature}`);
 
@@ -252,9 +306,16 @@ Please create a 7-day plan that:
         console.error(`[NUTRI+] Groq API Error (${response.status}):`, errorText);
         apiError = { status: response.status, message: errorText };
         
+        // For retry attempts with bad requests, break immediately to create fallback
+        if (retry && response.status === 400) {
+          console.log("[NUTRI+] JSON validation error in retry attempt, creating fallback plan");
+          break;
+        }
+        
         // For certain errors, don't retry
         if (response.status === 400) {
-          break; // Don't retry bad requests
+          console.log("[NUTRI+] JSON validation error, will try with simplified format next");
+          break; // Don't retry bad requests in the loop, but will handle with simplified retry outside loop
         }
         
         retries++;
@@ -282,8 +343,8 @@ Please create a 7-day plan that:
       }
     }
 
-    // If all retries failed, create fallback meal plan
-    if (!response || !response.ok) {
+    // If this was already a retry attempt and it failed, or if all retries failed
+    if ((retry && (!response || !response.ok)) || (!response || !response.ok)) {
       console.log("[NUTRI+] All API retries failed, falling back to local meal plan generation");
       
       // Create and return fallback meal plan
@@ -299,7 +360,21 @@ Please create a 7-day plan that:
       );
     }
 
-    // If we get here, the API call was successful
+    // If we get here, the API call was successful or we need to try with a simplified format
+    if (response.status === 400 && !retry) {
+      console.log("[NUTRI+] JSON validation error, attempting simplified format");
+      
+      // Instead of handling here, return an error so the client can retry with simplified format
+      return new Response(
+        JSON.stringify({ 
+          error: "JSON validation failed",
+          message: "Failed to generate valid JSON with the Llama model. Please retry with simplified format."
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+      );
+    }
+
+    // Process the successful API response
     const apiResponse = await response.json();
     console.log(`[NUTRI+] Response received from Groq API at ${new Date().toISOString()}`);
     
@@ -708,16 +783,29 @@ Please create a 7-day plan that:
       console.error("[NUTRI+] Error parsing JSON:", jsonError);
       console.error("[NUTRI+] Invalid JSON response:", mealPlanContent.substring(0, 1000));
       
-      // Create a fallback meal plan
-      const fallbackMealPlan = createFallbackMealPlan(userData, selectedFoods);
+      // If this is already a retry attempt, use the fallback
+      if (retry) {
+        console.log("[NUTRI+] JSON still invalid in retry attempt, using fallback plan");
+        const fallbackMealPlan = createFallbackMealPlan(userData, selectedFoods);
+        
+        return new Response(
+          JSON.stringify({
+            mealPlan: fallbackMealPlan,
+            modelUsed: "fallback-generator",
+            isFallback: true
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       
+      // Return error for client to retry with simplified format
       return new Response(
-        JSON.stringify({
-          mealPlan: fallbackMealPlan,
-          modelUsed: modelName,
-          isFallback: true
+        JSON.stringify({ 
+          error: "JSON parsing failed",
+          message: "Failed to parse JSON response from Llama model. Please retry with simplified format.",
+          jsonError: jsonError.message
         }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
     }
     
@@ -954,4 +1042,3 @@ function createFallbackMealPlan(userData, selectedFoods) {
     generatedBy: "fallback-generator"
   };
 }
-

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -241,163 +240,149 @@ export const useMealPlanGeneration = () => {
       console.log(`Meta: ${userData.goal}, Calorias diárias: ${userData.dailyCalories}kcal`);
       console.log(`Alimentos selecionados: ${selectedFoods.length}`);
       
-      // Set a timeout in case the function takes too long
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Tempo limite excedido ao chamar o serviço Nutri+")), 60000)
-      );
+      // Attempt normal generation first, then try simplified version if it fails
+      let attemptCount = 0;
+      const MAX_ATTEMPTS = 2;
+      let mealPlanResult = null;
       
-      // API call with timeout
-      const { data, error } = await Promise.race([
-        supabase.functions.invoke('nutri-plus-agent', {
-          body: {
-            userData,
-            selectedFoods,
-            foodsByMealType,
-            dietaryPreferences: preferences,
-            modelConfig: {
-              model: "llama3-8b-8192",
-              temperature: 0.3
-            }
-          }
-        }),
-        timeoutPromise
-      ]) as {data?: any, error?: any};
-
-      if (error) {
-        console.error("Erro ao chamar o agente Nutri+:", error);
-        
-        // Check for specific error types and provide helpful messages
-        let errorMessage = "Erro ao gerar plano alimentar. Por favor, tente novamente.";
-        
-        if (error.message?.includes("502") || error.message?.includes("Bad Gateway")) {
-          errorMessage = "Erro de conexão com o serviço Nutri+. Nossos servidores estão ocupados. Por favor, tente novamente em alguns minutos.";
-          console.error("Erro de gateway detectado:", error);
-        } else if (error.message?.includes("timeout") || error.message?.includes("Tempo limite")) {
-          errorMessage = "O serviço Nutri+ demorou muito para responder. Por favor, tente novamente.";
-          console.error("Timeout detectado:", error);
-        } else if (error.message?.includes("400") || error.message?.includes("json_validate_failed")) {
-          errorMessage = "Erro ao gerar formato de plano alimentar. Tentando método alternativo...";
-          console.error("Erro de validação JSON detectado:", error);
+      while (attemptCount < MAX_ATTEMPTS && !mealPlanResult) {
+        try {
+          const isRetry = attemptCount > 0;
+          console.log(`Tentativa #${attemptCount + 1} - ${isRetry ? 'Formato simplificado' : 'Formato completo'}`);
           
-          // Try again with a simplified model and format
-          const { data: retryData, error: retryError } = await supabase.functions.invoke('nutri-plus-agent', {
-            body: {
-              userData,
-              selectedFoods,
-              foodsByMealType,
-              dietaryPreferences: preferences,
-              modelConfig: {
-                model: "llama3-8b-8192",
-                temperature: 0.2,
-                useSimplifiedFormat: true
-              },
-              retry: true
-            }
-          });
-          
-          if (retryError) {
-            console.error("Erro na segunda tentativa:", retryError);
-            setError(`Erro nas duas tentativas de geração: ${retryError.message}`);
-            toast.error("Não foi possível gerar o plano após múltiplas tentativas. Tente novamente mais tarde.");
-            return null;
-          }
-          
-          if (retryData?.mealPlan) {
-            console.log("Plano gerado com sucesso após segunda tentativa");
-            retryData.mealPlan.userCalories = userData.dailyCalories;
-            retryData.mealPlan = ensureBalancedMeals(retryData.mealPlan);
-            
-            if (userData.id) {
-              await saveGeneratedPlan(retryData.mealPlan, userData, preferences);
-            }
-            
-            setMealPlan(retryData.mealPlan);
-            toast.success("Plano alimentar gerado com sucesso!");
-            return retryData.mealPlan;
-          }
-        }
-        
-        setError(`Erro ao gerar plano alimentar: ${error.message}`);
-        toast.error(errorMessage);
-        return null;
-      }
-
-      console.log("Resposta do agente Nutri+:", data);
-      
-      if (!data?.mealPlan) {
-        console.error("Nenhum plano alimentar retornado pelo agente Nutri+");
-        console.error("Estrutura da resposta:", JSON.stringify(data).substring(0, 200) + "...");
-        setError("Não foi possível gerar o plano alimentar");
-        toast.error("Não foi possível gerar o plano alimentar. Por favor, tente novamente.");
-        return null;
-      }
-
-      console.log("Plano alimentar recebido com sucesso");
-      console.log("Estrutura do plano:", Object.keys(data.mealPlan).join(', '));
-      console.log("weeklyPlan presente:", !!data.mealPlan.weeklyPlan);
-      console.log("weeklyTotals presente:", !!data.mealPlan.weeklyTotals);
-      
-      if (data.mealPlan) {
-        data.mealPlan.userCalories = userData.dailyCalories;
-        
-        if (!data.mealPlan.weeklyTotals || 
-            isNaN(Number(data.mealPlan.weeklyTotals.averageCalories)) || 
-            isNaN(Number(data.mealPlan.weeklyTotals.averageProtein))) {
-          
-          console.log("Recalculando médias semanais");
-          
-          const weeklyPlan = data.mealPlan.weeklyPlan || {};
-          const days = Object.values(weeklyPlan);
-          const validDays = days.filter((day: any) => 
-            day && day.dailyTotals && 
-            !isNaN(Number(day.dailyTotals.calories)) && 
-            !isNaN(Number(day.dailyTotals.protein))
+          // Set a timeout in case the function takes too long
+          const timeoutPromise = new Promise<never>((_, reject) => 
+            setTimeout(() => reject(new Error("Tempo limite excedido ao chamar o serviço Nutri+")), 60000)
           );
           
-          const dayCount = validDays.length || 1;
+          // API call with timeout
+          const { data, error } = await Promise.race([
+            supabase.functions.invoke('nutri-plus-agent', {
+              body: {
+                userData,
+                selectedFoods,
+                foodsByMealType,
+                dietaryPreferences: preferences,
+                modelConfig: {
+                  model: "llama3-8b-8192",
+                  temperature: isRetry ? 0.1 : 0.3,
+                  useSimplifiedFormat: isRetry
+                },
+                retry: isRetry
+              }
+            }),
+            timeoutPromise
+          ]) as {data?: any, error?: any};
+
+          if (error) {
+            console.error(`Erro na tentativa #${attemptCount + 1}:`, error);
+            
+            // For JSON validation errors and we're not already in a retry, try again with simplified format
+            if ((error.message?.includes("400") || error.message?.includes("json_validate_failed")) && !isRetry) {
+              console.log("Erro de validação JSON detectado, tentando novamente com formato simplificado");
+              attemptCount++;
+              continue;
+            }
+            
+            // For other errors or if this is already the retry, throw the error
+            throw error;
+          }
+
+          console.log(`Resposta recebida na tentativa #${attemptCount + 1}`);
           
-          let caloriesTotal = 0;
-          let proteinTotal = 0;
-          let carbsTotal = 0;
-          let fatsTotal = 0;
-          let fiberTotal = 0;
+          if (!data?.mealPlan) {
+            console.error("Nenhum plano alimentar retornado pelo agente Nutri+");
+            if (!isRetry) {
+              attemptCount++;
+              continue;
+            } else {
+              throw new Error("Não foi possível gerar o plano alimentar");
+            }
+          }
+
+          // Successfully generated meal plan
+          console.log("Plano alimentar recebido com sucesso");
+          mealPlanResult = data.mealPlan;
+          break;
           
-          for (const day of validDays as DayPlan[]) {
-            caloriesTotal += Number(day.dailyTotals?.calories || 0);
-            proteinTotal += Number(day.dailyTotals?.protein || 0);
-            carbsTotal += Number(day.dailyTotals?.carbs || 0);
-            fatsTotal += Number(day.dailyTotals?.fats || 0);
-            fiberTotal += Number(day.dailyTotals?.fiber || 0);
+        } catch (attemptError) {
+          console.error(`Erro na tentativa #${attemptCount + 1}:`, attemptError);
+          
+          // If this was the last attempt, rethrow the error
+          if (attemptCount === MAX_ATTEMPTS - 1) {
+            throw attemptError;
           }
           
-          const averageCalories = Math.round(caloriesTotal / dayCount);
-          const averageProtein = Math.round(proteinTotal / dayCount);
-          const averageCarbs = Math.round(carbsTotal / dayCount);
-          const averageFats = Math.round(fatsTotal / dayCount);
-          const averageFiber = Math.round(fiberTotal / dayCount);
-          
-          data.mealPlan.weeklyTotals = {
-            averageCalories,
-            averageProtein,
-            averageCarbs,
-            averageFats,
-            averageFiber
-          };
+          // Otherwise, try again with the simplified format
+          attemptCount++;
         }
-        
-        // Apply meal balancing to ensure protein, carbs, and salad in lunch and dinner
-        data.mealPlan = ensureBalancedMeals(data.mealPlan);
       }
       
+      if (!mealPlanResult) {
+        throw new Error("Não foi possível gerar o plano alimentar após múltiplas tentativas");
+      }
+      
+      // Process the successful meal plan
+      mealPlanResult.userCalories = userData.dailyCalories;
+      
+      if (!mealPlanResult.weeklyTotals || 
+          isNaN(Number(mealPlanResult.weeklyTotals.averageCalories)) || 
+          isNaN(Number(mealPlanResult.weeklyTotals.averageProtein))) {
+        
+        console.log("Recalculando médias semanais");
+        
+        const weeklyPlan = mealPlanResult.weeklyPlan || {};
+        const days = Object.values(weeklyPlan);
+        const validDays = days.filter((day: any) => 
+          day && day.dailyTotals && 
+          !isNaN(Number(day.dailyTotals.calories)) && 
+          !isNaN(Number(day.dailyTotals.protein))
+        );
+        
+        const dayCount = validDays.length || 1;
+        
+        let caloriesTotal = 0;
+        let proteinTotal = 0;
+        let carbsTotal = 0;
+        let fatsTotal = 0;
+        let fiberTotal = 0;
+        
+        for (const day of validDays as DayPlan[]) {
+          caloriesTotal += Number(day.dailyTotals?.calories || 0);
+          proteinTotal += Number(day.dailyTotals?.protein || 0);
+          carbsTotal += Number(day.dailyTotals?.carbs || 0);
+          fatsTotal += Number(day.dailyTotals?.fats || 0);
+          fiberTotal += Number(day.dailyTotals?.fiber || 0);
+        }
+        
+        const averageCalories = Math.round(caloriesTotal / dayCount);
+        const averageProtein = Math.round(proteinTotal / dayCount);
+        const averageCarbs = Math.round(carbsTotal / dayCount);
+        const averageFats = Math.round(fatsTotal / dayCount);
+        const averageFiber = Math.round(fiberTotal / dayCount);
+        
+        mealPlanResult.weeklyTotals = {
+          averageCalories,
+          averageProtein,
+          averageCarbs,
+          averageFats,
+          averageFiber
+        };
+      }
+      
+      // Apply meal balancing to ensure protein, carbs, and salad in lunch and dinner
+      mealPlanResult = ensureBalancedMeals(mealPlanResult);
+      
       if (userData.id) {
-        await saveGeneratedPlan(data.mealPlan, userData, preferences, data.modelUsed);
+        await saveGeneratedPlan(mealPlanResult, userData, preferences);
       } else {
         console.warn("Usuário não autenticado. Plano não será salvo no banco de dados.");
         toast.warning("Plano alimentar gerado, mas não foi possível salvar porque o usuário não está autenticado");
       }
 
-      setMealPlan(data.mealPlan);
-      return data.mealPlan;
+      setMealPlan(mealPlanResult);
+      toast.success("Plano alimentar gerado com sucesso!");
+      return mealPlanResult;
     } catch (error: any) {
       console.error("Erro inesperado em generateMealPlan:", error);
       setError(`Erro ao gerar plano alimentar: ${error.message}`);
@@ -405,8 +390,12 @@ export const useMealPlanGeneration = () => {
       // Provide a more user-friendly error message based on error type
       if (error.message?.includes("AbortError") || error.message?.includes("timeout")) {
         toast.error("O serviço Nutri+ demorou muito para responder. Por favor, tente novamente em alguns minutos.");
+      } else if (error.message?.includes("502") || error.message?.includes("Bad Gateway")) {
+        toast.error("Serviço Nutri+ indisponível no momento. Por favor, tente novamente mais tarde.");
       } else if (error.message?.includes("fetch")) {
         toast.error("Erro de conexão com o serviço Nutri+. Verifique sua conexão e tente novamente.");
+      } else if (error.message?.includes("json_validate_failed")) {
+        toast.error("Erro na geração do plano. O modelo precisa ser ajustado, notificamos a equipe técnica.");
       } else {
         toast.error("Erro ao gerar plano alimentar. Por favor, tente novamente.");
       }
