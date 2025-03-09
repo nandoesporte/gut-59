@@ -1,4 +1,4 @@
-
+<lov-code>
 // nutri-plus-agent: Uses Groq API to analyze user data and generate personalized meal plans
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -454,7 +454,7 @@ Please create a 7-day plan that:
       });
       
       // Complete meal plan with the latest data
-      const mealPlan = {
+      let mealPlan = {
         ...processedMealPlan.mealPlan,
         userCalories: userData.dailyCalories,
         generatedBy: "nutri-plus-agent-llama3"
@@ -508,6 +508,10 @@ Please create a 7-day plan that:
       
       console.log(`[NUTRI+] Response structure:`, Object.keys(finalResponse));
       console.log(`[NUTRI+] MealPlan structure:`, Object.keys(finalResponse.mealPlan));
+
+      // Add this line to call our enhancement function
+      finalResponse.mealPlan = enhanceMealPlanVariety(finalResponse.mealPlan);
+      console.log(`[NUTRI+] Meal plan enhanced with salads and variety maximization`);
       
       return new Response(
         JSON.stringify(finalResponse),
@@ -671,21 +675,4 @@ function createFallbackMealPlan(userData, selectedFoods) {
     general: "Consuma alimentos naturais e evite processados. Mantenha-se hidratado durante o dia.",
     preworkout: "Consuma carboidratos de fácil digestão 1-2 horas antes do treino para energia.",
     postworkout: "Após o treino, combine proteínas e carboidratos para recuperação muscular.",
-    timing: [
-      "Tome café da manhã até 1 hora após acordar",
-      "Mantenha intervalos de 3-4 horas entre as refeições",
-      "Consuma proteínas em todas as refeições",
-      "Hidrate-se com 30-40ml de água por kg de peso corporal",
-      "Evite refeições pesadas 2 horas antes de dormir"
-    ]
-  };
-  
-  return {
-    weeklyPlan,
-    weeklyTotals,
-    recommendations,
-    userCalories: userData.dailyCalories,
-    generatedBy: "fallback-generator"
-  };
-}
-
+    timing:
