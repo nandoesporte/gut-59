@@ -10,6 +10,7 @@ import { ptBR } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { MealPlan } from "../types";
+import { SavedMealPlanDetails } from "./SavedMealPlanDetails";
 
 export const LastMealPlanSummary = () => {
   const [lastPlan, setLastPlan] = useState<{
@@ -19,6 +20,7 @@ export const LastMealPlanSummary = () => {
     calories: number;
   } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isPlanDetailsOpen, setIsPlanDetailsOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -77,11 +79,11 @@ export const LastMealPlanSummary = () => {
   }, []);
 
   const handleViewDetails = () => {
-    // Navegar para a página de detalhes do plano com o ID do plano
     if (lastPlan && lastPlan.id) {
-      navigate(`/menu?planId=${lastPlan.id}`);
+      // Abrir o diálogo de detalhes do plano diretamente
+      setIsPlanDetailsOpen(true);
     } else {
-      navigate("/menu");
+      toast.error("Não foi possível abrir os detalhes do plano");
     }
   };
 
@@ -151,81 +153,93 @@ export const LastMealPlanSummary = () => {
   };
 
   return (
-    <Card className="w-full mt-4 overflow-hidden border-none shadow-md bg-gradient-to-r from-blue-50 to-white dark:from-gray-800 dark:to-gray-900">
-      <CardContent className="p-6">
-        <div className="flex flex-col">
-          <div className="flex justify-between items-center mb-3">
-            <div className="flex items-center gap-2">
-              <div className="bg-primary/10 p-2 rounded-full">
-                <UtensilsCrossed className="h-5 w-5 text-primary" />
+    <>
+      <Card className="w-full mt-4 overflow-hidden border-none shadow-md bg-gradient-to-r from-blue-50 to-white dark:from-gray-800 dark:to-gray-900">
+        <CardContent className="p-6">
+          <div className="flex flex-col">
+            <div className="flex justify-between items-center mb-3">
+              <div className="flex items-center gap-2">
+                <div className="bg-primary/10 p-2 rounded-full">
+                  <UtensilsCrossed className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold">Seu Plano Alimentar</h3>
+                  <p className="text-sm text-gray-500">
+                    {formatDate(lastPlan.created_at)}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-lg font-semibold">Seu Plano Alimentar</h3>
-                <p className="text-sm text-gray-500">
-                  {formatDate(lastPlan.created_at)}
-                </p>
-              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleViewDetails}
+                className="bg-white hover:bg-primary/5 border-primary/20 text-primary hover:text-primary-600 transition-all"
+              >
+                Ver completo <ChevronRight className="ml-1 h-4 w-4" />
+              </Button>
             </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleViewDetails}
-              className="bg-white hover:bg-primary/5 border-primary/20 text-primary hover:text-primary-600 transition-all"
-            >
-              Ver completo <ChevronRight className="ml-1 h-4 w-4" />
-            </Button>
-          </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
-            <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/20 rounded-xl p-3 transition-all hover:shadow-sm">
-              <div className="flex items-center text-green-600 dark:text-green-400 mb-1">
-                <Flame className="h-4 w-4 mr-1" />
-                <span className="text-sm font-medium">Calorias</span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
+              <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/20 rounded-xl p-3 transition-all hover:shadow-sm">
+                <div className="flex items-center text-green-600 dark:text-green-400 mb-1">
+                  <Flame className="h-4 w-4 mr-1" />
+                  <span className="text-sm font-medium">Calorias</span>
+                </div>
+                <p className="text-xl font-bold">{lastPlan.calories || lastPlan.plan_data.weeklyTotals.averageCalories || 0} kcal</p>
               </div>
-              <p className="text-xl font-bold">{lastPlan.calories || lastPlan.plan_data.weeklyTotals.averageCalories || 0} kcal</p>
+              
+              <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 rounded-xl p-3 transition-all hover:shadow-sm">
+                <div className="flex items-center text-blue-600 dark:text-blue-400 mb-1">
+                  <Target className="h-4 w-4 mr-1" />
+                  <span className="text-sm font-medium">Objetivo</span>
+                </div>
+                <p className="text-xl font-bold">{getGoalFromMacros()}</p>
+              </div>
+              
+              <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/20 rounded-xl p-3 transition-all hover:shadow-sm">
+                <div className="flex items-center text-purple-600 dark:text-purple-400 mb-1">
+                  <CalendarDays className="h-4 w-4 mr-1" />
+                  <span className="text-sm font-medium">Dias</span>
+                </div>
+                <p className="text-xl font-bold">{Object.keys(lastPlan.plan_data.weeklyPlan).length}</p>
+              </div>
+              
+              <div className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/30 dark:to-amber-800/20 rounded-xl p-3 transition-all hover:shadow-sm">
+                <div className="flex items-center text-amber-600 dark:text-amber-400 mb-1">
+                  <Clock className="h-4 w-4 mr-1" />
+                  <span className="text-sm font-medium">Refeições</span>
+                </div>
+                <p className="text-xl font-bold">{getMealCount()} / dia</p>
+              </div>
             </div>
             
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 rounded-xl p-3 transition-all hover:shadow-sm">
-              <div className="flex items-center text-blue-600 dark:text-blue-400 mb-1">
-                <Target className="h-4 w-4 mr-1" />
-                <span className="text-sm font-medium">Objetivo</span>
+            <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+              <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/30 rounded-lg p-3 transition-all hover:shadow-sm">
+                <p className="text-xs text-gray-500 dark:text-gray-400">Proteínas</p>
+                <p className="font-semibold text-lg">{lastPlan.plan_data.weeklyTotals.averageProtein || 0}g</p>
               </div>
-              <p className="text-xl font-bold">{getGoalFromMacros()}</p>
-            </div>
-            
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/20 rounded-xl p-3 transition-all hover:shadow-sm">
-              <div className="flex items-center text-purple-600 dark:text-purple-400 mb-1">
-                <CalendarDays className="h-4 w-4 mr-1" />
-                <span className="text-sm font-medium">Dias</span>
+              <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/30 rounded-lg p-3 transition-all hover:shadow-sm">
+                <p className="text-xs text-gray-500 dark:text-gray-400">Carboidratos</p>
+                <p className="font-semibold text-lg">{lastPlan.plan_data.weeklyTotals.averageCarbs || 0}g</p>
               </div>
-              <p className="text-xl font-bold">{Object.keys(lastPlan.plan_data.weeklyPlan).length}</p>
-            </div>
-            
-            <div className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/30 dark:to-amber-800/20 rounded-xl p-3 transition-all hover:shadow-sm">
-              <div className="flex items-center text-amber-600 dark:text-amber-400 mb-1">
-                <Clock className="h-4 w-4 mr-1" />
-                <span className="text-sm font-medium">Refeições</span>
+              <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/30 rounded-lg p-3 transition-all hover:shadow-sm">
+                <p className="text-xs text-gray-500 dark:text-gray-400">Gorduras</p>
+                <p className="font-semibold text-lg">{lastPlan.plan_data.weeklyTotals.averageFats || 0}g</p>
               </div>
-              <p className="text-xl font-bold">{getMealCount()} / dia</p>
             </div>
           </div>
-          
-          <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-            <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/30 rounded-lg p-3 transition-all hover:shadow-sm">
-              <p className="text-xs text-gray-500 dark:text-gray-400">Proteínas</p>
-              <p className="font-semibold text-lg">{lastPlan.plan_data.weeklyTotals.averageProtein || 0}g</p>
-            </div>
-            <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/30 rounded-lg p-3 transition-all hover:shadow-sm">
-              <p className="text-xs text-gray-500 dark:text-gray-400">Carboidratos</p>
-              <p className="font-semibold text-lg">{lastPlan.plan_data.weeklyTotals.averageCarbs || 0}g</p>
-            </div>
-            <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/30 rounded-lg p-3 transition-all hover:shadow-sm">
-              <p className="text-xs text-gray-500 dark:text-gray-400">Gorduras</p>
-              <p className="font-semibold text-lg">{lastPlan.plan_data.weeklyTotals.averageFats || 0}g</p>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+
+      {/* Modal de detalhes do plano */}
+      {lastPlan && (
+        <SavedMealPlanDetails
+          planId={lastPlan.id}
+          planData={lastPlan.plan_data}
+          isOpen={isPlanDetailsOpen}
+          onClose={() => setIsPlanDetailsOpen(false)}
+        />
+      )}
+    </>
   );
 };
