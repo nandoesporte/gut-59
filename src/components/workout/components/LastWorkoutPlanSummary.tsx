@@ -47,8 +47,12 @@ export const LastWorkoutPlanSummary = () => {
             created_at,
             workout_sessions (
               id,
+              day_number,
+              day_name,
               focus,
               intensity,
+              warmup_description,
+              cooldown_description,
               session_exercises (
                 id,
                 exercise:exercises (*)
@@ -58,12 +62,10 @@ export const LastWorkoutPlanSummary = () => {
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
         if (error) {
-          if (error.code !== 'PGRST116') { // No rows returned
-            console.error("Erro ao buscar último plano de treino:", error);
-          }
+          console.error("Erro ao buscar último plano de treino:", error);
           setLoading(false);
           return;
         }
