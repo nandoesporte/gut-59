@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { CalendarDays, Flame, Target, Clock, FileText, ChevronRight, UtensilsCrossed } from "lucide-react";
+import { CalendarDays, Flame, Target, Clock, ChevronRight, UtensilsCrossed } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
@@ -17,6 +18,7 @@ export const LastMealPlanSummary = () => {
     created_at: string;
     plan_data: MealPlan;
     calories: number;
+    goal?: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [isPlanDetailsOpen, setIsPlanDetailsOpen] = useState(false);
@@ -34,6 +36,7 @@ export const LastMealPlanSummary = () => {
           return;
         }
 
+        // First fetch the last meal plan
         const { data, error } = await supabase
           .from('meal_plans')
           .select('*')
@@ -55,11 +58,42 @@ export const LastMealPlanSummary = () => {
             
           if (planData && planData.weeklyPlan && planData.weeklyTotals) {
             console.log("Último plano alimentar encontrado:", data.id);
+            
+            // Now fetch the user's nutrition preferences to get their selected goal
+            const { data: nutritionPrefs, error: prefsError } = await supabase
+              .from('nutrition_preferences')
+              .select('goal')
+              .eq('user_id', user.id)
+              .single();
+            
+            if (prefsError && prefsError.code !== 'PGRST116') {
+              console.log("Erro ao buscar preferências nutricionais:", prefsError);
+            }
+            
+            // Map database goal to display goal
+            let displayGoal = "Equilibrado";
+            if (nutritionPrefs?.goal) {
+              switch(nutritionPrefs.goal) {
+                case 'lose_weight':
+                  displayGoal = "Perda de Peso";
+                  break;
+                case 'maintain':
+                  displayGoal = "Manter Peso";
+                  break;
+                case 'gain_mass':
+                  displayGoal = "Ganho de Massa";
+                  break;
+                default:
+                  displayGoal = "Equilibrado";
+              }
+            }
+            
             setLastPlan({
               id: data.id,
               created_at: data.created_at,
               plan_data: planData as MealPlan,
-              calories: data.calories
+              calories: data.calories,
+              goal: displayGoal
             });
           } else {
             console.log("Plano encontrado com formato inválido");
@@ -127,24 +161,6 @@ export const LastMealPlanSummary = () => {
     }
   };
 
-  const getGoalFromMacros = () => {
-    try {
-      const { averageProtein, averageCarbs, averageFats } = lastPlan.plan_data.weeklyTotals;
-      const total = averageProtein + averageCarbs + averageFats;
-      
-      if (total === 0) return "Equilibrado";
-      
-      const proteinPct = (averageProtein / total) * 100;
-      const carbsPct = (averageCarbs / total) * 100;
-      
-      if (proteinPct > 30) return "Rico em Proteínas";
-      if (carbsPct > 55) return "Rico em Carboidratos";
-      return "Equilibrado";
-    } catch (e) {
-      return "Equilibrado";
-    }
-  };
-
   return (
     <>
       <Card className="w-full mt-4 overflow-hidden border-none shadow-sm bg-white">
@@ -185,7 +201,7 @@ export const LastMealPlanSummary = () => {
                   <Target className="h-4 w-4" />
                 </div>
                 <p className="text-xs text-center text-cyan-800 font-medium">Objetivo</p>
-                <p className="text-sm font-bold text-center text-cyan-700">{getGoalFromMacros()}</p>
+                <p className="text-sm font-bold text-center text-cyan-700">{lastPlan.goal}</p>
               </div>
               
               <div className="bg-blue-50 rounded-lg p-2 transition-all">
