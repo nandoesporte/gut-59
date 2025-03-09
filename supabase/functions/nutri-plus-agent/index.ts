@@ -38,7 +38,8 @@ serve(async (req) => {
       },
       selectedFoodsCount: selectedFoods.length,
       hasFoodsByMealType: !!foodsByMealType,
-      dietaryPreferencesProvided: !!dietaryPreferences
+      dietaryPreferencesProvided: !!dietaryPreferences,
+      modelConfig: modelConfig
     });
 
     // Tradução para os nomes dos dias da semana em português
@@ -76,17 +77,21 @@ serve(async (req) => {
     if (modelConfig?.model?.toLowerCase().includes('llama')) {
       console.log("Usando modelo Llama para geração do plano alimentar");
       try {
-        result = await generateWithLlama(userData, organizedFoodsByMealType, dietaryPreferences, modelConfig);
+        console.log(`[NUTRI+] Chamando Groq API com modelo: ${modelConfig.model}`);
+        result = await generateWithGroq(userData, organizedFoodsByMealType, dietaryPreferences, modelConfig);
         modelUsed = modelConfig.model;
+        console.log("[NUTRI+] Resposta da Groq API recebida com sucesso");
       } catch (llamaError) {
-        console.error("Erro ao gerar com Llama:", llamaError);
-        throw new Error(`Erro ao gerar com modelo Llama: ${llamaError.message}`);
+        console.error("Erro ao gerar com Llama (via Groq):", llamaError);
+        throw new Error(`Erro ao gerar com modelo Llama (via Groq): ${llamaError.message}`);
       }
     } else if (modelConfig?.model?.toLowerCase().includes('groq') || modelConfig?.model?.toLowerCase().includes('mixtral')) {
       console.log("Usando modelo Groq para geração do plano alimentar");
       try {
+        console.log(`[NUTRI+] Chamando Groq API com modelo: ${modelConfig.model}`);
         result = await generateWithGroq(userData, organizedFoodsByMealType, dietaryPreferences, modelConfig);
         modelUsed = modelConfig.model;
+        console.log("[NUTRI+] Resposta da Groq API recebida com sucesso");
       } catch (groqError) {
         console.error("Erro ao gerar com Groq:", groqError);
         throw new Error(`Erro ao gerar com modelo Groq: ${groqError.message}`);
@@ -291,80 +296,13 @@ async function generateWithOpenAI(userData, foodsByMealType, dietaryPreferences,
   }
 }
 
-// Função para gerar com Llama
+// Função para gerar com Llama (via Groq)
 async function generateWithLlama(userData, foodsByMealType, dietaryPreferences, modelConfig) {
-  if (!llamaAPIKey) {
-    throw new Error("API key do Llama não configurada");
-  }
-
-  console.log("Preparando dados para o modelo Llama");
-  
-  // Preparar os dados para envio
-  const prompt = generateNutriPlusPrompt(userData, foodsByMealType, dietaryPreferences);
-  
-  try {
-    console.log("Enviando requisição para Llama");
-    const response = await fetch('https://api.llama-api.com/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${llamaAPIKey}`
-      },
-      body: JSON.stringify({
-        model: modelConfig?.model || 'llama3-8b-8192',
-        messages: [
-          {
-            role: 'system',
-            content: 'Você é um nutricionista especializado em criar planos alimentares personalizados. Responda apenas com o objeto JSON conforme solicitado, sem texto adicional.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: modelConfig?.temperature || 0.7,
-        max_tokens: 4000
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("Erro na resposta do Llama:", errorData);
-      throw new Error(`Erro na API do Llama: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    console.log("Resposta recebida do modelo Llama");
-
-    if (!data.choices || !data.choices[0] || !data.choices[0].message || !data.choices[0].message.content) {
-      throw new Error("Resposta inválida do Llama");
-    }
-
-    // Processar o JSON gerado pelo modelo
-    try {
-      // Tente extrair o JSON da resposta
-      const content = data.choices[0].message.content;
-      const jsonStart = content.indexOf('{');
-      const jsonEnd = content.lastIndexOf('}') + 1;
-      
-      if (jsonStart === -1 || jsonEnd === -1 || jsonStart >= jsonEnd) {
-        console.error("Formato JSON inválido na resposta:", content);
-        throw new Error("Formato JSON inválido na resposta");
-      }
-      
-      const jsonStr = content.substring(jsonStart, jsonEnd);
-      console.log("JSON extraído:", jsonStr.substring(0, 200) + "...");
-      const mealPlan = JSON.parse(jsonStr);
-      
-      return mealPlan;
-    } catch (jsonError) {
-      console.error("Erro ao processar JSON da resposta do Llama:", jsonError);
-      throw new Error("Falha ao processar o JSON do plano alimentar do Llama");
-    }
-  } catch (error) {
-    console.error("Erro ao gerar com Llama:", error);
-    throw error;
-  }
+  // Para compatibilidade, redirecionamos para Groq
+  return generateWithGroq(userData, foodsByMealType, dietaryPreferences, {
+    ...modelConfig,
+    model: 'llama3-8b-8192' // Forçar o modelo Llama via Groq
+  });
 }
 
 // Função para gerar com Groq
@@ -375,11 +313,15 @@ async function generateWithGroq(userData, foodsByMealType, dietaryPreferences, m
 
   console.log("Preparando dados para o modelo Groq");
   
+  // Usar modelo do parâmetro ou definir padrão
+  const modelToUse = modelConfig?.model || 'llama3-8b-8192';
+  console.log(`[NUTRI+] Usando modelo Groq: ${modelToUse}`);
+  
   // Preparar os dados para envio
   const prompt = generateNutriPlusPrompt(userData, foodsByMealType, dietaryPreferences);
   
   try {
-    console.log("Enviando requisição para Groq");
+    console.log(`[NUTRI+] Enviando requisição para Groq com modelo ${modelToUse}`);
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -387,11 +329,11 @@ async function generateWithGroq(userData, foodsByMealType, dietaryPreferences, m
         'Authorization': `Bearer ${groqAPIKey}`
       },
       body: JSON.stringify({
-        model: modelConfig?.model || 'mixtral-8x7b-32768',
+        model: modelToUse,
         messages: [
           {
             role: 'system',
-            content: 'Você é um nutricionista especializado em criar planos alimentares personalizados. Responda apenas com o objeto JSON conforme solicitado, sem texto adicional.'
+            content: 'Você é um nutricionista especializado em criar planos alimentares personalizados. Responda apenas com o objeto JSON conforme solicitado, sem texto adicional. Use português brasileiro para todos os textos.'
           },
           {
             role: 'user',
@@ -404,41 +346,67 @@ async function generateWithGroq(userData, foodsByMealType, dietaryPreferences, m
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error("Erro na resposta do Groq:", errorData);
-      throw new Error(`Erro na API do Groq: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.error(`[NUTRI+] Erro na resposta da Groq API (${response.status}):`, errorText);
+      let errorObj;
+      try {
+        errorObj = JSON.parse(errorText);
+      } catch (e) {
+        errorObj = { error: errorText };
+      }
+      throw new Error(`Erro na API da Groq: ${response.status} ${response.statusText} - ${JSON.stringify(errorObj)}`);
     }
 
     const data = await response.json();
-    console.log("Resposta recebida do modelo Groq");
+    console.log("[NUTRI+] Resposta recebida do modelo Groq");
 
     if (!data.choices || !data.choices[0] || !data.choices[0].message || !data.choices[0].message.content) {
-      throw new Error("Resposta inválida do Groq");
+      throw new Error("Resposta inválida da Groq API");
     }
 
     // Processar o JSON gerado pelo modelo
     try {
       // Tente extrair o JSON da resposta
       const content = data.choices[0].message.content;
+      console.log("[NUTRI+] Conteúdo da resposta bruta:", content.substring(0, 200) + "...");
+      
       const jsonStart = content.indexOf('{');
       const jsonEnd = content.lastIndexOf('}') + 1;
       
       if (jsonStart === -1 || jsonEnd === -1 || jsonStart >= jsonEnd) {
-        console.error("Formato JSON inválido na resposta:", content);
+        console.error("[NUTRI+] Formato JSON inválido na resposta:", content);
         throw new Error("Formato JSON inválido na resposta");
       }
       
       const jsonStr = content.substring(jsonStart, jsonEnd);
-      console.log("JSON extraído:", jsonStr.substring(0, 200) + "...");
-      const mealPlan = JSON.parse(jsonStr);
+      console.log("[NUTRI+] JSON extraído:", jsonStr.substring(0, 200) + "...");
       
-      return mealPlan;
+      try {
+        const mealPlan = JSON.parse(jsonStr);
+        console.log("[NUTRI+] JSON parseado com sucesso");
+        return mealPlan;
+      } catch (parseError) {
+        console.error("[NUTRI+] Erro ao fazer parse do JSON:", parseError);
+        
+        // Tentar um método alternativo de extração de JSON
+        console.log("[NUTRI+] Tentando método alternativo de extração de JSON");
+        const jsonRegex = /{[\s\S]*}/;
+        const match = content.match(jsonRegex);
+        
+        if (match && match[0]) {
+          console.log("[NUTRI+] JSON encontrado via regex");
+          const cleanedJson = match[0].replace(/\n/g, ' ').replace(/\r/g, '');
+          return JSON.parse(cleanedJson);
+        } else {
+          throw new Error("Não foi possível extrair um JSON válido da resposta");
+        }
+      }
     } catch (jsonError) {
-      console.error("Erro ao processar JSON da resposta do Groq:", jsonError);
-      throw new Error("Falha ao processar o JSON do plano alimentar do Groq");
+      console.error("[NUTRI+] Erro ao processar JSON da resposta da Groq:", jsonError);
+      throw new Error("Falha ao processar o JSON do plano alimentar da Groq API");
     }
   } catch (error) {
-    console.error("Erro ao gerar com Groq:", error);
+    console.error("[NUTRI+] Erro ao gerar com Groq:", error);
     throw error;
   }
 }
@@ -495,7 +463,7 @@ ${foods.map(food => `- ${food.name}: ${food.calories || 0} kcal, ${food.protein 
 
   // Construir o prompt em português
   return `
-Você é um nutricionista especializado em criar planos alimentares personalizados em português.
+Você é um nutricionista especializado em criar planos alimentares personalizados em português do Brasil.
 
 ## DADOS DO USUÁRIO:
 - Peso: ${userData.weight} kg
@@ -584,7 +552,7 @@ Crie um plano alimentar semanal para 7 dias apresentado em formato JSON, totalme
 7. Siga estritamente o formato JSON solicitado.
 8. Use o português brasileiro para todos os textos e descrições.
 9. Inclua porções realistas para cada alimento (em gramas, ml, unidades ou colheres).
-10. Adicione detalhes sobre como preparar ou combinar os alimentos em português.
+10. Adicione detalhes sobre como preparar ou combinar os alimentos em português do Brasil.
 
 Apenas responda com o JSON do plano alimentar, sem texto adicional ou explicações.
 `;
