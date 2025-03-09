@@ -1,6 +1,7 @@
+
 import { useEffect, useState } from 'react';
 import { Card } from "@/components/ui/card";
-import { Lock, Unlock, Check } from "lucide-react";
+import { Lock, Unlock, Check, RefreshCw } from "lucide-react";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -47,66 +48,104 @@ const TipsCalendar = () => {
   const [tips, setTips] = useState<Tip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedTip, setSelectedTip] = useState<Tip | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
   const { addTransaction } = useWallet();
 
   useEffect(() => {
-    const loadTips = async () => {
-      try {
-        const savedTips = localStorage.getItem('monthlyTips');
-        const currentMonth = new Date().getMonth();
-        const savedMonth = localStorage.getItem('tipsMonth');
-        const readTips = JSON.parse(localStorage.getItem('readTips') || '[]');
-
-        if (!savedTips || savedMonth !== currentMonth.toString()) {
-          const { data, error } = await supabase
-            .from('daily_tips')
-            .select('*');
-
-          if (error) throw error;
-
-          const tipsData = (data as DailyTip[]) || defaultTips;
-          const currentDay = new Date().getDate();
-
-          const newTips = Array.from({ length: 30 }, (_, index) => {
-            const tipData = tipsData[index % tipsData.length];
-            return {
-              id: index + 1,
-              content: tipData?.content || `Dica do dia ${index + 1}`,
-              isUnlocked: index + 1 <= currentDay,
-              theme: tipData?.theme || themes[Math.floor(Math.random() * themes.length)].name,
-              isRead: readTips.includes(index + 1)
-            };
-          });
-
-          localStorage.setItem('monthlyTips', JSON.stringify(newTips));
-          localStorage.setItem('tipsMonth', currentMonth.toString());
-          setTips(newTips);
-        } else {
-          const savedTipsData = JSON.parse(savedTips);
-          const updatedTips = savedTipsData.map((tip: Tip) => ({
-            ...tip,
-            isRead: readTips.includes(tip.id)
-          }));
-          setTips(updatedTips);
-        }
-      } catch (error) {
-        console.error('Erro ao carregar dicas:', error);
-        toast.error('Erro ao carregar as dicas do dia');
-        
-        const currentDay = new Date().getDate();
-        const fallbackTips = defaultTips.map((tip, index) => ({
-          ...tip,
-          isUnlocked: index + 1 <= currentDay,
-          isRead: false
-        }));
-        setTips(fallbackTips);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     loadTips();
   }, []);
+
+  const loadTips = async () => {
+    try {
+      setIsLoading(true);
+      const savedTips = localStorage.getItem('monthlyTips');
+      const currentMonth = new Date().getMonth();
+      const savedMonth = localStorage.getItem('tipsMonth');
+      const readTips = JSON.parse(localStorage.getItem('readTips') || '[]');
+
+      if (!savedTips || savedMonth !== currentMonth.toString()) {
+        await fetchTipsFromDB();
+      } else {
+        const savedTipsData = JSON.parse(savedTips);
+        const updatedTips = savedTipsData.map((tip: Tip) => ({
+          ...tip,
+          isRead: readTips.includes(tip.id)
+        }));
+        setTips(updatedTips);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dicas:', error);
+      toast.error('Erro ao carregar as dicas do dia');
+      
+      const currentDay = new Date().getDate();
+      const fallbackTips = defaultTips.map((tip, index) => ({
+        ...tip,
+        isUnlocked: index + 1 <= currentDay,
+        isRead: false
+      }));
+      setTips(fallbackTips);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchTipsFromDB = async () => {
+    const { data, error } = await supabase
+      .from('daily_tips')
+      .select('*');
+
+    if (error) throw error;
+
+    const tipsData = (data as DailyTip[]) || defaultTips;
+    const currentDay = new Date().getDate();
+    const readTips = JSON.parse(localStorage.getItem('readTips') || '[]');
+
+    const newTips = Array.from({ length: 30 }, (_, index) => {
+      const tipData = tipsData[index % tipsData.length];
+      return {
+        id: index + 1,
+        content: tipData?.content || `Dica do dia ${index + 1}`,
+        isUnlocked: index + 1 <= currentDay,
+        theme: tipData?.theme || themes[Math.floor(Math.random() * themes.length)].name,
+        isRead: readTips.includes(index + 1)
+      };
+    });
+
+    localStorage.setItem('monthlyTips', JSON.stringify(newTips));
+    localStorage.setItem('tipsMonth', currentMonth.toString());
+    setTips(newTips);
+  };
+
+  const generateNewChallenges = async () => {
+    try {
+      setIsGenerating(true);
+      toast.loading('Gerando novos desafios diários...');
+      
+      const response = await supabase.functions.invoke('generate-daily-challenges', {
+        body: { count: 30 }
+      });
+      
+      if (response.error) {
+        throw new Error(response.error);
+      }
+      
+      if (response.data?.challenges) {
+        // Clear localStorage cache to force refresh
+        localStorage.removeItem('monthlyTips');
+        localStorage.removeItem('tipsMonth');
+        
+        // Reload the tips
+        await loadTips();
+        
+        toast.success('Novos desafios gerados com sucesso!');
+      }
+    } catch (error) {
+      console.error('Erro ao gerar novos desafios:', error);
+      toast.error('Erro ao gerar novos desafios diários');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const markTipAsRead = async (tipId: number) => {
     try {
@@ -150,9 +189,22 @@ const TipsCalendar = () => {
 
   return (
     <div className="w-full px-4 py-6 bg-gradient-to-br from-slate-50 to-white rounded-lg shadow-sm border border-slate-200">
-      <h2 className="text-2xl font-bold text-center mb-6 text-primary-500">
-        Atividades Diárias
-      </h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-primary-500">
+          Atividades Diárias
+        </h2>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={generateNewChallenges}
+          disabled={isGenerating}
+          className="flex items-center gap-1"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${isGenerating ? 'animate-spin' : ''}`} />
+          <span>Atualizar</span>
+        </Button>
+      </div>
+      
       <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-7 lg:grid-cols-10 gap-2">
         {tips.map((tip) => (
           <motion.div
