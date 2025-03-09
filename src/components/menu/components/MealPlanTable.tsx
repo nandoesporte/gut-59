@@ -1,13 +1,21 @@
 
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { MealSection } from "./MealSection";
-import type { DayPlan } from "../types";
+import type { DayPlan, MealPlan } from "../types";
 
 interface MealPlanTableProps {
-  dayPlan: DayPlan;
+  dayPlan?: DayPlan;
+  mealPlan?: MealPlan;
 }
 
-export const MealPlanTable = ({ dayPlan }: MealPlanTableProps) => {
+export const MealPlanTable = ({ dayPlan, mealPlan }: MealPlanTableProps) => {
+  // Handle the case where mealPlan is provided instead of dayPlan
+  if (mealPlan && !dayPlan) {
+    // Display the first day's plan when mealPlan is provided
+    const firstDayKey = Object.keys(mealPlan.weeklyPlan)[0] as keyof typeof mealPlan.weeklyPlan;
+    dayPlan = mealPlan.weeklyPlan[firstDayKey];
+  }
+
   if (!dayPlan || !dayPlan.meals) {
     return (
       <div className="text-center p-4">
@@ -27,7 +35,7 @@ export const MealPlanTable = ({ dayPlan }: MealPlanTableProps) => {
   return (
     <Accordion type="multiple" defaultValue={["breakfast", "lunch", "dinner"]} className="w-full">
       {Object.entries(mealTypes).map(([mealType, mealName]) => {
-        const meal = dayPlan.meals[mealType as keyof typeof dayPlan.meals];
+        const meal = dayPlan?.meals[mealType as keyof typeof dayPlan.meals];
         if (!meal) return null;
         
         return (

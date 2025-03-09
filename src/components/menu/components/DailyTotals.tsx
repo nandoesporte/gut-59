@@ -9,15 +9,25 @@ interface DailyTotalsProps {
     fats: number;
     fiber: number;
   };
+  totalNutrition?: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fats: number;
+    fiber: number;
+  };
 }
 
-export const DailyTotals = ({ dailyTotals }: DailyTotalsProps) => {
+export const DailyTotals = ({ dailyTotals, totalNutrition }: DailyTotalsProps) => {
+  // Use totalNutrition if provided, otherwise use dailyTotals
+  const nutritionData = totalNutrition || dailyTotals;
+  
   const stats = [
-    { name: "Calorias", value: dailyTotals.calories || 0, unit: "kcal" },
-    { name: "Proteínas", value: dailyTotals.protein || 0, unit: "g" },
-    { name: "Carboidratos", value: dailyTotals.carbs || 0, unit: "g" },
-    { name: "Gorduras", value: dailyTotals.fats || 0, unit: "g" },
-    { name: "Fibras", value: dailyTotals.fiber || 0, unit: "g" },
+    { name: "Calorias", value: nutritionData.calories || 0, unit: "kcal" },
+    { name: "Proteínas", value: nutritionData.protein || 0, unit: "g" },
+    { name: "Carboidratos", value: nutritionData.carbs || 0, unit: "g" },
+    { name: "Gorduras", value: nutritionData.fats || 0, unit: "g" },
+    { name: "Fibras", value: nutritionData.fiber || 0, unit: "g" },
   ];
 
   return (

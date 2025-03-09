@@ -2,12 +2,15 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Meal } from "../types";
+import { ReactNode } from "react";
 
 interface MealSectionProps {
   meal: Meal;
+  title?: string;
+  icon?: ReactNode;
 }
 
-export const MealSection = ({ meal }: MealSectionProps) => {
+export const MealSection = ({ meal, title, icon }: MealSectionProps) => {
   if (!meal.foods || meal.foods.length === 0) {
     return (
       <div className="text-center py-4">
@@ -18,6 +21,13 @@ export const MealSection = ({ meal }: MealSectionProps) => {
 
   return (
     <div className="space-y-4">
+      {title && (
+        <div className="flex items-center mb-3">
+          {icon && <div className="mr-2">{icon}</div>}
+          <h3 className="text-lg font-medium">{title}</h3>
+        </div>
+      )}
+      
       {meal.description && (
         <div className="mb-4">
           <p className="text-sm text-gray-700 italic">{meal.description}</p>
