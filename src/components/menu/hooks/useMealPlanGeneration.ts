@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -130,26 +129,26 @@ export const useMealPlanGeneration = () => {
             meal.macros.fiber += saladNutrition.fiber;
           }
           
-          // Update daily totals
-          const updatedCalories = !hasProtein ? proteinNutrition.calories : 0 +
-                                 !hasCarbs ? carbsNutrition.calories : 0 +
-                                 !hasSalad ? saladNutrition.calories : 0;
+          // Update daily totals - Fix the TypeScript error by converting booleans to numbers
+          const updatedCalories = (!hasProtein ? proteinNutrition.calories : 0) +
+                                 (!hasCarbs ? carbsNutrition.calories : 0) +
+                                 (!hasSalad ? saladNutrition.calories : 0);
                                  
-          const updatedProtein = !hasProtein ? proteinNutrition.protein : 0 +
-                                !hasCarbs ? carbsNutrition.protein : 0 +
-                                !hasSalad ? saladNutrition.protein : 0;
+          const updatedProtein = (!hasProtein ? proteinNutrition.protein : 0) +
+                                (!hasCarbs ? carbsNutrition.protein : 0) +
+                                (!hasSalad ? saladNutrition.protein : 0);
                                 
-          const updatedCarbs = !hasProtein ? proteinNutrition.carbs : 0 +
-                              !hasCarbs ? carbsNutrition.carbs : 0 +
-                              !hasSalad ? saladNutrition.carbs : 0;
+          const updatedCarbs = (!hasProtein ? proteinNutrition.carbs : 0) +
+                              (!hasCarbs ? carbsNutrition.carbs : 0) +
+                              (!hasSalad ? saladNutrition.carbs : 0);
                               
-          const updatedFats = !hasProtein ? proteinNutrition.fats : 0 +
-                             !hasCarbs ? carbsNutrition.fats : 0 +
-                             !hasSalad ? saladNutrition.fats : 0;
+          const updatedFats = (!hasProtein ? proteinNutrition.fats : 0) +
+                             (!hasCarbs ? carbsNutrition.fats : 0) +
+                             (!hasSalad ? saladNutrition.fats : 0);
                              
-          const updatedFiber = !hasProtein ? proteinNutrition.fiber : 0 +
-                              !hasCarbs ? carbsNutrition.fiber : 0 +
-                              !hasSalad ? saladNutrition.fiber : 0;
+          const updatedFiber = (!hasProtein ? proteinNutrition.fiber : 0) +
+                              (!hasCarbs ? carbsNutrition.fiber : 0) +
+                              (!hasSalad ? saladNutrition.fiber : 0);
           
           dayPlan.dailyTotals.calories += updatedCalories;
           dayPlan.dailyTotals.protein += updatedProtein;
