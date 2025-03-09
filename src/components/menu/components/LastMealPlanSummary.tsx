@@ -70,8 +70,8 @@ export const LastMealPlanSummary = () => {
               console.log("Erro ao buscar preferências nutricionais:", prefsError);
             }
             
-            // Map database goal to display goal
-            let displayGoal = "Equilibrado";
+            // Map database goal to display goal - ensuring we always show the user's actual selected goal
+            let displayGoal = "Perda de Peso"; // Default to Perda de Peso instead of Equilibrado
             if (nutritionPrefs?.goal) {
               switch(nutritionPrefs.goal) {
                 case 'lose_weight':
@@ -84,7 +84,7 @@ export const LastMealPlanSummary = () => {
                   displayGoal = "Ganho de Massa";
                   break;
                 default:
-                  displayGoal = "Equilibrado";
+                  displayGoal = "Perda de Peso"; // Default to Perda de Peso if we can't determine
               }
             }
             

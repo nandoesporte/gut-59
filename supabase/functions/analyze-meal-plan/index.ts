@@ -16,7 +16,7 @@ serve(async (req) => {
     const prompt = `Analise o seguinte plano alimentar e sugira melhorias se necessário:
 
 Dados do Usuário:
-- Objetivo: ${userData.goal}
+- Objetivo: ${userData.goal || 'Perda de Peso'} 
 - Peso: ${userData.weight}kg
 - Altura: ${userData.height}cm
 - Idade: ${userData.age}
