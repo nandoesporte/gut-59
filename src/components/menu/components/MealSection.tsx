@@ -10,6 +10,12 @@ interface MealSectionProps {
 }
 
 export const MealSection = ({ title, icon, meal, unitLabels = {} }: MealSectionProps) => {
+  // Função para traduzir unidades
+  const translateUnit = (unit: string): string => {
+    // Verificar se temos uma tradução para esta unidade
+    return unitLabels[unit.toLowerCase()] || unit;
+  };
+
   return (
     <div className="border rounded-lg p-4">
       <div className="flex items-center mb-2">
@@ -28,7 +34,7 @@ export const MealSection = ({ title, icon, meal, unitLabels = {} }: MealSectionP
         {meal.foods?.map((food, index) => (
           <li key={index} className="text-sm">
             <span className="font-medium">{food.name}</span>:{" "}
-            {food.portion} {food.unit || "g"}
+            {food.portion} {translateUnit(food.unit || "g")}
             {food.details ? ` - ${food.details}` : ""}
           </li>
         ))}
