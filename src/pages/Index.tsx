@@ -14,6 +14,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { GraduationCap } from "lucide-react";
 import { LastMealPlanSummary } from "@/components/menu/components/LastMealPlanSummary";
+import { MentalHealthSummary } from "@/components/mental/MentalHealthSummary";
 
 const Index = () => {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -72,6 +73,10 @@ const Index = () => {
     <div className="space-y-8 flex flex-col items-center">
       <div className="w-full">
         <Profile />
+      </div>
+      
+      <div className="w-full">
+        <MentalHealthSummary />
       </div>
       
       <div className="w-full">
