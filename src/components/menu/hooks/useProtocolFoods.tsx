@@ -17,6 +17,7 @@ export const useProtocolFoods = () => {
   const [protocolFoods, setProtocolFoods] = useState<ProtocolFood[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [foodsByMealType, setFoodsByMealType] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
     const fetchFoods = async () => {
@@ -70,6 +71,35 @@ export const useProtocolFoods = () => {
           return food;
         });
         
+        // Process foods by meal type for easier access
+        const mealTypesMap: Record<string, string[]> = {
+          breakfast: [],
+          morning_snack: [],
+          lunch: [],
+          afternoon_snack: [],
+          dinner: [],
+          uncategorized: []
+        };
+        
+        processedData?.forEach(food => {
+          let mealType = 'uncategorized';
+          if (food.food_group_id !== null && food.food_group_id !== undefined) {
+            const groupId = Number(food.food_group_id);
+            if (!isNaN(groupId) && groupId >= 1 && groupId <= 5) {
+              switch(groupId) {
+                case 1: mealType = 'breakfast'; break;
+                case 2: mealType = 'morning_snack'; break;
+                case 3: mealType = 'lunch'; break;
+                case 4: mealType = 'afternoon_snack'; break;
+                case 5: mealType = 'dinner'; break;
+              }
+            }
+          }
+          mealTypesMap[mealType].push(food.id);
+        });
+        
+        setFoodsByMealType(mealTypesMap);
+        
         // Adicionar log para verificar a distribuição de alimentos por categoria
         if (processedData && processedData.length > 0) {
           const mealTypeCounts = processedData.reduce((acc: Record<string, number>, food) => {
@@ -105,5 +135,5 @@ export const useProtocolFoods = () => {
     fetchFoods();
   }, []);
 
-  return { protocolFoods, loading, error };
+  return { protocolFoods, loading, error, foodsByMealType };
 };

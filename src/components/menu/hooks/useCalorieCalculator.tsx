@@ -3,9 +3,17 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
-import type { CalorieCalculatorForm } from "../CalorieCalculator";
 
 export type Goal = "lose" | "maintain" | "gain";
+
+export interface CalorieCalculatorForm {
+  weight: string;
+  height: string;
+  age: string;
+  gender: "male" | "female";
+  activityLevel: string;
+  goal?: Goal;
+}
 
 type NutritionPreference = Database['public']['Tables']['nutrition_preferences']['Insert'];
 
@@ -22,60 +30,46 @@ export const useCalorieCalculator = () => {
   const [loading, setLoading] = useState(false);
   const [calorieNeeds, setCalorieNeeds] = useState<number | null>(null);
 
-  const calculateBMR = (data: CalorieCalculatorForm) => {
-    const weight = parseFloat(data.weight);
-    const height = parseFloat(data.height);
-    const age = parseFloat(data.age);
+  const calculateBMR = (weight: string | number, height: string | number, age: string | number, gender: string) => {
+    const weightNum = parseFloat(weight.toString());
+    const heightNum = parseFloat(height.toString());
+    const ageNum = parseFloat(age.toString());
 
-    if (data.gender === "male") {
-      return 88.36 + (13.4 * weight) + (4.8 * height) - (5.7 * age);
+    if (gender === "male") {
+      return 88.36 + (13.4 * weightNum) + (4.8 * heightNum) - (5.7 * ageNum);
     } else {
-      return 447.6 + (9.2 * weight) + (3.1 * height) - (4.3 * age);
+      return 447.6 + (9.2 * weightNum) + (3.1 * heightNum) - (4.3 * ageNum);
     }
   };
 
-  const calculateCalories = async (formData: CalorieCalculatorForm, selectedLevel: { multiplier: number }) => {
+  const calculateCalories = (weight: string | number, height: string | number, age: string | number, gender: string, activityLevel: string, goal?: string) => {
     try {
       setLoading(true);
-      const bmr = calculateBMR(formData);
-      const activityMultiplier = selectedLevel ? selectedLevel.multiplier : 1.2;
+      
+      // Map activity level to multiplier
+      let activityMultiplier = 1.2; // default to sedentary
+      
+      switch(activityLevel) {
+        case 'sedentary':
+          activityMultiplier = 1.2;
+          break;
+        case 'light':
+          activityMultiplier = 1.375;
+          break;
+        case 'moderate':
+          activityMultiplier = 1.55;
+          break;
+        case 'intense':
+          activityMultiplier = 1.725;
+          break;
+      }
+      
+      const bmr = calculateBMR(weight, height, age, gender);
       const dailyCalories = Math.round(bmr * activityMultiplier);
 
-      // Don't require authentication for calculating calories
-      // This allows the calculator to work even if the user is not logged in
-      let userId = null;
-      try {
-        const { data: userData } = await supabase.auth.getUser();
-        userId = userData.user?.id;
-      } catch (authError) {
-        console.warn("User not authenticated, proceeding with calculation only:", authError);
-      }
-
-      if (!formData.goal) {
+      if (!goal) {
         toast.error("Por favor, selecione um objetivo");
-        return null;
-      }
-
-      // Only save to database if user is logged in
-      if (userId) {
-        const nutritionPreference: NutritionPreference = {
-          weight: parseFloat(formData.weight),
-          height: parseFloat(formData.height),
-          age: parseFloat(formData.age),
-          gender: formData.gender,
-          activity_level: formData.activityLevel as Database['public']['Enums']['activity_level'],
-          goal: mapGoalToEnum(formData.goal),
-          user_id: userId
-        };
-
-        const { error: nutritionError } = await supabase
-          .from('nutrition_preferences')
-          .upsert(nutritionPreference);
-
-        if (nutritionError) {
-          console.error('Error saving nutrition preferences:', nutritionError);
-          // Continue anyway, this shouldn't block the calculation
-        }
+        return 0;
       }
 
       setCalorieNeeds(dailyCalories);
@@ -83,7 +77,7 @@ export const useCalorieCalculator = () => {
     } catch (error) {
       console.error('Error calculating calories:', error);
       toast.error("Erro ao calcular necessidades calóricas");
-      return null;
+      return 0;
     } finally {
       setLoading(false);
     }

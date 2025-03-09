@@ -11,9 +11,9 @@ import { toast } from "sonner";
 
 // Types
 interface FormData {
-  weight: number;
-  height: number;
-  age: number;
+  weight: string;
+  height: string;
+  age: string;
   gender: string;
   activityLevel: string;
   goal: string;
@@ -30,7 +30,7 @@ interface MenuState {
   formData: FormData;
   loading: boolean;
   foodsError: Error | null;
-  setFormData: (data: FormData) => void;
+  setFormData: (data: FormData | ((prev: FormData) => FormData)) => void;
   handleCalculateCalories: () => void;
   handleFoodSelection: (food: ProtocolFood) => void;
   handleConfirmFoodSelection: () => void;
@@ -50,9 +50,9 @@ export const useMenuController = (): MenuState => {
     trainingTime: null,
   });
   const [formData, setFormData] = useState<FormData>({
-    weight: 70,
-    height: 170,
-    age: 30,
+    weight: "70",
+    height: "170",
+    age: "30",
     gender: "male",
     activityLevel: "moderate",
     goal: "maintenance",
@@ -60,7 +60,14 @@ export const useMenuController = (): MenuState => {
   
   const { protocolFoods, error: foodsError, foodsByMealType } = useProtocolFoods();
   const { calculateCalories } = useCalorieCalculator();
-  const { selectedFoods, totalCalories, addFood, resetSelection } = useFoodSelection();
+  const { 
+    selectedFoods, 
+    totalCalories, 
+    handleFoodSelection: handleFoodSelect,
+    addFood,
+    resetSelection 
+  } = useFoodSelection();
+  
   const wallet = useWallet();
 
   // Check for authenticated user
@@ -94,9 +101,9 @@ export const useMenuController = (): MenuState => {
         console.log("Loaded nutrition preferences:", nutritionPrefs);
         setFormData(prev => ({
           ...prev,
-          weight: nutritionPrefs.weight || prev.weight,
-          height: nutritionPrefs.height || prev.height,
-          age: nutritionPrefs.age || prev.age,
+          weight: nutritionPrefs.weight ? nutritionPrefs.weight.toString() : prev.weight,
+          height: nutritionPrefs.height ? nutritionPrefs.height.toString() : prev.height,
+          age: nutritionPrefs.age ? nutritionPrefs.age.toString() : prev.age,
           gender: nutritionPrefs.gender || prev.gender,
           activityLevel: nutritionPrefs.activity_level || prev.activityLevel,
           goal: nutritionPrefs.goal || prev.goal,
@@ -137,6 +144,7 @@ export const useMenuController = (): MenuState => {
       formData.activityLevel,
       formData.goal
     );
+    
     setCalorieNeeds(calculatedCalories);
     setCurrentStep(2);
     
@@ -147,9 +155,9 @@ export const useMenuController = (): MenuState => {
         if (user) {
           const { error } = await supabase.from('nutrition_preferences').upsert({
             user_id: user.id,
-            weight: formData.weight,
-            height: formData.height,
-            age: formData.age,
+            weight: parseFloat(formData.weight),
+            height: parseFloat(formData.height),
+            age: parseInt(formData.age),
             gender: formData.gender,
             activity_level: formData.activityLevel,
             goal: formData.goal,
@@ -170,8 +178,8 @@ export const useMenuController = (): MenuState => {
 
   // Handle Food Selection
   const handleFoodSelection = useCallback((food: ProtocolFood) => {
-    addFood(food);
-  }, [addFood]);
+    handleFoodSelect(food);
+  }, [handleFoodSelect]);
 
   // Handle Confirm Food Selection
   const handleConfirmFoodSelection = useCallback(() => {
@@ -215,9 +223,9 @@ export const useMenuController = (): MenuState => {
       const generatedPlan = await generateMealPlan({
         userData: {
           id: user?.id,
-          weight: formData.weight,
-          height: formData.height,
-          age: formData.age,
+          weight: parseFloat(formData.weight),
+          height: parseFloat(formData.height),
+          age: parseInt(formData.age),
           gender: formData.gender,
           activityLevel: formData.activityLevel,
           goal: formData.goal,
