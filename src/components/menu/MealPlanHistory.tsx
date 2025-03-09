@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { List } from 'lucide-react';
 import { MealPlan } from './types';
 import { useMealPlanHistory } from './hooks/useMealPlanHistory';
@@ -17,8 +17,10 @@ export const MealPlanHistory = () => {
 
   const handleDeleteConfirm = async () => {
     if (deleteId) {
-      await deletePlan(deleteId);
-      setDeleteId(null);
+      const success = await deletePlan(deleteId);
+      if (success) {
+        setDeleteId(null);
+      }
     }
   };
 
@@ -34,6 +36,17 @@ export const MealPlanHistory = () => {
     setViewPlanData(null);
     fetchPlans(); // Refresh plans after closing details in case changes were made
   };
+
+  // Add an effect to refresh plans when the component mounts or user changes
+  useEffect(() => {
+    console.log('MealPlanHistory component mounted or user changed');
+    if (user) {
+      console.log('User is authenticated, fetching plans');
+      fetchPlans();
+    } else {
+      console.log('No authenticated user');
+    }
+  }, [user]);
 
   console.log('MealPlanHistory render - authenticated:', !!user);
   console.log('Plans loaded:', plans.length);

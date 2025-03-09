@@ -19,14 +19,29 @@ interface RawMealPlan {
 }
 
 const validateMealPlan = (planData: unknown): planData is MealPlan => {
+  if (!planData || typeof planData !== 'object') {
+    console.error('Invalid meal plan: not an object or null', planData);
+    return false;
+  }
+  
   const plan = planData as MealPlan;
-  return !!(
+  const isValid = !!(
     plan &&
-    typeof plan === 'object' &&
     'weeklyPlan' in plan &&
     'weeklyTotals' in plan &&
     'recommendations' in plan
   );
+  
+  if (!isValid) {
+    console.error('Invalid meal plan structure. Missing required properties:', 
+      'weeklyPlan:', 'weeklyPlan' in plan,
+      'weeklyTotals:', 'weeklyTotals' in plan,
+      'recommendations:', 'recommendations' in plan
+    );
+    console.log('Plan data:', JSON.stringify(plan).substring(0, 200) + '...');
+  }
+  
+  return isValid;
 };
 
 export const useMealPlanHistory = () => {
@@ -58,6 +73,7 @@ export const useMealPlanHistory = () => {
       }
 
       console.log('Raw meal plans data from database:', data);
+      console.log('Number of plans found:', data?.length || 0);
       
       if (!data || data.length === 0) {
         console.log('No meal plans found in database for this user');
@@ -66,42 +82,55 @@ export const useMealPlanHistory = () => {
         return;
       }
 
+      // Process each meal plan and log detailed information for debugging
       const validPlans = (data as RawMealPlan[]).reduce<StoredMealPlan[]>((acc, plan) => {
-        console.log('Processing plan:', plan.id, 'with data:', typeof plan.plan_data);
+        console.log(`Processing plan ${plan.id}:`);
+        console.log('- Plan data type:', typeof plan.plan_data);
         
         if (!plan.plan_data) {
-          console.error('Plan data is empty or null for plan:', plan.id);
+          console.error('- Plan data is empty or null');
           return acc;
         }
         
         try {
-          // If plan_data is a string, try to parse it as JSON
-          const planData = typeof plan.plan_data === 'string' 
-            ? JSON.parse(plan.plan_data) 
-            : plan.plan_data;
-            
-          if (validateMealPlan(planData)) {
+          // Parse plan_data if it's a string
+          let parsedPlanData = plan.plan_data;
+          if (typeof plan.plan_data === 'string') {
+            console.log('- Plan data is a string, attempting to parse JSON');
+            try {
+              parsedPlanData = JSON.parse(plan.plan_data);
+              console.log('- Successfully parsed JSON string');
+            } catch (parseError) {
+              console.error('- Failed to parse plan_data string:', parseError);
+              return acc;
+            }
+          }
+          
+          // Validate the meal plan structure
+          if (validateMealPlan(parsedPlanData)) {
+            console.log('- Plan validation successful');
             acc.push({
               id: plan.id,
               created_at: plan.created_at,
-              plan_data: planData as MealPlan,
+              plan_data: parsedPlanData as MealPlan,
               calories: plan.calories,
             });
           } else {
-            console.error('Invalid meal plan structure for plan:', plan.id);
-            console.log('Plan data that failed validation:', planData);
+            console.error('- Plan validation failed');
           }
         } catch (e) {
-          console.error('Error processing meal plan:', plan.id, e);
+          console.error(`- Error processing meal plan ${plan.id}:`, e);
         }
         
         return acc;
       }, []);
 
       console.log('Valid plans after processing:', validPlans.length);
+      console.log('First valid plan:', validPlans[0] ? JSON.stringify(validPlans[0].id) : 'none');
+      
       setPlans(validPlans);
     } catch (error) {
-      console.error('Error fetching meal plans:', error);
+      console.error('Error in fetchPlans:', error);
       toast.error('Erro ao carregar histórico de planos');
     } finally {
       setLoading(false);
@@ -110,13 +139,19 @@ export const useMealPlanHistory = () => {
 
   const deletePlan = async (id: string): Promise<boolean> => {
     try {
+      console.log('Deleting plan with ID:', id);
+      
       const { error } = await supabase
         .from('meal_plans')
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error deleting meal plan:', error);
+        throw error;
+      }
 
+      console.log('Plan deleted successfully');
       setPlans(plans.filter(plan => plan.id !== id));
       toast.success('Plano excluído com sucesso');
       return true;
