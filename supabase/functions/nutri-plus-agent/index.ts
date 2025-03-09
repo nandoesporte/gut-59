@@ -25,7 +25,7 @@ serve(async (req) => {
       throw new Error("Dados de requisição incompletos. Verifique os parâmetros obrigatórios.");
     }
     
-    const { userData, selectedFoods, foodsByMealType, dietaryPreferences, modelConfig } = requestData;
+    const { userData, selectedFoods, foodsByMealType, dietaryPreferences } = requestData;
     
     console.log("[NUTRI+] Dados recebidos:", {
       userData: {
@@ -37,8 +37,7 @@ serve(async (req) => {
       },
       selectedFoodsCount: selectedFoods.length,
       hasFoodsByMealType: !!foodsByMealType,
-      dietaryPreferencesProvided: !!dietaryPreferences,
-      modelConfig: modelConfig
+      dietaryPreferencesProvided: !!dietaryPreferences
     });
 
     // Tradução para os nomes dos dias da semana em português
@@ -69,86 +68,20 @@ serve(async (req) => {
       console.log(`[NUTRI+] ${mealType}: ${Array.isArray(foods) ? foods.length : 0} alimentos`);
     }
 
-    // Verificar modelo solicitado e chamar a API correspondente
+    // Usar sempre o modelo llama3-8b-8192 via Groq API
+    console.log("[NUTRI+] Usando exclusivamente o modelo llama3-8b-8192 via Groq API");
     let result;
-    let modelUsed;
     
-    console.log(`[NUTRI+] Modelo solicitado: ${modelConfig?.model || 'não especificado'}`);
-    
-    if (modelConfig?.model?.toLowerCase().includes('llama')) {
-      console.log("[NUTRI+] Usando modelo Llama via Groq API para geração do plano alimentar");
-      try {
-        const llamaModel = modelConfig.model || 'llama3-8b-8192';
-        console.log(`[NUTRI+] Chamando Groq API com modelo: ${llamaModel}`);
-        result = await generateWithGroq(userData, organizedFoodsByMealType, dietaryPreferences, {
-          ...modelConfig,
-          model: llamaModel
-        });
-        modelUsed = llamaModel;
-        console.log("[NUTRI+] Resposta da Groq API com modelo Llama recebida com sucesso");
-      } catch (llamaError) {
-        console.error("[NUTRI+] Erro ao gerar com Llama (via Groq):", llamaError);
-        
-        // Tentar com OpenAI como fallback
-        console.log("[NUTRI+] Tentando fallback para OpenAI após erro com Llama");
-        try {
-          const openaiModel = "gpt-4o-mini";
-          result = await generateWithOpenAI(userData, organizedFoodsByMealType, dietaryPreferences, {
-            model: openaiModel,
-            temperature: modelConfig?.temperature || 0.7
-          });
-          modelUsed = `${openaiModel} (fallback após erro em ${modelConfig?.model})`;
-          console.log("[NUTRI+] Fallback para OpenAI concluído com sucesso");
-        } catch (fallbackError) {
-          console.error("[NUTRI+] Erro também no fallback:", fallbackError);
-          throw new Error(`Erro ao gerar com Llama e no fallback: ${llamaError.message}. Erro no fallback: ${fallbackError.message}`);
-        }
-      }
-    } else if (modelConfig?.model?.toLowerCase().includes('groq') || modelConfig?.model?.toLowerCase().includes('mixtral')) {
-      console.log("[NUTRI+] Usando modelo Groq para geração do plano alimentar");
-      try {
-        const groqModel = modelConfig.model || 'mixtral-8x7b-32768';
-        console.log(`[NUTRI+] Chamando Groq API com modelo: ${groqModel}`);
-        result = await generateWithGroq(userData, organizedFoodsByMealType, dietaryPreferences, {
-          ...modelConfig,
-          model: groqModel
-        });
-        modelUsed = groqModel;
-        console.log("[NUTRI+] Resposta da Groq API recebida com sucesso");
-      } catch (groqError) {
-        console.error("[NUTRI+] Erro ao gerar com Groq:", groqError);
-        
-        // Tentar com OpenAI como fallback
-        console.log("[NUTRI+] Tentando fallback para OpenAI após erro com Groq");
-        try {
-          const openaiModel = "gpt-4o-mini";
-          result = await generateWithOpenAI(userData, organizedFoodsByMealType, dietaryPreferences, {
-            model: openaiModel,
-            temperature: modelConfig?.temperature || 0.7
-          });
-          modelUsed = `${openaiModel} (fallback após erro em ${modelConfig?.model})`;
-          console.log("[NUTRI+] Fallback para OpenAI concluído com sucesso");
-        } catch (fallbackError) {
-          console.error("[NUTRI+] Erro também no fallback:", fallbackError);
-          throw new Error(`Erro ao gerar com Groq e no fallback: ${groqError.message}. Erro no fallback: ${fallbackError.message}`);
-        }
-      }
-    } else {
-      // Usar OpenAI como padrão
-      console.log("[NUTRI+] Usando modelo OpenAI para geração do plano alimentar");
-      try {
-        const openaiModel = modelConfig?.model || "gpt-4o-mini";
-        console.log(`[NUTRI+] Chamando OpenAI API com modelo: ${openaiModel}`);
-        result = await generateWithOpenAI(userData, organizedFoodsByMealType, dietaryPreferences, {
-          ...modelConfig,
-          model: openaiModel
-        });
-        modelUsed = openaiModel;
-        console.log("[NUTRI+] Resposta da OpenAI API recebida com sucesso");
-      } catch (openaiError) {
-        console.error("[NUTRI+] Erro ao gerar com OpenAI:", openaiError);
-        throw new Error(`Erro ao gerar com modelo OpenAI: ${openaiError.message}`);
-      }
+    try {
+      console.log("[NUTRI+] Chamando Groq API com modelo llama3-8b-8192");
+      result = await generateWithGroq(userData, organizedFoodsByMealType, dietaryPreferences, {
+        model: "llama3-8b-8192",
+        temperature: 0.7
+      });
+      console.log("[NUTRI+] Resposta da Groq API recebida com sucesso");
+    } catch (groqError) {
+      console.error("[NUTRI+] Erro ao gerar com Groq:", groqError);
+      throw new Error(`Erro ao gerar plano alimentar com llama3-8b-8192: ${groqError.message}`);
     }
 
     // Processar resultado e traduzir nomes dos dias
@@ -185,11 +118,11 @@ serve(async (req) => {
     }
 
     console.log("[NUTRI+] Plano alimentar gerado com sucesso");
-    console.log("[NUTRI+] Modelo utilizado:", modelUsed);
+    console.log("[NUTRI+] Modelo utilizado: llama3-8b-8192");
 
     return new Response(JSON.stringify({ 
       mealPlan: result, 
-      modelUsed 
+      modelUsed: "llama3-8b-8192"
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
@@ -323,93 +256,19 @@ function enhanceFoodPreparation(food, mealType) {
   return updatedFood;
 }
 
-// Função para gerar com OpenAI
-async function generateWithOpenAI(userData, foodsByMealType, dietaryPreferences, modelConfig) {
-  if (!openAIApiKey) {
-    throw new Error("API key da OpenAI não configurada");
-  }
-
-  console.log("[NUTRI+] Preparando dados para o modelo OpenAI");
-  
-  // Preparar os dados para envio
-  const prompt = generateNutriPlusPrompt(userData, foodsByMealType, dietaryPreferences);
-  
-  try {
-    console.log("[NUTRI+] Enviando requisição para OpenAI");
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openAIApiKey}`
-      },
-      body: JSON.stringify({
-        model: modelConfig?.model || 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'Você é um nutricionista especializado em criar planos alimentares personalizados. Responda apenas com o objeto JSON conforme solicitado, sem texto adicional. Use português brasileiro para todos os textos.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: modelConfig?.temperature || 0.7,
-        max_tokens: 4000
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("[NUTRI+] Erro na resposta da OpenAI:", errorData);
-      throw new Error(`Erro na API do OpenAI: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    console.log("[NUTRI+] Resposta recebida do modelo OpenAI");
-
-    if (!data.choices || !data.choices[0] || !data.choices[0].message || !data.choices[0].message.content) {
-      throw new Error("Resposta inválida do OpenAI");
-    }
-
-    // Processar o JSON gerado pelo modelo
-    try {
-      // Tente extrair o JSON da resposta
-      const content = data.choices[0].message.content;
-      console.log("[NUTRI+] Conteúdo da resposta bruta (OpenAI):", content.substring(0, 200) + "...");
-      
-      // Detectar e reparar problemas comuns de JSON
-      const jsonData = extractJSON(content, "OpenAI");
-      console.log("[NUTRI+] JSON parseado com sucesso (OpenAI)");
-      
-      return jsonData;
-    } catch (jsonError) {
-      console.error("[NUTRI+] Erro ao processar JSON da resposta do OpenAI:", jsonError);
-      throw new Error("Falha ao processar o JSON do plano alimentar do OpenAI");
-    }
-  } catch (error) {
-    console.error("[NUTRI+] Erro ao gerar com OpenAI:", error);
-    throw error;
-  }
-}
-
-// Função para gerar com Groq
+// Função para gerar com Groq (única função de geração mantida)
 async function generateWithGroq(userData, foodsByMealType, dietaryPreferences, modelConfig) {
   if (!groqAPIKey) {
     throw new Error("API key do Groq não configurada");
   }
 
-  console.log("[NUTRI+] Preparando dados para o modelo Groq");
-  
-  // Usar modelo do parâmetro ou definir padrão
-  const modelToUse = modelConfig?.model || 'llama3-8b-8192';
-  console.log(`[NUTRI+] Usando modelo Groq: ${modelToUse}`);
+  console.log("[NUTRI+] Preparando dados para o modelo llama3-8b-8192 via Groq");
   
   // Preparar os dados para envio
   const prompt = generateNutriPlusPrompt(userData, foodsByMealType, dietaryPreferences);
   
   try {
-    console.log(`[NUTRI+] Enviando requisição para Groq com modelo ${modelToUse}`);
+    console.log("[NUTRI+] Enviando requisição para Groq com modelo llama3-8b-8192");
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -417,7 +276,7 @@ async function generateWithGroq(userData, foodsByMealType, dietaryPreferences, m
         'Authorization': `Bearer ${groqAPIKey}`
       },
       body: JSON.stringify({
-        model: modelToUse,
+        model: "llama3-8b-8192",
         messages: [
           {
             role: 'system',
@@ -446,7 +305,7 @@ async function generateWithGroq(userData, foodsByMealType, dietaryPreferences, m
     }
 
     const data = await response.json();
-    console.log("[NUTRI+] Resposta recebida do modelo Groq");
+    console.log("[NUTRI+] Resposta recebida do modelo llama3-8b-8192 via Groq");
 
     if (!data.choices || !data.choices[0] || !data.choices[0].message || !data.choices[0].message.content) {
       throw new Error("Resposta inválida da Groq API");
