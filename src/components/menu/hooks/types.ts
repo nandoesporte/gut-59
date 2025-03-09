@@ -1,5 +1,4 @@
 
-import type { CalorieCalculatorForm } from "../CalorieCalculator";
 import type { DietaryPreferences, MealPlan } from "../types";
 
 export interface MenuState {
@@ -7,10 +6,10 @@ export interface MenuState {
   dietaryPreferences: DietaryPreferences | null;
   mealPlan: MealPlan | null;
   loading: boolean;
-  formData: CalorieCalculatorForm;
+  formData: any; // We'll use the CalorieCalculatorForm from ../types.ts instead
 }
 
 export interface MenuActions {
   setCurrentStep: (step: number) => void;
-  setFormData: (formData: CalorieCalculatorForm) => void;
+  setFormData: (formData: any) => void;
 }
