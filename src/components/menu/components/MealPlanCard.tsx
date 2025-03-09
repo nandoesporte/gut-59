@@ -1,10 +1,9 @@
 
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Download, Eye, Trash2 } from 'lucide-react';
-import { Button } from "@/components/ui/button";
+import { Trash2, Eye, Download } from 'lucide-react';
 import { Card } from "@/components/ui/card";
-import { MealPlan } from '../types';
+import { Button } from "@/components/ui/button";
 
 interface MealPlanCardProps {
   id: string;
@@ -23,44 +22,50 @@ export const MealPlanCard = ({
   onDownload,
   onDelete
 }: MealPlanCardProps) => {
+  // Format the date
+  const formattedDate = format(
+    new Date(createdAt),
+    "dd 'de' MMMM 'de' yyyy 'às' HH:mm",
+    { locale: ptBR }
+  );
+
   return (
-    <Card key={id} className="p-4 sm:p-6">
-      <div className="flex flex-col sm:flex-row justify-between gap-4 sm:items-center">
+    <Card className="p-4 hover:shadow-md transition-shadow">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
         <div>
-          <h3 className="font-semibold text-sm sm:text-base">
-            Plano gerado em {format(new Date(createdAt), "d 'de' MMMM 'de' yyyy", { locale: ptBR })}
-          </h3>
-          <p className="text-sm text-gray-500 mt-1">
-            Média diária: {Math.round(calories)} kcal
+          <p className="text-sm text-gray-500">Criado em</p>
+          <p className="font-medium">{formattedDate}</p>
+          <p className="text-sm mt-1">
+            <span className="font-semibold">{calories}</span> calorias diárias
           </p>
         </div>
-        <div className="flex flex-wrap gap-2 w-full sm:w-auto justify-start">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onView}
-            className="flex-1 sm:flex-initial justify-center min-w-[80px]"
+        <div className="flex flex-wrap gap-2 mt-2 sm:mt-0">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={onView} 
+            className="flex items-center gap-1"
           >
-            <Eye className="w-4 h-4 mr-2" />
-            <span className="sm:inline">Detalhes</span>
+            <Eye className="w-4 h-4" />
+            <span className="hidden sm:inline">Visualizar</span>
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onDownload}
-            className="flex-1 sm:flex-initial justify-center min-w-[80px]"
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={onDownload} 
+            className="flex items-center gap-1"
           >
-            <Download className="w-4 h-4 mr-2" />
-            <span className="sm:inline">Baixar PDF</span>
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline">Download</span>
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onDelete}
-            className="flex-1 sm:flex-initial justify-center min-w-[80px] text-red-500 hover:text-red-600"
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={onDelete} 
+            className="flex items-center gap-1 text-red-500 hover:text-red-600 hover:bg-red-50"
           >
-            <Trash2 className="w-4 h-4 mr-2" />
-            <span className="sm:inline">Excluir</span>
+            <Trash2 className="w-4 h-4" />
+            <span className="hidden sm:inline">Excluir</span>
           </Button>
         </div>
       </div>

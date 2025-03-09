@@ -159,15 +159,53 @@ export const useMealPlanGeneration = () => {
             Object.assign(planData, { generated_by: data.modelUsed });
           }
           
-          const { error: saveError } = await supabase
+          console.log("Dados preparados para inserção na tabela meal_plans:", JSON.stringify(planData, null, 2));
+          
+          const { error: saveError, data: savedData } = await supabase
             .from('meal_plans')
-            .insert(planData);
+            .insert(planData)
+            .select();
 
           if (saveError) {
             console.error("Erro ao salvar plano alimentar:", saveError);
-            toast.error("Erro ao salvar plano alimentar no banco de dados");
+            console.error("Detalhes do erro:", JSON.stringify(saveError, null, 2));
+            
+            // Tente salvar sem o campo generated_by se esse for o problema
+            if (saveError.message && saveError.message.includes('generated_by')) {
+              console.log("Tentando salvar sem o campo generated_by");
+              const { error: retryError } = await supabase
+                .from('meal_plans')
+                .insert({
+                  user_id: userData.id,
+                  plan_data: data.mealPlan,
+                  calories: userData.dailyCalories,
+                  dietary_preferences: JSON.stringify(preferences)
+                });
+                
+              if (retryError) {
+                console.error("Erro persistente ao tentar salvar o plano alimentar:", retryError);
+                toast.error("Erro ao salvar plano alimentar no banco de dados");
+              } else {
+                console.log("Plano alimentar salvo com sucesso após remover campo gerado_by");
+                
+                // Add transaction if wallet function is available
+                if (addTransaction) {
+                  await addTransaction({
+                    amount: REWARDS.MEAL_PLAN || 10,
+                    type: 'meal_plan',
+                    description: 'Geração de plano alimentar'
+                  });
+                  console.log("Transação adicionada para geração do plano alimentar");
+                }
+                
+                toast.success("Plano alimentar gerado e salvo com sucesso!");
+              }
+            } else {
+              toast.error("Erro ao salvar plano alimentar no banco de dados");
+            }
           } else {
             console.log("Plano alimentar salvo com sucesso no banco de dados");
+            console.log("Dados salvos:", savedData);
             
             // Add transaction if wallet function is available
             if (addTransaction) {
@@ -183,9 +221,11 @@ export const useMealPlanGeneration = () => {
           }
         } catch (dbError) {
           console.error("Erro ao salvar plano alimentar no banco de dados:", dbError);
+          console.error("Detalhes da exceção:", dbError instanceof Error ? dbError.message : String(dbError));
           toast.error("Erro ao salvar plano alimentar no banco de dados");
         }
       } else {
+        console.warn("Usuário não autenticado. Plano não será salvo no banco de dados.");
         toast.warning("Plano alimentar gerado, mas não foi possível salvar porque o usuário não está autenticado");
       }
 
