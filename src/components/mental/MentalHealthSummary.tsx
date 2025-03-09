@@ -22,8 +22,8 @@ export const MentalHealthSummary = () => {
                 <BrainCircuit className="h-5 w-5 text-purple-600 dark:text-purple-400" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold">Saúde Mental</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <h3 className="text-lg font-semibold text-purple-800 dark:text-purple-300">Saúde Mental</h3>
+                <p className="text-sm text-purple-600/80 dark:text-purple-400/80">
                   Cuide da sua mente
                 </p>
               </div>
@@ -43,11 +43,11 @@ export const MentalHealthSummary = () => {
               className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/20 rounded-xl p-4 cursor-pointer transition-all hover:shadow-sm"
               onClick={() => handleNavigate('/mental')}
             >
-              <div className="flex items-center text-purple-600 dark:text-purple-400 mb-1">
+              <div className="flex items-center text-purple-700 dark:text-purple-400 mb-1">
                 <Heart className="h-4 w-4 mr-1" />
                 <span className="text-sm font-medium">Conversar</span>
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-300">
+              <p className="text-sm text-purple-700/80 dark:text-purple-300/90">
                 Dialogue com nossa assistente de saúde mental
               </p>
             </div>
@@ -56,11 +56,11 @@ export const MentalHealthSummary = () => {
               className="bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-900/30 dark:to-indigo-800/20 rounded-xl p-4 cursor-pointer transition-all hover:shadow-sm"
               onClick={() => handleNavigate('/mental')}
             >
-              <div className="flex items-center text-indigo-600 dark:text-indigo-400 mb-1">
+              <div className="flex items-center text-indigo-700 dark:text-indigo-400 mb-1">
                 <BookOpen className="h-4 w-4 mr-1" />
                 <span className="text-sm font-medium">Aprender</span>
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-300">
+              <p className="text-sm text-indigo-700/80 dark:text-indigo-300/90">
                 Acesse vídeos e recursos educacionais
               </p>
             </div>
@@ -69,11 +69,11 @@ export const MentalHealthSummary = () => {
               className="bg-gradient-to-br from-pink-50 to-pink-100 dark:from-pink-900/30 dark:to-pink-800/20 rounded-xl p-4 cursor-pointer transition-all hover:shadow-sm"
               onClick={() => handleNavigate('/mental')}
             >
-              <div className="flex items-center text-pink-600 dark:text-pink-400 mb-1">
+              <div className="flex items-center text-pink-700 dark:text-pink-400 mb-1">
                 <BrainCircuit className="h-4 w-4 mr-1" />
                 <span className="text-sm font-medium">Módulos</span>
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-300">
+              <p className="text-sm text-pink-700/80 dark:text-pink-300/90">
                 Explore módulos temáticos de saúde mental
               </p>
             </div>
