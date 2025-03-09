@@ -77,7 +77,12 @@ export const LastMealPlanSummary = () => {
   }, []);
 
   const handleViewDetails = () => {
-    navigate("/menu");
+    // Navegar para a página de menu com o ID do plano para visualização detalhada
+    if (lastPlan && lastPlan.id) {
+      navigate(`/menu?planId=${lastPlan.id}`);
+    } else {
+      navigate("/menu");
+    }
   };
 
   // Formatar a data de criação do plano
