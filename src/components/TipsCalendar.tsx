@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { Lock, Unlock, Check, RefreshCw } from "lucide-react";
@@ -99,6 +98,7 @@ const TipsCalendar = () => {
     const tipsData = (data as DailyTip[]) || defaultTips;
     const currentDay = new Date().getDate();
     const readTips = JSON.parse(localStorage.getItem('readTips') || '[]');
+    const currentMonth = new Date().getMonth();
 
     const newTips = Array.from({ length: 30 }, (_, index) => {
       const tipData = tipsData[index % tipsData.length];
@@ -130,11 +130,9 @@ const TipsCalendar = () => {
       }
       
       if (response.data?.challenges) {
-        // Clear localStorage cache to force refresh
         localStorage.removeItem('monthlyTips');
         localStorage.removeItem('tipsMonth');
         
-        // Reload the tips
         await loadTips();
         
         toast.success('Novos desafios gerados com sucesso!');
