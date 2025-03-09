@@ -6,15 +6,12 @@ verify_jwt = false
 
 [functions.groq-chat]
 verify_jwt = false
-timeout_seconds = 180
 
 [functions.generate-meal-plan-groq]
 verify_jwt = false
-timeout_seconds = 180
 
 [functions.generate-rehab-plan-groq]
 verify_jwt = false
-timeout_seconds = 120
 
 [functions.generate-meal-plan]
 verify_jwt = false
@@ -24,12 +21,9 @@ verify_jwt = false
 
 [functions.generate-meal-plan-llama]
 verify_jwt = false
-timeout_seconds = 180
 
 [functions.generate-workout-plan-llama]
 verify_jwt = false
-timeout_seconds = 180
 
 [functions.nutri-plus-agent]
 verify_jwt = false
-timeout_seconds = 240
