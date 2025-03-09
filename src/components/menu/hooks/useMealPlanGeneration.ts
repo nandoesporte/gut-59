@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { DietaryPreferences, MealPlan, ProtocolFood, DayPlan } from "../types";
 import { REWARDS } from "@/constants/rewards";
 import { useWallet } from "@/hooks/useWallet";
+import { addSaladsToMeals } from "../utils/meal-plan-enhancer";
 
 export const useMealPlanGeneration = () => {
   const [loading, setLoading] = useState(false);
@@ -133,6 +134,10 @@ export const useMealPlanGeneration = () => {
             averageFiber
           };
         }
+
+        // Enhance the meal plan by adding salads to lunch and dinner
+        data.mealPlan = addSaladsToMeals(data.mealPlan);
+        console.log("Plano alimentar atualizado com saladas nas refeições de almoço e jantar");
       }
       
       if (userData.id) {

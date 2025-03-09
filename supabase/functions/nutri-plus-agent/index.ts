@@ -1,5 +1,3 @@
-
-// nutri-plus-agent: Uses Groq API to analyze user data and generate personalized meal plans
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -183,7 +181,8 @@ Please create a 7-day plan that:
 9. CRITICAL: Uses only numerical values for quantities, without adding units like "g" or "kcal"
 10. For example, use "protein": 26 instead of "protein": "26g"
 11. Uses the correct meal nomenclature in camelCase: "breakfast", "morningSnack", "lunch", "afternoonSnack", "dinner" - don't use underscore versions like "morning_snack" or "afternoon_snack"
-12. CRITICAL: Each food item MUST include a "unit" field with values like "g", "ml", "unidade", etc.`;
+12. CRITICAL: Each food item MUST include a "unit" field with values like "g", "ml", "unidade", etc.
+13. IMPORTANT: The lunch and dinner meals MUST include some kind of salad or leafy greens`;
 
     // Track time for API call preparation
     console.log(`[NUTRI+] Preparing API call at ${new Date().toISOString()}`);
@@ -574,6 +573,27 @@ function createFallbackMealPlan(userData, selectedFoods) {
     food.meal_type.length === 0
   );
   
+  // Get some leafy green vegetables for salads
+  const saladFoods = selectedFoods.filter(food => 
+    food.name.toLowerCase().includes('alface') || 
+    food.name.toLowerCase().includes('rúcula') || 
+    food.name.toLowerCase().includes('espinafre') || 
+    food.name.toLowerCase().includes('agrião') || 
+    food.name.toLowerCase().includes('couve') || 
+    food.name.toLowerCase().includes('folha') || 
+    food.name.toLowerCase().includes('salada')
+  );
+  
+  // If no specific salad foods, create a default salad
+  const defaultSalad = {
+    name: "Salada verde mista",
+    calories: 45,
+    protein: 2,
+    carbs: 5,
+    fats: 3,
+    fiber: 3
+  };
+  
   // Helper function to get random items from array
   const getRandomItems = (arr, count) => {
     const result = [];
@@ -586,19 +606,57 @@ function createFallbackMealPlan(userData, selectedFoods) {
   };
   
   // Helper function to create a meal from food items
-  const createMeal = (foods, mealType) => {
-    const foodItems = foods.map(food => ({
+  const createMeal = (foods, mealType, includeSalad = false) => {
+    let foodItems = foods.map(food => ({
       name: food.name,
       portion: 100,
       unit: "g",
       details: `Prepare ${food.name} according to your preference. Consume fresh when possible.`
     }));
     
-    const calories = foods.reduce((sum, food) => sum + (food.calories || 0), 0);
-    const protein = foods.reduce((sum, food) => sum + (food.protein || 0), 0);
-    const carbs = foods.reduce((sum, food) => sum + (food.carbs || 0), 0);
-    const fats = foods.reduce((sum, food) => sum + (food.fats || 0), 0);
-    const fiber = foods.reduce((sum, food) => sum + (food.fiber || 0), 0);
+    let calories = foods.reduce((sum, food) => sum + (food.calories || 0), 0);
+    let protein = foods.reduce((sum, food) => sum + (food.protein || 0), 0);
+    let carbs = foods.reduce((sum, food) => sum + (food.carbs || 0), 0);
+    let fats = foods.reduce((sum, food) => sum + (food.fats || 0), 0);
+    let fiber = foods.reduce((sum, food) => sum + (food.fiber || 0), 0);
+    
+    // Add salad if requested and not already present
+    if (includeSalad && !foods.some(food => 
+      food.name.toLowerCase().includes('alface') || 
+      food.name.toLowerCase().includes('salada'))) {
+      
+      let saladItem;
+      if (saladFoods.length > 0) {
+        const randomSaladFood = saladFoods[Math.floor(Math.random() * saladFoods.length)];
+        saladItem = {
+          name: randomSaladFood.name,
+          portion: 100,
+          unit: "g",
+          details: `Sirva ${randomSaladFood.name} fresca, temperada com azeite de oliva, sal e limão a gosto.`
+        };
+        
+        calories += randomSaladFood.calories || defaultSalad.calories;
+        protein += randomSaladFood.protein || defaultSalad.protein;
+        carbs += randomSaladFood.carbs || defaultSalad.carbs;
+        fats += randomSaladFood.fats || defaultSalad.fats;
+        fiber += randomSaladFood.fiber || defaultSalad.fiber;
+      } else {
+        saladItem = {
+          name: defaultSalad.name,
+          portion: 100,
+          unit: "g",
+          details: "Mix de folhas verdes (alface, rúcula, agrião) com tomate e pepino, temperada com azeite, sal e limão."
+        };
+        
+        calories += defaultSalad.calories;
+        protein += defaultSalad.protein;
+        carbs += defaultSalad.carbs;
+        fats += defaultSalad.fats;
+        fiber += defaultSalad.fiber;
+      }
+      
+      foodItems.push(saladItem);
+    }
     
     return {
       description: `${mealType} meal`,
@@ -624,8 +682,8 @@ function createFallbackMealPlan(userData, selectedFoods) {
     const afternoonSnackItems = getRandomItems(snackFoods, 1);
     
     const breakfast = createMeal(breakfastItems, "Breakfast");
-    const lunch = createMeal(lunchItems, "Lunch");
-    const dinner = createMeal(dinnerItems, "Dinner");
+    const lunch = createMeal(lunchItems, "Lunch", true); // Include salad
+    const dinner = createMeal(dinnerItems, "Dinner", true); // Include salad
     const morningSnack = createMeal(morningSnackItems, "Morning Snack");
     const afternoonSnack = createMeal(afternoonSnackItems, "Afternoon Snack");
     
@@ -688,4 +746,3 @@ function createFallbackMealPlan(userData, selectedFoods) {
     generatedBy: "fallback-generator"
   };
 }
-
