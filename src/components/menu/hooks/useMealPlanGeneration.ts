@@ -105,12 +105,18 @@ export const useMealPlanGeneration = () => {
           
           const dayCount = validDays.length || 1; // Prevent division by zero
           
+          // Fix by ensuring all values are properly converted to numbers before arithmetic operations
           data.mealPlan.weeklyTotals = {
-            averageCalories: Math.round(validDays.reduce((sum: number, day: any) => sum + Number(day.dailyTotals?.calories || 0), 0) / dayCount),
-            averageProtein: Math.round(validDays.reduce((sum: number, day: any) => sum + Number(day.dailyTotals?.protein || 0), 0) / dayCount),
-            averageCarbs: Math.round(validDays.reduce((sum: number, day: any) => sum + Number(day.dailyTotals?.carbs || 0), 0) / dayCount),
-            averageFats: Math.round(validDays.reduce((sum: number, day: any) => sum + Number(day.dailyTotals?.fats || 0), 0) / dayCount),
-            averageFiber: Math.round(validDays.reduce((sum: number, day: any) => sum + Number(day.dailyTotals?.fiber || 0), 0) / dayCount)
+            averageCalories: Math.round(validDays.reduce((sum: number, day: any) => 
+              sum + Number(day.dailyTotals?.calories || 0), 0) / dayCount),
+            averageProtein: Math.round(validDays.reduce((sum: number, day: any) => 
+              sum + Number(day.dailyTotals?.protein || 0), 0) / dayCount),
+            averageCarbs: Math.round(validDays.reduce((sum: number, day: any) => 
+              sum + Number(day.dailyTotals?.carbs || 0), 0) / dayCount),
+            averageFats: Math.round(validDays.reduce((sum: number, day: any) => 
+              sum + Number(day.dailyTotals?.fats || 0), 0) / dayCount),
+            averageFiber: Math.round(validDays.reduce((sum: number, day: any) => 
+              sum + Number(day.dailyTotals?.fiber || 0), 0) / dayCount)
           };
         }
       }
@@ -125,7 +131,7 @@ export const useMealPlanGeneration = () => {
               plan_data: data.mealPlan,
               calories: userData.dailyCalories,
               generated_by: data.modelUsed || "nutri-plus-agent-llama3",
-              dietary_preferences: JSON.stringify(preferences) // Convert to JSON string for database storage
+              dietary_preferences: JSON.stringify(preferences) // Convert preferences to JSON string
             });
 
           if (saveError) {
