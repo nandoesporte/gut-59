@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -53,6 +54,7 @@ export const MealPlanHistory = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      console.log("Buscando histórico de planos alimentares...");
       const { data, error } = await supabase
         .from('meal_plans')
         .select('*')
@@ -61,6 +63,8 @@ export const MealPlanHistory = () => {
 
       if (error) throw error;
 
+      console.log(`Encontrados ${data?.length || 0} planos alimentares no histórico`);
+      
       const validPlans = (data as RawMealPlan[]).reduce<StoredMealPlan[]>((acc, plan) => {
         if (validateMealPlan(plan.plan_data)) {
           acc.push({
@@ -75,6 +79,7 @@ export const MealPlanHistory = () => {
         return acc;
       }, []);
 
+      console.log(`${validPlans.length} planos válidos após validação`);
       setPlans(validPlans);
     } catch (error) {
       console.error('Error fetching meal plans:', error);
@@ -86,6 +91,7 @@ export const MealPlanHistory = () => {
 
   const handleDelete = async (id: string) => {
     try {
+      console.log(`Excluindo plano alimentar com ID: ${id}`);
       const { error } = await supabase
         .from('meal_plans')
         .delete()
