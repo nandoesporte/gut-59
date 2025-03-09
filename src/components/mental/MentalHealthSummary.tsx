@@ -64,15 +64,15 @@ export const MentalHealthSummary = () => {
   const getEmotionIcon = (emotion: string) => {
     switch (emotion) {
       case 'happy':
-        return <SmilePlus className="h-5 w-5 text-green-600" />;
+        return <SmilePlus className="h-5 w-5 text-green-500" />;
       case 'good':
-        return <Smile className="h-5 w-5 text-blue-600" />;
+        return <Smile className="h-5 w-5 text-blue-500" />;
       case 'neutral':
-        return <Meh className="h-5 w-5 text-yellow-600" />;
+        return <Meh className="h-5 w-5 text-amber-500" />;
       case 'sad':
-        return <Frown className="h-5 w-5 text-pink-600" />;
+        return <Frown className="h-5 w-5 text-pink-500" />;
       case 'angry':
-        return <Angry className="h-5 w-5 text-orange-600" />;
+        return <Angry className="h-5 w-5 text-orange-500" />;
       default:
         return null;
     }
@@ -91,94 +91,84 @@ export const MentalHealthSummary = () => {
 
   const getEmotionBgColor = (emotion: string) => {
     switch (emotion) {
-      case 'happy': return 'bg-[#F2FCE2]';
-      case 'good': return 'bg-[#D3E4FD]';
-      case 'neutral': return 'bg-[#FEF7CD]';
-      case 'sad': return 'bg-[#FFDEE2]';
-      case 'angry': return 'bg-[#FEC6A1]';
-      default: return 'bg-gray-100';
+      case 'happy': return 'bg-green-50';
+      case 'good': return 'bg-blue-50';
+      case 'neutral': return 'bg-amber-50';
+      case 'sad': return 'bg-pink-50';
+      case 'angry': return 'bg-orange-50';
+      default: return 'bg-gray-50';
     }
   };
 
   return (
-    <Card className="w-full border-none shadow-md overflow-hidden bg-gradient-to-r from-purple-50 to-white dark:from-gray-800 dark:to-gray-900">
-      <CardContent className="p-6">
+    <Card className="w-full border-none shadow-sm overflow-hidden bg-white">
+      <CardContent className="p-4">
         <div className="flex flex-col">
-          <div className="flex justify-between items-center mb-4">
+          <div className="flex justify-between items-center mb-2">
             <div className="flex items-center gap-2">
-              <div className="bg-purple-100 dark:bg-purple-900/30 p-2 rounded-full">
-                <BrainCircuit className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              <div className="bg-violet-100 p-2 rounded-full">
+                <BrainCircuit className="h-5 w-5 text-violet-600" />
               </div>
-              <div>
-                <h3 className="text-lg font-semibold text-purple-800 dark:text-purple-300">Saúde Mental</h3>
-                <p className="text-sm text-purple-600/80 dark:text-purple-400/80">
-                  Cuide da sua mente
-                </p>
-              </div>
+              <h3 className="text-lg font-semibold text-violet-800">Saúde Mental</h3>
             </div>
             <Button 
               variant="outline" 
               size="sm" 
               onClick={() => handleNavigate('/mental')}
-              className="bg-white hover:bg-purple-50 border-purple-200 text-purple-700 hover:text-purple-800 transition-all"
+              className="bg-white hover:bg-violet-50 border-violet-200 text-violet-700 text-xs px-3 py-1 h-auto"
             >
-              Acessar <ArrowRight className="ml-1 h-4 w-4" />
+              Acessar <ArrowRight className="ml-1 h-3 w-3" />
             </Button>
           </div>
+          
+          <p className="text-sm text-violet-600/80 mb-2 -mt-1">
+            Cuide da sua mente
+          </p>
 
           {latestEmotion && (
-            <div className={`${getEmotionBgColor(latestEmotion.emotion)} rounded-xl p-3 mb-3 flex justify-between items-center`}>
+            <div className={`${getEmotionBgColor(latestEmotion.emotion)} rounded-lg p-3 mb-3 flex justify-between items-center`}>
               <div className="flex items-center gap-2">
                 {getEmotionIcon(latestEmotion.emotion)}
-                <div>
-                  <p className="text-sm font-medium">Seu humor hoje</p>
-                  <p className="text-md font-semibold">{getEmotionLabel(latestEmotion.emotion)}</p>
+                <div className="flex flex-col">
+                  <p className="text-xs text-gray-600 leading-tight">Seu humor hoje</p>
+                  <p className="text-sm font-semibold leading-tight">{getEmotionLabel(latestEmotion.emotion)}</p>
                 </div>
               </div>
-              <p className="text-xs text-gray-600">
+              <p className="text-xs text-gray-500">
                 {format(latestEmotion.date, "dd 'de' MMMM", { locale: ptBR })}
               </p>
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2">
+          <div className="grid grid-cols-3 gap-2">
             <div 
-              className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/20 rounded-xl p-4 cursor-pointer transition-all hover:shadow-sm"
+              className="bg-violet-50 rounded-lg p-2 cursor-pointer transition-all hover:shadow-sm"
               onClick={() => handleNavigate('/mental')}
             >
-              <div className="flex items-center text-purple-700 dark:text-purple-400 mb-1">
-                <Heart className="h-4 w-4 mr-1" />
-                <span className="text-sm font-medium">Conversar</span>
+              <div className="flex items-center justify-center text-violet-600 mb-1">
+                <Heart className="h-4 w-4" />
               </div>
-              <p className="text-sm text-purple-700/80 dark:text-purple-300/90">
-                Dialogue com nossa assistente de saúde mental
-              </p>
+              <p className="text-xs text-center text-violet-700">Conversar</p>
             </div>
             
             <div 
-              className="bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-900/30 dark:to-indigo-800/20 rounded-xl p-4 cursor-pointer transition-all hover:shadow-sm"
+              className="bg-indigo-50 rounded-lg p-2 cursor-pointer transition-all hover:shadow-sm"
               onClick={() => handleNavigate('/mental')}
             >
-              <div className="flex items-center text-indigo-700 dark:text-indigo-400 mb-1">
-                <BookOpen className="h-4 w-4 mr-1" />
-                <span className="text-sm font-medium">Aprender</span>
+              <div className="flex items-center justify-center text-indigo-600 mb-1">
+                <BookOpen className="h-4 w-4" />
               </div>
-              <p className="text-sm text-indigo-700/80 dark:text-indigo-300/90">
-                Acesse vídeos e recursos educacionais
-              </p>
+              <p className="text-xs text-center text-indigo-700">Aprender</p>
             </div>
             
             <div 
-              className="bg-gradient-to-br from-pink-50 to-pink-100 dark:from-pink-900/30 dark:to-pink-800/20 rounded-xl p-4 cursor-pointer transition-all hover:shadow-sm"
+              className="bg-purple-50 rounded-lg p-2 cursor-pointer transition-all hover:shadow-sm"
               onClick={() => handleNavigate('/mental')}
             >
-              <div className="flex items-center text-pink-700 dark:text-pink-400 mb-1">
-                <BrainCircuit className="h-4 w-4 mr-1" />
-                <span className="text-sm font-medium">Módulos</span>
+              <div className="flex items-center justify-center text-purple-600 mb-1">
+                <BrainCircuit className="h-4 w-4" />
               </div>
-              <p className="text-sm text-pink-700/80 dark:text-pink-300/90">
-                Explore módulos temáticos de saúde mental
-              </p>
+              <p className="text-xs text-center text-purple-700">Módulos</p>
             </div>
           </div>
         </div>
