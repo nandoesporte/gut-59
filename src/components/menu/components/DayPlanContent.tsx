@@ -90,15 +90,6 @@ export const DayPlanContent: React.FC<DayPlanContentProps> = ({
             />
           )}
           
-          {dayPlan.meals?.eveningSnack && (
-            <MealSection
-              title={mealTypeLabels["eveningSnack"] || "Ceia"}
-              icon={<Moon className="h-5 w-5 text-purple-500" />}
-              meal={dayPlan.meals.eveningSnack}
-              unitLabels={unitLabels}
-            />
-          )}
-          
           <DailyTotals 
             totalNutrition={dayPlan.dailyTotals} 
             macroLabels={macroLabels}

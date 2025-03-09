@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,18 +21,14 @@ export const useMealPlanGeneration = () => {
     try {
       console.log("Saving selected food preferences:", selectedFoodIds.length, "foods");
       
-      // Create array of UUIDs from food IDs
-      const foodUUIDs = selectedFoodIds.map(id => id);
-      
-      // Update the nutrition_preferences table with selected foods
-      const { error: updateError } = await supabase
-        .from('nutrition_preferences')
-        .upsert({
-          user_id: userId,
-          selected_foods: foodUUIDs
-        }, {
-          onConflict: 'user_id'
-        });
+      // Use a database function to update the selected foods
+      const { error: updateError } = await supabase.rpc(
+        'update_nutrition_selected_foods',
+        {
+          p_user_id: userId,
+          p_selected_foods: selectedFoodIds
+        }
+      );
 
       if (updateError) {
         console.error("Error saving food preferences:", updateError);
@@ -41,7 +36,7 @@ export const useMealPlanGeneration = () => {
         return false;
       }
       
-      console.log("Food preferences saved successfully:", foodUUIDs.length, "foods");
+      console.log("Food preferences saved successfully:", selectedFoodIds.length, "foods");
       return true;
     } catch (err) {
       console.error("Exception while saving food preferences:", err);
