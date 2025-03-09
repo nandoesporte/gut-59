@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { GraduationCap } from "lucide-react";
 import { LastMealPlanSummary } from "@/components/menu/components/LastMealPlanSummary";
 import { MentalHealthSummary } from "@/components/mental/MentalHealthSummary";
+import { LastWorkoutPlanSummary } from "@/components/workout/components/LastWorkoutPlanSummary";
 
 const Index = () => {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -81,6 +82,10 @@ const Index = () => {
       
       <div className="w-full">
         <LastMealPlanSummary />
+      </div>
+      
+      <div className="w-full">
+        <LastWorkoutPlanSummary />
       </div>
       
       <div className="w-full">
