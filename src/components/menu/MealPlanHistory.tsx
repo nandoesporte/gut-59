@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -51,7 +52,14 @@ export const MealPlanHistory = () => {
     try {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      
+      console.log('Fetching meal plans for user:', user?.id);
+      
+      if (!user) {
+        console.log('No authenticated user found');
+        setLoading(false);
+        return;
+      }
 
       const { data, error } = await supabase
         .from('meal_plans')
@@ -59,22 +67,53 @@ export const MealPlanHistory = () => {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching meal plans:', error);
+        throw error;
+      }
+
+      console.log('Raw meal plans data from database:', data);
+      
+      if (!data || data.length === 0) {
+        console.log('No meal plans found in database for this user');
+        setPlans([]);
+        setLoading(false);
+        return;
+      }
 
       const validPlans = (data as RawMealPlan[]).reduce<StoredMealPlan[]>((acc, plan) => {
-        if (validateMealPlan(plan.plan_data)) {
-          acc.push({
-            id: plan.id,
-            created_at: plan.created_at,
-            plan_data: plan.plan_data as MealPlan,
-            calories: plan.calories,
-          });
-        } else {
-          console.error('Invalid meal plan data for plan:', plan.id);
+        console.log('Processing plan:', plan.id, 'with data:', typeof plan.plan_data);
+        
+        if (!plan.plan_data) {
+          console.error('Plan data is empty or null for plan:', plan.id);
+          return acc;
         }
+        
+        try {
+          // If plan_data is a string, try to parse it as JSON
+          const planData = typeof plan.plan_data === 'string' 
+            ? JSON.parse(plan.plan_data) 
+            : plan.plan_data;
+            
+          if (validateMealPlan(planData)) {
+            acc.push({
+              id: plan.id,
+              created_at: plan.created_at,
+              plan_data: planData as MealPlan,
+              calories: plan.calories,
+            });
+          } else {
+            console.error('Invalid meal plan structure for plan:', plan.id);
+            console.log('Plan data that failed validation:', planData);
+          }
+        } catch (e) {
+          console.error('Error processing meal plan:', plan.id, e);
+        }
+        
         return acc;
       }, []);
 
+      console.log('Valid plans after processing:', validPlans.length);
       setPlans(validPlans);
     } catch (error) {
       console.error('Error fetching meal plans:', error);
@@ -116,6 +155,11 @@ export const MealPlanHistory = () => {
     setViewPlanId(plan.id);
     setViewPlanData(plan.plan_data);
   };
+
+  // For debugging purposes - log whenever the plans state changes
+  useEffect(() => {
+    console.log('Plans state updated, count:', plans.length);
+  }, [plans]);
 
   return (
     <div className="mt-12">
@@ -213,3 +257,4 @@ export const MealPlanHistory = () => {
     </div>
   );
 };
+

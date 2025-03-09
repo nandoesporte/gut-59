@@ -144,21 +144,30 @@ export const useMealPlanGeneration = () => {
       // Save the meal plan to the database if user is authenticated
       if (userData.id) {
         try {
+          console.log("Tentando salvar plano alimentar no banco de dados");
+          
+          // Prepare data for insertion without potentially non-existent columns
+          const planData = {
+            user_id: userData.id,
+            plan_data: data.mealPlan,
+            calories: userData.dailyCalories,
+            dietary_preferences: JSON.stringify(preferences)
+          };
+          
+          // If modelUsed exists in the response, include it
+          if (data.modelUsed) {
+            Object.assign(planData, { generated_by: data.modelUsed });
+          }
+          
           const { error: saveError } = await supabase
             .from('meal_plans')
-            .insert({
-              user_id: userData.id,
-              plan_data: data.mealPlan,
-              calories: userData.dailyCalories,
-              generated_by: data.modelUsed || "nutri-plus-agent-llama3",
-              dietary_preferences: JSON.stringify(preferences) // Convert preferences to JSON string
-            });
+            .insert(planData);
 
           if (saveError) {
             console.error("Erro ao salvar plano alimentar:", saveError);
             toast.error("Erro ao salvar plano alimentar no banco de dados");
           } else {
-            console.log("Plano alimentar salvo no banco de dados");
+            console.log("Plano alimentar salvo com sucesso no banco de dados");
             
             // Add transaction if wallet function is available
             if (addTransaction) {
