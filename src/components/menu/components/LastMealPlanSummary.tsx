@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,7 +34,6 @@ export const LastMealPlanSummary = () => {
           return;
         }
 
-        // Buscar o plano alimentar mais recente do usuário
         const { data, error } = await supabase
           .from('meal_plans')
           .select('*')
@@ -51,7 +49,6 @@ export const LastMealPlanSummary = () => {
         }
 
         if (data) {
-          // Validar se o plano possui a estrutura esperada
           const planData = typeof data.plan_data === 'string' 
             ? JSON.parse(data.plan_data) 
             : data.plan_data;
@@ -80,14 +77,12 @@ export const LastMealPlanSummary = () => {
 
   const handleViewDetails = () => {
     if (lastPlan && lastPlan.id) {
-      // Abrir o diálogo de detalhes do plano diretamente
       setIsPlanDetailsOpen(true);
     } else {
       toast.error("Não foi possível abrir os detalhes do plano");
     }
   };
 
-  // Formatar a data de criação do plano
   const formatDate = (dateString: string) => {
     try {
       return format(new Date(dateString), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
@@ -116,10 +111,9 @@ export const LastMealPlanSummary = () => {
   }
 
   if (!lastPlan) {
-    return null; // Não exibir nada se não houver plano
+    return null;
   }
 
-  // Calcular o número de refeições no plano
   const getMealCount = () => {
     try {
       const firstDay = Object.keys(lastPlan.plan_data.weeklyPlan)[0];
@@ -133,7 +127,6 @@ export const LastMealPlanSummary = () => {
     }
   };
 
-  // Obter o objetivo baseado nas macros (maior %, aproximado)
   const getGoalFromMacros = () => {
     try {
       const { averageProtein, averageCarbs, averageFats } = lastPlan.plan_data.weeklyTotals;
@@ -159,8 +152,8 @@ export const LastMealPlanSummary = () => {
           <div className="flex flex-col">
             <div className="flex justify-between items-center mb-3">
               <div className="flex items-center gap-2">
-                <div className="bg-primary/10 p-2 rounded-full">
-                  <UtensilsCrossed className="h-5 w-5 text-primary" />
+                <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-full">
+                  <UtensilsCrossed className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold">Seu Plano Alimentar</h3>
@@ -173,7 +166,7 @@ export const LastMealPlanSummary = () => {
                 variant="outline" 
                 size="sm" 
                 onClick={handleViewDetails}
-                className="bg-white hover:bg-primary/5 border-primary/20 text-primary hover:text-primary-600 transition-all"
+                className="bg-white hover:bg-blue-50 border-blue-200 text-blue-700 hover:text-blue-800 transition-all"
               >
                 Ver completo <ChevronRight className="ml-1 h-4 w-4" />
               </Button>
@@ -196,16 +189,16 @@ export const LastMealPlanSummary = () => {
                 <p className="text-xl font-bold">{getGoalFromMacros()}</p>
               </div>
               
-              <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/20 rounded-xl p-3 transition-all hover:shadow-sm">
-                <div className="flex items-center text-purple-600 dark:text-purple-400 mb-1">
+              <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-900/30 dark:to-indigo-800/20 rounded-xl p-3 transition-all hover:shadow-sm">
+                <div className="flex items-center text-indigo-600 dark:text-indigo-400 mb-1">
                   <CalendarDays className="h-4 w-4 mr-1" />
                   <span className="text-sm font-medium">Dias</span>
                 </div>
                 <p className="text-xl font-bold">{Object.keys(lastPlan.plan_data.weeklyPlan).length}</p>
               </div>
               
-              <div className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/30 dark:to-amber-800/20 rounded-xl p-3 transition-all hover:shadow-sm">
-                <div className="flex items-center text-amber-600 dark:text-amber-400 mb-1">
+              <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/20 rounded-xl p-3 transition-all hover:shadow-sm">
+                <div className="flex items-center text-purple-600 dark:text-purple-400 mb-1">
                   <Clock className="h-4 w-4 mr-1" />
                   <span className="text-sm font-medium">Refeições</span>
                 </div>
@@ -213,16 +206,16 @@ export const LastMealPlanSummary = () => {
               </div>
             </div>
             
-            <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-              <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/30 rounded-lg p-3 transition-all hover:shadow-sm">
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/30 rounded-lg p-3 transition-all hover:shadow-sm text-center">
                 <p className="text-xs text-gray-500 dark:text-gray-400">Proteínas</p>
                 <p className="font-semibold text-lg">{lastPlan.plan_data.weeklyTotals.averageProtein || 0}g</p>
               </div>
-              <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/30 rounded-lg p-3 transition-all hover:shadow-sm">
+              <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/30 rounded-lg p-3 transition-all hover:shadow-sm text-center">
                 <p className="text-xs text-gray-500 dark:text-gray-400">Carboidratos</p>
                 <p className="font-semibold text-lg">{lastPlan.plan_data.weeklyTotals.averageCarbs || 0}g</p>
               </div>
-              <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/30 rounded-lg p-3 transition-all hover:shadow-sm">
+              <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/30 rounded-lg p-3 transition-all hover:shadow-sm text-center">
                 <p className="text-xs text-gray-500 dark:text-gray-400">Gorduras</p>
                 <p className="font-semibold text-lg">{lastPlan.plan_data.weeklyTotals.averageFats || 0}g</p>
               </div>
@@ -231,7 +224,6 @@ export const LastMealPlanSummary = () => {
         </CardContent>
       </Card>
 
-      {/* Modal de detalhes do plano */}
       {lastPlan && (
         <SavedMealPlanDetails
           planId={lastPlan.id}
