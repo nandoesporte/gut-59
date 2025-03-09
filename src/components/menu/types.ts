@@ -1,4 +1,5 @@
 
+
 // Add the following export if it doesn't already exist in this file
 // This ensures we have a consistent type definition for MealPlan
 
@@ -83,4 +84,54 @@ export interface ProtocolFood {
   portion_unit?: string;
   food_group_id?: number;
   meal_type?: string[];
+  phase_id?: number;
+  pre_workout_compatible?: boolean;
+  post_workout_compatible?: boolean;
+}
+
+// Add missing interfaces for meal components
+export interface Meal {
+  description: string;
+  foods: Food[];
+  calories: number;
+  macros: {
+    protein: number;
+    carbs: number;
+    fats: number;
+    fiber: number;
+  };
+}
+
+export interface Food {
+  name: string;
+  portion: number;
+  unit: string;
+  details: string;
+}
+
+export interface DailyNutrition {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  fiber: number;
+}
+
+export interface RecommendationsObject {
+  general: string | string[];
+  preworkout?: string | string[];
+  postworkout?: string | string[];
+  timing?: string[];
+}
+
+// Add the CalorieCalculator related types
+export type Goal = 'lose' | 'maintain' | 'gain';
+
+export interface CalorieCalculatorForm {
+  weight: string;
+  height: string;
+  age: string;
+  gender: string;
+  activityLevel: string;
+  goal: Goal | '';
 }

@@ -1,3 +1,4 @@
+
 export interface User {
   id: string;
   name: string | null;
@@ -85,6 +86,7 @@ export interface ProtocolFood {
   dietary_flags?: string[];
   fiber?: number;
   fiber_per_100g?: number;
+  meal_type?: string[];
 }
 
 export interface PhaseFormValues {
