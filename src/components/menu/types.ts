@@ -1,41 +1,11 @@
-
-export interface ProtocolFood {
-  id: string;
-  name: string;
-  calories: number;
-  protein: number;
-  carbs: number;
-  fats: number;
-  fiber?: number;
-  food_group_id?: number;
-  food_group_name?: string;
-  phase?: number;
-  phase_id?: number;
-  pre_workout_compatible?: boolean;
-  post_workout_compatible?: boolean;
-  portion_size?: number;
-  portion_unit?: string;
-  protein_per_100g?: number;
-  carbs_per_100g?: number;
-  fats_per_100g?: number;
-  fiber_per_100g?: number;
-}
-
-export interface DietaryPreferences {
-  hasAllergies: boolean;
-  allergies: string[];
-  dietaryRestrictions: string[];
-  trainingTime?: string;
-}
-
-export interface MealFood {
+export interface Food {
   name: string;
   portion: number;
   unit: string;
-  details: string;
+  details?: string;
 }
 
-export interface MealMacros {
+export interface Macros {
   protein: number;
   carbs: number;
   fats: number;
@@ -44,9 +14,9 @@ export interface MealMacros {
 
 export interface Meal {
   description: string;
-  foods: MealFood[];
+  foods: Food[];
   calories: number;
-  macros: MealMacros;
+  macros: Macros;
 }
 
 export interface DailyNutrition {
@@ -60,11 +30,11 @@ export interface DailyNutrition {
 export interface DayPlan {
   dayName: string;
   meals: {
-    breakfast: Meal;
-    morningSnack: Meal;
-    lunch: Meal;
-    afternoonSnack: Meal;
-    dinner: Meal;
+    breakfast?: Meal;
+    morningSnack?: Meal;
+    lunch?: Meal;
+    afternoonSnack?: Meal;
+    dinner?: Meal;
   };
   dailyTotals: DailyNutrition;
 }
@@ -77,25 +47,29 @@ export interface WeeklyTotals {
   averageFiber: number;
 }
 
-export interface Recommendations {
-  general: string;
-  preworkout: string;
-  postworkout: string;
-  timing: string[];
+export interface MealPlan {
+  weeklyPlan: Record<string, DayPlan>;
+  weeklyTotals: WeeklyTotals;
+  recommendations?: string[] | string;
+  userCalories?: number;
+  created_at?: string;
+  generatedBy?: string;
 }
 
-export interface MealPlan {
-  weeklyPlan: {
-    monday: DayPlan;
-    tuesday: DayPlan;
-    wednesday: DayPlan;
-    thursday: DayPlan;
-    friday: DayPlan;
-    saturday: DayPlan;
-    sunday: DayPlan;
-  };
-  weeklyTotals: WeeklyTotals;
-  recommendations: Recommendations;
-  userCalories?: number;
-  generatedBy?: string;
+export interface ProtocolFood {
+  id: string;
+  name: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  fiber: number;
+  food_group_id?: number;
+}
+
+export interface DietaryPreferences {
+  hasAllergies: boolean;
+  allergies: string[];
+  dietaryRestrictions: string[];
+  trainingTime: string | null;
 }
