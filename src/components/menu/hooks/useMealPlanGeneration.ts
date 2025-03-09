@@ -17,6 +17,196 @@ export const useMealPlanGeneration = () => {
   
   let loadingTimer: NodeJS.Timeout | null = null;
 
+  /**
+   * Ensures lunch and dinner meals have a protein, carbohydrate, and salad
+   */
+  const ensureBalancedMeals = (mealPlan: MealPlan): MealPlan => {
+    if (!mealPlan || !mealPlan.weeklyPlan) return mealPlan;
+
+    // Iterate through each day in the meal plan
+    Object.keys(mealPlan.weeklyPlan).forEach(day => {
+      const dayPlan = mealPlan.weeklyPlan[day];
+      
+      // Function to ensure a meal has the required components
+      const balanceMeal = (mealType: 'lunch' | 'dinner') => {
+        const meal = dayPlan.meals[mealType];
+        if (!meal || !meal.foods) return;
+        
+        // Check for existing categories
+        let hasProtein = false;
+        let hasCarbs = false;
+        let hasSalad = false;
+        
+        // Track existing foods for reference
+        const existingFoods = [...meal.foods];
+        
+        // Check existing foods for categories
+        existingFoods.forEach(food => {
+          const foodName = food.name.toLowerCase();
+          
+          // Check for protein foods
+          if (foodName.includes('frango') || foodName.includes('carne') || 
+              foodName.includes('peixe') || foodName.includes('ovo') || 
+              foodName.includes('tofu') || foodName.includes('feijão') || 
+              foodName.includes('lentilha') || foodName.includes('grão-de-bico')) {
+            hasProtein = true;
+          }
+          
+          // Check for carbohydrate foods
+          if (foodName.includes('arroz') || foodName.includes('macarrão') || 
+              foodName.includes('batata') || foodName.includes('mandioca') || 
+              foodName.includes('pão') || foodName.includes('milho') || 
+              foodName.includes('quinoa') || foodName.includes('aveia')) {
+            hasCarbs = true;
+          }
+          
+          // Check for salad/vegetable foods
+          if (foodName.includes('salada') || foodName.includes('alface') || 
+              foodName.includes('tomate') || foodName.includes('pepino') || 
+              foodName.includes('espinafre') || foodName.includes('rúcula') || 
+              foodName.includes('cenoura') || foodName.includes('brócolis') ||
+              foodName.includes('legume') || foodName.includes('vegetal')) {
+            hasSalad = true;
+          }
+        });
+        
+        // Add missing components
+        if (!hasProtein) {
+          meal.foods.push({
+            name: mealType === 'lunch' ? "Peito de frango grelhado" : "Omelete",
+            portion: 100,
+            unit: "g",
+            details: "Preparar na grelha com temperos naturais a gosto."
+          });
+        }
+        
+        if (!hasCarbs) {
+          meal.foods.push({
+            name: mealType === 'lunch' ? "Arroz integral" : "Batata doce",
+            portion: 100,
+            unit: "g",
+            details: "Cozinhar até ficar macio, temperar levemente."
+          });
+        }
+        
+        if (!hasSalad) {
+          meal.foods.push({
+            name: mealType === 'lunch' ? "Salada verde com tomate" : "Mix de folhas verdes",
+            portion: 100,
+            unit: "g",
+            details: "Lavar bem as folhas e vegetais, temperar com azeite, limão e ervas."
+          });
+        }
+        
+        // Recalculate meal macros if components were added
+        if (!hasProtein || !hasCarbs || !hasSalad) {
+          // Default nutrition values for added items
+          const proteinNutrition = { calories: 165, protein: 31, carbs: 0, fats: 3.6, fiber: 0 };
+          const carbsNutrition = { calories: 130, protein: 2.7, carbs: 28, fats: 0.3, fiber: 1.8 };
+          const saladNutrition = { calories: 25, protein: 1.5, carbs: 5, fats: 0.2, fiber: 2.5 };
+          
+          // Add nutrition for added components
+          if (!hasProtein) {
+            meal.calories += proteinNutrition.calories;
+            meal.macros.protein += proteinNutrition.protein;
+            meal.macros.carbs += proteinNutrition.carbs;
+            meal.macros.fats += proteinNutrition.fats;
+            meal.macros.fiber += proteinNutrition.fiber;
+          }
+          
+          if (!hasCarbs) {
+            meal.calories += carbsNutrition.calories;
+            meal.macros.protein += carbsNutrition.protein;
+            meal.macros.carbs += carbsNutrition.carbs;
+            meal.macros.fats += carbsNutrition.fats;
+            meal.macros.fiber += carbsNutrition.fiber;
+          }
+          
+          if (!hasSalad) {
+            meal.calories += saladNutrition.calories;
+            meal.macros.protein += saladNutrition.protein;
+            meal.macros.carbs += saladNutrition.carbs;
+            meal.macros.fats += saladNutrition.fats;
+            meal.macros.fiber += saladNutrition.fiber;
+          }
+          
+          // Update daily totals
+          const updatedCalories = !hasProtein ? proteinNutrition.calories : 0 +
+                                 !hasCarbs ? carbsNutrition.calories : 0 +
+                                 !hasSalad ? saladNutrition.calories : 0;
+                                 
+          const updatedProtein = !hasProtein ? proteinNutrition.protein : 0 +
+                                !hasCarbs ? carbsNutrition.protein : 0 +
+                                !hasSalad ? saladNutrition.protein : 0;
+                                
+          const updatedCarbs = !hasProtein ? proteinNutrition.carbs : 0 +
+                              !hasCarbs ? carbsNutrition.carbs : 0 +
+                              !hasSalad ? saladNutrition.carbs : 0;
+                              
+          const updatedFats = !hasProtein ? proteinNutrition.fats : 0 +
+                             !hasCarbs ? carbsNutrition.fats : 0 +
+                             !hasSalad ? saladNutrition.fats : 0;
+                             
+          const updatedFiber = !hasProtein ? proteinNutrition.fiber : 0 +
+                              !hasCarbs ? carbsNutrition.fiber : 0 +
+                              !hasSalad ? saladNutrition.fiber : 0;
+          
+          dayPlan.dailyTotals.calories += updatedCalories;
+          dayPlan.dailyTotals.protein += updatedProtein;
+          dayPlan.dailyTotals.carbs += updatedCarbs;
+          dayPlan.dailyTotals.fats += updatedFats;
+          dayPlan.dailyTotals.fiber += updatedFiber;
+        }
+      };
+      
+      // Process lunch and dinner meals
+      if (dayPlan && dayPlan.meals) {
+        if (dayPlan.meals.lunch) {
+          balanceMeal('lunch');
+        }
+        
+        if (dayPlan.meals.dinner) {
+          balanceMeal('dinner');
+        }
+      }
+    });
+    
+    // Recalculate weekly averages
+    const weeklyPlan = mealPlan.weeklyPlan || {};
+    const days = Object.values(weeklyPlan);
+    const validDays = days.filter((day: any) => 
+      day && day.dailyTotals && 
+      !isNaN(Number(day.dailyTotals.calories)) && 
+      !isNaN(Number(day.dailyTotals.protein))
+    );
+    
+    const dayCount = validDays.length || 1;
+    
+    let caloriesTotal = 0;
+    let proteinTotal = 0;
+    let carbsTotal = 0;
+    let fatsTotal = 0;
+    let fiberTotal = 0;
+    
+    for (const day of validDays as DayPlan[]) {
+      caloriesTotal += Number(day.dailyTotals?.calories || 0);
+      proteinTotal += Number(day.dailyTotals?.protein || 0);
+      carbsTotal += Number(day.dailyTotals?.carbs || 0);
+      fatsTotal += Number(day.dailyTotals?.fats || 0);
+      fiberTotal += Number(day.dailyTotals?.fiber || 0);
+    }
+    
+    mealPlan.weeklyTotals = {
+      averageCalories: Math.round(caloriesTotal / dayCount),
+      averageProtein: Math.round(proteinTotal / dayCount),
+      averageCarbs: Math.round(carbsTotal / dayCount),
+      averageFats: Math.round(fatsTotal / dayCount),
+      averageFiber: Math.round(fiberTotal / dayCount)
+    };
+    
+    return mealPlan;
+  };
+
   const generatePlan = async (
     userData: {
       id?: string;
@@ -133,6 +323,9 @@ export const useMealPlanGeneration = () => {
             averageFiber
           };
         }
+        
+        // Apply meal balancing to ensure protein, carbs, and salad in lunch and dinner
+        data.mealPlan = ensureBalancedMeals(data.mealPlan);
       }
       
       if (userData.id) {

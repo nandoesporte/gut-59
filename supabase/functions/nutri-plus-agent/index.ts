@@ -135,6 +135,13 @@ IMPORTANT: Strictly respect the categorization of foods by meal type:
 - Foods categorized as 'afternoon_snack' should be placed ONLY in the afternoon snack
 - Foods categorized as 'dinner' should be placed ONLY in dinner
 
+CRITICALLY IMPORTANT: All lunch and dinner meals MUST include:
+1. A protein source (meat, chicken, fish, eggs, tofu, beans, etc.)
+2. A carbohydrate source (rice, potatoes, pasta, sweet potatoes, etc.)
+3. A vegetable/salad component (green leafy vegetables, raw vegetables, mixed salad, etc.)
+
+These three components should be separate items in the foods list, not mixed into a single dish.
+
 Recommendations should include:
 {
   "general": "General nutrition advice",
@@ -178,12 +185,13 @@ Please create a 7-day plan that:
 4. Respects the user's food preferences and restrictions
 5. Provides variety throughout the week
 6. Includes all meal types: breakfast, morning snack, lunch, afternoon snack, dinner
-7. Calculates calories and macros for each meal and day
-8. Provides preparation details for each food
-9. CRITICAL: Uses only numerical values for quantities, without adding units like "g" or "kcal"
-10. For example, use "protein": 26 instead of "protein": "26g"
-11. Uses the correct meal nomenclature in camelCase: "breakfast", "morningSnack", "lunch", "afternoonSnack", "dinner" - don't use underscore versions like "morning_snack" or "afternoon_snack"
-12. CRITICAL: Each food item MUST include a "unit" field with values like "g", "ml", "unidade", etc.`;
+7. IMPORTANT: For lunch and dinner, ALWAYS include three separate components: a protein source, a carbohydrate source, and a vegetable/salad component
+8. Calculates calories and macros for each meal and day
+9. Provides preparation details for each food
+10. CRITICAL: Uses only numerical values for quantities, without adding units like "g" or "kcal"
+11. For example, use "protein": 26 instead of "protein": "26g"
+12. Uses the correct meal nomenclature in camelCase: "breakfast", "morningSnack", "lunch", "afternoonSnack", "dinner" - don't use underscore versions like "morning_snack" or "afternoon_snack"
+13. CRITICAL: Each food item MUST include a "unit" field with values like "g", "ml", "unidade", etc.`;
 
     // Track time for API call preparation
     console.log(`[NUTRI+] Preparing API call at ${new Date().toISOString()}`);
@@ -460,6 +468,148 @@ Please create a 7-day plan that:
         generatedBy: "nutri-plus-agent-llama3"
       };
       
+      // Ensure lunch and dinner have required components (protein, carbs, salad)
+      Object.keys(mealPlan.weeklyPlan).forEach(day => {
+        const dayPlan = mealPlan.weeklyPlan[day];
+        if (dayPlan && dayPlan.meals) {
+          // Function to add missing components to lunch and dinner
+          const ensureRequiredComponents = (meal, mealType) => {
+            if (!meal || !meal.foods) return;
+            
+            // Check for existing components
+            let hasProtein = false;
+            let hasCarbs = false;
+            let hasSalad = false;
+            
+            // Check which components already exist
+            meal.foods.forEach(food => {
+              const name = food.name.toLowerCase();
+              
+              // Check for protein foods
+              if (name.includes('frango') || name.includes('carne') || 
+                  name.includes('peixe') || name.includes('ovo') || 
+                  name.includes('tofu') || name.includes('feijão') || 
+                  name.includes('lentilha') || name.includes('grão-de-bico')) {
+                hasProtein = true;
+              }
+              
+              // Check for carbohydrate foods
+              if (name.includes('arroz') || name.includes('macarrão') || 
+                  name.includes('batata') || name.includes('mandioca') || 
+                  name.includes('pão') || name.includes('milho') || 
+                  name.includes('quinoa') || name.includes('aveia')) {
+                hasCarbs = true;
+              }
+              
+              // Check for salad/vegetable foods
+              if (name.includes('salada') || name.includes('alface') || 
+                  name.includes('tomate') || name.includes('pepino') || 
+                  name.includes('espinafre') || name.includes('rúcula') || 
+                  name.includes('cenoura') || name.includes('brócolis') ||
+                  name.includes('legume') || name.includes('vegetal')) {
+                hasSalad = true;
+              }
+            });
+            
+            // Add missing components
+            const additionalItems = [];
+            
+            if (!hasProtein) {
+              additionalItems.push({
+                name: mealType === 'lunch' ? "Peito de frango grelhado" : "Omelete",
+                portion: 100,
+                unit: "g",
+                details: "Preparar na grelha com temperos naturais a gosto."
+              });
+            }
+            
+            if (!hasCarbs) {
+              additionalItems.push({
+                name: mealType === 'lunch' ? "Arroz integral" : "Batata doce",
+                portion: 100,
+                unit: "g",
+                details: "Cozinhar até ficar macio, temperar levemente."
+              });
+            }
+            
+            if (!hasSalad) {
+              additionalItems.push({
+                name: mealType === 'lunch' ? "Salada verde com tomate" : "Mix de folhas verdes",
+                portion: 100,
+                unit: "g",
+                details: "Lavar bem as folhas e vegetais, temperar com azeite, limão e ervas."
+              });
+            }
+            
+            // Add the items to the meal
+            if (additionalItems.length > 0) {
+              meal.foods = [...meal.foods, ...additionalItems];
+              
+              // Update meal calories and macros
+              additionalItems.forEach(item => {
+                // Approximate nutritional values for added items
+                let calories = 0;
+                let protein = 0;
+                let carbs = 0;
+                let fats = 0;
+                let fiber = 0;
+                
+                // Set nutritional values based on food type
+                if (item.name.includes("frango")) {
+                  calories = 165;
+                  protein = 31;
+                  fats = 3.6;
+                } else if (item.name.includes("Omelete")) {
+                  calories = 155;
+                  protein = 13;
+                  fats = 11;
+                  carbs = 1;
+                } else if (item.name.includes("Arroz")) {
+                  calories = 130;
+                  carbs = 28;
+                  protein = 2.7;
+                  fiber = 1.8;
+                } else if (item.name.includes("Batata")) {
+                  calories = 86;
+                  carbs = 20;
+                  protein = 1.6;
+                  fiber = 3;
+                } else if (item.name.includes("Salada") || item.name.includes("folhas")) {
+                  calories = 25;
+                  carbs = 5;
+                  protein = 1.5;
+                  fiber = 2.5;
+                  fats = 0.2;
+                }
+                
+                // Update meal nutrition totals
+                meal.calories += calories;
+                meal.macros.protein += protein;
+                meal.macros.carbs += carbs;
+                meal.macros.fats += fats;
+                meal.macros.fiber += fiber;
+                
+                // Update daily totals
+                dayPlan.dailyTotals.calories += calories;
+                dayPlan.dailyTotals.protein += protein;
+                dayPlan.dailyTotals.carbs += carbs;
+                dayPlan.dailyTotals.fats += fats;
+                dayPlan.dailyTotals.fiber += fiber;
+              });
+            }
+          };
+          
+          // Apply to lunch and dinner
+          if (dayPlan.meals.lunch) {
+            ensureRequiredComponents(dayPlan.meals.lunch, 'lunch');
+          }
+          
+          if (dayPlan.meals.dinner) {
+            ensureRequiredComponents(dayPlan.meals.dinner, 'dinner');
+          }
+        }
+      });
+      
       // Ensure all days have complete meal data and details for each food
       Object.keys(mealPlan.weeklyPlan).forEach(day => {
         const dayPlan = mealPlan.weeklyPlan[day];
@@ -561,9 +711,9 @@ function createFallbackMealPlan(userData, selectedFoods) {
   console.log("[NUTRI+] Creating fallback meal plan using selected foods");
   
   const dayOfWeek = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
-  const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  const dayNames = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"];
   
-  // Filter foods by meal type
+  // Filter foods by meal type and nutritional category
   const breakfastFoods = selectedFoods.filter(food => food.meal_type?.includes('breakfast') || !food.meal_type || food.meal_type.length === 0);
   const lunchFoods = selectedFoods.filter(food => food.meal_type?.includes('lunch') || !food.meal_type || food.meal_type.length === 0);
   const dinnerFoods = selectedFoods.filter(food => food.meal_type?.includes('dinner') || !food.meal_type || food.meal_type.length === 0);
@@ -573,6 +723,51 @@ function createFallbackMealPlan(userData, selectedFoods) {
     !food.meal_type || 
     food.meal_type.length === 0
   );
+  
+  // Further categorize lunch and dinner foods
+  const proteinFoods = selectedFoods.filter(food => 
+    food.nutritional_category?.includes('protein') || 
+    food.name.toLowerCase().includes('frango') || 
+    food.name.toLowerCase().includes('carne') ||
+    food.name.toLowerCase().includes('peixe') ||
+    food.name.toLowerCase().includes('ovo') ||
+    food.name.toLowerCase().includes('tofu')
+  );
+  
+  const carbFoods = selectedFoods.filter(food => 
+    food.nutritional_category?.includes('carbs_complex') || 
+    food.name.toLowerCase().includes('arroz') ||
+    food.name.toLowerCase().includes('batata') ||
+    food.name.toLowerCase().includes('macarrão') ||
+    food.name.toLowerCase().includes('pão')
+  );
+  
+  const saladFoods = selectedFoods.filter(food => 
+    food.nutritional_category?.includes('vegetables') || 
+    food.name.toLowerCase().includes('salada') ||
+    food.name.toLowerCase().includes('alface') ||
+    food.name.toLowerCase().includes('tomate') ||
+    food.name.toLowerCase().includes('legume')
+  );
+  
+  // Fallback items if categories are empty
+  const fallbackProteinItems = [
+    { name: "Peito de frango grelhado", calories: 165, protein: 31, carbs: 0, fats: 3.6, fiber: 0 },
+    { name: "Ovo cozido", calories: 155, protein: 13, carbs: 1, fats: 11, fiber: 0 },
+    { name: "Filé de peixe", calories: 180, protein: 30, carbs: 0, fats: 6, fiber: 0 }
+  ];
+  
+  const fallbackCarbItems = [
+    { name: "Arroz integral", calories: 130, protein: 2.7, carbs: 28, fats: 0.3, fiber: 1.8 },
+    { name: "Batata doce", calories: 86, protein: 1.6, carbs: 20, fats: 0.1, fiber: 3 },
+    { name: "Macarrão integral", calories: 158, protein: 5.5, carbs: 32, fats: 0.9, fiber: 4.2 }
+  ];
+  
+  const fallbackSaladItems = [
+    { name: "Salada verde com tomate", calories: 25, protein: 1.5, carbs: 5, fats: 0.2, fiber: 2.5 },
+    { name: "Mix de folhas verdes", calories: 20, protein: 1.2, carbs: 4, fats: 0.2, fiber: 2 },
+    { name: "Salada de legumes", calories: 35, protein: 2, carbs: 7, fats: 0.3, fiber: 3 }
+  ];
   
   // Helper function to get random items from array
   const getRandomItems = (arr, count) => {
@@ -591,7 +786,7 @@ function createFallbackMealPlan(userData, selectedFoods) {
       name: food.name,
       portion: 100,
       unit: "g",
-      details: `Prepare ${food.name} according to your preference. Consume fresh when possible.`
+      details: `Prepare ${food.name} de acordo com sua preferência. Consuma fresco quando possível.`
     }));
     
     const calories = foods.reduce((sum, food) => sum + (food.calories || 0), 0);
@@ -601,7 +796,9 @@ function createFallbackMealPlan(userData, selectedFoods) {
     const fiber = foods.reduce((sum, food) => sum + (food.fiber || 0), 0);
     
     return {
-      description: `${mealType} meal`,
+      description: mealType === 'lunch' || mealType === 'dinner' 
+        ? `Refeição balanceada com proteína, carboidrato e salada` 
+        : `Refeição de ${mealType}`,
       foods: foodItems,
       calories: calories,
       macros: {
@@ -613,21 +810,50 @@ function createFallbackMealPlan(userData, selectedFoods) {
     };
   };
   
+  // Create lunch and dinner with required components
+  const createBalancedMeal = (mealType) => {
+    // For protein
+    let proteinItem;
+    if (proteinFoods.length > 0) {
+      proteinItem = getRandomItems(proteinFoods, 1)[0];
+    } else {
+      proteinItem = fallbackProteinItems[Math.floor(Math.random() * fallbackProteinItems.length)];
+    }
+    
+    // For carbs
+    let carbItem;
+    if (carbFoods.length > 0) {
+      carbItem = getRandomItems(carbFoods, 1)[0];
+    } else {
+      carbItem = fallbackCarbItems[Math.floor(Math.random() * fallbackCarbItems.length)];
+    }
+    
+    // For salad
+    let saladItem;
+    if (saladFoods.length > 0) {
+      saladItem = getRandomItems(saladFoods, 1)[0];
+    } else {
+      saladItem = fallbackSaladItems[Math.floor(Math.random() * fallbackSaladItems.length)];
+    }
+    
+    const items = [proteinItem, carbItem, saladItem];
+    
+    return createMeal(items, mealType);
+  };
+  
   // Create a weekly plan
   const weeklyPlan = {};
   
   for (let i = 0; i < 7; i++) {
     const breakfastItems = getRandomItems(breakfastFoods, 2);
-    const lunchItems = getRandomItems(lunchFoods, 2);
-    const dinnerItems = getRandomItems(dinnerFoods, 2);
     const morningSnackItems = getRandomItems(snackFoods, 1);
     const afternoonSnackItems = getRandomItems(snackFoods, 1);
     
-    const breakfast = createMeal(breakfastItems, "Breakfast");
-    const lunch = createMeal(lunchItems, "Lunch");
-    const dinner = createMeal(dinnerItems, "Dinner");
-    const morningSnack = createMeal(morningSnackItems, "Morning Snack");
-    const afternoonSnack = createMeal(afternoonSnackItems, "Afternoon Snack");
+    const breakfast = createMeal(breakfastItems, "café da manhã");
+    const lunch = createBalancedMeal("almoço");
+    const dinner = createBalancedMeal("jantar");
+    const morningSnack = createMeal(morningSnackItems, "lanche da manhã");
+    const afternoonSnack = createMeal(afternoonSnackItems, "lanche da tarde");
     
     const dailyCalories = breakfast.calories + lunch.calories + dinner.calories + 
                           morningSnack.calories + afternoonSnack.calories;
@@ -688,4 +914,3 @@ function createFallbackMealPlan(userData, selectedFoods) {
     generatedBy: "fallback-generator"
   };
 }
-
