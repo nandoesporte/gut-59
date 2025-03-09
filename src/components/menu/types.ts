@@ -9,6 +9,7 @@ export interface DayPlan {
     lunch: MealData;
     afternoonSnack: MealData;
     dinner: MealData;
+    eveningSnack?: MealData;
   };
   dailyTotals: {
     calories: number;

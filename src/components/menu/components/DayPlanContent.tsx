@@ -90,11 +90,12 @@ export const DayPlanContent: React.FC<DayPlanContentProps> = ({
             />
           )}
           
-          {dayPlan.meals?.eveningSnack && (
+          {/* Evening snack is optional and might not exist in all meal plans */}
+          {dayPlan.meals?.['eveningSnack'] && (
             <MealSection
               title={mealTypeLabels["eveningSnack"] || "Ceia"}
               icon={<Moon className="h-5 w-5 text-purple-500" />}
-              meal={dayPlan.meals.eveningSnack}
+              meal={dayPlan.meals['eveningSnack']}
               unitLabels={unitLabels}
             />
           )}

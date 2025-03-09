@@ -1,15 +1,14 @@
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { MealSection } from "./MealSection";
-import { DailyTotals } from "./DailyTotals";
+import { SavedDayPlanRenderer } from "./SavedDayPlanRenderer";
 import { Recommendations } from "./Recommendations";
-import { MealPlan, Food, RecommendationsObject } from "../types";
+import { MealPlan, Food } from "../types";
 import { supabase } from "@/integrations/supabase/client";
 import { FoodReplacementDialog } from "./FoodReplacementDialog";
+import { formatRecommendations } from "../utils/recommendations-formatter";
 
 interface SavedMealPlanDetailsProps {
   planId: string;
@@ -88,170 +87,6 @@ export const SavedMealPlanDetails = ({ planId, planData, isOpen, onClose }: Save
     }
   };
 
-  // Function to format recommendations
-  const formatRecommendations = (recs: string | string[] | RecommendationsObject | undefined): {
-    general?: string;
-    preworkout?: string;
-    postworkout?: string;
-    timing?: string[];
-  } | undefined => {
-    if (!recs) return undefined;
-    
-    if (typeof recs === 'string') {
-      return { general: recs };
-    } else if (Array.isArray(recs)) {
-      return { general: recs.join('\n') };
-    }
-    
-    // Convert any string[] to string by joining with newlines
-    let formatted: { 
-      general?: string; 
-      preworkout?: string; 
-      postworkout?: string; 
-      timing?: string[];
-    } = {};
-    
-    if (recs.general) {
-      formatted.general = Array.isArray(recs.general) ? recs.general.join('\n') : recs.general;
-    }
-    
-    if (recs.preworkout) {
-      formatted.preworkout = Array.isArray(recs.preworkout) ? recs.preworkout.join('\n') : recs.preworkout;
-    }
-    
-    if (recs.postworkout) {
-      formatted.postworkout = Array.isArray(recs.postworkout) ? recs.postworkout.join('\n') : recs.postworkout;
-    }
-    
-    if (recs.timing) {
-      formatted.timing = recs.timing;
-    }
-    
-    return formatted;
-  };
-
-  const renderDayPlan = (dayKey: string) => {
-    const dayPlan = planData.weeklyPlan[dayKey];
-    if (!dayPlan) return null;
-
-    return (
-      <div className="space-y-6">
-        <div className="p-4 bg-muted rounded-md mb-6">
-          <h2 className="text-xl font-bold">📅 {dayNameMap[dayKey]} – Plano Alimentar</h2>
-        </div>
-
-        {dayPlan.meals.breakfast && (
-          <div className="relative">
-            <MealSection
-              title="Café da Manhã"
-              icon={<div className="w-5 h-5 text-primary">☀️</div>}
-              meal={dayPlan.meals.breakfast}
-            />
-            {dayPlan.meals.breakfast.foods.map((food, index) => (
-              <Button 
-                key={`breakfast-${index}`}
-                variant="outline" 
-                size="sm" 
-                className="absolute top-2 right-2"
-                onClick={() => handleReplaceFood(food, dayKey, "breakfast", index)}
-              >
-                Substituir
-              </Button>
-            ))}
-          </div>
-        )}
-
-        {dayPlan.meals.morningSnack && (
-          <div className="relative">
-            <MealSection
-              title="Lanche da Manhã"
-              icon={<div className="w-5 h-5 text-primary">🥪</div>}
-              meal={dayPlan.meals.morningSnack}
-            />
-            {dayPlan.meals.morningSnack.foods.map((food, index) => (
-              <Button 
-                key={`morningSnack-${index}`}
-                variant="outline" 
-                size="sm" 
-                className="absolute top-2 right-2"
-                onClick={() => handleReplaceFood(food, dayKey, "morningSnack", index)}
-              >
-                Substituir
-              </Button>
-            ))}
-          </div>
-        )}
-
-        {dayPlan.meals.lunch && (
-          <div className="relative">
-            <MealSection
-              title="Almoço"
-              icon={<div className="w-5 h-5 text-primary">🍽️</div>}
-              meal={dayPlan.meals.lunch}
-            />
-            {dayPlan.meals.lunch.foods.map((food, index) => (
-              <Button 
-                key={`lunch-${index}`}
-                variant="outline" 
-                size="sm" 
-                className="absolute top-2 right-2"
-                onClick={() => handleReplaceFood(food, dayKey, "lunch", index)}
-              >
-                Substituir
-              </Button>
-            ))}
-          </div>
-        )}
-
-        {dayPlan.meals.afternoonSnack && (
-          <div className="relative">
-            <MealSection
-              title="Lanche da Tarde"
-              icon={<div className="w-5 h-5 text-primary">🍎</div>}
-              meal={dayPlan.meals.afternoonSnack}
-            />
-            {dayPlan.meals.afternoonSnack.foods.map((food, index) => (
-              <Button 
-                key={`afternoonSnack-${index}`}
-                variant="outline" 
-                size="sm" 
-                className="absolute top-2 right-2"
-                onClick={() => handleReplaceFood(food, dayKey, "afternoonSnack", index)}
-              >
-                Substituir
-              </Button>
-            ))}
-          </div>
-        )}
-
-        {dayPlan.meals.dinner && (
-          <div className="relative">
-            <MealSection
-              title="Jantar"
-              icon={<div className="w-5 h-5 text-primary">🌙</div>}
-              meal={dayPlan.meals.dinner}
-            />
-            {dayPlan.meals.dinner.foods.map((food, index) => (
-              <Button 
-                key={`dinner-${index}`}
-                variant="outline" 
-                size="sm" 
-                className="absolute top-2 right-2"
-                onClick={() => handleReplaceFood(food, dayKey, "dinner", index)}
-              >
-                Substituir
-              </Button>
-            ))}
-          </div>
-        )}
-
-        {dayPlan.dailyTotals && (
-          <DailyTotals totalNutrition={dayPlan.dailyTotals} />
-        )}
-      </div>
-    );
-  };
-
   if (!planData || !planData.weeklyPlan) {
     return null;
   }
@@ -281,9 +116,14 @@ export const SavedMealPlanDetails = ({ planId, planData, isOpen, onClose }: Save
               ))}
             </TabsList>
 
-            {Object.keys(dayNameMap).map(day => (
+            {Object.entries(dayNameMap).map(([day, dayName]) => (
               <TabsContent key={day} value={day}>
-                {renderDayPlan(day)}
+                <SavedDayPlanRenderer
+                  dayKey={day}
+                  dayName={dayName}
+                  dayPlan={planData.weeklyPlan[day]}
+                  onReplaceFood={handleReplaceFood}
+                />
               </TabsContent>
             ))}
           </Tabs>
