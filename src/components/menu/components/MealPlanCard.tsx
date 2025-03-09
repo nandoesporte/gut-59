@@ -1,88 +1,69 @@
 
-import { Card, CardContent } from "@/components/ui/card";
-import { Coffee, Apple, Utensils, Moon } from "lucide-react";
-import { MealPlan, DailyNutrition, Meal } from "../types";
-import { MealSection } from "./MealSection";
-import { DailyTotals } from "./DailyTotals";
-import { formatDateToString } from "../utils/meal-plan-helpers";
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { Download, Eye, Trash2 } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { MealPlan } from '../types';
 
 interface MealPlanCardProps {
-  mealPlan: MealPlan;
-  day?: string;
+  id: string;
+  createdAt: string;
+  calories: number;
+  onView: () => void;
+  onDownload: () => void;
+  onDelete: () => void;
 }
 
-export const MealPlanCard = ({ mealPlan, day = "monday" }: MealPlanCardProps) => {
-  if (!mealPlan?.weeklyPlan || !mealPlan.weeklyPlan[day]) {
-    return (
-      <Card>
-        <CardContent className="p-4">
-          <p className="text-center text-gray-500">
-            Não existem dados de plano alimentar para este dia.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-  
-  const dayPlan = mealPlan.weeklyPlan[day];
-  const date = mealPlan.created_at ? new Date(mealPlan.created_at) : new Date();
-  
+export const MealPlanCard = ({
+  id,
+  createdAt,
+  calories,
+  onView,
+  onDownload,
+  onDelete
+}: MealPlanCardProps) => {
   return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="mb-4">
-          <h3 className="font-semibold text-lg">{dayPlan.dayName || "Plano Alimentar"}</h3>
-          <p className="text-sm text-gray-500">
-            {formatDateToString(date)} • {mealPlan.userCalories || mealPlan.weeklyTotals.averageCalories} kcal
+    <Card key={id} className="p-4 sm:p-6">
+      <div className="flex flex-col sm:flex-row justify-between gap-4 sm:items-center">
+        <div>
+          <h3 className="font-semibold text-sm sm:text-base">
+            Plano gerado em {format(new Date(createdAt), "d 'de' MMMM 'de' yyyy", { locale: ptBR })}
+          </h3>
+          <p className="text-sm text-gray-500 mt-1">
+            Média diária: {Math.round(calories)} kcal
           </p>
         </div>
-        
-        <div className="space-y-4">
-          {dayPlan.meals?.breakfast && (
-            <MealSection
-              title="Café da Manhã"
-              icon={<Coffee className="h-4 w-4 text-amber-500" />}
-              meal={dayPlan.meals.breakfast}
-            />
-          )}
-          
-          {dayPlan.meals?.morningSnack && (
-            <MealSection
-              title="Lanche da Manhã"
-              icon={<Apple className="h-4 w-4 text-red-500" />}
-              meal={dayPlan.meals.morningSnack}
-            />
-          )}
-          
-          {dayPlan.meals?.lunch && (
-            <MealSection
-              title="Almoço"
-              icon={<Utensils className="h-4 w-4 text-green-600" />}
-              meal={dayPlan.meals.lunch}
-            />
-          )}
-          
-          {dayPlan.meals?.afternoonSnack && (
-            <MealSection
-              title="Lanche da Tarde"
-              icon={<Apple className="h-4 w-4 text-orange-500" />}
-              meal={dayPlan.meals.afternoonSnack}
-            />
-          )}
-          
-          {dayPlan.meals?.dinner && (
-            <MealSection
-              title="Jantar"
-              icon={<Moon className="h-4 w-4 text-indigo-500" />}
-              meal={dayPlan.meals.dinner}
-            />
-          )}
-          
-          <DailyTotals
-            totalNutrition={dayPlan.dailyTotals as DailyNutrition}
-          />
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto justify-start">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onView}
+            className="flex-1 sm:flex-initial justify-center min-w-[80px]"
+          >
+            <Eye className="w-4 h-4 mr-2" />
+            <span className="sm:inline">Detalhes</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onDownload}
+            className="flex-1 sm:flex-initial justify-center min-w-[80px]"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            <span className="sm:inline">Baixar PDF</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onDelete}
+            className="flex-1 sm:flex-initial justify-center min-w-[80px] text-red-500 hover:text-red-600"
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            <span className="sm:inline">Excluir</span>
+          </Button>
         </div>
-      </CardContent>
+      </div>
     </Card>
   );
 };
