@@ -21,14 +21,6 @@ export const MealPlanTable = ({ mealPlan, mealTypeLabels = {}, macroLabels = {} 
     sunday: "Domingo"
   };
 
-  // Tradução de macros com capitalização da primeira letra
-  const translateMacro = (macro: string): string => {
-    const translated = macroLabels[macro.toLowerCase()];
-    return translated ? 
-      translated.charAt(0).toUpperCase() + translated.slice(1) : 
-      macro.charAt(0).toUpperCase() + macro.slice(1);
-  };
-
   return (
     <div className="overflow-x-auto">
       <Table>
@@ -37,10 +29,10 @@ export const MealPlanTable = ({ mealPlan, mealTypeLabels = {}, macroLabels = {} 
           <TableRow>
             <TableHead className="w-[100px]">Dia</TableHead>
             <TableHead>Calorias</TableHead>
-            <TableHead>{translateMacro("Protein")}</TableHead>
-            <TableHead>{translateMacro("Carbs")}</TableHead>
-            <TableHead>{translateMacro("Fats")}</TableHead>
-            <TableHead>{translateMacro("Fiber")}</TableHead>
+            <TableHead>Proteína</TableHead>
+            <TableHead>Carboidratos</TableHead>
+            <TableHead>Gorduras</TableHead>
+            <TableHead>Fibras</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

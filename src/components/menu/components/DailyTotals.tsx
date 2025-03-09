@@ -9,18 +9,10 @@ interface DailyTotalsProps {
 }
 
 export const DailyTotals = ({ totalNutrition, macroLabels = {} }: DailyTotalsProps) => {
-  // Função para traduzir macronutrientes
-  const translateMacro = (macro: string): string => {
-    const translated = macroLabels[macro.toLowerCase()];
-    return translated ? 
-      translated.charAt(0).toUpperCase() + translated.slice(1) : 
-      macro.charAt(0).toUpperCase() + macro.slice(1);
-  };
-
   const macros = [
-    { name: translateMacro("Protein"), value: Number(totalNutrition?.protein || 0), color: "#4caf50" },
-    { name: translateMacro("Carbs"), value: Number(totalNutrition?.carbs || 0), color: "#ff9800" },
-    { name: translateMacro("Fats"), value: Number(totalNutrition?.fats || 0), color: "#f44336" }
+    { name: "Proteína", value: Number(totalNutrition?.protein || 0), color: "#4caf50" },
+    { name: "Carboidratos", value: Number(totalNutrition?.carbs || 0), color: "#ff9800" },
+    { name: "Gorduras", value: Number(totalNutrition?.fats || 0), color: "#f44336" }
   ];
 
   return (

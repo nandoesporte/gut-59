@@ -73,7 +73,7 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
     );
   }
 
-  // Traduções para tipos de refeição
+  // Mapeamento de tipo de refeição para título em português
   const mealTypeLabels: Record<string, string> = {
     "breakfast": "Café da Manhã",
     "morningSnack": "Lanche da Manhã",
@@ -81,33 +81,6 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
     "afternoonSnack": "Lanche da Tarde",
     "dinner": "Jantar",
     "eveningSnack": "Ceia"
-  };
-
-  // Traduções para unidades
-  const unitLabels: Record<string, string> = {
-    "g": "g",
-    "ml": "ml",
-    "unit": "unidade",
-    "units": "unidades",
-    "cup": "xícara",
-    "cups": "xícaras",
-    "tbsp": "colher de sopa",
-    "tsp": "colher de chá",
-    "slice": "fatia",
-    "slices": "fatias",
-    "piece": "pedaço",
-    "pieces": "pedaços",
-    "scoop": "porção",
-    "scoops": "porções"
-  };
-
-  // Traduções para macronutrientes
-  const macroLabels: Record<string, string> = {
-    "protein": "proteína",
-    "carbs": "carboidratos",
-    "fats": "gorduras",
-    "fiber": "fibras",
-    "calories": "calorias"
   };
 
   return (
@@ -176,7 +149,6 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
                         title={mealTypeLabels["breakfast"] || "Café da Manhã"}
                         icon={<Coffee className="h-5 w-5 text-amber-500" />}
                         meal={dayPlan.meals.breakfast}
-                        unitLabels={unitLabels}
                       />
                     )}
                     
@@ -185,7 +157,6 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
                         title={mealTypeLabels["morningSnack"] || "Lanche da Manhã"}
                         icon={<Apple className="h-5 w-5 text-red-500" />}
                         meal={dayPlan.meals.morningSnack}
-                        unitLabels={unitLabels}
                       />
                     )}
                     
@@ -194,7 +165,6 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
                         title={mealTypeLabels["lunch"] || "Almoço"}
                         icon={<Utensils className="h-5 w-5 text-green-600" />}
                         meal={dayPlan.meals.lunch}
-                        unitLabels={unitLabels}
                       />
                     )}
                     
@@ -203,7 +173,6 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
                         title={mealTypeLabels["afternoonSnack"] || "Lanche da Tarde"}
                         icon={<Apple className="h-5 w-5 text-orange-500" />}
                         meal={dayPlan.meals.afternoonSnack}
-                        unitLabels={unitLabels}
                       />
                     )}
                     
@@ -212,7 +181,6 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
                         title={mealTypeLabels["dinner"] || "Jantar"}
                         icon={<Moon className="h-5 w-5 text-indigo-500" />}
                         meal={dayPlan.meals.dinner}
-                        unitLabels={unitLabels}
                       />
                     )}
                     
@@ -221,13 +189,11 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
                         title={mealTypeLabels["eveningSnack"] || "Ceia"}
                         icon={<Moon className="h-5 w-5 text-purple-500" />}
                         meal={dayPlan.meals.eveningSnack}
-                        unitLabels={unitLabels}
                       />
                     )}
                     
                     <DailyTotals 
-                      totalNutrition={dayPlan.dailyTotals} 
-                      macroLabels={macroLabels}
+                      totalNutrition={dayPlan.dailyTotals}
                     />
                   </div>
                 </CardContent>
@@ -249,9 +215,7 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
         <CardContent className="p-4 sm:p-6">
           <h3 className="font-bold text-lg mb-4">Visão Geral Semanal</h3>
           <MealPlanTable 
-            mealPlan={mealPlan} 
-            mealTypeLabels={mealTypeLabels} 
-            macroLabels={macroLabels}
+            mealPlan={mealPlan}
           />
         </CardContent>
       </Card>
