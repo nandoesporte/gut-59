@@ -28,6 +28,14 @@ const dayNameMap: Record<string, string> = {
   sunday: "Domingo"
 };
 
+const mealTypeTranslations: Record<string, string> = {
+  breakfast: "Café da Manhã",
+  morningSnack: "Lanche da Manhã",
+  lunch: "Almoço",
+  afternoonSnack: "Lanche da Tarde",
+  dinner: "Jantar"
+};
+
 export const SavedMealPlanDetails = ({ planId, planData, isOpen, onClose }: SavedMealPlanDetailsProps) => {
   const [selectedDay, setSelectedDay] = useState<string>("monday");
   const [replaceFoodDialogOpen, setReplaceFoodDialogOpen] = useState(false);
@@ -101,6 +109,41 @@ export const SavedMealPlanDetails = ({ planId, planData, isOpen, onClose }: Save
     return recs as RecommendationsObject;
   };
 
+  // Function to enhance food preparation details if they're missing or minimal
+  const enhanceFoodPreparation = (food: Food): Food => {
+    const updatedFood = { ...food };
+    
+    if (!updatedFood.details || updatedFood.details.length < 10) {
+      const foodName = updatedFood.name.toLowerCase();
+      
+      if (foodName.includes("arroz")) {
+        updatedFood.details = "Cozinhe o arroz na proporção de 2 partes de água para 1 de arroz. Refogue com um pouco de azeite e alho antes de adicionar a água. Cozinhe em fogo baixo com tampa por aproximadamente 15-20 minutos.";
+      } else if (foodName.includes("feijão")) {
+        updatedFood.details = "Deixe o feijão de molho por pelo menos 4 horas antes do preparo. Cozinhe na panela de pressão por aproximadamente 25-30 minutos. Tempere com cebola, alho e uma folha de louro para dar sabor.";
+      } else if (foodName.includes("frango") || foodName.includes("peito de frango")) {
+        updatedFood.details = "Tempere o frango com sal, pimenta e ervas de sua preferência. Grelhe em uma frigideira antiaderente com um fio de azeite por cerca de 6-7 minutos de cada lado até dourar. Deixe descansar por 5 minutos antes de servir.";
+      } else if (foodName.includes("peixe") || foodName.includes("salmão") || foodName.includes("tilápia")) {
+        updatedFood.details = "Tempere o peixe com sal, limão e ervas. Cozinhe em uma frigideira com azeite em fogo médio-alto por 3-4 minutos de cada lado. Verifique se está cozido quando a carne estiver opaca e se desfazendo facilmente.";
+      } else if (foodName.includes("ovo") || foodName.includes("ovos")) {
+        updatedFood.details = "Para ovos mexidos: bata os ovos em uma tigela com uma pitada de sal. Cozinhe em fogo baixo, mexendo constantemente. Para ovos cozidos: cozinhe em água fervente por 6 minutos (gema mole) ou 9 minutos (gema dura).";
+      } else if (foodName.includes("aveia") || foodName.includes("mingau")) {
+        updatedFood.details = "Misture a aveia com leite ou água na proporção de 1:2. Aqueça em fogo baixo por 3-5 minutos, mexendo constantemente. Adicione canela ou frutas para dar sabor.";
+      } else if (foodName.includes("salada")) {
+        updatedFood.details = "Lave bem todos os vegetais. Corte em pedaços do tamanho desejado. Misture com um molho simples de azeite, limão e sal. Consuma imediatamente para preservar os nutrientes e a textura.";
+      } else if (foodName.includes("batata") || foodName.includes("batata-doce")) {
+        updatedFood.details = "Cozinhe a batata em água fervente até que esteja macia (cerca de 15-20 minutos). Para assar, corte em cubos, tempere com azeite, sal e ervas, e asse a 200°C por 25-30 minutos.";
+      } else if (foodName.includes("iogurte")) {
+        updatedFood.details = "Consuma o iogurte gelado. Para torná-lo mais nutritivo, adicione frutas frescas, granola ou sementes.";
+      } else if (foodName.includes("maçã") || foodName.includes("banana") || foodName.includes("fruta")) {
+        updatedFood.details = "Lave bem a fruta antes de consumir. Pode ser consumida in natura ou cortada em pedaços para facilitar o consumo.";
+      } else {
+        updatedFood.details = "Prepare de acordo com suas preferências culinárias, utilizando temperos naturais como ervas, especiarias e limão para realçar o sabor. Evite o uso excessivo de sal e óleo.";
+      }
+    }
+    
+    return updatedFood;
+  };
+
   const renderDayPlan = (dayKey: string) => {
     const dayPlan = planData.weeklyPlan[dayKey];
     if (!dayPlan) return null;
@@ -114,105 +157,105 @@ export const SavedMealPlanDetails = ({ planId, planData, isOpen, onClose }: Save
         {dayPlan.meals.breakfast && (
           <div className="relative">
             <MealSection
-              title="Café da Manhã"
+              title={mealTypeTranslations.breakfast}
               icon={<div className="w-5 h-5 text-primary">☀️</div>}
-              meal={dayPlan.meals.breakfast}
+              meal={{
+                ...dayPlan.meals.breakfast,
+                foods: dayPlan.meals.breakfast.foods.map(enhanceFoodPreparation)
+              }}
             />
-            {dayPlan.meals.breakfast.foods.map((food, index) => (
-              <Button 
-                key={`breakfast-${index}`}
-                variant="outline" 
-                size="sm" 
-                className="absolute top-2 right-2"
-                onClick={() => handleReplaceFood(food, dayKey, "breakfast", index)}
-              >
-                Substituir
-              </Button>
-            ))}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="absolute top-2 right-2"
+              onClick={() => handleReplaceFood(dayPlan.meals.breakfast.foods[0], dayKey, "breakfast", 0)}
+            >
+              Substituir
+            </Button>
           </div>
         )}
 
         {dayPlan.meals.morningSnack && (
           <div className="relative">
             <MealSection
-              title="Lanche da Manhã"
+              title={mealTypeTranslations.morningSnack}
               icon={<div className="w-5 h-5 text-primary">🥪</div>}
-              meal={dayPlan.meals.morningSnack}
+              meal={{
+                ...dayPlan.meals.morningSnack,
+                foods: dayPlan.meals.morningSnack.foods.map(enhanceFoodPreparation)
+              }}
             />
-            {dayPlan.meals.morningSnack.foods.map((food, index) => (
-              <Button 
-                key={`morningSnack-${index}`}
-                variant="outline" 
-                size="sm" 
-                className="absolute top-2 right-2"
-                onClick={() => handleReplaceFood(food, dayKey, "morningSnack", index)}
-              >
-                Substituir
-              </Button>
-            ))}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="absolute top-2 right-2"
+              onClick={() => handleReplaceFood(dayPlan.meals.morningSnack.foods[0], dayKey, "morningSnack", 0)}
+            >
+              Substituir
+            </Button>
           </div>
         )}
 
         {dayPlan.meals.lunch && (
           <div className="relative">
             <MealSection
-              title="Almoço"
+              title={mealTypeTranslations.lunch}
               icon={<div className="w-5 h-5 text-primary">🍽️</div>}
-              meal={dayPlan.meals.lunch}
+              meal={{
+                ...dayPlan.meals.lunch,
+                foods: dayPlan.meals.lunch.foods.map(enhanceFoodPreparation)
+              }}
             />
-            {dayPlan.meals.lunch.foods.map((food, index) => (
-              <Button 
-                key={`lunch-${index}`}
-                variant="outline" 
-                size="sm" 
-                className="absolute top-2 right-2"
-                onClick={() => handleReplaceFood(food, dayKey, "lunch", index)}
-              >
-                Substituir
-              </Button>
-            ))}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="absolute top-2 right-2"
+              onClick={() => handleReplaceFood(dayPlan.meals.lunch.foods[0], dayKey, "lunch", 0)}
+            >
+              Substituir
+            </Button>
           </div>
         )}
 
         {dayPlan.meals.afternoonSnack && (
           <div className="relative">
             <MealSection
-              title="Lanche da Tarde"
+              title={mealTypeTranslations.afternoonSnack}
               icon={<div className="w-5 h-5 text-primary">🍎</div>}
-              meal={dayPlan.meals.afternoonSnack}
+              meal={{
+                ...dayPlan.meals.afternoonSnack,
+                foods: dayPlan.meals.afternoonSnack.foods.map(enhanceFoodPreparation)
+              }}
             />
-            {dayPlan.meals.afternoonSnack.foods.map((food, index) => (
-              <Button 
-                key={`afternoonSnack-${index}`}
-                variant="outline" 
-                size="sm" 
-                className="absolute top-2 right-2"
-                onClick={() => handleReplaceFood(food, dayKey, "afternoonSnack", index)}
-              >
-                Substituir
-              </Button>
-            ))}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="absolute top-2 right-2"
+              onClick={() => handleReplaceFood(dayPlan.meals.afternoonSnack.foods[0], dayKey, "afternoonSnack", 0)}
+            >
+              Substituir
+            </Button>
           </div>
         )}
 
         {dayPlan.meals.dinner && (
           <div className="relative">
             <MealSection
-              title="Jantar"
+              title={mealTypeTranslations.dinner}
               icon={<div className="w-5 h-5 text-primary">🌙</div>}
-              meal={dayPlan.meals.dinner}
+              meal={{
+                ...dayPlan.meals.dinner,
+                foods: dayPlan.meals.dinner.foods.map(enhanceFoodPreparation)
+              }}
             />
-            {dayPlan.meals.dinner.foods.map((food, index) => (
-              <Button 
-                key={`dinner-${index}`}
-                variant="outline" 
-                size="sm" 
-                className="absolute top-2 right-2"
-                onClick={() => handleReplaceFood(food, dayKey, "dinner", index)}
-              >
-                Substituir
-              </Button>
-            ))}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="absolute top-2 right-2"
+              onClick={() => handleReplaceFood(dayPlan.meals.dinner.foods[0], dayKey, "dinner", 0)}
+            >
+              Substituir
+            </Button>
           </div>
         )}
 
