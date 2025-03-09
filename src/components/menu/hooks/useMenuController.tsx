@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useProtocolFoods } from "./useProtocolFoods";
-import { useCalorieCalculator, type CalorieCalculatorForm } from "./useCalorieCalculator";
+import { useCalorieCalculator, type CalorieCalculatorForm, type Goal } from "./useCalorieCalculator";
 import { useFoodSelection } from "./useFoodSelection";
 import { generateMealPlan } from "./useMealPlanGeneration";
 import { DietaryPreferences, MealPlan, ProtocolFood } from "../types";
@@ -16,7 +16,7 @@ export interface FormData {
   age: string;
   gender: "male" | "female";
   activityLevel: string;
-  goal: string;
+  goal: Goal;
 }
 
 interface MenuState {
@@ -106,7 +106,7 @@ export const useMenuController = (): MenuState => {
           age: nutritionPrefs.age ? nutritionPrefs.age.toString() : prev.age,
           gender: nutritionPrefs.gender as "male" | "female" || prev.gender,
           activityLevel: nutritionPrefs.activity_level || prev.activityLevel,
-          goal: nutritionPrefs.goal || prev.goal,
+          goal: nutritionPrefs.goal as Goal || prev.goal,
         }));
       }
       
@@ -163,7 +163,8 @@ export const useMenuController = (): MenuState => {
               gender: formData.gender,
               activity_level: formData.activityLevel,
               goal: formData.goal,
-              calories_needed: calculatedCalories
+              calories_needed: calculatedCalories,
+              selected_foods: [] // Empty array for selected foods initially
             });
           
           if (error) {

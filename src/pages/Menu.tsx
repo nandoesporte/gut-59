@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { useEffect, useRef } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/integrations/supabase/client";
+import { CalorieCalculatorForm } from "@/components/menu/hooks/useCalorieCalculator";
 
 const Menu = () => {
   const mealPlanRef = useRef<HTMLDivElement>(null);
@@ -137,7 +138,7 @@ const Menu = () => {
               </h2>
               {currentStep === 1 && (
                 <CalorieCalculatorStep
-                  formData={formData}
+                  formData={formData as CalorieCalculatorForm}
                   onInputChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
                   onCalculate={handleCalculateCalories}
                   calorieNeeds={calorieNeeds}

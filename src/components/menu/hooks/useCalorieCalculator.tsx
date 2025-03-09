@@ -12,7 +12,7 @@ export interface CalorieCalculatorForm {
   age: string;
   gender: "male" | "female";
   activityLevel: string;
-  goal?: Goal;
+  goal: Goal;
 }
 
 type NutritionPreference = Database['public']['Tables']['nutrition_preferences']['Insert'];
