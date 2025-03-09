@@ -51,7 +51,6 @@ const translateRecommendation = (text: string): string => {
     "in all meals": "em todas as refeições",
     "Drink 30-40ml of water": "Beba 30-40ml de água",
     "per kg of body weight": "por kg de peso corporal",
-    "Avoid heavy meals": "Evite refeições pesadas",
     "2 hours before sleep": "2 horas antes de dormir"
   };
   

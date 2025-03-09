@@ -89,7 +89,12 @@ export const SavedMealPlanDetails = ({ planId, planData, isOpen, onClose }: Save
   };
 
   // Function to format recommendations
-  const formatRecommendations = (recs: string | string[] | RecommendationsObject | undefined): RecommendationsObject | undefined => {
+  const formatRecommendations = (recs: string | string[] | RecommendationsObject | undefined): {
+    general?: string;
+    preworkout?: string;
+    postworkout?: string;
+    timing?: string[];
+  } | undefined => {
     if (!recs) return undefined;
     
     if (typeof recs === 'string') {
@@ -98,7 +103,31 @@ export const SavedMealPlanDetails = ({ planId, planData, isOpen, onClose }: Save
       return { general: recs.join('\n') };
     }
     
-    return recs as RecommendationsObject;
+    // Convert any string[] to string by joining with newlines
+    let formatted: { 
+      general?: string; 
+      preworkout?: string; 
+      postworkout?: string; 
+      timing?: string[];
+    } = {};
+    
+    if (recs.general) {
+      formatted.general = Array.isArray(recs.general) ? recs.general.join('\n') : recs.general;
+    }
+    
+    if (recs.preworkout) {
+      formatted.preworkout = Array.isArray(recs.preworkout) ? recs.preworkout.join('\n') : recs.preworkout;
+    }
+    
+    if (recs.postworkout) {
+      formatted.postworkout = Array.isArray(recs.postworkout) ? recs.postworkout.join('\n') : recs.postworkout;
+    }
+    
+    if (recs.timing) {
+      formatted.timing = recs.timing;
+    }
+    
+    return formatted;
   };
 
   const renderDayPlan = (dayKey: string) => {

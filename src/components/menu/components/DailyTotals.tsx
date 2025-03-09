@@ -64,9 +64,11 @@ export const DailyTotals = ({ totalNutrition, macroLabels = {} }: DailyTotalsPro
       </div>
 
       <MacroDistributionBar
-        proteinPercentage={proteinPercentage}
-        carbsPercentage={carbsPercentage}
-        fatsPercentage={fatsPercentage}
+        macros={{
+          protein: proteinPercentage,
+          carbs: carbsPercentage,
+          fats: fatsPercentage
+        }}
       />
 
       <div className="grid grid-cols-3 text-center text-xs mt-2">

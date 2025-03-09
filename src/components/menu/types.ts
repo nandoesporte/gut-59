@@ -1,5 +1,3 @@
-
-
 // Add the following export if it doesn't already exist in this file
 // This ensures we have a consistent type definition for MealPlan
 
@@ -118,7 +116,7 @@ export interface DailyNutrition {
 }
 
 export interface RecommendationsObject {
-  general: string | string[];
+  general?: string | string[];
   preworkout?: string | string[];
   postworkout?: string | string[];
   timing?: string[];

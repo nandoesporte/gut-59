@@ -48,7 +48,7 @@ export const MacroDistributionBar = ({ macros }: MacroDistributionBarProps) => {
               />
             </TooltipTrigger>
             <TooltipContent>
-              <p>Proteínas: {macros.protein}g ({Math.round(proteinPercentage)}%)</p>
+              <p>Proteínas: {macros.protein}% ({Math.round(proteinPercentage)}%)</p>
             </TooltipContent>
           </Tooltip>
           
@@ -60,7 +60,7 @@ export const MacroDistributionBar = ({ macros }: MacroDistributionBarProps) => {
               />
             </TooltipTrigger>
             <TooltipContent>
-              <p>Carboidratos: {macros.carbs}g ({Math.round(carbsPercentage)}%)</p>
+              <p>Carboidratos: {macros.carbs}% ({Math.round(carbsPercentage)}%)</p>
             </TooltipContent>
           </Tooltip>
           
@@ -72,7 +72,7 @@ export const MacroDistributionBar = ({ macros }: MacroDistributionBarProps) => {
               />
             </TooltipTrigger>
             <TooltipContent>
-              <p>Gorduras: {macros.fats}g ({Math.round(fatsPercentage)}%)</p>
+              <p>Gorduras: {macros.fats}% ({Math.round(fatsPercentage)}%)</p>
             </TooltipContent>
           </Tooltip>
         </div>
