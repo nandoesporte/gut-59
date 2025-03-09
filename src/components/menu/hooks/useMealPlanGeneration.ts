@@ -130,7 +130,7 @@ export const useMealPlanGeneration = () => {
             meal.macros.fiber += saladNutrition.fiber;
           }
           
-          // Update daily totals - Fix the TypeScript error by converting booleans to numbers
+          // Update daily totals - Fix TypeScript error by using ternary operators instead of boolean addition
           const updatedCalories = (!hasProtein ? proteinNutrition.calories : 0) +
                                  (!hasCarbs ? carbsNutrition.calories : 0) +
                                  (!hasSalad ? saladNutrition.calories : 0);
@@ -275,6 +275,46 @@ export const useMealPlanGeneration = () => {
         } else if (error.message?.includes("timeout") || error.message?.includes("Tempo limite")) {
           errorMessage = "O serviço Nutri+ demorou muito para responder. Por favor, tente novamente.";
           console.error("Timeout detectado:", error);
+        } else if (error.message?.includes("400") || error.message?.includes("json_validate_failed")) {
+          errorMessage = "Erro ao gerar formato de plano alimentar. Tentando método alternativo...";
+          console.error("Erro de validação JSON detectado:", error);
+          
+          // Try again with a simplified model and format
+          const { data: retryData, error: retryError } = await supabase.functions.invoke('nutri-plus-agent', {
+            body: {
+              userData,
+              selectedFoods,
+              foodsByMealType,
+              dietaryPreferences: preferences,
+              modelConfig: {
+                model: "llama3-8b-8192",
+                temperature: 0.2,
+                useSimplifiedFormat: true
+              },
+              retry: true
+            }
+          });
+          
+          if (retryError) {
+            console.error("Erro na segunda tentativa:", retryError);
+            setError(`Erro nas duas tentativas de geração: ${retryError.message}`);
+            toast.error("Não foi possível gerar o plano após múltiplas tentativas. Tente novamente mais tarde.");
+            return null;
+          }
+          
+          if (retryData?.mealPlan) {
+            console.log("Plano gerado com sucesso após segunda tentativa");
+            retryData.mealPlan.userCalories = userData.dailyCalories;
+            retryData.mealPlan = ensureBalancedMeals(retryData.mealPlan);
+            
+            if (userData.id) {
+              await saveGeneratedPlan(retryData.mealPlan, userData, preferences);
+            }
+            
+            setMealPlan(retryData.mealPlan);
+            toast.success("Plano alimentar gerado com sucesso!");
+            return retryData.mealPlan;
+          }
         }
         
         setError(`Erro ao gerar plano alimentar: ${error.message}`);
@@ -350,85 +390,7 @@ export const useMealPlanGeneration = () => {
       }
       
       if (userData.id) {
-        try {
-          console.log("Tentando salvar plano alimentar no banco de dados");
-          
-          // Create a serializable plan object for database storage
-          const planData = {
-            user_id: userData.id,
-            plan_data: JSON.parse(JSON.stringify(data.mealPlan)), // Ensure the data is JSON serializable
-            calories: userData.dailyCalories,
-            dietary_preferences: JSON.stringify(preferences) // Convert DietaryPreferences to JSON string
-          };
-          
-          if (data.modelUsed) {
-            Object.assign(planData, { generated_by: data.modelUsed });
-          }
-          
-          console.log("Dados preparados para inserção na tabela meal_plans:", 
-            "user_id:", planData.user_id,
-            "plan_data structure:", Object.keys(planData.plan_data),
-            "calories:", planData.calories
-          );
-          
-          const { error: saveError, data: savedData } = await supabase
-            .from('meal_plans')
-            .insert(planData)
-            .select();
-
-          if (saveError) {
-            console.error("Erro ao salvar plano alimentar:", saveError);
-            console.error("Detalhes do erro:", JSON.stringify(saveError, null, 2));
-            
-            // If the error is related to JSON serialization, try a different approach
-            console.log("Tentando salvar novamente com abordagem alternativa");
-            
-            const { error: retryError } = await supabase
-              .from('meal_plans')
-              .insert({
-                user_id: userData.id,
-                plan_data: JSON.parse(JSON.stringify(data.mealPlan)), // Explicitly convert to JSON
-                calories: userData.dailyCalories,
-                dietary_preferences: JSON.stringify(preferences) // Convert DietaryPreferences to JSON string
-              });
-              
-            if (retryError) {
-              console.error("Erro persistente ao tentar salvar o plano alimentar:", retryError);
-              toast.error("Erro ao salvar plano alimentar no banco de dados");
-            } else {
-              console.log("Plano alimentar salvo com sucesso após ajustes");
-              
-              if (addTransaction) {
-                await addTransaction({
-                  amount: REWARDS.MEAL_PLAN || 10,
-                  type: 'meal_plan',
-                  description: 'Geração de plano alimentar'
-                });
-                console.log("Transação adicionada para geração do plano alimentar");
-              }
-              
-              toast.success("Plano alimentar gerado e salvo com sucesso!");
-            }
-          } else {
-            console.log("Plano alimentar salvo com sucesso no banco de dados");
-            console.log("Dados salvos:", savedData);
-            
-            if (addTransaction) {
-              await addTransaction({
-                amount: REWARDS.MEAL_PLAN || 10,
-                type: 'meal_plan',
-                description: 'Geração de plano alimentar'
-              });
-              console.log("Transação adicionada para geração do plano alimentar");
-            }
-            
-            toast.success("Plano alimentar gerado e salvo com sucesso!");
-          }
-        } catch (dbError) {
-          console.error("Erro ao salvar plano alimentar no banco de dados:", dbError);
-          console.error("Detalhes da exceção:", dbError instanceof Error ? dbError.message : String(dbError));
-          toast.error("Erro ao salvar plano alimentar no banco de dados");
-        }
+        await saveGeneratedPlan(data.mealPlan, userData, preferences, data.modelUsed);
       } else {
         console.warn("Usuário não autenticado. Plano não será salvo no banco de dados.");
         toast.warning("Plano alimentar gerado, mas não foi possível salvar porque o usuário não está autenticado");
@@ -459,6 +421,94 @@ export const useMealPlanGeneration = () => {
     }
   };
 
+  // Helper function to save the generated plan to the database
+  const saveGeneratedPlan = async (
+    mealPlan: MealPlan, 
+    userData: any, 
+    preferences: DietaryPreferences,
+    modelUsed?: string
+  ) => {
+    try {
+      console.log("Tentando salvar plano alimentar no banco de dados");
+      
+      // Create a serializable plan object for database storage
+      const planData = {
+        user_id: userData.id,
+        plan_data: JSON.parse(JSON.stringify(mealPlan)), // Ensure the data is JSON serializable
+        calories: userData.dailyCalories,
+        dietary_preferences: JSON.stringify(preferences) // Convert DietaryPreferences to JSON string
+      };
+      
+      if (modelUsed) {
+        Object.assign(planData, { generated_by: modelUsed });
+      }
+      
+      console.log("Dados preparados para inserção na tabela meal_plans:", 
+        "user_id:", planData.user_id,
+        "plan_data structure:", Object.keys(planData.plan_data),
+        "calories:", planData.calories
+      );
+      
+      const { error: saveError, data: savedData } = await supabase
+        .from('meal_plans')
+        .insert(planData)
+        .select();
+
+      if (saveError) {
+        console.error("Erro ao salvar plano alimentar:", saveError);
+        console.error("Detalhes do erro:", JSON.stringify(saveError, null, 2));
+        
+        // If the error is related to JSON serialization, try a different approach
+        console.log("Tentando salvar novamente com abordagem alternativa");
+        
+        const { error: retryError } = await supabase
+          .from('meal_plans')
+          .insert({
+            user_id: userData.id,
+            plan_data: JSON.parse(JSON.stringify(mealPlan)), // Explicitly convert to JSON
+            calories: userData.dailyCalories,
+            dietary_preferences: JSON.stringify(preferences) // Convert DietaryPreferences to JSON string
+          });
+          
+        if (retryError) {
+          console.error("Erro persistente ao tentar salvar o plano alimentar:", retryError);
+          toast.error("Erro ao salvar plano alimentar no banco de dados");
+        } else {
+          console.log("Plano alimentar salvo com sucesso após ajustes");
+          
+          if (addTransaction) {
+            await addTransaction({
+              amount: REWARDS.MEAL_PLAN || 10,
+              type: 'meal_plan',
+              description: 'Geração de plano alimentar'
+            });
+            console.log("Transação adicionada para geração do plano alimentar");
+          }
+          
+          toast.success("Plano alimentar gerado e salvo com sucesso!");
+        }
+      } else {
+        console.log("Plano alimentar salvo com sucesso no banco de dados");
+        console.log("Dados salvos:", savedData);
+        
+        if (addTransaction) {
+          await addTransaction({
+            amount: REWARDS.MEAL_PLAN || 10,
+            type: 'meal_plan',
+            description: 'Geração de plano alimentar'
+          });
+          console.log("Transação adicionada para geração do plano alimentar");
+        }
+        
+        toast.success("Plano alimentar gerado e salvo com sucesso!");
+      }
+    } catch (dbError) {
+      console.error("Erro ao salvar plano alimentar no banco de dados:", dbError);
+      console.error("Detalhes da exceção:", dbError instanceof Error ? dbError.message : String(dbError));
+      toast.error("Erro ao salvar plano alimentar no banco de dados");
+    }
+  };
+
   return {
     loading,
     mealPlan,
@@ -469,4 +519,3 @@ export const useMealPlanGeneration = () => {
     generationAttempted
   };
 };
-
