@@ -20,6 +20,13 @@ interface GenerateMealPlanParams {
   addTransaction?: (params: any) => Promise<void>;
 }
 
+// Helper function to ensure values are numeric before arithmetic operations
+const getNumericValue = (value: any): number => {
+  if (value === null || value === undefined) return 0;
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  return isNaN(num) ? 0 : num;
+};
+
 export const generateMealPlan = async ({
   userData,
   selectedFoods,
@@ -103,11 +110,11 @@ export const generateMealPlan = async ({
         const dayCount = validDays.length || 1; // Prevent division by zero
         
         data.mealPlan.weeklyTotals = {
-          averageCalories: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.calories, 0) / dayCount),
-          averageProtein: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.protein, 0) / dayCount),
-          averageCarbs: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.carbs, 0) / dayCount),
-          averageFats: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.fats, 0) / dayCount),
-          averageFiber: Math.round(validDays.reduce((sum, day) => sum + day.dailyTotals.fiber, 0) / dayCount)
+          averageCalories: Math.round(validDays.reduce((sum, day) => sum + getNumericValue(day.dailyTotals.calories), 0) / dayCount),
+          averageProtein: Math.round(validDays.reduce((sum, day) => sum + getNumericValue(day.dailyTotals.protein), 0) / dayCount),
+          averageCarbs: Math.round(validDays.reduce((sum, day) => sum + getNumericValue(day.dailyTotals.carbs), 0) / dayCount),
+          averageFats: Math.round(validDays.reduce((sum, day) => sum + getNumericValue(day.dailyTotals.fats), 0) / dayCount),
+          averageFiber: Math.round(validDays.reduce((sum, day) => sum + getNumericValue(day.dailyTotals.fiber), 0) / dayCount)
         };
         
         console.log("🔄 Novos valores de médias semanais:", data.mealPlan.weeklyTotals);
