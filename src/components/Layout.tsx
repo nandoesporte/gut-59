@@ -1,15 +1,18 @@
+
 import { ReactNode, useEffect, useState } from "react";
 import Navigation from "./Navigation";
 import { supabase } from "@/integrations/supabase/client";
 import { useLocation, Outlet } from "react-router-dom";
 import { PaymentConfirmationDialog } from "./menu/components/PaymentConfirmationDialog";
 import { toast } from "sonner";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const Layout = () => {
   const [hasNewMessage, setHasNewMessage] = useState(false);
   const [showPaymentConfirmation, setShowPaymentConfirmation] = useState(false);
   const [paymentMessage, setPaymentMessage] = useState("");
   const location = useLocation();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -106,7 +109,7 @@ const Layout = () => {
           )}
         </div>
       </header>
-      <main className="w-full px-2 sm:px-6 lg:px-8 py-4 pb-24 animate-fadeIn mt-16">
+      <main className="w-full px-2 sm:px-6 lg:px-8 py-4 pb-28 animate-fadeIn mt-16">
         <Outlet />
       </main>
       <Navigation />

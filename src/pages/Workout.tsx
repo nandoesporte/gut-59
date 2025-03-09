@@ -9,11 +9,13 @@ import { Dumbbell } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import type { WorkoutPlan } from '@/components/workout/types/workout-plan';
 import { toast } from 'sonner';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const Workout = () => {
   const [preferences, setPreferences] = useState<WorkoutPreferences | null>(null);
   const [historyPlans, setHistoryPlans] = useState<WorkoutPlan[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const isMobile = useIsMobile();
 
   const fetchWorkoutHistory = useCallback(async () => {
     try {
@@ -70,20 +72,20 @@ const Workout = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
-      <div className="container mx-auto px-4 py-8 space-y-8">
-        <div className="text-center space-y-4">
+      <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6 space-y-6">
+        <div className="text-center space-y-3">
           <div className="inline-flex items-center justify-center p-2 bg-primary/10 rounded-full">
-            <Dumbbell className="w-6 h-6 text-primary" />
+            <Dumbbell className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
           </div>
-          <h1 className="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary-600">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary-600">
             Plano de Treino Personalizado
           </h1>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-sm sm:text-base text-muted-foreground max-w-2xl mx-auto">
             Crie um plano de treino personalizado baseado em suas preferências e objetivos
           </p>
         </div>
 
-        <div className="max-w-4xl mx-auto space-y-8">
+        <div className="max-w-4xl mx-auto space-y-6">
           {!preferences ? (
             <div className="transform transition-all duration-500 hover:scale-[1.01]">
               <PreferencesForm onSubmit={handlePreferencesSubmit} />
@@ -96,7 +98,7 @@ const Workout = () => {
             />
           )}
 
-          <div className="mt-8">
+          <div className="mt-6">
             <WorkoutHistory
               plans={historyPlans}
               isLoading={isLoadingHistory}
