@@ -1,3 +1,4 @@
+
 import { Card } from "@/components/ui/card";
 import { InitialMenuContent } from "@/components/menu/InitialMenuContent";
 import { CalorieCalculatorStep } from "@/components/menu/CalorieCalculatorStep";
@@ -27,12 +28,15 @@ const Menu = () => {
     mealPlan,
     formData,
     loading,
+    error,
     foodsError,
     handleCalculateCalories,
     handleFoodSelection,
     handleConfirmFoodSelection,
     handleDietaryPreferences,
+    handleRegeneratePlan,
     setFormData,
+    loadingTime
   } = useMenuController();
 
   useEffect(() => {
@@ -57,12 +61,12 @@ const Menu = () => {
 
   useEffect(() => {
     console.log("Current step:", currentStep);
-    console.log("Protocol foods count:", protocolFoods.length);
-    console.log("Selected foods count:", selectedFoods.length);
+    console.log("Protocol foods count:", protocolFoods?.length || 0);
+    console.log("Selected foods count:", selectedFoods?.length || 0);
     
     if (currentStep === 2) {
       console.log("Step 2 (food selection) is active");
-      if (protocolFoods.length === 0) {
+      if (protocolFoods?.length === 0) {
         console.log("Warning: No foods available for selection");
       }
     }
@@ -76,35 +80,6 @@ const Menu = () => {
       });
     }
   }, [currentStep, protocolFoods, selectedFoods, mealPlan]);
-
-  const handleRefreshMealPlan = async () => {
-    try {
-      toast.info("Funcionalidade de atualização em desenvolvimento");
-      return Promise.resolve();
-    } catch (error) {
-      console.error('Erro ao atualizar cardápio:', error);
-      toast.error("Erro ao atualizar o cardápio");
-      return Promise.reject(error);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-4">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <div className="text-center px-4">
-          <h3 className="text-lg font-semibold text-gray-900">
-            Gerando seu plano alimentar personalizado...
-          </h3>
-          <p className="text-sm text-gray-500 mt-1">
-            Este processo pode levar de 1 a 2 minutos.
-            <br />
-            Por favor, aguarde enquanto o Nutri+ prepara seu cardápio.
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 py-4 sm:py-8">
@@ -163,7 +138,7 @@ const Menu = () => {
                         Tentar Novamente
                       </button>
                     </div>
-                  ) : protocolFoods.length === 0 ? (
+                  ) : protocolFoods?.length === 0 ? (
                     <div className="p-6 text-center">
                       <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
                       <h3 className="text-lg font-medium mb-2">Sem dados de alimentos</h3>
@@ -191,7 +166,7 @@ const Menu = () => {
               )}
               {currentStep > 2 && (
                 <div className="text-center py-2">
-                  <p className="text-green-600 font-medium">✓ {selectedFoods.length} alimentos selecionados</p>
+                  <p className="text-green-600 font-medium">✓ {selectedFoods?.length || 0} alimentos selecionados</p>
                   <button 
                     onClick={() => setCurrentStep(2)} 
                     className="text-sm text-gray-500 underline mt-2 px-4 py-1 rounded-md hover:bg-gray-100 transition-colors"
@@ -237,7 +212,7 @@ const Menu = () => {
                   </h2>
                   <MealPlanDisplay
                     mealPlan={mealPlan}
-                    onRefresh={handleRefreshMealPlan}
+                    onRefresh={handleRegeneratePlan}
                   />
                 </Card>
               </div>
@@ -247,6 +222,25 @@ const Menu = () => {
           </div>
         </div>
       </div>
+      
+      {loading && (
+        <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-4">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <div className="text-center px-4">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Gerando seu plano alimentar personalizado...
+            </h3>
+            <p className="text-sm text-gray-500 mt-1">
+              Este processo pode levar de 1 a 2 minutos.
+              <br />
+              Por favor, aguarde enquanto o Nutri+ prepara seu cardápio.
+              {loadingTime > 0 && (
+                <span className="block mt-2">Tempo decorrido: {loadingTime}s</span>
+              )}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

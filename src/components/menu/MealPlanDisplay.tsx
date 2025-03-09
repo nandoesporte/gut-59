@@ -13,7 +13,7 @@ import {
   Moon,
   Sun
 } from "lucide-react";
-import { MealPlan, DailyNutrition } from "./types";
+import { MealPlan, DailyNutrition, RecommendationsObject } from "./types";
 import { MealSection } from "./components/MealSection";
 import { DailyTotals } from "./components/DailyTotals";
 import { Recommendations } from "./components/Recommendations";
@@ -67,6 +67,19 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
       </div>
     );
   }
+
+  // Convert recommendations to the expected format if needed
+  const formatRecommendations = (recs: string | string[] | RecommendationsObject | undefined): RecommendationsObject | undefined => {
+    if (!recs) return undefined;
+    
+    if (typeof recs === 'string') {
+      return { general: recs };
+    } else if (Array.isArray(recs)) {
+      return { general: recs.join('\n') };
+    }
+    
+    return recs as RecommendationsObject;
+  };
 
   return (
     <div className="space-y-6">
@@ -186,7 +199,7 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
       {mealPlan.recommendations && (
         <Card>
           <CardContent className="p-4 sm:p-6">
-            <Recommendations recommendations={mealPlan.recommendations} />
+            <Recommendations recommendations={formatRecommendations(mealPlan.recommendations)} />
           </CardContent>
         </Card>
       )}

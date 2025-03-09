@@ -9,16 +9,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Loader2, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { MealFood } from "../types";
+import { Food } from "../types";
 
 interface FoodReplacementDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  originalFood: MealFood;
+  originalFood: Food;
   dayKey: string;
   mealType: string;
   foodIndex: number;
-  onFoodReplaced: (originalFood: MealFood, newFood: MealFood, dayKey: string, mealType: string, foodIndex: number) => void;
+  onFoodReplaced: (originalFood: Food, newFood: Food, dayKey: string, mealType: string, foodIndex: number) => void;
 }
 
 interface SuggestedFood {
@@ -155,7 +155,7 @@ export const FoodReplacementDialog = ({
   };
 
   const handleReplace = () => {
-    let newFood: MealFood;
+    let newFood: Food;
 
     if (selectedOption === "suggestion" || selectedOption === "search") {
       const foodList = selectedOption === "suggestion" ? suggestions : searchResults;

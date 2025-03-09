@@ -1,101 +1,60 @@
 
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { MealPlan } from "../types";
+import React from "react";
+import { MealPlan } from "../types";
 
 interface MealPlanTableProps {
   mealPlan: MealPlan;
 }
 
-const dayNameMap: Record<string, string> = {
-  monday: "Segunda-feira",
-  tuesday: "Terça-feira",
-  wednesday: "Quarta-feira",
-  thursday: "Quinta-feira",
-  friday: "Sexta-feira",
-  saturday: "Sábado",
-  sunday: "Domingo"
-};
-
-const mealNameMap: Record<string, string> = {
-  breakfast: "Café da manhã",
-  morningSnack: "Lanche da manhã",
-  lunch: "Almoço",
-  afternoonSnack: "Lanche da tarde",
-  dinner: "Jantar"
-};
-
 export const MealPlanTable = ({ mealPlan }: MealPlanTableProps) => {
   if (!mealPlan || !mealPlan.weeklyPlan) {
-    return <div className="text-center p-4">Nenhum plano alimentar disponível</div>;
+    return <div>Não há dados disponíveis para exibir</div>;
   }
 
-  const tableRows: Array<{
-    day: string;
-    meal: string;
-    description: string;
-    foods: string;
-    quantities: string;
-    details: string;
-  }> = [];
-
-  // Convert the meal plan data to the table format
-  Object.entries(mealPlan.weeklyPlan).forEach(([dayKey, dayPlan]) => {
-    const dayName = dayNameMap[dayKey] || dayKey;
-    
-    Object.entries(dayPlan.meals).forEach(([mealKey, meal]) => {
-      if (!meal) return;
-      
-      const mealName = mealNameMap[mealKey] || mealKey;
-      
-      // Join food names for the "Ingredientes" column
-      const foodNames = meal.foods.map(food => food.name).join(", ");
-      
-      // Create quantities string
-      const quantities = meal.foods.map(food => 
-        `${food.portion}${food.unit}`
-      ).join(", ");
-      
-      tableRows.push({
-        day: dayName,
-        meal: mealName,
-        description: meal.description,
-        foods: foodNames,
-        quantities: quantities,
-        details: meal.foods.map(food => 
-          food.details ? food.details : "Sem instruções específicas"
-        ).join(". ")
-      });
-    });
-  });
-
-  console.log("Generated table rows for meal plan:", tableRows.length);
+  const dayNames: Record<string, string> = {
+    monday: "Segunda",
+    tuesday: "Terça",
+    wednesday: "Quarta", 
+    thursday: "Quinta",
+    friday: "Sexta",
+    saturday: "Sábado",
+    sunday: "Domingo"
+  };
 
   return (
     <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Dia</TableHead>
-            <TableHead>Refeição</TableHead>
-            <TableHead>Prato</TableHead>
-            <TableHead>Ingredientes</TableHead>
-            <TableHead>Quantidade (g/ml/unidade)</TableHead>
-            <TableHead>Modo de Preparo</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {tableRows.map((row, idx) => (
-            <TableRow key={idx}>
-              <TableCell className="font-medium">{row.day}</TableCell>
-              <TableCell>{row.meal}</TableCell>
-              <TableCell>{row.description}</TableCell>
-              <TableCell>{row.foods}</TableCell>
-              <TableCell>{row.quantities}</TableCell>
-              <TableCell className="whitespace-pre-wrap">{row.details}</TableCell>
-            </TableRow>
+      <table className="w-full border-collapse">
+        <thead>
+          <tr>
+            <th className="border p-2 bg-gray-50">Dia</th>
+            <th className="border p-2 bg-gray-50">Calorias</th>
+            <th className="border p-2 bg-gray-50">Proteína (g)</th>
+            <th className="border p-2 bg-gray-50">Carboidratos (g)</th>
+            <th className="border p-2 bg-gray-50">Gorduras (g)</th>
+            <th className="border p-2 bg-gray-50">Fibras (g)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {Object.entries(mealPlan.weeklyPlan).map(([day, dayPlan]) => (
+            <tr key={day}>
+              <td className="border p-2">{dayNames[day] || day}</td>
+              <td className="border p-2 text-center">{dayPlan.dailyTotals.calories}</td>
+              <td className="border p-2 text-center">{dayPlan.dailyTotals.protein}</td>
+              <td className="border p-2 text-center">{dayPlan.dailyTotals.carbs}</td>
+              <td className="border p-2 text-center">{dayPlan.dailyTotals.fats}</td>
+              <td className="border p-2 text-center">{dayPlan.dailyTotals.fiber}</td>
+            </tr>
           ))}
-        </TableBody>
-      </Table>
+          <tr className="bg-green-50 font-medium">
+            <td className="border p-2">Média Semanal</td>
+            <td className="border p-2 text-center">{mealPlan.weeklyTotals.averageCalories}</td>
+            <td className="border p-2 text-center">{mealPlan.weeklyTotals.averageProtein}</td>
+            <td className="border p-2 text-center">{mealPlan.weeklyTotals.averageCarbs}</td>
+            <td className="border p-2 text-center">{mealPlan.weeklyTotals.averageFats}</td>
+            <td className="border p-2 text-center">{mealPlan.weeklyTotals.averageFiber}</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   );
 };

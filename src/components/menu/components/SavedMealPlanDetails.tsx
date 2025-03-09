@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { MealSection } from "./MealSection";
 import { DailyTotals } from "./DailyTotals";
 import { Recommendations } from "./Recommendations";
-import { MealPlan, MealFood } from "../types";
+import { MealPlan, Food, RecommendationsObject } from "../types";
 import { supabase } from "@/integrations/supabase/client";
 import { FoodReplacementDialog } from "./FoodReplacementDialog";
 
@@ -32,25 +32,25 @@ export const SavedMealPlanDetails = ({ planId, planData, isOpen, onClose }: Save
   const [selectedDay, setSelectedDay] = useState<string>("monday");
   const [replaceFoodDialogOpen, setReplaceFoodDialogOpen] = useState(false);
   const [selectedFood, setSelectedFood] = useState<{
-    food: MealFood;
+    food: Food;
     dayKey: string;
     mealType: string;
     index: number;
   } | null>(null);
 
-  const handleReplaceFood = (food: MealFood, dayKey: string, mealType: string, index: number) => {
+  const handleReplaceFood = (food: Food, dayKey: string, mealType: string, index: number) => {
     setSelectedFood({ food, dayKey, mealType, index });
     setReplaceFoodDialogOpen(true);
   };
 
-  const handleFoodReplaced = async (originalFood: MealFood, newFood: MealFood, dayKey: string, mealType: string, foodIndex: number) => {
+  const handleFoodReplaced = async (originalFood: Food, newFood: Food, dayKey: string, mealType: string, foodIndex: number) => {
     try {
       // Create a deep copy of the plan data
       const updatedPlanData = JSON.parse(JSON.stringify(planData)) as MealPlan;
       
       // Update the specific food item
-      if (updatedPlanData.weeklyPlan[dayKey as keyof typeof updatedPlanData.weeklyPlan]?.meals) {
-        const dayPlan = updatedPlanData.weeklyPlan[dayKey as keyof typeof updatedPlanData.weeklyPlan];
+      if (updatedPlanData.weeklyPlan[dayKey]?.meals) {
+        const dayPlan = updatedPlanData.weeklyPlan[dayKey];
         const meal = dayPlan.meals[mealType as keyof typeof dayPlan.meals];
         
         if (meal && meal.foods && meal.foods[foodIndex]) {
@@ -88,8 +88,21 @@ export const SavedMealPlanDetails = ({ planId, planData, isOpen, onClose }: Save
     }
   };
 
+  // Function to format recommendations
+  const formatRecommendations = (recs: string | string[] | RecommendationsObject | undefined): RecommendationsObject | undefined => {
+    if (!recs) return undefined;
+    
+    if (typeof recs === 'string') {
+      return { general: recs };
+    } else if (Array.isArray(recs)) {
+      return { general: recs.join('\n') };
+    }
+    
+    return recs as RecommendationsObject;
+  };
+
   const renderDayPlan = (dayKey: string) => {
-    const dayPlan = planData.weeklyPlan[dayKey as keyof typeof planData.weeklyPlan];
+    const dayPlan = planData.weeklyPlan[dayKey];
     if (!dayPlan) return null;
 
     return (
@@ -247,7 +260,7 @@ export const SavedMealPlanDetails = ({ planId, planData, isOpen, onClose }: Save
           </Tabs>
 
           {planData.recommendations && (
-            <Recommendations recommendations={planData.recommendations} />
+            <Recommendations recommendations={formatRecommendations(planData.recommendations)} />
           )}
         </DialogContent>
       </Dialog>

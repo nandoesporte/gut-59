@@ -1,8 +1,13 @@
+
 export interface Food {
   name: string;
   portion: number;
   unit: string;
   details?: string;
+}
+
+export interface MealFood extends Food {
+  // Additional properties for foods that need to be replaced or modified
 }
 
 export interface Macros {
@@ -47,10 +52,17 @@ export interface WeeklyTotals {
   averageFiber: number;
 }
 
+export interface RecommendationsObject {
+  general?: string;
+  preworkout?: string;
+  postworkout?: string;
+  timing?: string | string[];
+}
+
 export interface MealPlan {
   weeklyPlan: Record<string, DayPlan>;
   weeklyTotals: WeeklyTotals;
-  recommendations?: string[] | string;
+  recommendations?: string[] | string | RecommendationsObject;
   userCalories?: number;
   created_at?: string;
   generatedBy?: string;
@@ -65,6 +77,12 @@ export interface ProtocolFood {
   fats: number;
   fiber: number;
   food_group_id?: number;
+  phase?: number;
+  phase_id?: number;
+  pre_workout_compatible?: boolean;
+  post_workout_compatible?: boolean;
+  portion_size?: number;
+  portion_unit?: string;
 }
 
 export interface DietaryPreferences {
@@ -72,4 +90,14 @@ export interface DietaryPreferences {
   allergies: string[];
   dietaryRestrictions: string[];
   trainingTime: string | null;
+}
+
+export interface CalorieCalculatorForm {
+  age: number;
+  weight: number;
+  height: number;
+  gender: string;
+  activity_level: string;
+  activityLevel: string;
+  goal: string;
 }

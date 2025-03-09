@@ -34,10 +34,11 @@ export const useMenuController = () => {
     dietaryRestrictions: [],
     trainingTime: null
   });
+  const [calorieNeeds, setCalorieNeeds] = useState<number>(0);
   
   // Import hooks
-  const { calculateCalories, calorieNeeds, setCalorieNeeds } = useCalorieCalculator();
-  const { protocolFoods, foodsError } = useProtocolFoods();
+  const { calculateCalories } = useCalorieCalculator();
+  const { protocolFoods, error: foodsError } = useProtocolFoods();
   const { selectedFoods, handleFoodSelection, totalCalories } = useFoodSelection();
   const { loading, mealPlan, error, generatePlan, loadingTime, setMealPlan } = useMealPlanGeneration();
 
@@ -54,12 +55,16 @@ export const useMenuController = () => {
   const handleCalculateCalories = () => {
     try {
       const calculatedCalories = calculateCalories(
-        formData.gender,
-        formData.age,
-        formData.weight,
-        formData.height,
-        formData.activity_level,
-        formData.goal
+        {
+          gender: formData.gender,
+          age: formData.age,
+          weight: formData.weight,
+          height: formData.height,
+          activity_level: formData.activity_level,
+          activityLevel: formData.activity_level,
+          goal: formData.goal
+        },
+        { multiplier: 1.0 }
       );
       setCalorieNeeds(calculatedCalories);
       setCurrentStep(2);
@@ -171,6 +176,7 @@ export const useMenuController = () => {
     handleConfirmFoodSelection,
     handleDietaryPreferences,
     handleRegeneratePlan,
-    loadingTime
+    loadingTime,
+    setCalorieNeeds
   };
 };

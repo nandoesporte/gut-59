@@ -1,13 +1,6 @@
 
 import { MacroDistributionBar } from "./MacroDistributionBar";
-
-interface DailyNutrition {
-  calories: number;
-  protein: number;
-  carbs: number;
-  fats: number;
-  fiber: number;
-}
+import { DailyNutrition } from "../types";
 
 interface DailyTotalsProps {
   totalNutrition?: DailyNutrition;

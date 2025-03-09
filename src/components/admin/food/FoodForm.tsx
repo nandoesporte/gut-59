@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,11 +21,12 @@ interface FoodFormProps {
 interface FoodDataType {
   name: string;
   calories: number;
-  phase: number | null;
+  phase_id?: number | null;
   food_group_id: number | null;
   protein: number | null;
   carbs: number | null;
   fats: number | null;
+  fiber: number | null;
   pre_workout_compatible: boolean;
   post_workout_compatible: boolean;
   portion_size: number | null;
@@ -32,17 +34,19 @@ interface FoodDataType {
   protein_per_100g?: number | null;
   carbs_per_100g?: number | null;
   fats_per_100g?: number | null;
+  fiber_per_100g?: number | null;
 }
 
 export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps) => {
   const [formData, setFormData] = useState<Partial<ProtocolFood>>({
     name: "",
-    phase: null,
+    phase_id: null,
     food_group_id: null,
     calories: 0,
     protein: null,
     carbs: null,
     fats: null,
+    fiber: null,
     pre_workout_compatible: true,
     post_workout_compatible: true,
     portion_size: 100,
@@ -74,7 +78,7 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
     setFormData(prev => ({
       ...prev,
       [name]: value === '' ? null : 
-        (name === 'phase' || name === 'food_group_id' ? parseInt(value) : value)
+        (name === 'phase_id' || name === 'food_group_id' ? parseInt(value) : value)
     }));
   };
 
@@ -104,11 +108,12 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
       const foodData: FoodDataType = {
         name: formData.name,
         calories: Number(formData.calories),
-        phase: formData.phase,
+        phase_id: formData.phase_id,
         food_group_id: formData.food_group_id,
         protein: formData.protein,
         carbs: formData.carbs,
         fats: formData.fats,
+        fiber: formData.fiber,
         pre_workout_compatible: formData.pre_workout_compatible || false,
         post_workout_compatible: formData.post_workout_compatible || false,
         portion_size: formData.portion_size,
@@ -125,6 +130,10 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
       
       if (formData.fats !== null && formData.portion_size && formData.portion_size !== 100) {
         foodData.fats_per_100g = (Number(formData.fats) / Number(formData.portion_size)) * 100;
+      }
+      
+      if (formData.fiber !== null && formData.portion_size && formData.portion_size !== 100) {
+        foodData.fiber_per_100g = (Number(formData.fiber) / Number(formData.portion_size)) * 100;
       }
 
       if (food) {
@@ -177,10 +186,10 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="phase">Fase</Label>
+          <Label htmlFor="phase_id">Fase</Label>
           <Select
-            value={formData.phase?.toString() || ''}
-            onValueChange={(value) => handleSelectChange('phase', value)}
+            value={formData.phase_id?.toString() || ''}
+            onValueChange={(value) => handleSelectChange('phase_id', value)}
           >
             <SelectTrigger>
               <SelectValue placeholder="Selecione a fase" />
@@ -257,7 +266,7 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="space-y-2">
           <Label htmlFor="protein">Proteína (g)</Label>
           <Input
@@ -287,6 +296,17 @@ export const FoodForm = ({ food, foodGroups, onSubmit, onCancel }: FoodFormProps
             name="fats"
             type="number"
             value={formData.fats === null ? '' : formData.fats}
+            onChange={handleChange}
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="fiber">Fibras (g)</Label>
+          <Input
+            id="fiber"
+            name="fiber"
+            type="number"
+            value={formData.fiber === null ? '' : formData.fiber}
             onChange={handleChange}
           />
         </div>

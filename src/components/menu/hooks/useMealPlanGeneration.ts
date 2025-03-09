@@ -90,8 +90,8 @@ export const useMealPlanGeneration = () => {
         
         // Process weeklyTotals if missing or has NaN values
         if (!data.mealPlan.weeklyTotals || 
-            isNaN(data.mealPlan.weeklyTotals.averageCalories) || 
-            isNaN(data.mealPlan.weeklyTotals.averageProtein)) {
+            isNaN(Number(data.mealPlan.weeklyTotals.averageCalories)) || 
+            isNaN(Number(data.mealPlan.weeklyTotals.averageProtein))) {
           
           console.log("Recalculando médias semanais");
           
@@ -99,18 +99,18 @@ export const useMealPlanGeneration = () => {
           const days = Object.values(weeklyPlan);
           const validDays = days.filter((day: any) => 
             day && day.dailyTotals && 
-            !isNaN(day.dailyTotals.calories) && 
-            !isNaN(day.dailyTotals.protein)
+            !isNaN(Number(day.dailyTotals.calories)) && 
+            !isNaN(Number(day.dailyTotals.protein))
           );
           
           const dayCount = validDays.length || 1; // Prevent division by zero
           
           data.mealPlan.weeklyTotals = {
-            averageCalories: Math.round(validDays.reduce((sum: number, day: any) => sum + day.dailyTotals.calories, 0) / dayCount),
-            averageProtein: Math.round(validDays.reduce((sum: number, day: any) => sum + day.dailyTotals.protein, 0) / dayCount),
-            averageCarbs: Math.round(validDays.reduce((sum: number, day: any) => sum + day.dailyTotals.carbs, 0) / dayCount),
-            averageFats: Math.round(validDays.reduce((sum: number, day: any) => sum + day.dailyTotals.fats, 0) / dayCount),
-            averageFiber: Math.round(validDays.reduce((sum: number, day: any) => sum + day.dailyTotals.fiber, 0) / dayCount)
+            averageCalories: Math.round(validDays.reduce((sum: number, day: any) => sum + Number(day.dailyTotals.calories), 0) / dayCount),
+            averageProtein: Math.round(validDays.reduce((sum: number, day: any) => sum + Number(day.dailyTotals.protein), 0) / dayCount),
+            averageCarbs: Math.round(validDays.reduce((sum: number, day: any) => sum + Number(day.dailyTotals.carbs), 0) / dayCount),
+            averageFats: Math.round(validDays.reduce((sum: number, day: any) => sum + Number(day.dailyTotals.fats), 0) / dayCount),
+            averageFiber: Math.round(validDays.reduce((sum: number, day: any) => sum + Number(day.dailyTotals.fiber), 0) / dayCount)
           };
         }
       }
@@ -125,7 +125,7 @@ export const useMealPlanGeneration = () => {
               plan_data: data.mealPlan,
               calories: userData.dailyCalories,
               generated_by: data.modelUsed || "nutri-plus-agent-llama3",
-              dietary_preferences: preferences // Save the user preferences with the meal plan
+              dietary_preferences: JSON.stringify(preferences) // Convert preferences to JSON string
             });
 
           if (saveError) {
