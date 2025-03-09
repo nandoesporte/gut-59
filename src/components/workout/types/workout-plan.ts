@@ -30,6 +30,7 @@ export interface WorkoutSession {
     volume?: string;
     progression?: string;
   };
+  intensity?: string; // Added this property
 }
 
 interface Critique {
@@ -46,4 +47,5 @@ export interface WorkoutPlan {
   end_date: string;
   workout_sessions: WorkoutSession[];
   critique?: Critique; // Added this property
+  created_at: string; // Added this property
 }
