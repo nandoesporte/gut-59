@@ -69,6 +69,7 @@ const TipsCalendar = () => {
         const savedTipsData = JSON.parse(savedTips);
         const updatedTips = savedTipsData.map((tip: Tip) => ({
           ...tip,
+          isUnlocked: tip.id <= getCurrentDay(),
           isRead: readTips.includes(tip.id)
         }));
         setTips(updatedTips);
@@ -77,16 +78,19 @@ const TipsCalendar = () => {
       console.error('Erro ao carregar dicas:', error);
       toast.error('Erro ao carregar as dicas do dia');
       
-      const currentDay = new Date().getDate();
       const fallbackTips = defaultTips.map((tip, index) => ({
         ...tip,
-        isUnlocked: index + 1 <= currentDay,
+        isUnlocked: index + 1 <= getCurrentDay(),
         isRead: false
       }));
       setTips(fallbackTips);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const getCurrentDay = () => {
+    return new Date().getDate();
   };
 
   const fetchTipsFromDB = async () => {
@@ -97,7 +101,7 @@ const TipsCalendar = () => {
     if (error) throw error;
 
     const tipsData = (data as DailyTip[]) || defaultTips;
-    const currentDay = new Date().getDate();
+    const currentDay = getCurrentDay();
     const readTips = JSON.parse(localStorage.getItem('readTips') || '[]');
     const currentMonth = new Date().getMonth();
 
