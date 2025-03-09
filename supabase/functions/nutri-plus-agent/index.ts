@@ -1,5 +1,4 @@
-
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
+// nutri-plus-agent: Uses Groq API to analyze user data and generate personalized meal plans
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -7,551 +6,782 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Obter chaves de API dos ambientes
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-const groqAPIKey = Deno.env.get('GROQ_API_KEY');
+const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY');
+const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 
 serve(async (req) => {
-  // Handle CORS preflight requests
+  // Handle CORS preflight request
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log("[NUTRI+] Iniciando agente Nutri+");
+    // Log start of process with timestamp
+    const startTime = new Date().toISOString();
+    console.log(`[NUTRI+] Process started at ${startTime}`);
+
+    // Parse the request body
     const requestData = await req.json();
     
-    if (!requestData || !requestData.userData || !requestData.selectedFoods) {
-      throw new Error("Dados de requisição incompletos. Verifique os parâmetros obrigatórios.");
+    // Validate request data
+    if (!requestData || !requestData.userData) {
+      console.error("[NUTRI+] Error: Invalid request data - userData missing");
+      return new Response(
+        JSON.stringify({ error: "Invalid request data" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+      );
     }
+
+    const { userData, selectedFoods, foodsByMealType, dietaryPreferences, modelConfig } = requestData;
+    console.log(`[NUTRI+] Data received for user: ${userData.id || 'anonymous'}`);
+    console.log(`[NUTRI+] User profile: ${userData.age} years, ${userData.gender}, ${userData.weight}kg, ${userData.height}cm`);
+    console.log(`[NUTRI+] Goal: ${userData.goal}, Daily calories: ${userData.dailyCalories}kcal`);
+    console.log(`[NUTRI+] Selected foods: ${selectedFoods?.length || 0}`);
+    console.log(`[NUTRI+] Preferences and restrictions: ${JSON.stringify(dietaryPreferences)}`);
     
-    const { userData, selectedFoods, foodsByMealType, dietaryPreferences } = requestData;
-    
-    console.log("[NUTRI+] Dados recebidos:", {
-      userData: {
-        weight: userData.weight,
-        height: userData.height,
-        age: userData.age,
-        gender: userData.gender,
-        goal: userData.goal
-      },
-      selectedFoodsCount: selectedFoods.length,
-      hasFoodsByMealType: !!foodsByMealType,
-      dietaryPreferencesProvided: !!dietaryPreferences
-    });
-
-    // Tradução para os nomes dos dias da semana em português
-    const dayTranslations = {
-      monday: "Segunda-feira",
-      tuesday: "Terça-feira",
-      wednesday: "Quarta-feira",
-      thursday: "Quinta-feira",
-      friday: "Sexta-feira",
-      saturday: "Sábado",
-      sunday: "Domingo"
-    };
-
-    // Tradução para os tipos de refeição em português
-    const mealTypeTranslations = {
-      breakfast: "Café da Manhã",
-      morningSnack: "Lanche da Manhã",
-      lunch: "Almoço",
-      afternoonSnack: "Lanche da Tarde",
-      dinner: "Jantar"
-    };
-
-    // Organizar alimentos por tipo de refeição se não foram fornecidos
-    const organizedFoodsByMealType = foodsByMealType || organizeFoodsByMealType(selectedFoods);
-    
-    console.log("[NUTRI+] Alimentos organizados por tipo de refeição");
-    for (const [mealType, foods] of Object.entries(organizedFoodsByMealType)) {
-      console.log(`[NUTRI+] ${mealType}: ${Array.isArray(foods) ? foods.length : 0} alimentos`);
+    if (!selectedFoods || selectedFoods.length === 0) {
+      console.error("[NUTRI+] Error: No foods selected");
+      return new Response(
+        JSON.stringify({ error: "No foods selected" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+      );
     }
 
-    // Usar sempre o modelo llama3-8b-8192 via Groq API
-    console.log("[NUTRI+] Usando exclusivamente o modelo llama3-8b-8192 via Groq API");
-    let result;
-    
-    try {
-      console.log("[NUTRI+] Chamando Groq API com modelo llama3-8b-8192");
-      result = await generateWithGroq(userData, organizedFoodsByMealType, dietaryPreferences, {
-        model: "llama3-8b-8192",
-        temperature: 0.7
-      });
-      console.log("[NUTRI+] Resposta da Groq API recebida com sucesso");
-    } catch (groqError) {
-      console.error("[NUTRI+] Erro ao gerar com Groq:", groqError);
-      throw new Error(`Erro ao gerar plano alimentar com llama3-8b-8192: ${groqError.message}`);
+    // Check if GROQ API key is available
+    if (!GROQ_API_KEY) {
+      console.error("[NUTRI+] Error: GROQ_API_KEY not found in environment variables");
+      return new Response(
+        JSON.stringify({ error: "API configuration error" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      );
     }
 
-    // Processar resultado e traduzir nomes dos dias
-    if (result && result.weeklyPlan) {
-      console.log("[NUTRI+] Processando e traduzindo plano alimentar gerado");
-      for (const [dayKey, dayPlan] of Object.entries(result.weeklyPlan)) {
-        // Traduzir nome do dia
-        if (dayTranslations[dayKey]) {
-          dayPlan.dayName = dayTranslations[dayKey];
-        }
+    // Prepare system message for Nutri+ agent
+    const systemMessage = `You are Nutri+, a nutrition expert agent that creates personalized meal plans. 
+Your task is to analyze user data and create a detailed, scientifically-based weekly meal plan.
 
-        // Traduzir nomes das refeições e adicionar mais detalhes de preparação
-        if (dayPlan.meals) {
-          Object.entries(dayPlan.meals).forEach(([mealType, meal]) => {
-            // Verificar se a refeição existe e tem alimentos
-            if (meal && meal.foods && Array.isArray(meal.foods)) {
-              // Adicionar detalhes adicionais de preparação para cada alimento
-              meal.foods = meal.foods.map(food => enhanceFoodPreparation(food, mealType));
-            }
-          });
-        }
-      }
-    }
-
-    // Verificar que o plano tem a estrutura esperada
-    if (!result || !result.weeklyPlan) {
-      console.error("[NUTRI+] Plano gerado incompleto ou inválido", result);
-      throw new Error("O plano alimentar gerado está incompleto ou em formato inválido");
-    }
-
-    if (!result.weeklyTotals) {
-      console.warn("[NUTRI+] Plano sem totais semanais, calculando...");
-      result.weeklyTotals = calculateWeeklyTotals(result.weeklyPlan);
-    }
-
-    console.log("[NUTRI+] Plano alimentar gerado com sucesso");
-    console.log("[NUTRI+] Modelo utilizado: llama3-8b-8192");
-
-    return new Response(JSON.stringify({ 
-      mealPlan: result, 
-      modelUsed: "llama3-8b-8192"
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-  } catch (error) {
-    console.error("[NUTRI+] Erro no agente Nutri+:", error);
-    return new Response(JSON.stringify({ 
-      error: error instanceof Error ? error.message : "Erro interno no servidor",
-      stack: error instanceof Error ? error.stack : undefined
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+IMPORTANT OUTPUT FORMAT RULES:
+1. Your response MUST be valid JSON that can be processed with JSON.parse().
+2. Your response must contain ONLY the JSON object without explanations, narratives or additional text.
+3. CRITICALLY IMPORTANT: All numerical values must be numbers, not strings. For example, use "protein": 26 instead of "protein": "26g".
+4. NEVER add units (like "g" or "kcal") after numerical values in the JSON. These values must be numbers only.
+5. The output must follow exactly this structure:
+{
+  "mealPlan": {
+    "weeklyPlan": {
+      "monday": { /* daily plan structure */ },
+      "tuesday": { /* daily plan structure */ },
+      /* ... other days ... */
+    },
+    "weeklyTotals": { /* weekly nutritional averages */ },
+    "recommendations": { /* personalized recommendations */ }
   }
-});
-
-// Função para calcular totais semanais
-function calculateWeeklyTotals(weeklyPlan) {
-  console.log("[NUTRI+] Calculando totais semanais");
-  
-  if (!weeklyPlan || typeof weeklyPlan !== 'object') {
-    console.error("[NUTRI+] weeklyPlan inválido para cálculo de totais:", weeklyPlan);
-    return {
-      averageCalories: 0,
-      averageProtein: 0,
-      averageCarbs: 0,
-      averageFats: 0,
-      averageFiber: 0
-    };
-  }
-  
-  const days = Object.values(weeklyPlan);
-  const validDays = days.filter((day: any) => 
-    day && day.dailyTotals && 
-    !isNaN(Number(day.dailyTotals.calories)) && 
-    !isNaN(Number(day.dailyTotals.protein))
-  );
-  
-  const dayCount = validDays.length || 1;
-  
-  let caloriesTotal = 0;
-  let proteinTotal = 0;
-  let carbsTotal = 0;
-  let fatsTotal = 0;
-  let fiberTotal = 0;
-  
-  for (const day of validDays as any[]) {
-    caloriesTotal += Number(day.dailyTotals?.calories || 0);
-    proteinTotal += Number(day.dailyTotals?.protein || 0);
-    carbsTotal += Number(day.dailyTotals?.carbs || 0);
-    fatsTotal += Number(day.dailyTotals?.fats || 0);
-    fiberTotal += Number(day.dailyTotals?.fiber || 0);
-  }
-  
-  return {
-    averageCalories: Math.round(caloriesTotal / dayCount),
-    averageProtein: Math.round(proteinTotal / dayCount),
-    averageCarbs: Math.round(carbsTotal / dayCount),
-    averageFats: Math.round(fatsTotal / dayCount),
-    averageFiber: Math.round(fiberTotal / dayCount)
-  };
 }
 
-// Função para organizar alimentos por tipo de refeição
-function organizeFoodsByMealType(foods) {
-  // Definir grupos de alimentos por tipo de refeição
-  const mealTypeGroups = {
-    breakfast: [1, 2, 3, 6], // Vegetais, frutas, grãos, laticínios
-    morningSnack: [2, 6, 7], // Frutas, laticínios, gorduras saudáveis
-    lunch: [1, 3, 4, 5], // Vegetais, grãos, proteínas animais e vegetais
-    afternoonSnack: [2, 6, 7], // Similar ao lanche da manhã
-    dinner: [1, 3, 4, 5] // Similar ao almoço
-  };
-
-  const result = {};
-  
-  // Organizar alimentos por tipo de refeição
-  for (const [mealType, groupIds] of Object.entries(mealTypeGroups)) {
-    result[mealType] = foods.filter(food => 
-      groupIds.includes(food.food_group_id) || 
-      // Incluir alimentos sem grupo definido em todas as refeições
-      !food.food_group_id || food.food_group_id === 10
-    );
-  }
-  
-  return result;
-}
-
-// Função para melhorar detalhes de preparação dos alimentos
-function enhanceFoodPreparation(food, mealType) {
-  const updatedFood = { ...food };
-  
-  if (!updatedFood.details || updatedFood.details.length < 10) {
-    const foodName = updatedFood.name.toLowerCase();
-    
-    if (foodName.includes("arroz")) {
-      updatedFood.details = "Cozinhe o arroz na proporção de 2 partes de água para 1 de arroz. Refogue com um pouco de azeite e alho antes de adicionar a água. Cozinhe em fogo baixo com tampa por aproximadamente 15-20 minutos.";
-    } else if (foodName.includes("feijão")) {
-      updatedFood.details = "Deixe o feijão de molho por pelo menos 4 horas antes do preparo. Cozinhe na panela de pressão por aproximadamente 25-30 minutos. Tempere com cebola, alho e uma folha de louro para dar sabor.";
-    } else if (foodName.includes("frango") || foodName.includes("peito de frango")) {
-      updatedFood.details = "Tempere o frango com sal, pimenta e ervas de sua preferência. Grelhe em uma frigideira antiaderente com um fio de azeite por cerca de 6-7 minutos de cada lado até dourar. Deixe descansar por 5 minutos antes de servir.";
-    } else if (foodName.includes("peixe") || foodName.includes("salmão") || foodName.includes("tilápia")) {
-      updatedFood.details = "Tempere o peixe com sal, limão e ervas. Cozinhe em uma frigideira com azeite em fogo médio-alto por 3-4 minutos de cada lado. Verifique se está cozido quando a carne estiver opaca e se desfazendo facilmente.";
-    } else if (foodName.includes("ovo") || foodName.includes("ovos")) {
-      updatedFood.details = "Para ovos mexidos: bata os ovos em uma tigela com uma pitada de sal. Cozinhe em fogo baixo, mexendo constantemente. Para ovos cozidos: cozinhe em água fervente por 6 minutos (gema mole) ou 9 minutos (gema dura).";
-    } else if (foodName.includes("aveia") || foodName.includes("mingau")) {
-      updatedFood.details = "Misture a aveia com leite ou água na proporção de 1:2. Aqueça em fogo baixo por 3-5 minutos, mexendo constantemente. Adicione canela ou frutas para dar sabor.";
-    } else if (foodName.includes("salada")) {
-      updatedFood.details = "Lave bem todos os vegetais. Corte em pedaços do tamanho desejado. Misture com um molho simples de azeite, limão e sal. Consuma imediatamente para preservar os nutrientes e a textura.";
-    } else if (foodName.includes("batata") || foodName.includes("batata-doce")) {
-      updatedFood.details = "Cozinhe a batata em água fervente até que esteja macia (cerca de 15-20 minutos). Para assar, corte em cubos, tempere com azeite, sal e ervas, e asse a 200°C por 25-30 minutos.";
-    } else if (foodName.includes("iogurte")) {
-      updatedFood.details = "Consuma o iogurte gelado. Para torná-lo mais nutritivo, adicione frutas frescas, granola ou sementes.";
-    } else if (foodName.includes("maçã") || foodName.includes("banana") || foodName.includes("fruta")) {
-      updatedFood.details = "Lave bem a fruta antes de consumir. Pode ser consumida in natura ou cortada em pedaços para facilitar o consumo.";
-    } else {
-      // Instruções de preparo específicas para cada tipo de refeição
-      if (mealType === "breakfast") {
-        updatedFood.details = "Prepare este alimento de forma leve e nutritiva para o café da manhã. Consuma pela manhã para garantir energia para o início do dia.";
-      } else if (mealType === "morningSnack") {
-        updatedFood.details = "Prepare como um lanche leve da manhã. Ideal para manter os níveis de energia entre o café da manhã e o almoço.";
-      } else if (mealType === "lunch") {
-        updatedFood.details = "Prepare de acordo com suas preferências culinárias para o almoço. Utilize temperos naturais como ervas frescas e limão para realçar o sabor sem adicionar sódio em excesso.";
-      } else if (mealType === "afternoonSnack") {
-        updatedFood.details = "Preparação rápida e simples para o lanche da tarde. Consuma entre o almoço e o jantar para manter o metabolismo ativo.";
-      } else if (mealType === "dinner") {
-        updatedFood.details = "Prepare para o jantar de forma leve. Evite o uso excessivo de sal e óleo. Consuma pelo menos 2 horas antes de dormir para melhor digestão.";
-      }
+Make sure weeklyPlan contains ALL 7 days (Monday to Sunday). Each day must have the following structure:
+{
+  "dayName": "Day Name",
+  "meals": {
+    "breakfast": {
+      "description": "Breakfast description",
+      "foods": [{"name": "Food name", "portion": 100, "unit": "g", "details": "Details about food preparation and consumption"}],
+      "calories": 500,
+      "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
+    },
+    "morningSnack": {
+      "description": "Morning snack description",
+      "foods": [{"name": "Food name", "portion": 100, "unit": "g", "details": "Details about food preparation and consumption"}],
+      "calories": 500,
+      "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
+    },
+    "lunch": {
+      "description": "Lunch description",
+      "foods": [{"name": "Food name", "portion": 100, "unit": "g", "details": "Details about food preparation and consumption"}],
+      "calories": 500,
+      "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
+    },
+    "afternoonSnack": {
+      "description": "Afternoon snack description",
+      "foods": [{"name": "Food name", "portion": 100, "unit": "g", "details": "Details about food preparation and consumption"}],
+      "calories": 500,
+      "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
+    },
+    "dinner": {
+      "description": "Dinner description",
+      "foods": [{"name": "Food name", "portion": 100, "unit": "g", "details": "Details about food preparation and consumption"}],
+      "calories": 500,
+      "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
     }
-  }
-  
-  return updatedFood;
+  },
+  "dailyTotals": {"calories": 2000, "protein": 120, "carbs": 180, "fats": 60, "fiber": 25}
 }
 
-// Função para gerar com Groq (única função de geração mantida)
-async function generateWithGroq(userData, foodsByMealType, dietaryPreferences, modelConfig) {
-  if (!groqAPIKey) {
-    throw new Error("API key do Groq não configurada");
-  }
+IMPORTANT: Use exactly the property names specified above:
+- Use "breakfast" for breakfast (not "breakfast_meal" or "morning_meal")
+- Use "morningSnack" for morning snack (not "morning_snack")
+- Use "lunch" for lunch
+- Use "afternoonSnack" for afternoon snack (not "afternoon_snack")
+- Use "dinner" for dinner
 
-  console.log("[NUTRI+] Preparando dados para o modelo llama3-8b-8192 via Groq");
-  
-  // Preparar os dados para envio
-  const prompt = generateNutriPlusPrompt(userData, foodsByMealType, dietaryPreferences);
-  
-  try {
-    console.log("[NUTRI+] Enviando requisição para Groq com modelo llama3-8b-8192");
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
+It is ESSENTIAL that each food in the "foods" list contains detailed preparation instructions in the "details" field, explaining how the food should be prepared, cooked, or consumed.
+
+IMPORTANT: Strictly respect the categorization of foods by meal type:
+- Foods categorized as 'breakfast' should be placed ONLY in the breakfast meal
+- Foods categorized as 'morning_snack' should be placed ONLY in the morning snack
+- Foods categorized as 'lunch' should be placed ONLY in lunch
+- Foods categorized as 'afternoon_snack' should be placed ONLY in the afternoon snack
+- Foods categorized as 'dinner' should be placed ONLY in dinner
+
+Recommendations should include:
+{
+  "general": "General nutrition advice",
+  "preworkout": "Pre-workout nutrition advice",
+  "postworkout": "Post-workout nutrition advice",
+  "timing": ["Specific meal timing advice", "Another timing advice"]
+}
+
+REMEMBER: ALL NUMERICAL VALUES MUST BE INTEGERS OR DECIMALS, NOT STRINGS WITH UNITS. THIS IS A CRITICAL REQUIREMENT.
+
+IMPORTANT: Due to technical limitations, your response CANNOT exceed 8000 tokens. If necessary, simplify food preparation descriptions, but NEVER omit essential information like calories, macronutrients, or required items.`;
+
+    // Construct user message with all relevant data
+    const userMessage = `Create a personalized weekly meal plan based on this data:
+
+USER PROFILE:
+- Age: ${userData.age}
+- Gender: ${userData.gender}
+- Weight: ${userData.weight}kg
+- Height: ${userData.height}cm
+- Activity Level: ${userData.activityLevel}
+- Goal: ${userData.goal}
+- Daily Calorie Target: ${userData.dailyCalories}kcal
+
+FOOD PREFERENCES:
+${dietaryPreferences.hasAllergies ? `- Allergies: ${dietaryPreferences.allergies.join(', ')}` : '- No known allergies'}
+${dietaryPreferences.dietaryRestrictions && dietaryPreferences.dietaryRestrictions.length > 0 ? `- Dietary Restrictions: ${dietaryPreferences.dietaryRestrictions.join(', ')}` : '- No dietary restrictions'}
+${dietaryPreferences.trainingTime ? `- Training Time: ${dietaryPreferences.trainingTime}` : '- No specific training time'}
+
+AVAILABLE FOODS (${selectedFoods.length} total):
+${selectedFoods.slice(0, 30).map(food => `- ${food.name} (${food.calories} kcal, P:${food.protein}g, C:${food.carbs}g, F:${food.fats}g)`).join('\n')}
+${selectedFoods.length > 30 ? `\n... and ${selectedFoods.length - 30} more foods.` : ''}
+
+${foodsByMealType ? `FOODS CATEGORIZED BY MEAL:
+${Object.entries(foodsByMealType).map(([mealType, foods]) => 
+  `- ${mealType}: ${Array.isArray(foods) ? foods.length : 0} foods`
+).join('\n')}` : ''}
+
+Please create a 7-day plan that:
+1. Meets the ${userData.dailyCalories} daily calorie target (with a margin of +/- 100 kcal)
+2. Properly distributes macronutrients (proteins, carbohydrates, fats, fiber)
+3. Uses the provided available foods
+4. Respects the user's food preferences and restrictions
+5. Provides variety throughout the week
+6. Includes all meal types: breakfast, morning snack, lunch, afternoon snack, dinner
+7. Calculates calories and macros for each meal and day
+8. Provides preparation details for each food
+9. CRITICAL: Uses only numerical values for quantities, without adding units like "g" or "kcal"
+10. For example, use "protein": 26 instead of "protein": "26g"
+11. Uses the correct meal nomenclature in camelCase: "breakfast", "morningSnack", "lunch", "afternoonSnack", "dinner" - don't use underscore versions like "morning_snack" or "afternoon_snack"`;
+
+    // Track time for API call preparation
+    console.log(`[NUTRI+] Preparing API call at ${new Date().toISOString()}`);
+
+    // Get model settings from request or use defaults
+    const modelName = modelConfig?.model || "llama3-8b-8192";
+    const temperature = modelConfig?.temperature || 0.3;
+    
+    console.log(`[NUTRI+] Using model: ${modelName} with temperature: ${temperature}`);
+
+    // Prepare the API call to Groq
+    const groqPayload = {
+      model: modelName,
+      messages: [
+        { role: "system", content: systemMessage },
+        { role: "user", content: userMessage }
+      ],
+      temperature: temperature, // Lower temperature for more consistent output
+      max_tokens: 7000,
+      top_p: 0.9,
+      response_format: { type: "json_object" } // Request JSON format response
+    };
+
+    console.log(`[NUTRI+] Calling Groq API with model: ${groqPayload.model}`);
+
+    // Call the Groq API
+    const response = await fetch(GROQ_API_URL, {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${groqAPIKey}`
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${GROQ_API_KEY}`
       },
-      body: JSON.stringify({
-        model: "llama3-8b-8192",
-        messages: [
-          {
-            role: 'system',
-            content: 'Você é um nutricionista especializado em criar planos alimentares personalizados. Responda apenas com o objeto JSON conforme solicitado, sem texto adicional. Use português brasileiro para todos os textos.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: modelConfig?.temperature || 0.7,
-        max_tokens: 4000
-      })
+      body: JSON.stringify(groqPayload)
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[NUTRI+] Erro na resposta da Groq API (${response.status}):`, errorText);
-      let errorObj;
-      try {
-        errorObj = JSON.parse(errorText);
-      } catch (e) {
-        errorObj = { error: errorText };
-      }
-      throw new Error(`Erro na API da Groq: ${response.status} ${response.statusText} - ${JSON.stringify(errorObj)}`);
-    }
-
-    const data = await response.json();
-    console.log("[NUTRI+] Resposta recebida do modelo llama3-8b-8192 via Groq");
-
-    if (!data.choices || !data.choices[0] || !data.choices[0].message || !data.choices[0].message.content) {
-      throw new Error("Resposta inválida da Groq API");
-    }
-
-    // Processar o JSON gerado pelo modelo
-    try {
-      // Tente extrair o JSON da resposta
-      const content = data.choices[0].message.content;
-      console.log("[NUTRI+] Conteúdo da resposta bruta (Groq):", content.substring(0, 200) + "...");
+      const errorData = await response.text();
+      console.error(`[NUTRI+] Groq API Error (${response.status}):`, errorData);
       
-      // Extrair e processar o JSON
-      const jsonData = extractJSON(content, "Groq");
-      console.log("[NUTRI+] JSON parseado com sucesso (Groq)");
-      
-      return jsonData;
-    } catch (jsonError) {
-      console.error("[NUTRI+] Erro ao processar JSON da resposta da Groq:", jsonError);
-      throw new Error("Falha ao processar o JSON do plano alimentar da Groq API");
-    }
-  } catch (error) {
-    console.error("[NUTRI+] Erro ao gerar com Groq:", error);
-    throw error;
-  }
-}
-
-// Função para extrair e corrigir JSON da resposta do modelo
-function extractJSON(content, modelName) {
-  console.log(`[NUTRI+] Extraindo JSON da resposta do ${modelName}`);
-  
-  try {
-    // Primeiro, tenta parsear diretamente
-    try {
-      return JSON.parse(content);
-    } catch (e) {
-      console.log(`[NUTRI+] Parse direto falhou, tentando extrair JSON válido`);
-    }
-    
-    // Determinar o início e fim do JSON
-    let jsonStr = content;
-    
-    // Remover texto antes do primeiro '{'
-    const jsonStart = content.indexOf('{');
-    if (jsonStart > 0) {
-      jsonStr = content.substring(jsonStart);
-      console.log(`[NUTRI+] Removido ${jsonStart} caracteres antes do início do JSON`);
-    }
-    
-    // Remover texto após o último '}'
-    const jsonEnd = jsonStr.lastIndexOf('}');
-    if (jsonEnd >= 0 && jsonEnd < jsonStr.length - 1) {
-      jsonStr = jsonStr.substring(0, jsonEnd + 1);
-      console.log(`[NUTRI+] Removido texto após o final do JSON`);
-    }
-    
-    // Verificar se o JSON possui chaves de abertura e fechamento
-    if (!jsonStr.trim().startsWith('{') || !jsonStr.trim().endsWith('}')) {
-      console.error(`[NUTRI+] Formato de resposta inesperado (${modelName}):`, jsonStr);
-      
-      // Tentar extrair usando regex como último recurso
-      const jsonMatch = content.match(/{[\s\S]*}/);
-      if (jsonMatch && jsonMatch[0]) {
-        jsonStr = jsonMatch[0];
-        console.log(`[NUTRI+] Extraído JSON via regex: ${jsonStr.substring(0, 50)}...`);
-      } else {
-        throw new Error("Não foi possível extrair um objeto JSON válido da resposta");
-      }
-    }
-    
-    // Tentar reparar JSON
-    jsonStr = jsonStr
-      .replace(/\\'/g, "'")
-      .replace(/\\"/g, '"')
-      .replace(/\\n/g, ' ')
-      .replace(/\\r/g, ' ')
-      .replace(/\\t/g, ' ')
-      .replace(/\n/g, ' ')
-      .replace(/\r/g, ' ')
-      .replace(/\t/g, ' ');
-    
-    // Tentar parsear JSON reparado
-    try {
-      const result = JSON.parse(jsonStr);
-      return result;
-    } catch (parseError) {
-      console.error(`[NUTRI+] Erro ao parsear JSON reparado:`, parseError);
-      
-      // Logging mais detalhado para diagnóstico
-      for (let i = 0; i < jsonStr.length; i += 5000) {
-        const chunk = jsonStr.substring(i, i + 5000);
-        console.log(`[NUTRI+] Chunk ${i}-${i+5000} do JSON:`, chunk);
-      }
-      
-      throw new Error(`Falha ao parsear JSON: ${parseError.message}`);
-    }
-  } catch (error) {
-    console.error(`[NUTRI+] Erro ao extrair JSON:`, error);
-    throw new Error(`Erro ao extrair e processar JSON: ${error.message}`);
-  }
-}
-
-// Função para gerar o prompt para o NutriPlus
-function generateNutriPlusPrompt(userData, foodsByMealType, dietaryPreferences) {
-  // Mapear nome dos grupos alimentares
-  const foodGroups = {
-    1: "Verduras e Legumes",
-    2: "Frutas",
-    3: "Grãos e Cereais",
-    4: "Proteínas Animais",
-    5: "Proteínas Vegetais",
-    6: "Laticínios",
-    7: "Gorduras",
-    8: "Condimentos",
-    9: "Bebidas",
-    10: "Outros"
-  };
-
-  // Calcular macros ideais baseados nas calorias e objetivo
-  const idealMacros = {
-    protein: 0,
-    carbs: 0,
-    fats: 0
-  };
-
-  switch (userData.goal) {
-    case "lose_weight":
-      idealMacros.protein = Math.round(userData.weight * 2); // 2g por kg
-      idealMacros.fats = Math.round(userData.weight * 1); // 1g por kg
-      idealMacros.carbs = Math.round((userData.dailyCalories - (idealMacros.protein * 4 + idealMacros.fats * 9)) / 4);
-      break;
-    case "gain_weight":
-      idealMacros.protein = Math.round(userData.weight * 2); // 2g por kg
-      idealMacros.fats = Math.round(userData.weight * 1); // 1g por kg
-      idealMacros.carbs = Math.round((userData.dailyCalories - (idealMacros.protein * 4 + idealMacros.fats * 9)) / 4);
-      break;
-    default: // maintain
-      idealMacros.protein = Math.round(userData.weight * 1.8); // 1.8g por kg
-      idealMacros.fats = Math.round(userData.weight * 1); // 1g por kg
-      idealMacros.carbs = Math.round((userData.dailyCalories - (idealMacros.protein * 4 + idealMacros.fats * 9)) / 4);
-  }
-
-  // Montar texto de alimentos organizados por tipo de refeição
-  const mealTypesSection = Object.entries(foodsByMealType)
-    .map(([mealType, foods]) => {
-      if (!foods || !Array.isArray(foods) || foods.length === 0) return `### ${mealType}: Nenhum alimento disponível`;
-      
-      return `### ${mealType}:
-${foods.map(food => `- ${food.name}: ${food.calories || 0} kcal, ${food.protein || 0}g proteína, ${food.carbs || 0}g carboidratos, ${food.fats || 0}g gorduras`).join('\n')}`;
-    })
-    .join('\n\n');
-
-  // Construir o prompt em português
-  return `
-Você é um nutricionista especializado em criar planos alimentares personalizados em português do Brasil.
-
-## DADOS DO USUÁRIO:
-- Peso: ${userData.weight} kg
-- Altura: ${userData.height} cm
-- Idade: ${userData.age} anos
-- Gênero: ${userData.gender === 'male' ? 'Masculino' : 'Feminino'}
-- Nível de Atividade: ${userData.activityLevel}
-- Objetivo: ${userData.goal}
-- Calorias Diárias: ${userData.dailyCalories} kcal
-
-## MACRONUTRIENTES IDEAIS:
-- Proteínas: ${idealMacros.protein}g
-- Carboidratos: ${idealMacros.carbs}g
-- Gorduras: ${idealMacros.fats}g
-
-## PREFERÊNCIAS DIETÉTICAS:
-${dietaryPreferences?.hasAllergies ? `- Alergias: ${dietaryPreferences.allergies?.join(', ')}` : '- Sem alergias'}
-${dietaryPreferences?.dietaryRestrictions?.length > 0 ? `- Restrições: ${dietaryPreferences.dietaryRestrictions.join(', ')}` : '- Sem restrições alimentares'}
-${dietaryPreferences?.trainingTime ? `- Horário de Treino: ${dietaryPreferences.trainingTime}` : '- Sem treino'}
-
-## ALIMENTOS DISPONÍVEIS POR TIPO DE REFEIÇÃO:
-${mealTypesSection}
-
-## ESTRUTURA DE SAÍDA
-Crie um plano alimentar semanal para 7 dias apresentado em formato JSON, totalmente em português do Brasil:
-
-{
-  "weeklyPlan": {
-    "monday": {
-      "dayName": "Segunda-feira",
-      "meals": {
-        "breakfast": {
-          "description": "string",
-          "foods": [
-            {
-              "name": "string",
-              "portion": number,
-              "unit": "g | ml | unidade | colher",
-              "details": "string"
+      // If we received a JSON generation error, we'll try to fix the failed_generation content
+      if (response.status === 400 && errorData.includes('json_validate_failed')) {
+        try {
+          const errorJson = JSON.parse(errorData);
+          if (errorJson.error && errorJson.error.failed_generation) {
+            console.log("[NUTRI+] Attempting to fix invalid JSON...");
+            
+            // Get the failed JSON generation
+            let failedJson = errorJson.error.failed_generation;
+            
+            // Fix values with unit suffixes (like "26g" -> 26)
+            failedJson = failedJson.replace(/"protein":\s*"?(\d+)g"?/g, '"protein": $1');
+            failedJson = failedJson.replace(/"carbs":\s*"?(\d+)g"?/g, '"carbs": $1');
+            failedJson = failedJson.replace(/"fats":\s*"?(\d+)g"?/g, '"fats": $1');
+            failedJson = failedJson.replace(/"fiber":\s*"?(\d+)g"?/g, '"fiber": $1');
+            failedJson = failedJson.replace(/"calories":\s*"?(\d+)kcal"?/g, '"calories": $1');
+            failedJson = failedJson.replace(/"calories":\s*"?(\d+)\s*kcal"?/g, '"calories": $1');
+            failedJson = failedJson.replace(/"protein":\s*"?(\d+)\s*g"?/g, '"protein": $1');
+            failedJson = failedJson.replace(/"carbs":\s*"?(\d+)\s*g"?/g, '"carbs": $1');
+            failedJson = failedJson.replace(/"fats":\s*"?(\d+)\s*g"?/g, '"fats": $1');
+            failedJson = failedJson.replace(/"fiber":\s*"?(\d+)\s*g"?/g, '"fiber": $1');
+            
+            // Fix common JSON format issues with meal types
+            failedJson = failedJson
+              .replace(/"morning_snack":/g, '"morningSnack":')
+              .replace(/"afternoon_snack":/g, '"afternoonSnack":')
+              .replace(/"evening_snack":/g, '"eveningSnack":')
+              .replace(/"pre_workout":/g, '"preWorkout":')
+              .replace(/"post_workout":/g, '"postWorkout":')
+              // Fix common issues with array commas
+              .replace(/,\s*\]/g, ']')         // Remove trailing commas in arrays
+              .replace(/,\s*\}/g, '}')         // Remove trailing commas in objects
+              .replace(/\.\.\.[\s\n]*\}/g, '}')  // Fix ellipsis in JSON
+              .replace(/\.\.\.[\s\n]*\]/g, ']'); // Fix ellipsis in JSON
+            
+            // Advanced fix for ... outros dias ... pattern which breaks the JSON
+            failedJson = failedJson.replace(/(\s*"[^"]+"\s*:\s*\{\s*\/\*[^*]*\*\/\s*\})(,\s*\/\*\s*\.\.\.\s*outros\s*dias\s*\.\.\.\s*\*\/)/g, 
+              (match, group1) => {
+                return group1;
+              }
+            );
+            
+            // Attempt to complete truncated JSON if necessary
+            if (!failedJson.endsWith('}')) {
+              // Count open and close braces to determine needed closing
+              const openBraces = (failedJson.match(/\{/g) || []).length;
+              const closeBraces = (failedJson.match(/\}/g) || []).length;
+              const missingCloseBraces = openBraces - closeBraces;
+              
+              if (missingCloseBraces > 0) {
+                failedJson = failedJson + '}'.repeat(missingCloseBraces);
+              }
             }
-          ],
-          "calories": number,
-          "macros": {
-            "protein": number,
-            "carbs": number,
-            "fats": number,
-            "fiber": number
+            
+            try {
+              // Try to parse the fixed JSON
+              const fixedMealPlan = JSON.parse(failedJson);
+              console.log("[NUTRI+] JSON successfully fixed!");
+              
+              // Process the meal plan to ensure all numerical values are actually numbers
+              const processNumericalValues = (obj) => {
+                if (!obj || typeof obj !== 'object') return obj;
+                
+                Object.keys(obj).forEach(key => {
+                  // If this is a macros object, ensure all values are numbers
+                  if (key === 'macros' && obj[key]) {
+                    ['protein', 'carbs', 'fats', 'fiber'].forEach(macro => {
+                      if (obj[key][macro] !== undefined) {
+                        // If it's a string potentially with unit (e.g. "26g"), convert to number
+                        if (typeof obj[key][macro] === 'string') {
+                          const numValue = parseInt(obj[key][macro].replace(/[^\d.]/g, ''), 10);
+                          if (!isNaN(numValue)) obj[key][macro] = numValue;
+                        }
+                      }
+                    });
+                  }
+                  
+                  // For calories and dailyTotals
+                  if ((key === 'calories' || key === 'dailyTotals') && obj[key] && typeof obj[key] === 'object') {
+                    ['calories', 'protein', 'carbs', 'fats', 'fiber'].forEach(nutrient => {
+                      if (obj[key][nutrient] !== undefined) {
+                        // If it's a string potentially with unit, convert to number
+                        if (typeof obj[key][nutrient] === 'string') {
+                          const numValue = parseInt(obj[key][nutrient].replace(/[^\d.]/g, ''), 10);
+                          if (!isNaN(numValue)) obj[key][nutrient] = numValue;
+                        }
+                      }
+                    });
+                  } else if (key === 'calories' && typeof obj[key] === 'string') {
+                    // Direct calories property as string (e.g., "500kcal")
+                    const numValue = parseInt(obj[key].replace(/[^\d.]/g, ''), 10);
+                    if (!isNaN(numValue)) obj[key] = numValue;
+                  }
+                  
+                  // Process weeklyTotals
+                  if (key === 'weeklyTotals' && obj[key]) {
+                    ['averageCalories', 'averageProtein', 'averageCarbs', 'averageFats', 'averageFiber'].forEach(avg => {
+                      if (obj[key][avg] !== undefined) {
+                        if (typeof obj[key][avg] === 'string') {
+                          const numValue = parseInt(obj[key][avg].replace(/[^\d.]/g, ''), 10);
+                          if (!isNaN(numValue)) obj[key][avg] = numValue;
+                        }
+                      }
+                    });
+                  }
+                  
+                  // Also check for numbers in dailyTotals directly
+                  if (key === 'dailyTotals' && obj[key]) {
+                    for (const nutrient in obj[key]) {
+                      if (typeof obj[key][nutrient] === 'string') {
+                        // Remove any non-numeric characters (like 'g' or 'kcal')
+                        const numericValue = parseFloat(obj[key][nutrient].replace(/[^\d.]/g, ''));
+                        if (!isNaN(numericValue)) {
+                          obj[key][nutrient] = numericValue;
+                        }
+                      }
+                    }
+                  }
+                  
+                  // Recursively process child objects and arrays
+                  if (obj[key] && typeof obj[key] === 'object') {
+                    processNumericalValues(obj[key]);
+                  }
+                });
+                
+                return obj;
+              };
+              
+              // Process all numerical values in the meal plan
+              const processedMealPlan = processNumericalValues(fixedMealPlan);
+              
+              // Final validation of meal plan structure
+              if (processedMealPlan.mealPlan && processedMealPlan.mealPlan.weeklyPlan) {
+                // Fix any remaining meal type inconsistencies in the weekly plan
+                Object.keys(processedMealPlan.mealPlan.weeklyPlan).forEach(day => {
+                  const dayPlan = processedMealPlan.mealPlan.weeklyPlan[day];
+                  if (dayPlan && dayPlan.meals) {
+                    // Create a new meals object with correct keys
+                    const correctedMeals = {};
+                    
+                    // Map different meal type formats to the correct format
+                    const mealTypeMap = {
+                      'breakfast': 'breakfast',
+                      'morning_snack': 'morningSnack',
+                      'morningSnack': 'morningSnack',
+                      'lunch': 'lunch',
+                      'afternoon_snack': 'afternoonSnack',
+                      'afternoonSnack': 'afternoonSnack',
+                      'dinner': 'dinner',
+                      'evening_snack': 'eveningSnack',
+                      'eveningSnack': 'eveningSnack'
+                    };
+                    
+                    // Copy and correct each meal
+                    Object.keys(dayPlan.meals).forEach(mealType => {
+                      const correctMealType = mealTypeMap[mealType] || mealType;
+                      if (dayPlan.meals[mealType]) {
+                        correctedMeals[correctMealType] = dayPlan.meals[mealType];
+                      }
+                    });
+                    
+                    // Replace the meals object with the corrected one
+                    dayPlan.meals = correctedMeals;
+                  }
+                });
+                
+                return new Response(
+                  JSON.stringify({
+                    mealPlan: processedMealPlan.mealPlan,
+                    modelUsed: modelName,
+                    recovered: true
+                  }),
+                  { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                );
+              }
+            } catch (parseError) {
+              console.error("[NUTRI+] Unable to fix JSON:", parseError);
+              console.error("[NUTRI+] Incorrect JSON:", failedJson.substring(0, 500) + "...");
+              
+              // Try more aggressive JSON repair techniques
+              try {
+                // Replace problematic section with a placeholder structure
+                if (parseError.message.includes("position")) {
+                  const errorPosition = parseInt(parseError.message.match(/position (\d+)/)?.[1] || "0");
+                  const contextStart = Math.max(0, errorPosition - 100);
+                  const contextEnd = Math.min(failedJson.length, errorPosition + 100);
+                  const errorContext = failedJson.substring(contextStart, contextEnd);
+                  
+                  console.log(`[NUTRI+] Error context (position ${errorPosition}):`, errorContext);
+                  
+                  // Find the closest enclosing array or object
+                  let braceLevel = 0;
+                  let arrayLevel = 0;
+                  let lastArrayStart = -1;
+                  
+                  for (let i = 0; i < errorPosition; i++) {
+                    if (failedJson[i] === '{') braceLevel++;
+                    if (failedJson[i] === '}') braceLevel--;
+                    if (failedJson[i] === '[') {
+                      arrayLevel++;
+                      lastArrayStart = i;
+                    }
+                    if (failedJson[i] === ']') arrayLevel--;
+                  }
+                  
+                  // If error is in an array, try to fix it by closing the array
+                  if (arrayLevel > 0 && lastArrayStart !== -1) {
+                    const beforeError = failedJson.substring(0, lastArrayStart + 1);
+                    const afterError = failedJson.substring(errorPosition);
+                    
+                    // Create a simplified version with empty array
+                    const simplifiedJson = beforeError + "]" + afterError.substring(afterError.indexOf("]") + 1);
+                    
+                    try {
+                      const fixedMealPlan = JSON.parse(simplifiedJson);
+                      console.log("[NUTRI+] JSON successfully fixed after aggressive repair!");
+                      
+                      return new Response(
+                        JSON.stringify({
+                          mealPlan: fixedMealPlan.mealPlan,
+                          modelUsed: modelName,
+                          recovered: true,
+                          repaired: true
+                        }),
+                        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                      );
+                    } catch (finalError) {
+                      console.error("[NUTRI+] All repair attempts failed:", finalError);
+                    }
+                  }
+                }
+              } catch (repairError) {
+                console.error("[NUTRI+] Error during aggressive repair:", repairError);
+              }
+            }
           }
-        },
-        "morningSnack": { ... mesmo formato do breakfast },
-        "lunch": { ... mesmo formato do breakfast },
-        "afternoonSnack": { ... mesmo formato do breakfast },
-        "dinner": { ... mesmo formato do breakfast }
-      },
-      "dailyTotals": {
-        "calories": number,
-        "protein": number,
-        "carbs": number,
-        "fats": number,
-        "fiber": number
+        } catch (errorParseError) {
+          console.error("[NUTRI+] Error parsing API error:", errorParseError);
+        }
       }
-    },
-    "tuesday": { ... mesmo formato de monday },
-    "wednesday": { ... mesmo formato de monday },
-    "thursday": { ... mesmo formato de monday },
-    "friday": { ... mesmo formato de monday },
-    "saturday": { ... mesmo formato de monday },
-    "sunday": { ... mesmo formato de monday }
-  },
-  "weeklyTotals": {
-    "averageCalories": number,
-    "averageProtein": number,
-    "averageCarbs": number,
-    "averageFats": number,
-    "averageFiber": number
+      
+      // Return the error to the client if recovery failed
+      return new Response(
+        JSON.stringify({ 
+          error: `API Error: ${response.status}`, 
+          details: errorData,
+          // Suggest alternative model next time
+          suggestedModel: modelName === "llama3-8b-8192" ? "llama3-70b-8192" : "llama3-8b-8192"
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      );
+    }
+
+    // Get the API response
+    const apiResponse = await response.json();
+    console.log(`[NUTRI+] Response received from Groq API at ${new Date().toISOString()}`);
+    
+    // Check for valid response content
+    if (!apiResponse.choices || !apiResponse.choices[0] || !apiResponse.choices[0].message) {
+      console.error("[NUTRI+] Invalid API response format:", JSON.stringify(apiResponse).substring(0, 200));
+      return new Response(
+        JSON.stringify({ error: "Invalid API response format" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      );
+    }
+
+    // Get the model's response content
+    const mealPlanContent = apiResponse.choices[0].message.content;
+    
+    // Ensure the response is valid JSON
+    try {
+      // Fix common format issues before parsing
+      let formattedContent = mealPlanContent
+        // Fix values with unit suffixes (like "26g" -> 26)
+        .replace(/"protein":\s*"?(\d+)g"?/g, '"protein": $1')
+        .replace(/"carbs":\s*"?(\d+)g"?/g, '"carbs": $1')
+        .replace(/"fats":\s*"?(\d+)g"?/g, '"fats": $1')
+        .replace(/"fiber":\s*"?(\d+)g"?/g, '"fiber": $1')
+        .replace(/"calories":\s*"?(\d+)kcal"?/g, '"calories": $1')
+        .replace(/"calories":\s*"?(\d+)\s*kcal"?/g, '"calories": $1')
+        .replace(/"protein":\s*"?(\d+)\s*g"?/g, '"protein": $1')
+        .replace(/"carbs":\s*"?(\d+)\s*g"?/g, '"carbs": $1')
+        .replace(/"fats":\s*"?(\d+)\s*g"?/g, '"fats": $1')
+        .replace(/"fiber":\s*"?(\d+)\s*g"?/g, '"fiber": $1')
+        // Fix meal type naming
+        .replace(/"morning_snack":/g, '"morningSnack":')
+        .replace(/"afternoon_snack":/g, '"afternoonSnack":')
+        .replace(/"evening_snack":/g, '"eveningSnack":')
+        .replace(/"pre_workout":/g, '"preWorkout":')
+        .replace(/"post_workout":/g, '"postWorkout":')
+        // Fix common issues with array commas
+        .replace(/,\s*\]/g, ']')         // Remove trailing commas in arrays
+        .replace(/,\s*\}/g, '}')         // Remove trailing commas in objects
+        .replace(/\.\.\.[\s\n]*\}/g, '}')  // Fix ellipsis in JSON
+        .replace(/\.\.\.[\s\n]*\]/g, ']'); // Fix ellipsis in JSON
+      
+      // Advanced fix for ... outros dias ... pattern which breaks the JSON
+      formattedContent = formattedContent.replace(/(\s*"[^"]+"\s*:\s*\{\s*\/\*[^*]*\*\/\s*\})(,\s*\/\*\s*\.\.\.\s*outros\s*dias\s*\.\.\.\s*\*\/)/g, 
+        (match, group1) => {
+          return group1;
+        }
+      );
+      
+      // Log size and a preview of the content
+      console.log(`[NUTRI+] Response size: ${formattedContent.length} characters`);
+      console.log(`[NUTRI+] Response preview: ${formattedContent.substring(0, 300)}...`);
+      
+      // Process function to ensure all numerical values are actually numbers
+      const processNumericalValues = (obj) => {
+        if (!obj || typeof obj !== 'object') return obj;
+        
+        Object.keys(obj).forEach(key => {
+          // If this is a macros object, ensure all values are numbers
+          if (key === 'macros' && obj[key]) {
+            ['protein', 'carbs', 'fats', 'fiber'].forEach(macro => {
+              if (obj[key][macro] !== undefined) {
+                // If it's a string potentially with unit (e.g. "26g"), convert to number
+                if (typeof obj[key][macro] === 'string') {
+                  const numValue = parseInt(obj[key][macro].replace(/[^\d.]/g, ''), 10);
+                  if (!isNaN(numValue)) obj[key][macro] = numValue;
+                }
+              }
+            });
+          }
+          
+          // For calories and dailyTotals
+          if ((key === 'dailyTotals') && obj[key] && typeof obj[key] === 'object') {
+            ['calories', 'protein', 'carbs', 'fats', 'fiber'].forEach(nutrient => {
+              if (obj[key][nutrient] !== undefined) {
+                // If it's a string potentially with unit, convert to number
+                if (typeof obj[key][nutrient] === 'string') {
+                  const numValue = parseInt(obj[key][nutrient].replace(/[^\d.]/g, ''), 10);
+                  if (!isNaN(numValue)) obj[key][nutrient] = numValue;
+                }
+              }
+            });
+          } else if (key === 'calories' && typeof obj[key] === 'string') {
+            // Direct calories property as string (e.g., "500kcal")
+            const numValue = parseInt(obj[key].replace(/[^\d.]/g, ''), 10);
+            if (!isNaN(numValue)) obj[key] = numValue;
+          }
+          
+          // Process weeklyTotals
+          if (key === 'weeklyTotals' && obj[key]) {
+            ['averageCalories', 'averageProtein', 'averageCarbs', 'averageFats', 'averageFiber'].forEach(avg => {
+              if (obj[key][avg] !== undefined) {
+                if (typeof obj[key][avg] === 'string') {
+                  const numValue = parseInt(obj[key][avg].replace(/[^\d.]/g, ''), 10);
+                  if (!isNaN(numValue)) obj[key][avg] = numValue;
+                }
+              }
+            });
+          }
+          
+          // Also check for numbers in dailyTotals directly
+          if (key === 'dailyTotals' && obj[key]) {
+            for (const nutrient in obj[key]) {
+              if (typeof obj[key][nutrient] === 'string') {
+                // Remove any non-numeric characters (like 'g' or 'kcal')
+                const numericValue = parseFloat(obj[key][nutrient].replace(/[^\d.]/g, ''));
+                if (!isNaN(numericValue)) {
+                  obj[key][nutrient] = numericValue;
+                }
+              }
+            }
+          }
+          
+          // Recursively process child objects and arrays
+          if (obj[key] && typeof obj[key] === 'object') {
+            processNumericalValues(obj[key]);
+          }
+        });
+        
+        return obj;
+      };
+      
+      // Parse and validate the JSON response
+      const mealPlanJson = JSON.parse(formattedContent);
+      
+      // Process all numerical values in the meal plan
+      const processedMealPlan = processNumericalValues(mealPlanJson);
+      
+      // Validate the structure
+      if (!processedMealPlan.mealPlan || !processedMealPlan.mealPlan.weeklyPlan) {
+        console.error("[NUTRI+] API response missing required structure. Response:", formattedContent.substring(0, 500));
+        return new Response(
+          JSON.stringify({ error: "Invalid meal plan structure" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        );
+      }
+      
+      // Fix any remaining meal type inconsistencies in the weekly plan
+      Object.keys(processedMealPlan.mealPlan.weeklyPlan).forEach(day => {
+        const dayPlan = processedMealPlan.mealPlan.weeklyPlan[day];
+        if (dayPlan && dayPlan.meals) {
+          // Create a new meals object with correct keys
+          const correctedMeals = {};
+          
+          // Map different meal type formats to the correct format
+          const mealTypeMap = {
+            'breakfast': 'breakfast',
+            'morning_snack': 'morningSnack',
+            'morningSnack': 'morningSnack',
+            'lunch': 'lunch',
+            'afternoon_snack': 'afternoonSnack',
+            'afternoonSnack': 'afternoonSnack',
+            'dinner': 'dinner',
+            'evening_snack': 'eveningSnack',
+            'eveningSnack': 'eveningSnack'
+          };
+          
+          // Copy and correct each meal
+          Object.keys(dayPlan.meals).forEach(mealType => {
+            const correctMealType = mealTypeMap[mealType] || mealType;
+            if (dayPlan.meals[mealType]) {
+              correctedMeals[correctMealType] = dayPlan.meals[mealType];
+            }
+          });
+          
+          // Replace the meals object with the corrected one
+          dayPlan.meals = correctedMeals;
+        }
+      });
+      
+      // Complete meal plan with the latest data
+      const mealPlan = {
+        ...processedMealPlan.mealPlan,
+        userCalories: userData.dailyCalories,
+        generatedBy: "nutri-plus-agent-llama3"
+      };
+      
+      // Ensure all days have complete meal data and details for each food
+      Object.keys(mealPlan.weeklyPlan).forEach(day => {
+        const dayPlan = mealPlan.weeklyPlan[day];
+        if (dayPlan && dayPlan.meals) {
+          Object.keys(dayPlan.meals).forEach(mealType => {
+            const meal = dayPlan.meals[mealType];
+            if (meal && meal.foods) {
+              meal.foods.forEach(food => {
+                // Ensure each food has details for preparation
+                if (!food.details || food.details === "") {
+                  food.details = "Prepare according to personal preference. Consume fresh when possible.";
+                }
+              });
+            }
+          });
+        }
+      });
+      
+      // Verify the weekly totals match the user's calorie goal
+      if (!mealPlan.weeklyTotals || 
+          isNaN(mealPlan.weeklyTotals.averageCalories) || 
+          isNaN(mealPlan.weeklyTotals.averageProtein) ||
+          isNaN(mealPlan.weeklyTotals.averageCarbs) ||
+          isNaN(mealPlan.weeklyTotals.averageFats) ||
+          isNaN(mealPlan.weeklyTotals.averageFiber)) {
+        
+        console.log("[NUTRI+] Recalculating weekly averages due to invalid values");
+        
+        const days = Object.values(mealPlan.weeklyPlan);
+        const validDays = days.filter(day => day && day.dailyTotals);
+        const dayCount = validDays.length || 1; // Avoid division by zero
+        
+        mealPlan.weeklyTotals = {
+          averageCalories: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.calories || 0), 0) / dayCount),
+          averageProtein: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.protein || 0), 0) / dayCount),
+          averageCarbs: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.carbs || 0), 0) / dayCount),
+          averageFats: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.fats || 0), 0) / dayCount),
+          averageFiber: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.fiber || 0), 0) / dayCount)
+        };
+      }
+
+      console.log(`[NUTRI+] Meal plan successfully generated at ${new Date().toISOString()}`);
+      console.log(`[NUTRI+] Process duration: ${(new Date().getTime() - new Date(startTime).getTime()) / 1000}s`);
+      
+      // Return the successful response with model info and ensure it's directly accessible
+      // Important: Make sure we're only returning the mealPlan without nesting it further
+      const finalResponse = {
+        mealPlan,
+        modelUsed: modelName
+      };
+      
+      console.log(`[NUTRI+] Response structure:`, Object.keys(finalResponse));
+      console.log(`[NUTRI+] MealPlan structure:`, Object.keys(finalResponse.mealPlan));
+      
+      return new Response(
+        JSON.stringify(finalResponse),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+      
+    } catch (jsonError) {
+      // If the response is not valid JSON, log the error and return error response
+      console.error("[NUTRI+] Error parsing JSON:", jsonError);
+      console.error("[NUTRI+] Invalid JSON response:", mealPlanContent.substring(0, 1000));
+      
+      // Try to repair JSON syntax
+      try {
+        // Locate the error
+        if (jsonError.message.includes("position")) {
+          const errorPosition = parseInt(jsonError.message.match(/position (\d+)/)?.[1] || "0");
+          const contextStart = Math.max(0, errorPosition - 100);
+          const contextEnd = Math.min(mealPlanContent.length, errorPosition + 100);
+          const errorContext = mealPlanContent.substring(contextStart, contextEnd);
+          
+          console.log(`[NUTRI+] Error context (position ${errorPosition}):`, errorContext);
+          
+          // Attempt to repair specific formatting issues in the response
+          let repaired = mealPlanContent;
+          
+          // Fix values with unit suffixes (like "26g" -> 26)
+          repaired = repaired
+            .replace(/"protein":\s*"?(\d+)g"?/g, '"protein": $1')
+            .replace(/"carbs":\s*"?(\d+)g"?/g, '"carbs": $1')
+            .replace(/"fats":\s*"?(\d+)g"?/g, '"fats": $1')
+            .replace(/"fiber":\s*"?(\d+)g"?/g, '"fiber": $1')
+            .replace(/"calories":\s*"?(\d+)kcal"?/g, '"calories": $1')
+            .replace(/"calories":\s*"?(\d+)\s*kcal"?/g, '"calories": $1')
+            .replace(/"protein":\s*"?(\d+)\s*g"?/g, '"protein": $1')
+            .replace(/"carbs":\s*"?(\d+)\s*g"?/g, '"carbs": $1')
+            .replace(/"fats":\s*"?(\d+)\s*g"?/g, '"fats": $1')
+            .replace(/"fiber":\s*"?(\d+)\s*g"?/g, '"fiber": $1');
+            
+          try {
+            const repairedJson = JSON.parse(repaired);
+            console.log("[NUTRI+] JSON repaired successfully!");
+            
+            // Return the repaired JSON if it was successfully parsed
+            if (repairedJson.mealPlan && repairedJson.mealPlan.weeklyPlan) {
+              return new Response(
+                JSON.stringify({ 
+                  mealPlan: repairedJson.mealPlan,
+                  modelUsed: modelName,
+                  repaired: true
+                }),
+                { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+              );
+            }
+          } catch (repairError) {
+            console.error("[NUTRI+] Repair attempt failed:", repairError);
+          }
+        }
+      } catch (repairAttemptError) {
+        console.error("[NUTRI+] Error in repair attempt:", repairAttemptError);
+      }
+      
+      return new Response(
+        JSON.stringify({ 
+          error: "Failed to parse meal plan JSON",
+          details: jsonError.message,
+          rawContent: mealPlanContent.substring(0, 500) + "..." 
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      );
+    }
+    
+  } catch (error) {
+    // Handle any unexpected errors
+    console.error("[NUTRI+] Unexpected error:", error);
+    return new Response(
+      JSON.stringify({ error: "Internal server error", details: error.message }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+    );
   }
-}
-
-### INSTRUÇÕES IMPORTANTES:
-1. Distribua as calorias diárias entre as refeições, considerando o objetivo do usuário.
-2. Utilize apenas os alimentos da lista fornecida para cada tipo de refeição.
-3. NÃO MISTURE alimentos entre os diferentes tipos de refeição (use apenas os alimentos listados em cada seção para aquela refeição).
-4. Evite alimentos aos quais o usuário tem alergia ou restrição.
-5. Adeque as refeições ao horário de treino, se fornecido.
-6. Varie os alimentos ao longo da semana.
-7. Siga estritamente o formato JSON solicitado.
-8. Use o português brasileiro para todos os textos e descrições.
-9. Inclua porções realistas para cada alimento (em gramas, ml, unidades ou colheres).
-10. Adicione detalhes sobre como preparar ou combinar os alimentos em português do Brasil.
-11. MUITO IMPORTANTE: Não adicione nenhum texto, comentário ou formatação markdown antes ou depois do objeto JSON.
-12. Sua resposta deve conter APENAS o objeto JSON válido, nada mais.
-
-Apenas responda com o JSON do plano alimentar, sem texto adicional ou explicações.
-`;
-}
+});

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,7 +12,7 @@ export const useMealPlanGeneration = () => {
   const [loadingTime, setLoadingTime] = useState(0);
   const { addTransaction } = useWallet();
   
-  const [generationAttempted, setGenerationAttempted] = useState(false);
+  const generationAttempted = useState(false);
   
   let loadingTimer: NodeJS.Timeout | null = null;
 
@@ -35,7 +34,6 @@ export const useMealPlanGeneration = () => {
     setLoading(true);
     setError(null);
     setLoadingTime(0);
-    setGenerationAttempted(true);
     
     if (loadingTimer) {
       clearInterval(loadingTimer);
@@ -239,7 +237,6 @@ export const useMealPlanGeneration = () => {
     error,
     generatePlan,
     loadingTime,
-    setMealPlan,
-    generationAttempted
+    setMealPlan
   };
 };
