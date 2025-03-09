@@ -19,97 +19,97 @@ serve(async (req) => {
   try {
     // Log start of process with timestamp
     const startTime = new Date().toISOString();
-    console.log(`[NUTRI+] Processamento iniciado às ${startTime}`);
+    console.log(`[NUTRI+] Process started at ${startTime}`);
 
     // Parse the request body
     const requestData = await req.json();
     
     // Validate request data
     if (!requestData || !requestData.userData) {
-      console.error("[NUTRI+] Erro: Dados de requisição inválidos - userData ausente");
+      console.error("[NUTRI+] Error: Invalid request data - userData missing");
       return new Response(
-        JSON.stringify({ error: "Dados de requisição inválidos" }),
+        JSON.stringify({ error: "Invalid request data" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
     }
 
     const { userData, selectedFoods, foodsByMealType, dietaryPreferences, modelConfig } = requestData;
-    console.log(`[NUTRI+] Dados recebidos para usuário: ${userData.id || 'anônimo'}`);
-    console.log(`[NUTRI+] Perfil do usuário: ${userData.age} anos, ${userData.gender}, ${userData.weight}kg, ${userData.height}cm`);
-    console.log(`[NUTRI+] Objetivo: ${userData.goal}, Calorias diárias: ${userData.dailyCalories}kcal`);
-    console.log(`[NUTRI+] Alimentos selecionados: ${selectedFoods?.length || 0}`);
-    console.log(`[NUTRI+] Preferências e restrições: ${JSON.stringify(dietaryPreferences)}`);
+    console.log(`[NUTRI+] Data received for user: ${userData.id || 'anonymous'}`);
+    console.log(`[NUTRI+] User profile: ${userData.age} years, ${userData.gender}, ${userData.weight}kg, ${userData.height}cm`);
+    console.log(`[NUTRI+] Goal: ${userData.goal}, Daily calories: ${userData.dailyCalories}kcal`);
+    console.log(`[NUTRI+] Selected foods: ${selectedFoods?.length || 0}`);
+    console.log(`[NUTRI+] Preferences and restrictions: ${JSON.stringify(dietaryPreferences)}`);
     
     if (!selectedFoods || selectedFoods.length === 0) {
-      console.error("[NUTRI+] Erro: Nenhum alimento selecionado");
+      console.error("[NUTRI+] Error: No foods selected");
       return new Response(
-        JSON.stringify({ error: "Nenhum alimento selecionado" }),
+        JSON.stringify({ error: "No foods selected" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
     }
 
     // Check if GROQ API key is available
     if (!GROQ_API_KEY) {
-      console.error("[NUTRI+] Erro: GROQ_API_KEY não encontrada nas variáveis de ambiente");
+      console.error("[NUTRI+] Error: GROQ_API_KEY not found in environment variables");
       return new Response(
-        JSON.stringify({ error: "Erro de configuração da API" }),
+        JSON.stringify({ error: "API configuration error" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
       );
     }
 
     // Prepare system message for Nutri+ agent
-    const systemMessage = `Você é Nutri+, um agente especialista em nutrição que cria planos alimentares personalizados. 
-Sua tarefa é analisar os dados do usuário e criar um plano alimentar semanal detalhado e cientificamente fundamentado.
+    const systemMessage = `You are Nutri+, a nutrition expert agent that creates personalized meal plans. 
+Your task is to analyze user data and create a detailed, scientifically-based weekly meal plan.
 
-REGRAS IMPORTANTES DE FORMATO DE SAÍDA:
-1. Sua resposta DEVE ser um JSON válido que possa ser processado com JSON.parse().
-2. Sua resposta deve conter APENAS o objeto JSON sem explicações, narrativas ou texto adicional.
-3. ABSOLUTAMENTE CRÍTICO: Todos os valores numéricos devem ser números, não strings. Por exemplo, use "protein": 26 em vez de "protein": "26g".
-4. NUNCA adicione unidades (como "g" ou "kcal") após os valores numéricos no JSON. Esses valores devem ser apenas números.
-5. A saída deve seguir exatamente esta estrutura:
+IMPORTANT OUTPUT FORMAT RULES:
+1. Your response MUST be valid JSON that can be processed with JSON.parse().
+2. Your response must contain ONLY the JSON object without explanations, narratives or additional text.
+3. CRITICALLY IMPORTANT: All numerical values must be numbers, not strings. For example, use "protein": 26 instead of "protein": "26g".
+4. NEVER add units (like "g" or "kcal") after numerical values in the JSON. These values must be numbers only.
+5. The output must follow exactly this structure:
 {
   "mealPlan": {
     "weeklyPlan": {
-      "monday": { /* estrutura do plano diário */ },
-      "tuesday": { /* estrutura do plano diário */ },
-      /* ... outros dias ... */
+      "monday": { /* daily plan structure */ },
+      "tuesday": { /* daily plan structure */ },
+      /* ... other days ... */
     },
-    "weeklyTotals": { /* médias nutricionais semanais */ },
-    "recommendations": { /* recomendações personalizadas */ }
+    "weeklyTotals": { /* weekly nutritional averages */ },
+    "recommendations": { /* personalized recommendations */ }
   }
 }
 
-Certifique-se de que o weeklyPlan contenha TODOS os 7 dias (segunda a domingo). Cada dia deve ter a seguinte estrutura:
+Make sure weeklyPlan contains ALL 7 days (Monday to Sunday). Each day must have the following structure:
 {
-  "dayName": "Nome do Dia",
+  "dayName": "Day Name",
   "meals": {
     "breakfast": {
-      "description": "Descrição do café da manhã",
-      "foods": [{"name": "Nome do alimento", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento"}],
+      "description": "Breakfast description",
+      "foods": [{"name": "Food name", "portion": 100, "unit": "g", "details": "Details about food preparation and consumption"}],
       "calories": 500,
       "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
     },
     "morningSnack": {
-      "description": "Descrição do lanche da manhã",
-      "foods": [{"name": "Nome do alimento", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento"}],
+      "description": "Morning snack description",
+      "foods": [{"name": "Food name", "portion": 100, "unit": "g", "details": "Details about food preparation and consumption"}],
       "calories": 500,
       "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
     },
     "lunch": {
-      "description": "Descrição do almoço",
-      "foods": [{"name": "Nome do alimento", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento"}],
+      "description": "Lunch description",
+      "foods": [{"name": "Food name", "portion": 100, "unit": "g", "details": "Details about food preparation and consumption"}],
       "calories": 500,
       "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
     },
     "afternoonSnack": {
-      "description": "Descrição do lanche da tarde",
-      "foods": [{"name": "Nome do alimento", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento"}],
+      "description": "Afternoon snack description",
+      "foods": [{"name": "Food name", "portion": 100, "unit": "g", "details": "Details about food preparation and consumption"}],
       "calories": 500,
       "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
     },
     "dinner": {
-      "description": "Descrição do jantar",
-      "foods": [{"name": "Nome do alimento", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento"}],
+      "description": "Dinner description",
+      "foods": [{"name": "Food name", "portion": 100, "unit": "g", "details": "Details about food preparation and consumption"}],
       "calories": 500,
       "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
     }
@@ -117,81 +117,81 @@ Certifique-se de que o weeklyPlan contenha TODOS os 7 dias (segunda a domingo). 
   "dailyTotals": {"calories": 2000, "protein": 120, "carbs": 180, "fats": 60, "fiber": 25}
 }
 
-IMPORTANTE: Use exatamente os nomes de propriedades especificados acima:
-- Use "breakfast" para café da manhã (não "breakfast_meal" ou "morning_meal")
-- Use "morningSnack" para lanche da manhã (não "morning_snack")
-- Use "lunch" para almoço
-- Use "afternoonSnack" para lanche da tarde (não "afternoon_snack")
-- Use "dinner" para jantar
+IMPORTANT: Use exactly the property names specified above:
+- Use "breakfast" for breakfast (not "breakfast_meal" or "morning_meal")
+- Use "morningSnack" for morning snack (not "morning_snack")
+- Use "lunch" for lunch
+- Use "afternoonSnack" for afternoon snack (not "afternoon_snack")
+- Use "dinner" for dinner
 
-É FUNDAMENTAL que cada alimento na lista "foods" contenha instruções detalhadas de preparo no campo "details", explicando como o alimento deve ser preparado, cozido ou consumido.
+It is ESSENTIAL that each food in the "foods" list contains detailed preparation instructions in the "details" field, explaining how the food should be prepared, cooked, or consumed.
 
-IMPORTANTE: Respeite rigorosamente a categorização dos alimentos por tipo de refeição:
-- Alimentos categorizados como 'breakfast' devem ser colocados APENAS na refeição do café da manhã
-- Alimentos categorizados como 'morning_snack' devem ser colocados APENAS no lanche da manhã
-- Alimentos categorizados como 'lunch' devem ser colocados APENAS no almoço
-- Alimentos categorizados como 'afternoon_snack' devem ser colocados APENAS no lanche da tarde
-- Alimentos categorizados como 'dinner' devem ser colocados APENAS no jantar
+IMPORTANT: Strictly respect the categorization of foods by meal type:
+- Foods categorized as 'breakfast' should be placed ONLY in the breakfast meal
+- Foods categorized as 'morning_snack' should be placed ONLY in the morning snack
+- Foods categorized as 'lunch' should be placed ONLY in lunch
+- Foods categorized as 'afternoon_snack' should be placed ONLY in the afternoon snack
+- Foods categorized as 'dinner' should be placed ONLY in dinner
 
-As recomendações devem incluir:
+Recommendations should include:
 {
-  "general": "Conselho geral de nutrição",
-  "preworkout": "Conselho de nutrição pré-treino",
-  "postworkout": "Conselho de nutrição pós-treino",
-  "timing": ["Conselho específico de tempo de refeição", "Outro conselho de timing"]
+  "general": "General nutrition advice",
+  "preworkout": "Pre-workout nutrition advice",
+  "postworkout": "Post-workout nutrition advice",
+  "timing": ["Specific meal timing advice", "Another timing advice"]
 }
 
-LEMBRE-SE: TODOS OS VALORES NUMÉRICOS DEVEM SER NÚMEROS INTEIROS OU DECIMAIS, NÃO STRINGS COM UNIDADES. ESTE É UM REQUISITO CRÍTICO.
+REMEMBER: ALL NUMERICAL VALUES MUST BE INTEGERS OR DECIMALS, NOT STRINGS WITH UNITS. THIS IS A CRITICAL REQUIREMENT.
 
-IMPORTANTE: Devido a limitações técnicas, sua resposta NÃO pode exceder 8000 tokens. Se necessário, simplifique as descrições de preparo dos alimentos, mas NUNCA omita informações essenciais como calorias, macronutrientes ou items requeridos.`;
+IMPORTANT: Due to technical limitations, your response CANNOT exceed 8000 tokens. If necessary, simplify food preparation descriptions, but NEVER omit essential information like calories, macronutrients, or required items.`;
 
     // Construct user message with all relevant data
-    const userMessage = `Crie um plano alimentar semanal personalizado com base nestes dados:
+    const userMessage = `Create a personalized weekly meal plan based on this data:
 
-PERFIL DO USUÁRIO:
-- Idade: ${userData.age}
-- Gênero: ${userData.gender}
-- Peso: ${userData.weight}kg
-- Altura: ${userData.height}cm
-- Nível de Atividade: ${userData.activityLevel}
-- Objetivo: ${userData.goal}
-- Meta de Calorias Diárias: ${userData.dailyCalories}kcal
+USER PROFILE:
+- Age: ${userData.age}
+- Gender: ${userData.gender}
+- Weight: ${userData.weight}kg
+- Height: ${userData.height}cm
+- Activity Level: ${userData.activityLevel}
+- Goal: ${userData.goal}
+- Daily Calorie Target: ${userData.dailyCalories}kcal
 
-PREFERÊNCIAS ALIMENTARES:
-${dietaryPreferences.hasAllergies ? `- Alergias: ${dietaryPreferences.allergies.join(', ')}` : '- Sem alergias conhecidas'}
-${dietaryPreferences.dietaryRestrictions && dietaryPreferences.dietaryRestrictions.length > 0 ? `- Restrições Alimentares: ${dietaryPreferences.dietaryRestrictions.join(', ')}` : '- Sem restrições alimentares'}
-${dietaryPreferences.trainingTime ? `- Horário de Treino: ${dietaryPreferences.trainingTime}` : '- Sem horário específico de treino'}
+FOOD PREFERENCES:
+${dietaryPreferences.hasAllergies ? `- Allergies: ${dietaryPreferences.allergies.join(', ')}` : '- No known allergies'}
+${dietaryPreferences.dietaryRestrictions && dietaryPreferences.dietaryRestrictions.length > 0 ? `- Dietary Restrictions: ${dietaryPreferences.dietaryRestrictions.join(', ')}` : '- No dietary restrictions'}
+${dietaryPreferences.trainingTime ? `- Training Time: ${dietaryPreferences.trainingTime}` : '- No specific training time'}
 
-ALIMENTOS DISPONÍVEIS (${selectedFoods.length} no total):
-${selectedFoods.slice(0, 30).map(food => `- ${food.name} (${food.calories} kcal, P:${food.protein}g, C:${food.carbs}g, G:${food.fats}g)`).join('\n')}
-${selectedFoods.length > 30 ? `\n... e mais ${selectedFoods.length - 30} alimentos.` : ''}
+AVAILABLE FOODS (${selectedFoods.length} total):
+${selectedFoods.slice(0, 30).map(food => `- ${food.name} (${food.calories} kcal, P:${food.protein}g, C:${food.carbs}g, F:${food.fats}g)`).join('\n')}
+${selectedFoods.length > 30 ? `\n... and ${selectedFoods.length - 30} more foods.` : ''}
 
-${foodsByMealType ? `ALIMENTOS CATEGORIZADOS POR REFEIÇÃO:
+${foodsByMealType ? `FOODS CATEGORIZED BY MEAL:
 ${Object.entries(foodsByMealType).map(([mealType, foods]) => 
-  `- ${mealType}: ${Array.isArray(foods) ? foods.length : 0} alimentos`
+  `- ${mealType}: ${Array.isArray(foods) ? foods.length : 0} foods`
 ).join('\n')}` : ''}
 
-Por favor, crie um plano de 7 dias que:
-1. Atenda à meta de ${userData.dailyCalories} calorias diárias (com margem de +/- 100 kcal)
-2. Distribua adequadamente os macronutrientes (proteínas, carboidratos, gorduras, fibras)
-3. Use os alimentos disponíveis fornecidos
-4. Respeite as preferências e restrições alimentares do usuário
-5. Forneça variedade ao longo da semana
-6. Inclua todos os tipos de refeições: café da manhã, lanche da manhã, almoço, lanche da tarde, jantar
-7. Calcule as calorias e macros para cada refeição e dia
-8. Forneça detalhes de preparo para cada alimento
-9. CRÍTICO: Use apenas valores numéricos para quantidades, sem adicionar unidades como "g" ou "kcal"
-10. Por exemplo, use "protein": 26 em vez de "protein": "26g"
-11. Use a nomenclatura correta para as refeições em camelCase: "breakfast", "morningSnack", "lunch", "afternoonSnack", "dinner" - não use versões com underscore como "morning_snack" ou "afternoon_snack"`;
+Please create a 7-day plan that:
+1. Meets the ${userData.dailyCalories} daily calorie target (with a margin of +/- 100 kcal)
+2. Properly distributes macronutrients (proteins, carbohydrates, fats, fiber)
+3. Uses the provided available foods
+4. Respects the user's food preferences and restrictions
+5. Provides variety throughout the week
+6. Includes all meal types: breakfast, morning snack, lunch, afternoon snack, dinner
+7. Calculates calories and macros for each meal and day
+8. Provides preparation details for each food
+9. CRITICAL: Uses only numerical values for quantities, without adding units like "g" or "kcal"
+10. For example, use "protein": 26 instead of "protein": "26g"
+11. Uses the correct meal nomenclature in camelCase: "breakfast", "morningSnack", "lunch", "afternoonSnack", "dinner" - don't use underscore versions like "morning_snack" or "afternoon_snack"`;
 
     // Track time for API call preparation
-    console.log(`[NUTRI+] Preparando chamada de API às ${new Date().toISOString()}`);
+    console.log(`[NUTRI+] Preparing API call at ${new Date().toISOString()}`);
 
     // Get model settings from request or use defaults
     const modelName = modelConfig?.model || "llama3-8b-8192";
     const temperature = modelConfig?.temperature || 0.3;
     
-    console.log(`[NUTRI+] Usando modelo: ${modelName} com temperatura: ${temperature}`);
+    console.log(`[NUTRI+] Using model: ${modelName} with temperature: ${temperature}`);
 
     // Prepare the API call to Groq
     const groqPayload = {
@@ -206,7 +206,7 @@ Por favor, crie um plano de 7 dias que:
       response_format: { type: "json_object" } // Request JSON format response
     };
 
-    console.log(`[NUTRI+] Chamando API Groq com modelo: ${groqPayload.model}`);
+    console.log(`[NUTRI+] Calling Groq API with model: ${groqPayload.model}`);
 
     // Call the Groq API
     const response = await fetch(GROQ_API_URL, {
@@ -220,14 +220,14 @@ Por favor, crie um plano de 7 dias que:
 
     if (!response.ok) {
       const errorData = await response.text();
-      console.error(`[NUTRI+] Erro da API Groq (${response.status}):`, errorData);
+      console.error(`[NUTRI+] Groq API Error (${response.status}):`, errorData);
       
       // If we received a JSON generation error, we'll try to fix the failed_generation content
       if (response.status === 400 && errorData.includes('json_validate_failed')) {
         try {
           const errorJson = JSON.parse(errorData);
           if (errorJson.error && errorJson.error.failed_generation) {
-            console.log("[NUTRI+] Tentando corrigir JSON inválido...");
+            console.log("[NUTRI+] Attempting to fix invalid JSON...");
             
             // Get the failed JSON generation
             let failedJson = errorJson.error.failed_generation;
@@ -279,7 +279,7 @@ Por favor, crie um plano de 7 dias que:
             try {
               // Try to parse the fixed JSON
               const fixedMealPlan = JSON.parse(failedJson);
-              console.log("[NUTRI+] JSON corrigido com sucesso!");
+              console.log("[NUTRI+] JSON successfully fixed!");
               
               // Process the meal plan to ensure all numerical values are actually numbers
               const processNumericalValues = (obj) => {
@@ -398,8 +398,8 @@ Por favor, crie um plano de 7 dias que:
                 );
               }
             } catch (parseError) {
-              console.error("[NUTRI+] Não foi possível corrigir o JSON:", parseError);
-              console.error("[NUTRI+] JSON incorreto:", failedJson.substring(0, 500) + "...");
+              console.error("[NUTRI+] Unable to fix JSON:", parseError);
+              console.error("[NUTRI+] Incorrect JSON:", failedJson.substring(0, 500) + "...");
               
               // Try more aggressive JSON repair techniques
               try {
@@ -410,7 +410,7 @@ Por favor, crie um plano de 7 dias que:
                   const contextEnd = Math.min(failedJson.length, errorPosition + 100);
                   const errorContext = failedJson.substring(contextStart, contextEnd);
                   
-                  console.log(`[NUTRI+] Contexto do erro (posição ${errorPosition}):`, errorContext);
+                  console.log(`[NUTRI+] Error context (position ${errorPosition}):`, errorContext);
                   
                   // Find the closest enclosing array or object
                   let braceLevel = 0;
@@ -437,7 +437,7 @@ Por favor, crie um plano de 7 dias que:
                     
                     try {
                       const fixedMealPlan = JSON.parse(simplifiedJson);
-                      console.log("[NUTRI+] JSON corrigido com sucesso após reparo agressivo!");
+                      console.log("[NUTRI+] JSON successfully fixed after aggressive repair!");
                       
                       return new Response(
                         JSON.stringify({
@@ -449,26 +449,26 @@ Por favor, crie um plano de 7 dias que:
                         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
                       );
                     } catch (finalError) {
-                      console.error("[NUTRI+] Todas as tentativas de reparo falharam:", finalError);
+                      console.error("[NUTRI+] All repair attempts failed:", finalError);
                     }
                   }
                 }
               } catch (repairError) {
-                console.error("[NUTRI+] Erro durante reparo agressivo:", repairError);
+                console.error("[NUTRI+] Error during aggressive repair:", repairError);
               }
             }
           }
         } catch (errorParseError) {
-          console.error("[NUTRI+] Erro ao analisar o erro da API:", errorParseError);
+          console.error("[NUTRI+] Error parsing API error:", errorParseError);
         }
       }
       
       // Return the error to the client if recovery failed
       return new Response(
         JSON.stringify({ 
-          error: `Erro da API: ${response.status}`, 
+          error: `API Error: ${response.status}`, 
           details: errorData,
-          // Try alternative model next time
+          // Suggest alternative model next time
           suggestedModel: modelName === "llama3-8b-8192" ? "llama3-70b-8192" : "llama3-8b-8192"
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
@@ -477,13 +477,13 @@ Por favor, crie um plano de 7 dias que:
 
     // Get the API response
     const apiResponse = await response.json();
-    console.log(`[NUTRI+] Resposta recebida da API Groq às ${new Date().toISOString()}`);
+    console.log(`[NUTRI+] Response received from Groq API at ${new Date().toISOString()}`);
     
     // Check for valid response content
     if (!apiResponse.choices || !apiResponse.choices[0] || !apiResponse.choices[0].message) {
-      console.error("[NUTRI+] Formato de resposta da API inválido:", JSON.stringify(apiResponse).substring(0, 200));
+      console.error("[NUTRI+] Invalid API response format:", JSON.stringify(apiResponse).substring(0, 200));
       return new Response(
-        JSON.stringify({ error: "Formato de resposta da API inválido" }),
+        JSON.stringify({ error: "Invalid API response format" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
       );
     }
@@ -526,8 +526,8 @@ Por favor, crie um plano de 7 dias que:
       );
       
       // Log size and a preview of the content
-      console.log(`[NUTRI+] Tamanho da resposta: ${formattedContent.length} caracteres`);
-      console.log(`[NUTRI+] Prévia da resposta: ${formattedContent.substring(0, 300)}...`);
+      console.log(`[NUTRI+] Response size: ${formattedContent.length} characters`);
+      console.log(`[NUTRI+] Response preview: ${formattedContent.substring(0, 300)}...`);
       
       // Process function to ensure all numerical values are actually numbers
       const processNumericalValues = (obj) => {
@@ -606,9 +606,9 @@ Por favor, crie um plano de 7 dias que:
       
       // Validate the structure
       if (!processedMealPlan.mealPlan || !processedMealPlan.mealPlan.weeklyPlan) {
-        console.error("[NUTRI+] Resposta da API sem estrutura requerida. Resposta:", formattedContent.substring(0, 500));
+        console.error("[NUTRI+] API response missing required structure. Response:", formattedContent.substring(0, 500));
         return new Response(
-          JSON.stringify({ error: "Estrutura do plano alimentar inválida" }),
+          JSON.stringify({ error: "Invalid meal plan structure" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
         );
       }
@@ -663,7 +663,7 @@ Por favor, crie um plano de 7 dias que:
               meal.foods.forEach(food => {
                 // Ensure each food has details for preparation
                 if (!food.details || food.details === "") {
-                  food.details = "Preparar conforme preferência pessoal. Consumir fresco quando possível.";
+                  food.details = "Prepare according to personal preference. Consume fresh when possible.";
                 }
               });
             }
@@ -679,7 +679,7 @@ Por favor, crie um plano de 7 dias que:
           isNaN(mealPlan.weeklyTotals.averageFats) ||
           isNaN(mealPlan.weeklyTotals.averageFiber)) {
         
-        console.log("[NUTRI+] Recalculando médias semanais devido a valores inválidos");
+        console.log("[NUTRI+] Recalculating weekly averages due to invalid values");
         
         const days = Object.values(mealPlan.weeklyPlan);
         const validDays = days.filter(day => day && day.dailyTotals);
@@ -694,8 +694,8 @@ Por favor, crie um plano de 7 dias que:
         };
       }
 
-      console.log(`[NUTRI+] Plano alimentar gerado com sucesso às ${new Date().toISOString()}`);
-      console.log(`[NUTRI+] Duração do processo: ${(new Date().getTime() - new Date(startTime).getTime()) / 1000}s`);
+      console.log(`[NUTRI+] Meal plan successfully generated at ${new Date().toISOString()}`);
+      console.log(`[NUTRI+] Process duration: ${(new Date().getTime() - new Date(startTime).getTime()) / 1000}s`);
       
       // Return the successful response with model info
       return new Response(
@@ -708,8 +708,8 @@ Por favor, crie um plano de 7 dias que:
       
     } catch (jsonError) {
       // If the response is not valid JSON, log the error and return error response
-      console.error("[NUTRI+] Erro ao analisar JSON:", jsonError);
-      console.error("[NUTRI+] Resposta JSON inválida:", mealPlanContent.substring(0, 1000));
+      console.error("[NUTRI+] Error parsing JSON:", jsonError);
+      console.error("[NUTRI+] Invalid JSON response:", mealPlanContent.substring(0, 1000));
       
       // Try to repair JSON syntax
       try {
@@ -720,7 +720,7 @@ Por favor, crie um plano de 7 dias que:
           const contextEnd = Math.min(mealPlanContent.length, errorPosition + 100);
           const errorContext = mealPlanContent.substring(contextStart, contextEnd);
           
-          console.log(`[NUTRI+] Contexto do erro (posição ${errorPosition}):`, errorContext);
+          console.log(`[NUTRI+] Error context (position ${errorPosition}):`, errorContext);
           
           // Attempt to repair specific formatting issues in the response
           let repaired = mealPlanContent;
@@ -740,7 +740,7 @@ Por favor, crie um plano de 7 dias que:
             
           try {
             const repairedJson = JSON.parse(repaired);
-            console.log("[NUTRI+] JSON reparado com sucesso!");
+            console.log("[NUTRI+] JSON repaired successfully!");
             
             // Return the repaired JSON if it was successfully parsed
             if (repairedJson.mealPlan && repairedJson.mealPlan.weeklyPlan) {
@@ -754,16 +754,16 @@ Por favor, crie um plano de 7 dias que:
               );
             }
           } catch (repairError) {
-            console.error("[NUTRI+] Falha na tentativa de reparo:", repairError);
+            console.error("[NUTRI+] Repair attempt failed:", repairError);
           }
         }
       } catch (repairAttemptError) {
-        console.error("[NUTRI+] Erro na tentativa de reparo:", repairAttemptError);
+        console.error("[NUTRI+] Error in repair attempt:", repairAttemptError);
       }
       
       return new Response(
         JSON.stringify({ 
-          error: "Falha ao analisar JSON do plano alimentar",
+          error: "Failed to parse meal plan JSON",
           details: jsonError.message,
           rawContent: mealPlanContent.substring(0, 500) + "..." 
         }),
@@ -773,9 +773,9 @@ Por favor, crie um plano de 7 dias que:
     
   } catch (error) {
     // Handle any unexpected errors
-    console.error("[NUTRI+] Erro inesperado:", error);
+    console.error("[NUTRI+] Unexpected error:", error);
     return new Response(
-      JSON.stringify({ error: "Erro interno do servidor", details: error.message }),
+      JSON.stringify({ error: "Internal server error", details: error.message }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
     );
   }

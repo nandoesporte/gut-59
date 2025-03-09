@@ -1,50 +1,35 @@
 
 project_id = "sxjafhzikftdenqnkcri"
 
-[api]
-enabled = true
-port = 54321
-schemas = ["public", "storage"]
-
-[functions]
-[functions.create-asaas-payment]
-verify_jwt = true
-
-[functions.check-asaas-payment]
-verify_jwt = true
-
-[functions.create-mercadopago-preference]
-verify_jwt = true
-
-[functions.check-mercadopago-payment]
-verify_jwt = true
-
-[functions.handle-mercadopago-webhook]
+[functions.mental-health-chat]
 verify_jwt = false
 
-[functions.generate-rehab-plan]
-verify_jwt = true
-
-[functions.generate-workout-plan]
-verify_jwt = true
-
-[functions.generate-meal-plan]
-verify_jwt = true
+[functions.groq-chat]
+verify_jwt = false
+timeout_seconds = 180
 
 [functions.generate-meal-plan-groq]
 verify_jwt = false
+timeout_seconds = 180
 
-[functions.grant-plan-access]
-verify_jwt = true
+[functions.generate-rehab-plan-groq]
+verify_jwt = false
+timeout_seconds = 120
 
-[functions.mental-health-chat]
-verify_jwt = true
+[functions.generate-meal-plan]
+verify_jwt = false
 
-[functions.llama-completion]
-verify_jwt = true
+[functions.generate-rehab-plan]
+verify_jwt = false
 
-[functions.groq-chat]
-verify_jwt = true
+[functions.generate-meal-plan-llama]
+verify_jwt = false
+timeout_seconds = 180
 
 [functions.generate-workout-plan-llama]
-verify_jwt = true
+verify_jwt = false
+timeout_seconds = 180
+
+[functions.nutri-plus-agent]
+verify_jwt = false
+timeout_seconds = 240
