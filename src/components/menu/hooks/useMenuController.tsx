@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useProtocolFoods } from "./useProtocolFoods";
-import { useCalorieCalculator } from "./useCalorieCalculator";
+import { useCalorieCalculator, type CalorieCalculatorForm } from "./useCalorieCalculator";
 import { useFoodSelection } from "./useFoodSelection";
 import { generateMealPlan } from "./useMealPlanGeneration";
 import { DietaryPreferences, MealPlan, ProtocolFood } from "../types";
@@ -10,11 +10,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 // Types
-interface FormData {
+export interface FormData {
   weight: string;
   height: string;
   age: string;
-  gender: string;
+  gender: "male" | "female";
   activityLevel: string;
   goal: string;
 }
@@ -47,7 +47,7 @@ export const useMenuController = (): MenuState => {
     hasAllergies: false,
     allergies: [],
     dietaryRestrictions: [],
-    trainingTime: null,
+    trainingTime: undefined,
   });
   const [formData, setFormData] = useState<FormData>({
     weight: "70",
@@ -55,7 +55,7 @@ export const useMenuController = (): MenuState => {
     age: "30",
     gender: "male",
     activityLevel: "moderate",
-    goal: "maintenance",
+    goal: "maintain",
   });
   
   const { protocolFoods, error: foodsError, foodsByMealType } = useProtocolFoods();
@@ -104,7 +104,7 @@ export const useMenuController = (): MenuState => {
           weight: nutritionPrefs.weight ? nutritionPrefs.weight.toString() : prev.weight,
           height: nutritionPrefs.height ? nutritionPrefs.height.toString() : prev.height,
           age: nutritionPrefs.age ? nutritionPrefs.age.toString() : prev.age,
-          gender: nutritionPrefs.gender || prev.gender,
+          gender: nutritionPrefs.gender as "male" | "female" || prev.gender,
           activityLevel: nutritionPrefs.activity_level || prev.activityLevel,
           goal: nutritionPrefs.goal || prev.goal,
         }));
@@ -126,7 +126,7 @@ export const useMenuController = (): MenuState => {
           hasAllergies: dietaryPrefs.has_allergies || false,
           allergies: dietaryPrefs.allergies || [],
           dietaryRestrictions: dietaryPrefs.dietary_restrictions || [],
-          trainingTime: dietaryPrefs.training_time || null,
+          trainingTime: dietaryPrefs.training_time || undefined,
         }));
       }
     } catch (error) {
@@ -153,16 +153,18 @@ export const useMenuController = (): MenuState => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          const { error } = await supabase.from('nutrition_preferences').upsert({
-            user_id: user.id,
-            weight: parseFloat(formData.weight),
-            height: parseFloat(formData.height),
-            age: parseInt(formData.age),
-            gender: formData.gender,
-            activity_level: formData.activityLevel,
-            goal: formData.goal,
-            calories_needed: calculatedCalories
-          });
+          const { error } = await supabase
+            .from('nutrition_preferences')
+            .upsert({
+              user_id: user.id,
+              weight: parseFloat(formData.weight),
+              height: parseFloat(formData.height),
+              age: parseInt(formData.age),
+              gender: formData.gender,
+              activity_level: formData.activityLevel,
+              goal: formData.goal,
+              calories_needed: calculatedCalories
+            });
           
           if (error) {
             console.error("Error saving nutrition preferences:", error);
@@ -199,13 +201,15 @@ export const useMenuController = (): MenuState => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { error } = await supabase.from('dietary_preferences').upsert({
-          user_id: user.id,
-          has_allergies: preferences.hasAllergies,
-          allergies: preferences.allergies,
-          dietary_restrictions: preferences.dietaryRestrictions,
-          training_time: preferences.trainingTime
-        });
+        const { error } = await supabase
+          .from('dietary_preferences')
+          .upsert({
+            user_id: user.id,
+            has_allergies: preferences.hasAllergies,
+            allergies: preferences.allergies,
+            dietary_restrictions: preferences.dietaryRestrictions,
+            training_time: preferences.trainingTime
+          });
         
         if (error) {
           console.error("Error saving dietary preferences:", error);

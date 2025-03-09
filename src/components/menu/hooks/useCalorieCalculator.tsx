@@ -42,7 +42,14 @@ export const useCalorieCalculator = () => {
     }
   };
 
-  const calculateCalories = (weight: string | number, height: string | number, age: string | number, gender: string, activityLevel: string, goal?: string) => {
+  const calculateCalories = (
+    weight: string | number, 
+    height: string | number, 
+    age: string | number, 
+    gender: string, 
+    activityLevel: string, 
+    goal?: string
+  ): number => {
     try {
       setLoading(true);
       

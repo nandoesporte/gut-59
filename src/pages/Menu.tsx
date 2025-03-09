@@ -7,7 +7,7 @@ import { DietaryPreferencesForm } from "@/components/menu/DietaryPreferencesForm
 import { MealPlanDisplay } from "@/components/menu/MealPlanDisplay";
 import { MealPlanHistory } from "@/components/menu/MealPlanHistory";
 import { MenuHeader } from "@/components/menu/MenuHeader";
-import { useMenuController } from "@/components/menu/hooks/useMenuController";
+import { useMenuController, FormData } from "@/components/menu/hooks/useMenuController";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useRef } from "react";
