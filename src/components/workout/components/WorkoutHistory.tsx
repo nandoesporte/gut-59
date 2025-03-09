@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Badge } from "@/components/ui/badge";
 import { WorkoutPlan } from '../types/workout-plan';
@@ -330,3 +330,4 @@ const WorkoutHistory: React.FC<WorkoutHistoryProps> = ({
 };
 
 export default WorkoutHistory;
+
