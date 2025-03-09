@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { ProtocolFood, MealPlan, DietaryPreferences } from "../types";
+import { ProtocolFood, MealPlan, DietaryPreferences, Goal } from "../types";
 import { useCalorieCalculator } from "./useCalorieCalculator";
 import { useFoodSelection } from "./useFoodSelection";
 import { useMealPlanGeneration } from "./useMealPlanGeneration";
@@ -12,9 +12,10 @@ interface FormData {
   age: number;
   weight: number;
   height: number;
-  gender: string;
+  gender: "male" | "female";
   activity_level: string;
-  goal: string;
+  activityLevel: string;
+  goal: Goal;
 }
 
 export const useMenuController = () => {
@@ -26,6 +27,7 @@ export const useMenuController = () => {
     height: 170,
     gender: 'male',
     activity_level: 'moderate',
+    activityLevel: 'moderate',
     goal: 'maintain'
   });
   const [dietaryPreferences, setDietaryPreferences] = useState<DietaryPreferences>({
@@ -66,6 +68,7 @@ export const useMenuController = () => {
         },
         { multiplier: 1.0 }
       );
+      
       setCalorieNeeds(calculatedCalories);
       setCurrentStep(2);
     } catch (error) {
@@ -83,7 +86,7 @@ export const useMenuController = () => {
   };
 
   // Handle step 3: Dietary preferences
-  const handleDietaryPreferences = (preferences: DietaryPreferences) => {
+  const handleDietaryPreferences = async (preferences: DietaryPreferences) => {
     setDietaryPreferences(preferences);
     
     // Organize foods by meal type for the API
@@ -102,20 +105,24 @@ export const useMenuController = () => {
       height: formData.height,
       age: formData.age,
       gender: formData.gender,
-      activityLevel: formData.activity_level,
+      activityLevel: formData.activityLevel,
       goal: formData.goal,
       dailyCalories: calorieNeeds
     };
     
+    // Map selected food IDs to full protocol food objects
+    const selectedFoodObjects = selectedFoods.map(foodId => {
+      return protocolFoods.find(food => food.id === foodId);
+    }).filter(food => !!food) as ProtocolFood[];
+    
     // Generate the meal plan
-    generatePlan(userData, selectedFoods, foodsByMealType, preferences)
-      .then(() => {
-        setCurrentStep(4);
-      })
-      .catch((error) => {
-        console.error("Erro ao gerar plano alimentar:", error);
-        toast.error("Erro ao gerar plano alimentar. Por favor, tente novamente.");
-      });
+    try {
+      await generatePlan(userData, selectedFoodObjects, foodsByMealType, preferences);
+      setCurrentStep(4);
+    } catch (error) {
+      console.error("Erro ao gerar plano alimentar:", error);
+      toast.error("Erro ao gerar plano alimentar. Por favor, tente novamente.");
+    }
   };
   
   // Function to handle regenerating the meal plan
@@ -149,9 +156,14 @@ export const useMenuController = () => {
     // Clear previous meal plan to avoid stale data
     setMealPlan(null);
     
+    // Map selected food IDs to full protocol food objects
+    const selectedFoodObjects = selectedFoods.map(foodId => {
+      return protocolFoods.find(food => food.id === foodId);
+    }).filter(food => !!food) as ProtocolFood[];
+    
     // Generate new meal plan
     try {
-      await generatePlan(userData, selectedFoods, foodsByMealType, dietaryPreferences);
+      await generatePlan(userData, selectedFoodObjects, foodsByMealType, dietaryPreferences);
     } catch (error) {
       console.error("Erro ao regenerar plano alimentar:", error);
       toast.error("Erro ao regenerar plano alimentar. Por favor, tente novamente.");
@@ -176,7 +188,6 @@ export const useMenuController = () => {
     handleConfirmFoodSelection,
     handleDietaryPreferences,
     handleRegeneratePlan,
-    loadingTime,
-    setCalorieNeeds
+    loadingTime
   };
 };

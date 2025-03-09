@@ -1,6 +1,6 @@
 
 import { jsPDF } from 'jspdf';
-import { MealPlan } from '../types';
+import { MealPlan, RecommendationsObject } from '../types';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -13,6 +13,19 @@ const dayNameMap: Record<string, string> = {
   friday: "Sexta-feira",
   saturday: "Sábado",
   sunday: "Domingo"
+};
+
+// Helper function to format recommendations for PDF
+const formatRecommendations = (recs: string | string[] | RecommendationsObject | undefined): RecommendationsObject => {
+  if (!recs) return { general: '' };
+  
+  if (typeof recs === 'string') {
+    return { general: recs };
+  } else if (Array.isArray(recs)) {
+    return { general: recs };
+  }
+  
+  return recs as RecommendationsObject;
 };
 
 export const generateMealPlanPDF = async (mealPlan: MealPlan) => {
@@ -186,58 +199,69 @@ export const generateMealPlanPDF = async (mealPlan: MealPlan) => {
       doc.text("Recomendações:", 20, yPos);
       yPos += lineHeight * 1.5;
 
+      const formattedRecommendations = formatRecommendations(mealPlan.recommendations);
+      
       doc.setFontSize(10);
       
       // Recomendações gerais
-      if (mealPlan.recommendations.general) {
+      if (formattedRecommendations.general) {
         doc.setTextColor(0, 0, 0);
         doc.text("Gerais:", 20, yPos);
         yPos += lineHeight;
         
         doc.setTextColor(50, 50, 50);
-        const generalLines = doc.splitTextToSize(mealPlan.recommendations.general, 170);
+        const generalText = Array.isArray(formattedRecommendations.general) 
+          ? formattedRecommendations.general.join('\n') 
+          : formattedRecommendations.general;
+        const generalLines = doc.splitTextToSize(generalText, 170);
         doc.text(generalLines, 25, yPos);
         yPos += lineHeight * (generalLines.length + 1);
       }
       
       // Recomendações pré-treino
-      if (mealPlan.recommendations.preworkout) {
+      if (formattedRecommendations.preworkout) {
         doc.setTextColor(0, 0, 0);
         doc.text("Pré-treino:", 20, yPos);
         yPos += lineHeight;
         
         doc.setTextColor(50, 50, 50);
-        const preworkoutLines = doc.splitTextToSize(mealPlan.recommendations.preworkout, 170);
+        const preworkoutText = Array.isArray(formattedRecommendations.preworkout) 
+          ? formattedRecommendations.preworkout.join('\n') 
+          : formattedRecommendations.preworkout;
+        const preworkoutLines = doc.splitTextToSize(preworkoutText, 170);
         doc.text(preworkoutLines, 25, yPos);
         yPos += lineHeight * (preworkoutLines.length + 1);
       }
       
       // Recomendações pós-treino
-      if (mealPlan.recommendations.postworkout) {
+      if (formattedRecommendations.postworkout) {
         doc.setTextColor(0, 0, 0);
         doc.text("Pós-treino:", 20, yPos);
         yPos += lineHeight;
         
         doc.setTextColor(50, 50, 50);
-        const postworkoutLines = doc.splitTextToSize(mealPlan.recommendations.postworkout, 170);
+        const postworkoutText = Array.isArray(formattedRecommendations.postworkout) 
+          ? formattedRecommendations.postworkout.join('\n') 
+          : formattedRecommendations.postworkout;
+        const postworkoutLines = doc.splitTextToSize(postworkoutText, 170);
         doc.text(postworkoutLines, 25, yPos);
         yPos += lineHeight * (postworkoutLines.length + 1);
       }
       
       // Recomendações de timing
-      if (mealPlan.recommendations.timing) {
+      if (formattedRecommendations.timing) {
         doc.setTextColor(0, 0, 0);
         doc.text("Horários das refeições:", 20, yPos);
         yPos += lineHeight;
         
         doc.setTextColor(50, 50, 50);
-        if (Array.isArray(mealPlan.recommendations.timing)) {
-          for (const tip of mealPlan.recommendations.timing) {
+        if (Array.isArray(formattedRecommendations.timing)) {
+          for (const tip of formattedRecommendations.timing) {
             doc.text(`• ${tip}`, 25, yPos);
             yPos += lineHeight;
           }
         } else {
-          const timingLines = doc.splitTextToSize(mealPlan.recommendations.timing, 170);
+          const timingLines = doc.splitTextToSize(formattedRecommendations.timing, 170);
           doc.text(timingLines, 25, yPos);
           yPos += lineHeight * timingLines.length;
         }

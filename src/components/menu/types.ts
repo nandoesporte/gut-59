@@ -107,7 +107,7 @@ export interface CalorieCalculatorForm {
   gender: "male" | "female";
   activity_level: string;
   activityLevel: string;
-  goal: string;
+  goal: Goal;
 }
 
 export type Goal = "lose" | "maintain" | "gain";

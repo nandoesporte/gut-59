@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,11 +13,12 @@ import {
   Moon,
   Sun
 } from "lucide-react";
-import { MealPlan, DailyNutrition, RecommendationsObject } from "./types";
+import { MealPlan, DailyNutrition } from "./types";
 import { MealSection } from "./components/MealSection";
 import { DailyTotals } from "./components/DailyTotals";
 import { Recommendations } from "./components/Recommendations";
 import { MealPlanTable } from "./components/MealPlanTable";
+import { generateMealPlanPDF } from "./utils/pdf-generator";
 
 interface MealPlanDisplayProps {
   mealPlan: MealPlan;
@@ -44,6 +46,10 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
     } finally {
       setIsRefreshing(false);
     }
+  };
+
+  const handleDownloadPDF = () => {
+    generateMealPlanPDF(mealPlan);
   };
   
   const days = Object.keys(mealPlan.weeklyPlan);
@@ -93,10 +99,7 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
           <Button 
             variant="outline" 
             size="sm"
-            onClick={() => {
-              // PDF export functionality will be implemented later
-              alert("Funcionalidade de download em desenvolvimento");
-            }}
+            onClick={handleDownloadPDF}
           >
             <Download className="h-4 w-4 mr-2" />
             PDF

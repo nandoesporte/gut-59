@@ -1,8 +1,7 @@
 
 import { Card } from "@/components/ui/card";
-import { CalorieCalculatorForm } from "./CalorieCalculator";
 import { CalorieCalculator } from "./CalorieCalculator";
-import { Goal } from "./GoalCards";
+import { CalorieCalculatorForm, Goal } from "./types";
 
 interface CalorieCalculatorStepProps {
   formData: CalorieCalculatorForm;
