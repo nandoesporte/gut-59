@@ -3,7 +3,6 @@ import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Toast } from "@/components/ui/toast";
 import { toast } from "sonner";
 import { CalendarDays, Flame, Target, Clock, FileText, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
@@ -51,10 +50,18 @@ export const LastMealPlanSummary = () => {
 
         if (data) {
           // Validar se o plano possui a estrutura esperada
-          const plan = data.plan_data;
-          if (plan && plan.weeklyPlan && plan.weeklyTotals) {
+          const planData = typeof data.plan_data === 'string' 
+            ? JSON.parse(data.plan_data) 
+            : data.plan_data;
+            
+          if (planData && planData.weeklyPlan && planData.weeklyTotals) {
             console.log("Último plano alimentar encontrado:", data.id);
-            setLastPlan(data);
+            setLastPlan({
+              id: data.id,
+              created_at: data.created_at,
+              plan_data: planData as MealPlan,
+              calories: data.calories
+            });
           } else {
             console.log("Plano encontrado com formato inválido");
           }
