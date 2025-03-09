@@ -2,7 +2,7 @@
 import { Card } from "@/components/ui/card";
 
 interface DailyTotalsProps {
-  dailyTotals: {
+  dailyTotals?: {
     calories: number;
     protein: number;
     carbs: number;
@@ -19,8 +19,14 @@ interface DailyTotalsProps {
 }
 
 export const DailyTotals = ({ dailyTotals, totalNutrition }: DailyTotalsProps) => {
-  // Use totalNutrition if provided, otherwise use dailyTotals
-  const nutritionData = totalNutrition || dailyTotals;
+  // Use totalNutrition if provided, otherwise use dailyTotals, or default to empty values
+  const nutritionData = totalNutrition || dailyTotals || {
+    calories: 0,
+    protein: 0,
+    carbs: 0,
+    fats: 0,
+    fiber: 0
+  };
   
   const stats = [
     { name: "Calorias", value: nutritionData.calories || 0, unit: "kcal" },
