@@ -293,20 +293,54 @@ async function generateWithOpenAI(userData, foodsByMealType, dietaryPreferences,
       const content = data.choices[0].message.content;
       console.log("[NUTRI+] Conteúdo da resposta bruta (OpenAI):", content.substring(0, 200) + "...");
       
-      const jsonStart = content.indexOf('{');
-      const jsonEnd = content.lastIndexOf('}') + 1;
+      // Detectar e reparar problemas comuns de JSON
+      let jsonStr = content;
       
-      if (jsonStart === -1 || jsonEnd === -1 || jsonStart >= jsonEnd) {
-        console.error("[NUTRI+] Formato JSON inválido na resposta do OpenAI:", content);
-        throw new Error("Formato JSON inválido na resposta");
+      // Tentar encontrar o início do JSON
+      const jsonStart = content.indexOf('{');
+      if (jsonStart > 0) {
+        jsonStr = content.substring(jsonStart);
+        console.log("[NUTRI+] Removido texto antes do JSON:", content.substring(0, jsonStart));
       }
       
-      const jsonStr = content.substring(jsonStart, jsonEnd);
-      console.log("[NUTRI+] JSON extraído (OpenAI):", jsonStr.substring(0, 200) + "...");
-      const mealPlan = JSON.parse(jsonStr);
-      console.log("[NUTRI+] JSON parseado com sucesso (OpenAI)");
+      // Tentar encontrar o fim do JSON
+      const jsonEnd = jsonStr.lastIndexOf('}');
+      if (jsonEnd >= 0 && jsonEnd < jsonStr.length - 1) {
+        jsonStr = jsonStr.substring(0, jsonEnd + 1);
+        console.log("[NUTRI+] Removido texto após o JSON");
+      }
       
-      return mealPlan;
+      // Verificar se o JSON possui chaves de abertura e fechamento
+      if (!jsonStr.trim().startsWith('{') || !jsonStr.trim().endsWith('}')) {
+        console.error("[NUTRI+] JSON inválido:", jsonStr);
+        throw new Error("O modelo não retornou um objeto JSON válido");
+      }
+      
+      console.log("[NUTRI+] JSON extraído (OpenAI):", jsonStr.substring(0, 200) + "...");
+      
+      try {
+        const mealPlan = JSON.parse(jsonStr);
+        console.log("[NUTRI+] JSON parseado com sucesso (OpenAI)");
+        return mealPlan;
+      } catch (parseError) {
+        console.error("[NUTRI+] Erro ao fazer parse do JSON (OpenAI):", parseError);
+        
+        // Tentativa adicional de reparo para problemas de escape
+        const repairedJson = jsonStr
+          .replace(/\\'/g, "'")
+          .replace(/\\"/g, '"')
+          .replace(/\\n/g, '\\n')
+          .replace(/\\r/g, '\\r')
+          .replace(/\\t/g, '\\t');
+        
+        try {
+          console.log("[NUTRI+] Tentando parsear JSON reparado");
+          return JSON.parse(repairedJson);
+        } catch (finalError) {
+          console.error("[NUTRI+] Falha final no parse do JSON (OpenAI):", finalError);
+          throw new Error("Erro ao processar a resposta do modelo: JSON inválido");
+        }
+      }
     } catch (jsonError) {
       console.error("[NUTRI+] Erro ao processar JSON da resposta do OpenAI:", jsonError);
       throw new Error("Falha ao processar o JSON do plano alimentar do OpenAI");
@@ -392,32 +426,29 @@ async function generateWithGroq(userData, foodsByMealType, dietaryPreferences, m
       const content = data.choices[0].message.content;
       console.log("[NUTRI+] Conteúdo da resposta bruta (Groq):", content.substring(0, 200) + "...");
       
-      // Primeira tentativa: usando índices de chaves
-      const jsonStart = content.indexOf('{');
-      const jsonEnd = content.lastIndexOf('}') + 1;
+      // Detectar e reparar problemas comuns de JSON
+      let jsonStr = content;
       
-      if (jsonStart === -1 || jsonEnd === -1 || jsonStart >= jsonEnd) {
-        console.error("[NUTRI+] Formato JSON inválido na resposta do Groq (tentativa 1):", content);
-        // Segunda tentativa: usando regex
-        const jsonRegex = /{[\s\S]*}/;
-        const match = content.match(jsonRegex);
-        
-        if (match && match[0]) {
-          console.log("[NUTRI+] JSON encontrado via regex (tentativa 2)");
-          try {
-            const cleanedJson = match[0].replace(/\n/g, ' ').replace(/\r/g, '');
-            return JSON.parse(cleanedJson);
-          } catch (regexParseError) {
-            console.error("[NUTRI+] Erro ao fazer parse do JSON via regex:", regexParseError);
-            throw new Error("Não foi possível extrair um JSON válido da resposta usando regex");
-          }
-        } else {
-          throw new Error("Não foi possível encontrar um JSON válido na resposta");
-        }
+      // Tentar encontrar o início do JSON
+      const jsonStart = content.indexOf('{');
+      if (jsonStart > 0) {
+        jsonStr = content.substring(jsonStart);
+        console.log("[NUTRI+] Removido texto antes do JSON:", content.substring(0, jsonStart));
       }
       
-      // Continuar com a primeira tentativa se os índices forem válidos
-      const jsonStr = content.substring(jsonStart, jsonEnd);
+      // Tentar encontrar o fim do JSON
+      const jsonEnd = jsonStr.lastIndexOf('}');
+      if (jsonEnd >= 0 && jsonEnd < jsonStr.length - 1) {
+        jsonStr = jsonStr.substring(0, jsonEnd + 1);
+        console.log("[NUTRI+] Removido texto após o JSON");
+      }
+      
+      // Verificar se o JSON possui chaves de abertura e fechamento
+      if (!jsonStr.trim().startsWith('{') || !jsonStr.trim().endsWith('}')) {
+        console.error("[NUTRI+] Formato de resposta inesperado (Groq):", jsonStr);
+        throw new Error("O modelo não retornou um objeto JSON válido");
+      }
+      
       console.log("[NUTRI+] JSON extraído (Groq):", jsonStr.substring(0, 200) + "...");
       
       try {
@@ -425,18 +456,41 @@ async function generateWithGroq(userData, foodsByMealType, dietaryPreferences, m
         console.log("[NUTRI+] JSON parseado com sucesso (Groq)");
         return mealPlan;
       } catch (parseError) {
-        console.error("[NUTRI+] Erro ao fazer parse do JSON (tentativa 1):", parseError);
+        console.error("[NUTRI+] Erro ao fazer parse do JSON (Groq):", parseError);
         
-        // Tentar um método alternativo de extração de JSON
-        console.log("[NUTRI+] Tentando método alternativo de extração de JSON (tentativa 3)");
-        // Remove quebras de linha e espaços extras que podem causar problemas
-        const cleanedJsonStr = jsonStr.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
+        // Tentativa adicional de reparo para problemas comuns em modelos Llama/Groq
+        // Remover aspas desbalanceadas, caracteres de controle, etc.
+        const repairedJson = jsonStr
+          .replace(/\\'/g, "'")
+          .replace(/\\"/g, '"')
+          .replace(/\\n/g, ' ')
+          .replace(/\\r/g, ' ')
+          .replace(/\\t/g, ' ')
+          .replace(/\n/g, ' ')
+          .replace(/\r/g, ' ')
+          .replace(/\t/g, ' ');
         
         try {
-          return JSON.parse(cleanedJsonStr);
-        } catch (finalParseError) {
-          console.error("[NUTRI+] Erro final ao fazer parse do JSON:", finalParseError);
-          throw new Error("Todas as tentativas de extrair um JSON válido falharam");
+          console.log("[NUTRI+] Tentando parsear JSON reparado (Groq)");
+          return JSON.parse(repairedJson);
+        } catch (secondError) {
+          console.error("[NUTRI+] Segunda tentativa falhou (Groq):", secondError);
+          
+          // Terceira tentativa: usar regex para extrair apenas o bloco JSON válido
+          try {
+            console.log("[NUTRI+] Tentando extrair bloco JSON usando regex (Groq)");
+            const jsonMatch = content.match(/{[\s\S]*}/);
+            if (jsonMatch && jsonMatch[0]) {
+              const extractedJson = jsonMatch[0];
+              console.log("[NUTRI+] JSON extraído via regex:", extractedJson.substring(0, 200) + "...");
+              return JSON.parse(extractedJson);
+            } else {
+              throw new Error("Não foi possível extrair bloco JSON usando regex");
+            }
+          } catch (finalError) {
+            console.error("[NUTRI+] Falha final no parse do JSON (Groq):", finalError);
+            throw new Error("Erro ao processar a resposta do modelo: JSON inválido");
+          }
         }
       }
     } catch (jsonError) {
@@ -591,8 +645,9 @@ Crie um plano alimentar semanal para 7 dias apresentado em formato JSON, totalme
 8. Use o português brasileiro para todos os textos e descrições.
 9. Inclua porções realistas para cada alimento (em gramas, ml, unidades ou colheres).
 10. Adicione detalhes sobre como preparar ou combinar os alimentos em português do Brasil.
+11. MUITO IMPORTANTE: Não adicione nenhum texto, comentário ou formatação markdown antes ou depois do objeto JSON.
+12. Sua resposta deve conter APENAS o objeto JSON válido, nada mais.
 
 Apenas responda com o JSON do plano alimentar, sem texto adicional ou explicações.
 `;
 }
-
