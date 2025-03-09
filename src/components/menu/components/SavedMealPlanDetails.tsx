@@ -110,7 +110,7 @@ export const SavedMealPlanDetails = ({ planId, planData, isOpen, onClose }: Save
   };
 
   // Function to enhance food preparation details if they're missing or minimal
-  const enhanceFoodPreparation = (food: Food): Food => {
+  const enhanceFoodPreparation = (food: Food, mealType: string): Food => {
     const updatedFood = { ...food };
     
     if (!updatedFood.details || updatedFood.details.length < 10) {
@@ -137,7 +137,18 @@ export const SavedMealPlanDetails = ({ planId, planData, isOpen, onClose }: Save
       } else if (foodName.includes("maçã") || foodName.includes("banana") || foodName.includes("fruta")) {
         updatedFood.details = "Lave bem a fruta antes de consumir. Pode ser consumida in natura ou cortada em pedaços para facilitar o consumo.";
       } else {
-        updatedFood.details = "Prepare de acordo com suas preferências culinárias, utilizando temperos naturais como ervas, especiarias e limão para realçar o sabor. Evite o uso excessivo de sal e óleo.";
+        // Instruções de preparo específicas para cada tipo de refeição
+        if (mealType === "breakfast") {
+          updatedFood.details = "Prepare este alimento de forma leve e nutritiva para o café da manhã. Consuma pela manhã para garantir energia para o início do dia.";
+        } else if (mealType === "morningSnack") {
+          updatedFood.details = "Prepare como um lanche leve da manhã. Ideal para manter os níveis de energia entre o café da manhã e o almoço.";
+        } else if (mealType === "lunch") {
+          updatedFood.details = "Prepare de acordo com suas preferências culinárias para o almoço. Utilize temperos naturais como ervas frescas e limão para realçar o sabor sem adicionar sódio em excesso.";
+        } else if (mealType === "afternoonSnack") {
+          updatedFood.details = "Preparação rápida e simples para o lanche da tarde. Consuma entre o almoço e o jantar para manter o metabolismo ativo.";
+        } else if (mealType === "dinner") {
+          updatedFood.details = "Prepare para o jantar de forma leve. Evite o uso excessivo de sal e óleo. Consuma pelo menos 2 horas antes de dormir para melhor digestão.";
+        }
       }
     }
     
@@ -151,7 +162,7 @@ export const SavedMealPlanDetails = ({ planId, planData, isOpen, onClose }: Save
     return (
       <div className="space-y-6">
         <div className="p-4 bg-muted rounded-md mb-6">
-          <h2 className="text-xl font-bold">📅 {dayNameMap[dayKey]} – Plano Alimentar</h2>
+          <h2 className="text-xl font-bold">📅 {dayNameMap[dayKey] || dayPlan.dayName} – Plano Alimentar</h2>
         </div>
 
         {dayPlan.meals.breakfast && (
@@ -161,7 +172,7 @@ export const SavedMealPlanDetails = ({ planId, planData, isOpen, onClose }: Save
               icon={<div className="w-5 h-5 text-primary">☀️</div>}
               meal={{
                 ...dayPlan.meals.breakfast,
-                foods: dayPlan.meals.breakfast.foods.map(enhanceFoodPreparation)
+                foods: dayPlan.meals.breakfast.foods.map(food => enhanceFoodPreparation(food, "breakfast"))
               }}
             />
             <Button 
@@ -182,7 +193,7 @@ export const SavedMealPlanDetails = ({ planId, planData, isOpen, onClose }: Save
               icon={<div className="w-5 h-5 text-primary">🥪</div>}
               meal={{
                 ...dayPlan.meals.morningSnack,
-                foods: dayPlan.meals.morningSnack.foods.map(enhanceFoodPreparation)
+                foods: dayPlan.meals.morningSnack.foods.map(food => enhanceFoodPreparation(food, "morningSnack"))
               }}
             />
             <Button 
@@ -203,7 +214,7 @@ export const SavedMealPlanDetails = ({ planId, planData, isOpen, onClose }: Save
               icon={<div className="w-5 h-5 text-primary">🍽️</div>}
               meal={{
                 ...dayPlan.meals.lunch,
-                foods: dayPlan.meals.lunch.foods.map(enhanceFoodPreparation)
+                foods: dayPlan.meals.lunch.foods.map(food => enhanceFoodPreparation(food, "lunch"))
               }}
             />
             <Button 
@@ -224,7 +235,7 @@ export const SavedMealPlanDetails = ({ planId, planData, isOpen, onClose }: Save
               icon={<div className="w-5 h-5 text-primary">🍎</div>}
               meal={{
                 ...dayPlan.meals.afternoonSnack,
-                foods: dayPlan.meals.afternoonSnack.foods.map(enhanceFoodPreparation)
+                foods: dayPlan.meals.afternoonSnack.foods.map(food => enhanceFoodPreparation(food, "afternoonSnack"))
               }}
             />
             <Button 
@@ -245,7 +256,7 @@ export const SavedMealPlanDetails = ({ planId, planData, isOpen, onClose }: Save
               icon={<div className="w-5 h-5 text-primary">🌙</div>}
               meal={{
                 ...dayPlan.meals.dinner,
-                foods: dayPlan.meals.dinner.foods.map(enhanceFoodPreparation)
+                foods: dayPlan.meals.dinner.foods.map(food => enhanceFoodPreparation(food, "dinner"))
               }}
             />
             <Button 

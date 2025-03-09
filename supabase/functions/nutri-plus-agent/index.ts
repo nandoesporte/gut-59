@@ -1,3 +1,4 @@
+
 // nutri-plus-agent: Uses Groq API to analyze user data and generate personalized meal plans
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -80,35 +81,35 @@ IMPORTANT OUTPUT FORMAT RULES:
 
 Make sure weeklyPlan contains ALL 7 days (Monday to Sunday). Each day must have the following structure:
 {
-  "dayName": "Day Name",
+  "dayName": "Segunda-feira",
   "meals": {
     "breakfast": {
-      "description": "Breakfast description",
-      "foods": [{"name": "Food name", "portion": 100, "unit": "g", "details": "Details about food preparation and consumption"}],
+      "description": "Café da Manhã",
+      "foods": [{"name": "Nome do alimento", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento"}],
       "calories": 500,
       "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
     },
     "morningSnack": {
-      "description": "Morning snack description",
-      "foods": [{"name": "Food name", "portion": 100, "unit": "g", "details": "Details about food preparation and consumption"}],
+      "description": "Lanche da Manhã",
+      "foods": [{"name": "Nome do alimento", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento"}],
       "calories": 500,
       "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
     },
     "lunch": {
-      "description": "Lunch description",
-      "foods": [{"name": "Food name", "portion": 100, "unit": "g", "details": "Details about food preparation and consumption"}],
+      "description": "Almoço",
+      "foods": [{"name": "Nome do alimento", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento"}],
       "calories": 500,
       "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
     },
     "afternoonSnack": {
-      "description": "Afternoon snack description",
-      "foods": [{"name": "Food name", "portion": 100, "unit": "g", "details": "Details about food preparation and consumption"}],
+      "description": "Lanche da Tarde",
+      "foods": [{"name": "Nome do alimento", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento"}],
       "calories": 500,
       "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
     },
     "dinner": {
-      "description": "Dinner description",
-      "foods": [{"name": "Food name", "portion": 100, "unit": "g", "details": "Details about food preparation and consumption"}],
+      "description": "Jantar",
+      "foods": [{"name": "Nome do alimento", "portion": 100, "unit": "g", "details": "Detalhes sobre o preparo e consumo do alimento"}],
       "calories": 500,
       "macros": {"protein": 30, "carbs": 40, "fats": 15, "fiber": 5}
     }
@@ -123,7 +124,7 @@ IMPORTANT: Use exactly the property names specified above:
 - Use "afternoonSnack" for afternoon snack (not "afternoon_snack")
 - Use "dinner" for dinner
 
-It is ESSENTIAL that each food in the "foods" list contains detailed preparation instructions in the "details" field, explaining how the food should be prepared, cooked, or consumed.
+It is ESSENTIAL that each food in the "foods" list contains detailed preparation instructions in the "details" field, explaining how the food should be prepared, cooked, or consumed. Write these details in Portuguese-BR.
 
 IMPORTANT: Strictly respect the categorization of foods by meal type:
 - Foods categorized as 'breakfast' should be placed ONLY in the breakfast meal
@@ -132,12 +133,14 @@ IMPORTANT: Strictly respect the categorization of foods by meal type:
 - Foods categorized as 'afternoon_snack' should be placed ONLY in the afternoon snack
 - Foods categorized as 'dinner' should be placed ONLY in dinner
 
+DO NOT mix up foods between different meal types. For example, don't include breakfast foods in the lunch section.
+
 Recommendations should include:
 {
-  "general": "General nutrition advice",
-  "preworkout": "Pre-workout nutrition advice",
-  "postworkout": "Post-workout nutrition advice",
-  "timing": ["Specific meal timing advice", "Another timing advice"]
+  "general": "Recomendações gerais de nutrição",
+  "preworkout": "Recomendações para alimentação pré-treino",
+  "postworkout": "Recomendações para alimentação pós-treino",
+  "timing": ["Recomendações específicas sobre horários das refeições", "Outra recomendação de horário"]
 }
 
 REMEMBER: ALL NUMERICAL VALUES MUST BE INTEGERS OR DECIMALS, NOT STRINGS WITH UNITS. THIS IS A CRITICAL REQUIREMENT.
@@ -178,10 +181,12 @@ Please create a 7-day plan that:
 5. Provides variety throughout the week
 6. Includes all meal types: breakfast, morning snack, lunch, afternoon snack, dinner
 7. Calculates calories and macros for each meal and day
-8. Provides preparation details for each food
+8. Provides detailed preparation instructions for each food IN PORTUGUESE-BR
 9. CRITICAL: Uses only numerical values for quantities, without adding units like "g" or "kcal"
 10. For example, use "protein": 26 instead of "protein": "26g"
-11. Uses the correct meal nomenclature in camelCase: "breakfast", "morningSnack", "lunch", "afternoonSnack", "dinner" - don't use underscore versions like "morning_snack" or "afternoon_snack"`;
+11. Uses the correct meal nomenclature in camelCase: "breakfast", "morningSnack", "lunch", "afternoonSnack", "dinner" - don't use underscore versions like "morning_snack" or "afternoon_snack"
+12. All food names and preparation instructions should be in Portuguese-BR
+13. DO NOT mix foods between meal types - only use foods in their designated meal type categories`;
 
     // Track time for API call preparation
     console.log(`[NUTRI+] Preparing API call at ${new Date().toISOString()}`);
@@ -660,9 +665,21 @@ Please create a 7-day plan that:
             const meal = dayPlan.meals[mealType];
             if (meal && meal.foods) {
               meal.foods.forEach(food => {
-                // Ensure each food has details for preparation
+                // Ensure each food has details for preparation in Portuguese
                 if (!food.details || food.details === "") {
-                  food.details = "Prepare according to personal preference. Consume fresh when possible.";
+                  if (mealType === "breakfast") {
+                    food.details = "Preparar de acordo com a preferência pessoal. Consumir fresco quando possível.";
+                  } else if (mealType === "morningSnack") {
+                    food.details = "Consumir como lanche da manhã. Preparar de maneira simples, mantendo os nutrientes intactos.";
+                  } else if (mealType === "lunch") {
+                    food.details = "Preparar com temperos naturais. Cozinhar adequadamente para garantir sabor e valor nutricional.";
+                  } else if (mealType === "afternoonSnack") {
+                    food.details = "Consumir como lanche da tarde para manter os níveis de energia durante o dia.";
+                  } else if (mealType === "dinner") {
+                    food.details = "Preparar de forma leve para a refeição noturna. Evitar excesso de gorduras e carboidratos simples.";
+                  } else {
+                    food.details = "Preparar de acordo com a preferência pessoal. Consumir fresco quando possível.";
+                  }
                 }
               });
             }
@@ -670,21 +687,47 @@ Please create a 7-day plan that:
         }
       });
       
+      // Add day name translations if needed
+      const addPortugueseDayNames = (mealPlan) => {
+        const dayTranslations = {
+          'monday': 'Segunda-feira',
+          'tuesday': 'Terça-feira',
+          'wednesday': 'Quarta-feira',
+          'thursday': 'Quinta-feira',
+          'friday': 'Sexta-feira',
+          'saturday': 'Sábado',
+          'sunday': 'Domingo'
+        };
+        
+        if (mealPlan && mealPlan.weeklyPlan) {
+          Object.keys(mealPlan.weeklyPlan).forEach(day => {
+            if (dayTranslations[day] && !mealPlan.weeklyPlan[day].dayName) {
+              mealPlan.weeklyPlan[day].dayName = dayTranslations[day];
+            }
+          });
+        }
+        
+        return mealPlan;
+      };
+      
+      // Add Portuguese day names if missing
+      const localizedMealPlan = addPortugueseDayNames(mealPlan);
+      
       // Verify the weekly totals match the user's calorie goal
-      if (!mealPlan.weeklyTotals || 
-          isNaN(mealPlan.weeklyTotals.averageCalories) || 
-          isNaN(mealPlan.weeklyTotals.averageProtein) ||
-          isNaN(mealPlan.weeklyTotals.averageCarbs) ||
-          isNaN(mealPlan.weeklyTotals.averageFats) ||
-          isNaN(mealPlan.weeklyTotals.averageFiber)) {
+      if (!localizedMealPlan.weeklyTotals || 
+          isNaN(localizedMealPlan.weeklyTotals.averageCalories) || 
+          isNaN(localizedMealPlan.weeklyTotals.averageProtein) ||
+          isNaN(localizedMealPlan.weeklyTotals.averageCarbs) ||
+          isNaN(localizedMealPlan.weeklyTotals.averageFats) ||
+          isNaN(localizedMealPlan.weeklyTotals.averageFiber)) {
         
         console.log("[NUTRI+] Recalculating weekly averages due to invalid values");
         
-        const days = Object.values(mealPlan.weeklyPlan);
+        const days = Object.values(localizedMealPlan.weeklyPlan);
         const validDays = days.filter(day => day && day.dailyTotals);
         const dayCount = validDays.length || 1; // Avoid division by zero
         
-        mealPlan.weeklyTotals = {
+        localizedMealPlan.weeklyTotals = {
           averageCalories: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.calories || 0), 0) / dayCount),
           averageProtein: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.protein || 0), 0) / dayCount),
           averageCarbs: Math.round(validDays.reduce((sum, day) => sum + (day.dailyTotals?.carbs || 0), 0) / dayCount),
@@ -699,7 +742,7 @@ Please create a 7-day plan that:
       // Return the successful response with model info and ensure it's directly accessible
       // Important: Make sure we're only returning the mealPlan without nesting it further
       const finalResponse = {
-        mealPlan,
+        mealPlan: localizedMealPlan,
         modelUsed: modelName
       };
       
