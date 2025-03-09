@@ -1,6 +1,6 @@
 
 import React from "react";
-import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MealPlan } from "../types";
 
 interface MealPlanTableProps {
@@ -10,8 +10,14 @@ interface MealPlanTableProps {
 }
 
 export const MealPlanTable = ({ mealPlan, mealTypeLabels = {}, macroLabels = {} }: MealPlanTableProps) => {
+  if (!mealPlan || !mealPlan.weeklyPlan) {
+    return <div className="text-gray-500">Dados do plano alimentar indisponíveis</div>;
+  }
+
   const days = Object.keys(mealPlan.weeklyPlan);
-  const dayLabels: Record<string, string> = {
+  if (days.length === 0) return null;
+
+  const weekdayLabels: Record<string, string> = {
     monday: "Segunda",
     tuesday: "Terça",
     wednesday: "Quarta",
@@ -21,51 +27,86 @@ export const MealPlanTable = ({ mealPlan, mealTypeLabels = {}, macroLabels = {} 
     sunday: "Domingo"
   };
 
-  // Tradução de macros com capitalização da primeira letra
-  const translateMacro = (macro: string): string => {
-    const translated = macroLabels[macro.toLowerCase()];
-    return translated ? 
-      translated.charAt(0).toUpperCase() + translated.slice(1) : 
-      macro.charAt(0).toUpperCase() + macro.slice(1);
+  // Função para traduzir nomes de dias
+  const translateDayName = (dayKey: string, dayName?: string): string => {
+    // Primeiro tentar o nome do dia
+    if (dayName) {
+      const translations: Record<string, string> = {
+        "Monday": "Segunda-feira",
+        "Tuesday": "Terça-feira",
+        "Wednesday": "Quarta-feira",
+        "Thursday": "Quinta-feira",
+        "Friday": "Sexta-feira",
+        "Saturday": "Sábado",
+        "Sunday": "Domingo"
+      };
+      if (translations[dayName]) return translations[dayName];
+    }
+    
+    // Caso contrário, usar a chave do dia
+    return weekdayLabels[dayKey] || dayKey;
   };
+
+  // Função para traduzir tipos de refeição
+  const translateMealType = (mealType: string): string => {
+    return mealTypeLabels[mealType] || mealType;
+  };
+
+  // Função para traduzir macronutrientes
+  const translateMacro = (macro: string): string => {
+    return macroLabels[macro.toLowerCase()] || macro;
+  };
+
+  const mealTypes = ["breakfast", "morningSnack", "lunch", "afternoonSnack", "dinner", "eveningSnack"];
+  const visibleMealTypes = mealTypes.filter(type => 
+    days.some(day => mealPlan.weeklyPlan[day]?.meals?.[type])
+  );
 
   return (
     <div className="overflow-x-auto">
       <Table>
-        <TableCaption>Resumo semanal do plano alimentar</TableCaption>
         <TableHeader>
           <TableRow>
             <TableHead className="w-[100px]">Dia</TableHead>
-            <TableHead>Calorias</TableHead>
-            <TableHead>{translateMacro("Protein")}</TableHead>
-            <TableHead>{translateMacro("Carbs")}</TableHead>
-            <TableHead>{translateMacro("Fats")}</TableHead>
-            <TableHead>{translateMacro("Fiber")}</TableHead>
+            <TableHead>{translateMacro("calories")}</TableHead>
+            <TableHead>{translateMacro("protein")}</TableHead>
+            <TableHead>{translateMacro("carbs")}</TableHead>
+            <TableHead>{translateMacro("fats")}</TableHead>
+            <TableHead>{translateMacro("fiber")}</TableHead>
+            <TableHead>Refeições</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {days.map((day) => {
+          {days.map(day => {
             const dayPlan = mealPlan.weeklyPlan[day];
-            if (!dayPlan || !dayPlan.dailyTotals) return null;
-            
+            if (!dayPlan) return null;
+
+            const mealCount = visibleMealTypes.filter(
+              type => dayPlan.meals && dayPlan.meals[type]
+            ).length;
+
             return (
               <TableRow key={day}>
-                <TableCell className="font-medium">{dayLabels[day] || day}</TableCell>
-                <TableCell>{dayPlan.dailyTotals.calories} kcal</TableCell>
-                <TableCell>{dayPlan.dailyTotals.protein}g</TableCell>
-                <TableCell>{dayPlan.dailyTotals.carbs}g</TableCell>
-                <TableCell>{dayPlan.dailyTotals.fats}g</TableCell>
-                <TableCell>{dayPlan.dailyTotals.fiber}g</TableCell>
+                <TableCell className="font-medium">
+                  {translateDayName(day, dayPlan.dayName)}
+                </TableCell>
+                <TableCell>{dayPlan.dailyTotals?.calories || 0} kcal</TableCell>
+                <TableCell>{dayPlan.dailyTotals?.protein || 0}g</TableCell>
+                <TableCell>{dayPlan.dailyTotals?.carbs || 0}g</TableCell>
+                <TableCell>{dayPlan.dailyTotals?.fats || 0}g</TableCell>
+                <TableCell>{dayPlan.dailyTotals?.fiber || 0}g</TableCell>
+                <TableCell>{mealCount} refeições</TableCell>
               </TableRow>
             );
           })}
           <TableRow className="bg-muted/50">
             <TableCell className="font-medium">Média</TableCell>
-            <TableCell className="font-bold">{mealPlan.weeklyTotals.averageCalories} kcal</TableCell>
-            <TableCell className="font-bold">{mealPlan.weeklyTotals.averageProtein}g</TableCell>
-            <TableCell className="font-bold">{mealPlan.weeklyTotals.averageCarbs}g</TableCell>
-            <TableCell className="font-bold">{mealPlan.weeklyTotals.averageFats}g</TableCell>
-            <TableCell className="font-bold">{mealPlan.weeklyTotals.averageFiber}g</TableCell>
+            <TableCell>{mealPlan.weeklyTotals?.averageCalories || 0} kcal</TableCell>
+            <TableCell>{mealPlan.weeklyTotals?.averageProtein || 0}g</TableCell>
+            <TableCell>{mealPlan.weeklyTotals?.averageCarbs || 0}g</TableCell>
+            <TableCell>{mealPlan.weeklyTotals?.averageFats || 0}g</TableCell>
+            <TableCell>{mealPlan.weeklyTotals?.averageFiber || 0}g</TableCell>
+            <TableCell>-</TableCell>
           </TableRow>
         </TableBody>
       </Table>

@@ -1,7 +1,8 @@
 
 import React from "react";
 import { DailyNutrition } from "../types";
-import { PieChart, Pie, ResponsiveContainer, Cell, Legend, Tooltip } from "recharts";
+import { MacroDistributionBar } from "./MacroDistributionBar";
+import { PieChart } from "lucide-react";
 
 interface DailyTotalsProps {
   totalNutrition: DailyNutrition;
@@ -9,73 +10,69 @@ interface DailyTotalsProps {
 }
 
 export const DailyTotals = ({ totalNutrition, macroLabels = {} }: DailyTotalsProps) => {
-  // Função para traduzir macronutrientes
+  if (!totalNutrition) return null;
+
+  // Função para traduzir rótulos de macros
   const translateMacro = (macro: string): string => {
-    const translated = macroLabels[macro.toLowerCase()];
-    return translated ? 
-      translated.charAt(0).toUpperCase() + translated.slice(1) : 
-      macro.charAt(0).toUpperCase() + macro.slice(1);
+    return macroLabels[macro.toLowerCase()] || macro;
   };
 
-  const macros = [
-    { name: translateMacro("Protein"), value: Number(totalNutrition?.protein || 0), color: "#4caf50" },
-    { name: translateMacro("Carbs"), value: Number(totalNutrition?.carbs || 0), color: "#ff9800" },
-    { name: translateMacro("Fats"), value: Number(totalNutrition?.fats || 0), color: "#f44336" }
-  ];
+  // Calcular percentuais de macronutrientes
+  const totalCaloriesFromMacros =
+    totalNutrition.protein * 4 +
+    totalNutrition.carbs * 4 +
+    totalNutrition.fats * 9;
+
+  const proteinPercentage = Math.round(
+    (totalNutrition.protein * 4 * 100) / totalCaloriesFromMacros
+  );
+  const carbsPercentage = Math.round(
+    (totalNutrition.carbs * 4 * 100) / totalCaloriesFromMacros
+  );
+  const fatsPercentage = Math.round(
+    (totalNutrition.fats * 9 * 100) / totalCaloriesFromMacros
+  );
 
   return (
-    <div className="border rounded-lg p-4 mt-4">
-      <h4 className="font-medium text-lg mb-3">Totais Diários</h4>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <div className="flex justify-between">
-            <span>Calorias Totais:</span>
-            <span className="font-medium">{totalNutrition?.calories || 0} kcal</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Proteínas:</span>
-            <span className="font-medium">{totalNutrition?.protein || 0}g</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Carboidratos:</span>
-            <span className="font-medium">{totalNutrition?.carbs || 0}g</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Gorduras:</span>
-            <span className="font-medium">{totalNutrition?.fats || 0}g</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Fibras:</span>
-            <span className="font-medium">{totalNutrition?.fiber || 0}g</span>
-          </div>
+    <div className="border rounded-lg p-4 mt-6">
+      <div className="flex items-center mb-4">
+        <PieChart className="h-5 w-5 mr-2 text-purple-600" />
+        <h4 className="font-medium text-lg">Totais Diários</h4>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
+        <div className="text-center">
+          <div className="text-2xl font-bold">{totalNutrition.calories}</div>
+          <div className="text-xs text-gray-500">{translateMacro("calories")}</div>
         </div>
-        
-        <div className="h-40">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={macros}
-                cx="50%"
-                cy="50%"
-                innerRadius={40}
-                outerRadius={80}
-                paddingAngle={2}
-                dataKey="value"
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                labelLine={false}
-              >
-                {macros.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip 
-                formatter={(value) => [`${value}g`, ""]}
-                labelFormatter={(index) => macros[index].name}
-              />
-            </PieChart>
-          </ResponsiveContainer>
+        <div className="text-center">
+          <div className="text-2xl font-bold">{totalNutrition.protein}g</div>
+          <div className="text-xs text-gray-500">{translateMacro("protein")}</div>
         </div>
+        <div className="text-center">
+          <div className="text-2xl font-bold">{totalNutrition.carbs}g</div>
+          <div className="text-xs text-gray-500">{translateMacro("carbs")}</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-bold">{totalNutrition.fats}g</div>
+          <div className="text-xs text-gray-500">{translateMacro("fats")}</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-bold">{totalNutrition.fiber}g</div>
+          <div className="text-xs text-gray-500">{translateMacro("fiber")}</div>
+        </div>
+      </div>
+
+      <MacroDistributionBar
+        proteinPercentage={proteinPercentage}
+        carbsPercentage={carbsPercentage}
+        fatsPercentage={fatsPercentage}
+      />
+
+      <div className="grid grid-cols-3 text-center text-xs mt-2">
+        <div className="text-blue-500">{translateMacro("protein")}: {proteinPercentage}%</div>
+        <div className="text-green-500">{translateMacro("carbs")}: {carbsPercentage}%</div>
+        <div className="text-orange-500">{translateMacro("fats")}: {fatsPercentage}%</div>
       </div>
     </div>
   );

@@ -110,6 +110,21 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
     "calories": "calorias"
   };
 
+  // Traduzir o nome do dia da semana
+  const translateDayName = (dayName: string): string => {
+    const translations: Record<string, string> = {
+      "Monday": "Segunda-feira",
+      "Tuesday": "Terça-feira",
+      "Wednesday": "Quarta-feira",
+      "Thursday": "Quinta-feira",
+      "Friday": "Sexta-feira",
+      "Saturday": "Sábado",
+      "Sunday": "Domingo"
+    };
+    
+    return translations[dayName] || dayName;
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between gap-4">
@@ -167,7 +182,7 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
                 <CardContent className="p-4 sm:p-6">
                   <h3 className="font-bold text-lg mb-4 flex items-center">
                     <Calendar className="w-5 h-5 mr-2 text-blue-600" />
-                    {dayPlan.dayName || dayLabels[day] || "Dia da Semana"}
+                    {translateDayName(dayPlan.dayName) || dayLabels[day] || "Dia da Semana"}
                   </h3>
                   
                   <div className="grid grid-cols-1 gap-6">
