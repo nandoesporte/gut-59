@@ -139,9 +139,10 @@ export const useMealPlanGeneration = () => {
         try {
           console.log("Tentando salvar plano alimentar no banco de dados");
           
+          // Fix: Create a serializable plan object for database storage
           const planData = {
             user_id: userData.id,
-            plan_data: data.mealPlan,
+            plan_data: JSON.parse(JSON.stringify(data.mealPlan)), // Ensure the data is JSON serializable
             calories: userData.dailyCalories,
             dietary_preferences: JSON.stringify(preferences)
           };
@@ -165,21 +166,23 @@ export const useMealPlanGeneration = () => {
             console.error("Erro ao salvar plano alimentar:", saveError);
             console.error("Detalhes do erro:", JSON.stringify(saveError, null, 2));
             
-            console.log("Tentando salvar com plan_data como string JSON");
-            const stringifiedPlanData = {
-              ...planData,
-              plan_data: JSON.stringify(planData.plan_data)
-            };
+            // If the error is related to JSON serialization, try stringifying the plan_data first
+            console.log("Tentando salvar novamente com conversão explícita para JSON");
             
             const { error: retryError } = await supabase
               .from('meal_plans')
-              .insert(stringifiedPlanData);
+              .insert({
+                user_id: userData.id,
+                plan_data: data.mealPlan,  // Let Supabase handle the JSON conversion
+                calories: userData.dailyCalories,
+                dietary_preferences: preferences
+              });
               
             if (retryError) {
               console.error("Erro persistente ao tentar salvar o plano alimentar:", retryError);
               toast.error("Erro ao salvar plano alimentar no banco de dados");
             } else {
-              console.log("Plano alimentar salvo com sucesso após converter para string");
+              console.log("Plano alimentar salvo com sucesso após ajustes");
               
               if (addTransaction) {
                 await addTransaction({
