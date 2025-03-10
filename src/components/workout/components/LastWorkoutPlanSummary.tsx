@@ -48,7 +48,6 @@ export const LastWorkoutPlanSummary = () => {
             workout_sessions (
               id,
               day_number,
-              day_name,
               focus,
               intensity,
               warmup_description,
