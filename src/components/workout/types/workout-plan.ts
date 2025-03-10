@@ -14,23 +14,23 @@ export interface SessionExercise {
   reps: number;
   rest_time_seconds: number;
   exercise: Exercise;
-  intensity?: string; // Added this property
+  intensity?: string; 
 }
 
 export interface WorkoutSession {
   id: string;
   day_number: number;
-  day_name?: string; // Added this property
-  focus?: string; // Added this property
+  day_name?: string;
+  focus?: string;
   warmup_description: string;
   cooldown_description: string;
   session_exercises: SessionExercise[];
-  training_load?: { // Added this property
+  training_load?: {
     intensity?: string;
     volume?: string;
     progression?: string;
   };
-  intensity?: string; // Added this property
+  intensity?: string; // Explicitly added this property
 }
 
 interface Critique {
@@ -46,6 +46,6 @@ export interface WorkoutPlan {
   start_date: string;
   end_date: string;
   workout_sessions: WorkoutSession[];
-  critique?: Critique; // Added this property
-  created_at: string; // Added this property
+  critique?: Critique;
+  created_at: string; // Explicitly added this property
 }
