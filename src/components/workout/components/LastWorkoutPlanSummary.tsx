@@ -17,7 +17,7 @@ import { ptBR } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { WorkoutPlan } from "../types/workout-plan";
-import { WorkoutPlanDetailed } from "./WorkoutPlanDetailed";
+import { SavedWorkoutPlanDetails } from "./WorkoutPlanDetailed";
 
 export const LastWorkoutPlanSummary = () => {
   const [lastPlan, setLastPlan] = useState<WorkoutPlan | null>(null);
@@ -41,19 +41,11 @@ export const LastWorkoutPlanSummary = () => {
         const { data, error } = await supabase
           .from('workout_plans')
           .select(`
-            id,
-            user_id,
-            goal,
-            created_at,
+            *,
             workout_sessions (
-              id,
-              day_number,
-              focus,
-              intensity,
-              warmup_description,
-              cooldown_description,
+              *,
               session_exercises (
-                id,
+                *,
                 exercise:exercises (*)
               )
             )
@@ -61,17 +53,19 @@ export const LastWorkoutPlanSummary = () => {
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(1)
-          .maybeSingle();
+          .single();
 
         if (error) {
-          console.error("Erro ao buscar último plano de treino:", error);
+          if (error.code !== 'PGRST116') { // No rows returned
+            console.error("Erro ao buscar último plano de treino:", error);
+          }
           setLoading(false);
           return;
         }
 
         if (data) {
           console.log("Último plano de treino encontrado:", data.id);
-          setLastPlan(data as unknown as WorkoutPlan);
+          setLastPlan(data as WorkoutPlan);
         }
       } catch (error) {
         console.error("Erro ao buscar último plano de treino:", error);
@@ -97,7 +91,7 @@ export const LastWorkoutPlanSummary = () => {
 
   if (loading) {
     return (
-      <Card className="w-full mt-2">
+      <Card className="w-full mt-4">
         <CardContent className="p-4">
           <div className="flex flex-col space-y-3">
             <Skeleton className="h-6 w-3/4" />
@@ -131,7 +125,7 @@ export const LastWorkoutPlanSummary = () => {
   )).join(', ');
 
   return (
-    <Card className="w-full mt-2 overflow-hidden border-none shadow-sm bg-white">
+    <Card className="w-full mt-4 overflow-hidden border-none shadow-sm bg-white">
       <CardContent className="p-4">
         <div className="flex flex-col">
           <div className="flex justify-between items-center mb-2">
@@ -152,7 +146,7 @@ export const LastWorkoutPlanSummary = () => {
           </div>
 
           <p className="text-sm text-indigo-600/80 mb-2 -mt-1">
-            {formatDate(lastPlan.created_at as string)}
+            {formatDate(lastPlan.created_at)}
           </p>
 
           <div className="grid grid-cols-4 gap-2 mb-2">
