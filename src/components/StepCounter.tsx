@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { Footprints, Activity, MapPin, Settings } from 'lucide-react';
+import { Footprints, Activity, MapPin } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useWallet } from '@/hooks/useWallet';
 import { REWARDS } from '@/constants/rewards';
@@ -23,22 +24,24 @@ interface AccelerationData {
   timestamp: number;
 }
 
-interface CalibrationData {
-  magnitude: number;
-  avgMagnitude: number;
-  timestamp: number;
-}
-
 const STORAGE_KEYS = {
   STEPS: 'stepCounter_steps',
   LAST_SYNC: 'stepCounter_lastSync',
-  PARAMETERS: 'stepCounter_parameters',
+  PERMISSION_GRANTED: 'stepCounter_permissionGranted',
   LAST_STEP_TIME: 'stepCounter_lastStepTime'
 };
 
 const ACCELEROMETER_CONFIG = {
   frequency: 60,
-  windowSize: 10  // Aumentado de 5 para 10
+  windowSize: 10
+};
+
+// Parâmetros otimizados para detecção de passos
+const STEP_DETECTION_PARAMS = {
+  magnitudeThreshold: 0.7,
+  averageThreshold: 0.35,
+  minStepInterval: 180,
+  peakThreshold: 0.55
 };
 
 const loadStoredSteps = () => {
@@ -58,27 +61,17 @@ const loadStoredSteps = () => {
 const StepCounter = () => {
   const initialSteps = loadStoredSteps();
   const initialLastStepTime = Number(localStorage.getItem(STORAGE_KEYS.LAST_STEP_TIME) || '0');
-  const initialParameters = JSON.parse(localStorage.getItem(STORAGE_KEYS.PARAMETERS) || 'null') || {
-    magnitudeThreshold: 0.8,     // Reduzido de 1.0
-    averageThreshold: 0.4,       // Reduzido de 0.6
-    minStepInterval: 180,        // Reduzido de 200
-    peakThreshold: 0.6           // Reduzido de 0.8
-  };
+  const storedPermission = localStorage.getItem(STORAGE_KEYS.PERMISSION_GRANTED) === 'true';
 
   const [steps, setSteps] = useState(initialSteps);
   const [goalSteps] = useState(10000);
   const [lastAcceleration, setLastAcceleration] = useState<AccelerationData>({ x: 0, y: 0, z: 0, timestamp: 0 });
-  const [permission, setPermission] = useState<PermissionState | null>(null);
+  const [permission, setPermission] = useState<PermissionState | null>(storedPermission ? 'granted' : null);
   const { addTransaction } = useWallet();
   const [lastRewardDate, setLastRewardDate] = useState<string | null>(null);
   const [lastStepTime, setLastStepTime] = useState(initialLastStepTime);
   const [accelerationBuffer, setAccelerationBuffer] = useState<number[]>([]);
   const [peakDetected, setPeakDetected] = useState(false);
-  const [isCalibrating, setIsCalibrating] = useState(false);
-  const [calibrationTime, setCalibrationTime] = useState(0);
-  const calibrationData = useRef<CalibrationData[]>([]);
-  const [parameters, setParameters] = useState(initialParameters);
-  const [debugInfo, setDebugInfo] = useState<string>('');
   const [deviceMotionActive, setDeviceMotionActive] = useState(false);
   const [sensorActive, setSensorActive] = useState(false);
 
@@ -93,72 +86,10 @@ const StepCounter = () => {
     return Math.sqrt(acc.x * acc.x + acc.y * acc.y * 2 + acc.z * acc.z);
   };
 
-  const analyzeCalibrationData = () => {
-    if (calibrationData.current.length < 10) {
-      toast.error('Dados de calibração insuficientes');
-      return;
-    }
-
-    const magnitudes = calibrationData.current.map(d => d.magnitude);
-    const avgMagnitudes = calibrationData.current.map(d => d.avgMagnitude);
-    
-    const sortedMagnitudes = [...magnitudes].sort((a, b) => b - a);
-    const sortedAvgMagnitudes = [...avgMagnitudes].sort((a, b) => b - a);
-    
-    const topCount = Math.max(Math.floor(magnitudes.length * 0.2), 1);
-    const peakMagnitudes = sortedMagnitudes.slice(0, topCount);
-    const peakAvgMagnitudes = sortedAvgMagnitudes.slice(0, topCount);
-    
-    const avgPeakMagnitude = peakMagnitudes.reduce((a, b) => a + b, 0) / peakMagnitudes.length;
-    const avgPeakAvgMagnitude = peakAvgMagnitudes.reduce((a, b) => a + b, 0) / peakAvgMagnitudes.length;
-
-    const intervals: number[] = [];
-    let lastPeakTime = 0;
-    calibrationData.current.forEach(data => {
-      if (data.magnitude > avgPeakMagnitude * 0.7) {
-        if (lastPeakTime > 0) {
-          intervals.push(data.timestamp - lastPeakTime);
-        }
-        lastPeakTime = data.timestamp;
-      }
-    });
-
-    const avgInterval = intervals.length > 0 
-      ? intervals.reduce((a, b) => a + b, 0) / intervals.length 
-      : 250;
-
-    const newParameters = {
-      magnitudeThreshold: avgPeakMagnitude * 0.5, // Reduzido para ser mais sensível
-      averageThreshold: avgPeakAvgMagnitude * 0.4, // Reduzido para ser mais sensível
-      minStepInterval: Math.min(Math.max(avgInterval * 0.5, 150), 300), // Intervalo mínimo menor
-      peakThreshold: avgPeakMagnitude * 0.4 // Reduzido para ser mais sensível
-    };
-
-    setParameters(newParameters);
-    console.log('Novos parâmetros calculados:', newParameters);
-    toast.success('Calibração concluída!');
-  };
-
   const detectStep = (acceleration: AccelerationData) => {
     const now = Date.now();
     const magnitude = calculateMagnitude(acceleration);
     
-    if (isCalibrating) {
-      setAccelerationBuffer(prev => {
-        const newBuffer = [...prev, magnitude];
-        return newBuffer.slice(-ACCELEROMETER_CONFIG.windowSize);
-      });
-      
-      const avgMagnitude = movingAverageFilter(accelerationBuffer);
-      calibrationData.current.push({
-        magnitude,
-        avgMagnitude,
-        timestamp: now
-      });
-      
-      return;
-    }
-
     setAccelerationBuffer(prev => {
       const newBuffer = [...prev, magnitude];
       return newBuffer.slice(-ACCELEROMETER_CONFIG.windowSize);
@@ -170,33 +101,21 @@ const StepCounter = () => {
     
     const timeSinceLastStep = now - lastStepTime;
 
-    setDebugInfo(`Mag: ${magnitude.toFixed(2)}, Avg: ${avgMagnitude.toFixed(2)}, Vrt: ${verticalChange.toFixed(2)}, T: ${timeSinceLastStep}`);
-
-    // Reduzindo os limiares para detecção mais sensível
-    if (magnitude > parameters.peakThreshold && 
+    if (magnitude > STEP_DETECTION_PARAMS.peakThreshold && 
         !peakDetected && 
-        timeSinceLastStep > parameters.minStepInterval) {
+        timeSinceLastStep > STEP_DETECTION_PARAMS.minStepInterval) {
       setPeakDetected(true);
       
-      if ((verticalChange > parameters.magnitudeThreshold * 0.8 || 
-           magnitude > parameters.magnitudeThreshold * 1.2) && 
-          avgMagnitude > parameters.averageThreshold * 0.9) {
+      if ((verticalChange > STEP_DETECTION_PARAMS.magnitudeThreshold * 0.8 || 
+           magnitude > STEP_DETECTION_PARAMS.magnitudeThreshold * 1.2) && 
+          avgMagnitude > STEP_DETECTION_PARAMS.averageThreshold * 0.9) {
         const newSteps = steps + 1;
         setSteps(newSteps);
         setLastStepTime(now);
         localStorage.setItem(STORAGE_KEYS.STEPS, newSteps.toString());
         localStorage.setItem(STORAGE_KEYS.LAST_STEP_TIME, now.toString());
-        
-        console.log('Passo detectado:', {
-          magnitude,
-          avgMagnitude,
-          verticalChange,
-          timeSinceLastStep,
-          parameters
-        });
       }
-    } else if (magnitude < parameters.peakThreshold / 1.8) {
-      // Reduzindo o limiar para reset do pico detectado
+    } else if (magnitude < STEP_DETECTION_PARAMS.peakThreshold / 1.8) {
       setPeakDetected(false);
     }
     
@@ -208,7 +127,6 @@ const StepCounter = () => {
 
   useEffect(() => {
     let sensor: any = null;
-    let calibrationInterval: NodeJS.Timeout | null = null;
 
     const startAccelerometer = async () => {
       if (permission !== 'granted') return;
@@ -308,22 +226,6 @@ const StepCounter = () => {
       }
     };
 
-    if (isCalibrating) {
-      calibrationData.current = [];
-      setCalibrationTime(10);
-      calibrationInterval = setInterval(() => {
-        setCalibrationTime(prev => {
-          if (prev <= 1) {
-            setIsCalibrating(false);
-            analyzeCalibrationData();
-            if (calibrationInterval) clearInterval(calibrationInterval);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-
     startAccelerometer();
 
     return () => {
@@ -341,12 +243,8 @@ const StepCounter = () => {
         window.removeEventListener('devicemotion', () => {});
         setDeviceMotionActive(false);
       }
-      
-      if (calibrationInterval) {
-        clearInterval(calibrationInterval);
-      }
     };
-  }, [permission, isCalibrating]);
+  }, [permission]);
 
   useEffect(() => {
     if (steps !== initialSteps) {
@@ -359,10 +257,6 @@ const StepCounter = () => {
       localStorage.setItem(STORAGE_KEYS.LAST_STEP_TIME, lastStepTime.toString());
     }
   }, [lastStepTime, initialLastStepTime]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.PARAMETERS, JSON.stringify(parameters));
-  }, [parameters]);
 
   useEffect(() => {
     const syncOnVisibilityChange = () => {
@@ -406,61 +300,6 @@ const StepCounter = () => {
     checkLastReward();
   }, []);
 
-  const startCalibration = () => {
-    setIsCalibrating(true);
-    toast.info('Calibração iniciada! Por favor, caminhe normalmente por 10 segundos.');
-  };
-
-  const requestPermission = async () => {
-    try {
-      console.log('Solicitando permissão para o acelerômetro');
-      
-      if (typeof DeviceMotionEvent !== 'undefined' && 
-          typeof (DeviceMotionEvent as any).requestPermission === 'function') {
-        const permissionResult = await (DeviceMotionEvent as any).requestPermission();
-        setPermission(permissionResult);
-        
-        if (permissionResult === 'granted') {
-          toast.success('Permissão concedida!');
-        } else {
-          toast.error('Permissão negada');
-        }
-        return;
-      }
-      
-      if (navigator.permissions) {
-        try {
-          const result = await (navigator.permissions as any).query({ 
-            name: 'accelerometer' 
-          });
-
-          console.log('Resultado da permissão:', result.state);
-          setPermission(result.state);
-          
-          if (result.state === 'granted') {
-            toast.success('Permissão concedida!');
-          } else {
-            toast.error('Permissão negada');
-          }
-        } catch (error) {
-          console.error('Erro ao solicitar permissão via Permissions API:', error);
-          setPermission('granted');
-          toast.success('Permissão presumida concedida');
-        }
-      } else {
-        console.log('Permissions API não suportada, presumindo permissão');
-        setPermission('granted');
-        toast.success('Permissão presumida concedida');
-      }
-    } catch (error) {
-      console.error('Erro ao solicitar permissão:', error);
-      toast.error('Erro ao solicitar permissão');
-      
-      setPermission('granted');
-      toast.info('Tentando continuar sem permissão explícita');
-    }
-  };
-
   // Adicionando detecção automática de movimento a cada 500ms via DeviceMotion
   useEffect(() => {
     if (permission === 'granted' && !deviceMotionActive && !sensorActive) {
@@ -487,6 +326,61 @@ const StepCounter = () => {
       };
     }
   }, [permission, deviceMotionActive, sensorActive]);
+
+  const requestPermission = async () => {
+    try {
+      console.log('Solicitando permissão para o acelerômetro');
+      
+      if (typeof DeviceMotionEvent !== 'undefined' && 
+          typeof (DeviceMotionEvent as any).requestPermission === 'function') {
+        const permissionResult = await (DeviceMotionEvent as any).requestPermission();
+        setPermission(permissionResult);
+        
+        if (permissionResult === 'granted') {
+          localStorage.setItem(STORAGE_KEYS.PERMISSION_GRANTED, 'true');
+          toast.success('Permissão concedida!');
+        } else {
+          toast.error('Permissão negada');
+        }
+        return;
+      }
+      
+      if (navigator.permissions) {
+        try {
+          const result = await (navigator.permissions as any).query({ 
+            name: 'accelerometer' 
+          });
+
+          console.log('Resultado da permissão:', result.state);
+          setPermission(result.state);
+          
+          if (result.state === 'granted') {
+            localStorage.setItem(STORAGE_KEYS.PERMISSION_GRANTED, 'true');
+            toast.success('Permissão concedida!');
+          } else {
+            toast.error('Permissão negada');
+          }
+        } catch (error) {
+          console.error('Erro ao solicitar permissão via Permissions API:', error);
+          setPermission('granted');
+          localStorage.setItem(STORAGE_KEYS.PERMISSION_GRANTED, 'true');
+          toast.success('Permissão presumida concedida');
+        }
+      } else {
+        console.log('Permissions API não suportada, presumindo permissão');
+        setPermission('granted');
+        localStorage.setItem(STORAGE_KEYS.PERMISSION_GRANTED, 'true');
+        toast.success('Permissão presumida concedida');
+      }
+    } catch (error) {
+      console.error('Erro ao solicitar permissão:', error);
+      toast.error('Erro ao solicitar permissão');
+      
+      setPermission('granted');
+      localStorage.setItem(STORAGE_KEYS.PERMISSION_GRANTED, 'true');
+      toast.info('Tentando continuar sem permissão explícita');
+    }
+  };
 
   const handleRewardSteps = async () => {
     try {
@@ -547,83 +441,57 @@ const StepCounter = () => {
             <Footprints className="w-7 h-7" />
             <span className="text-xl">Atividade Diária</span>
           </div>
-          {permission === 'granted' && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={startCalibration}
-              disabled={isCalibrating}
-              className="text-primary-600"
-            >
-              <Settings className="w-5 h-5" />
-            </Button>
-          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
         <div>
-          {isCalibrating ? (
-            <div className="text-center space-y-2">
-              <div className="text-xl font-semibold text-primary-600">
-                Calibrando... {calibrationTime}s
+          <div className="text-center space-y-2">
+            <span className="text-7xl font-bold text-primary-600">
+              {steps.toLocaleString()}
+            </span>
+            <div className="text-base text-muted-foreground">
+              / {goalSteps.toLocaleString()} passos
+            </div>
+          </div>
+          
+          <Progress 
+            value={progress} 
+            className="h-3 w-full bg-primary-100"
+          />
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-white p-4 rounded-xl shadow-sm">
+              <div className="flex items-center gap-2 text-base text-muted-foreground mb-1">
+                <Activity className="w-5 h-5" />
+                Calorias
               </div>
-              <div className="text-base text-muted-foreground">
-                Por favor, caminhe normalmente
+              <div className="text-xl font-semibold text-primary-600">
+                {calories} kcal
               </div>
             </div>
-          ) : (
-            // Always show step counter content, regardless of permission status
-            <>
-              <div className="text-center space-y-2">
-                <span className="text-7xl font-bold text-primary-600">
-                  {steps.toLocaleString()}
-                </span>
-                <div className="text-base text-muted-foreground">
-                  / {goalSteps.toLocaleString()} passos
-                </div>
+            
+            <div className="bg-white p-4 rounded-xl shadow-sm">
+              <div className="flex items-center gap-2 text-base text-muted-foreground mb-1">
+                <MapPin className="w-5 h-5" />
+                Distância
               </div>
-              
-              <Progress 
-                value={progress} 
-                className="h-3 w-full bg-primary-100"
-              />
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-white p-4 rounded-xl shadow-sm">
-                  <div className="flex items-center gap-2 text-base text-muted-foreground mb-1">
-                    <Activity className="w-5 h-5" />
-                    Calorias
-                  </div>
-                  <div className="text-xl font-semibold text-primary-600">
-                    {calories} kcal
-                  </div>
-                </div>
-                
-                <div className="bg-white p-4 rounded-xl shadow-sm">
-                  <div className="flex items-center gap-2 text-base text-muted-foreground mb-1">
-                    <MapPin className="w-5 h-5" />
-                    Distância
-                  </div>
-                  <div className="text-xl font-semibold text-primary-600">
-                    {distance} km
-                  </div>
-                </div>
+              <div className="text-xl font-semibold text-primary-600">
+                {distance} km
               </div>
+            </div>
+          </div>
 
-              {process.env.NODE_ENV === 'development' && (
-                <div className="text-sm text-gray-500 mb-2 text-center">
-                  {debugInfo}
-                  <Button 
-                    onClick={addStepForTesting} 
-                    size="sm" 
-                    variant="outline" 
-                    className="ml-2 h-7 text-sm"
-                  >
-                    +1 (Test)
-                  </Button>
-                </div>
-              )}
-            </>
+          {process.env.NODE_ENV === 'development' && (
+            <div className="text-sm text-gray-500 mt-2 text-center">
+              <Button 
+                onClick={addStepForTesting} 
+                size="sm" 
+                variant="outline" 
+                className="h-7 text-sm"
+              >
+                +1 (Test)
+              </Button>
+            </div>
           )}
         </div>
 
