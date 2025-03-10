@@ -22,6 +22,7 @@ export interface WorkoutSession {
   day_number: number;
   day_name?: string; // Added this property
   focus?: string; // Added this property
+  intensity?: string; // Adding this missing property
   warmup_description: string;
   cooldown_description: string;
   session_exercises: SessionExercise[];
@@ -44,6 +45,7 @@ export interface WorkoutPlan {
   goal: string;
   start_date: string;
   end_date: string;
+  created_at: string; // Adding this missing property
   workout_sessions: WorkoutSession[];
   critique?: Critique; // Added this property
 }

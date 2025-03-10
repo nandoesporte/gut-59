@@ -17,7 +17,7 @@ import { ptBR } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { WorkoutPlan } from "../types/workout-plan";
-import { SavedWorkoutPlanDetails } from "./WorkoutPlanDetailed";
+// Removing incorrect import and we're not using this component here anyway
 
 export const LastWorkoutPlanSummary = () => {
   const [lastPlan, setLastPlan] = useState<WorkoutPlan | null>(null);
@@ -53,12 +53,10 @@ export const LastWorkoutPlanSummary = () => {
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle(); // Changed from .single() to .maybeSingle() to avoid errors when no data is found
 
         if (error) {
-          if (error.code !== 'PGRST116') { // No rows returned
-            console.error("Erro ao buscar último plano de treino:", error);
-          }
+          console.error("Erro ao buscar último plano de treino:", error);
           setLoading(false);
           return;
         }
