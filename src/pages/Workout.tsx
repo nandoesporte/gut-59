@@ -10,12 +10,26 @@ import { supabase } from '@/integrations/supabase/client';
 import type { WorkoutPlan } from '@/components/workout/types/workout-plan';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useLocation, useSearchParams } from 'react-router-dom';
 
 const Workout = () => {
   const [preferences, setPreferences] = useState<WorkoutPreferences | null>(null);
   const [historyPlans, setHistoryPlans] = useState<WorkoutPlan[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
   const isMobile = useIsMobile();
+  
+  // Check URL parameters for plan ID and view mode
+  useEffect(() => {
+    const planId = searchParams.get('planId');
+    const viewMode = searchParams.get('view');
+    
+    if (planId && viewMode === 'details') {
+      console.log('Opening plan details for:', planId);
+      setSelectedPlanId(planId);
+    }
+  }, [searchParams]);
 
   const fetchWorkoutHistory = useCallback(async () => {
     try {
@@ -103,6 +117,7 @@ const Workout = () => {
               plans={historyPlans}
               isLoading={isLoadingHistory}
               onRefresh={fetchWorkoutHistory}
+              selectedPlanId={selectedPlanId}
             />
           </div>
         </div>

@@ -76,7 +76,12 @@ export const LastWorkoutPlanSummary = () => {
   }, []);
 
   const handleViewDetails = () => {
-    navigate('/workout');
+    if (lastPlan) {
+      // Navigate to the workout page with the plan ID as a parameter to open the details tab
+      navigate(`/workout?planId=${lastPlan.id}&view=details`);
+    } else {
+      navigate('/workout');
+    }
   };
 
   const formatDate = (dateString: string) => {
