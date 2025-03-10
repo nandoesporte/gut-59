@@ -36,30 +36,30 @@ export const DailyTotals = ({ totalNutrition, macroLabels = {} }: DailyTotalsPro
   return (
     <div className="border rounded-lg p-4 mt-6">
       <div className="flex items-center mb-4">
-        <PieChart className="h-5 w-5 mr-2 text-purple-600" />
-        <h4 className="font-medium text-lg">Totais Diários</h4>
+        <PieChart className="h-6 w-6 mr-2 text-purple-600" />
+        <h4 className="font-medium text-xl">Totais Diários</h4>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
         <div className="text-center">
-          <div className="text-2xl font-bold">{totalNutrition.calories}</div>
-          <div className="text-xs text-gray-500">{translateMacro("calories")}</div>
+          <div className="text-3xl font-bold">{totalNutrition.calories}</div>
+          <div className="text-sm text-gray-500">{translateMacro("calories")}</div>
         </div>
         <div className="text-center">
-          <div className="text-2xl font-bold">{totalNutrition.protein}g</div>
-          <div className="text-xs text-gray-500">{translateMacro("protein")}</div>
+          <div className="text-3xl font-bold">{totalNutrition.protein}g</div>
+          <div className="text-sm text-gray-500">{translateMacro("protein")}</div>
         </div>
         <div className="text-center">
-          <div className="text-2xl font-bold">{totalNutrition.carbs}g</div>
-          <div className="text-xs text-gray-500">{translateMacro("carbs")}</div>
+          <div className="text-3xl font-bold">{totalNutrition.carbs}g</div>
+          <div className="text-sm text-gray-500">{translateMacro("carbs")}</div>
         </div>
         <div className="text-center">
-          <div className="text-2xl font-bold">{totalNutrition.fats}g</div>
-          <div className="text-xs text-gray-500">{translateMacro("fats")}</div>
+          <div className="text-3xl font-bold">{totalNutrition.fats}g</div>
+          <div className="text-sm text-gray-500">{translateMacro("fats")}</div>
         </div>
         <div className="text-center">
-          <div className="text-2xl font-bold">{totalNutrition.fiber}g</div>
-          <div className="text-xs text-gray-500">{translateMacro("fiber")}</div>
+          <div className="text-3xl font-bold">{totalNutrition.fiber}g</div>
+          <div className="text-sm text-gray-500">{translateMacro("fiber")}</div>
         </div>
       </div>
 
@@ -71,7 +71,7 @@ export const DailyTotals = ({ totalNutrition, macroLabels = {} }: DailyTotalsPro
         }}
       />
 
-      <div className="grid grid-cols-3 text-center text-xs mt-2">
+      <div className="grid grid-cols-3 text-center text-sm mt-2">
         <div className="text-blue-500">{translateMacro("protein")}: {proteinPercentage}%</div>
         <div className="text-green-500">{translateMacro("carbs")}: {carbsPercentage}%</div>
         <div className="text-orange-500">{translateMacro("fats")}: {fatsPercentage}%</div>

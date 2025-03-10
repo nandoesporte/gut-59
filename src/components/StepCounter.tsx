@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -545,8 +544,8 @@ const StepCounter = () => {
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center justify-between text-primary-600">
           <div className="flex items-center gap-2">
-            <Footprints className="w-6 h-6" />
-            Atividade Diária
+            <Footprints className="w-7 h-7" />
+            <span className="text-xl">Atividade Diária</span>
           </div>
           {permission === 'granted' && (
             <Button
@@ -556,7 +555,7 @@ const StepCounter = () => {
               disabled={isCalibrating}
               className="text-primary-600"
             >
-              <Settings className="w-4 h-4" />
+              <Settings className="w-5 h-5" />
             </Button>
           )}
         </CardTitle>
@@ -565,10 +564,10 @@ const StepCounter = () => {
         <div>
           {isCalibrating ? (
             <div className="text-center space-y-2">
-              <div className="text-lg font-semibold text-primary-600">
+              <div className="text-xl font-semibold text-primary-600">
                 Calibrando... {calibrationTime}s
               </div>
-              <div className="text-sm text-muted-foreground">
+              <div className="text-base text-muted-foreground">
                 Por favor, caminhe normalmente
               </div>
             </div>
@@ -576,49 +575,49 @@ const StepCounter = () => {
             // Always show step counter content, regardless of permission status
             <>
               <div className="text-center space-y-2">
-                <span className="text-6xl font-bold text-primary-600">
+                <span className="text-7xl font-bold text-primary-600">
                   {steps.toLocaleString()}
                 </span>
-                <div className="text-sm text-muted-foreground">
+                <div className="text-base text-muted-foreground">
                   / {goalSteps.toLocaleString()} passos
                 </div>
               </div>
               
               <Progress 
                 value={progress} 
-                className="h-2 w-full bg-primary-100"
+                className="h-3 w-full bg-primary-100"
               />
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-white p-4 rounded-xl shadow-sm">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                    <Activity className="w-4 h-4" />
+                  <div className="flex items-center gap-2 text-base text-muted-foreground mb-1">
+                    <Activity className="w-5 h-5" />
                     Calorias
                   </div>
-                  <div className="text-lg font-semibold text-primary-600">
+                  <div className="text-xl font-semibold text-primary-600">
                     {calories} kcal
                   </div>
                 </div>
                 
                 <div className="bg-white p-4 rounded-xl shadow-sm">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                    <MapPin className="w-4 h-4" />
+                  <div className="flex items-center gap-2 text-base text-muted-foreground mb-1">
+                    <MapPin className="w-5 h-5" />
                     Distância
                   </div>
-                  <div className="text-lg font-semibold text-primary-600">
+                  <div className="text-xl font-semibold text-primary-600">
                     {distance} km
                   </div>
                 </div>
               </div>
 
               {process.env.NODE_ENV === 'development' && (
-                <div className="text-xs text-gray-500 mb-2 text-center">
+                <div className="text-sm text-gray-500 mb-2 text-center">
                   {debugInfo}
                   <Button 
                     onClick={addStepForTesting} 
                     size="sm" 
                     variant="outline" 
-                    className="ml-2 h-6 text-xs"
+                    className="ml-2 h-7 text-sm"
                   >
                     +1 (Test)
                   </Button>
@@ -631,7 +630,7 @@ const StepCounter = () => {
         {permission !== 'granted' && (
           <Button 
             onClick={requestPermission} 
-            className="w-full bg-primary hover:bg-primary-600 text-white"
+            className="w-full bg-primary hover:bg-primary-600 text-white text-lg py-6"
           >
             Permitir contagem de passos
           </Button>
@@ -641,7 +640,7 @@ const StepCounter = () => {
           <Button
             onClick={handleRewardSteps}
             disabled={!canReceiveReward}
-            className="w-full bg-primary hover:bg-primary-600 text-white"
+            className="w-full bg-primary hover:bg-primary-600 text-white text-lg py-6"
           >
             {lastRewardDate === today
               ? 'Recompensa já recebida hoje'
