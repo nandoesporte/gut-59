@@ -39,7 +39,7 @@ const STORAGE_KEYS = {
 
 const ACCELEROMETER_CONFIG = {
   frequency: 60,
-  windowSize: 5
+  windowSize: 10  // Aumentado de 5 para 10
 };
 
 const loadStoredSteps = () => {
@@ -60,10 +60,10 @@ const StepCounter = () => {
   const initialSteps = loadStoredSteps();
   const initialLastStepTime = Number(localStorage.getItem(STORAGE_KEYS.LAST_STEP_TIME) || '0');
   const initialParameters = JSON.parse(localStorage.getItem(STORAGE_KEYS.PARAMETERS) || 'null') || {
-    magnitudeThreshold: 1.0, // Reduced from 1.2
-    averageThreshold: 0.6,   // Reduced from 0.8
-    minStepInterval: 200,    // Reduced from 250
-    peakThreshold: 0.8       // Reduced from 1.0
+    magnitudeThreshold: 0.8,     // Reduzido de 1.0
+    averageThreshold: 0.4,       // Reduzido de 0.6
+    minStepInterval: 180,        // Reduzido de 200
+    peakThreshold: 0.6           // Reduzido de 0.8
   };
 
   const [steps, setSteps] = useState(initialSteps);
@@ -80,6 +80,8 @@ const StepCounter = () => {
   const calibrationData = useRef<CalibrationData[]>([]);
   const [parameters, setParameters] = useState(initialParameters);
   const [debugInfo, setDebugInfo] = useState<string>('');
+  const [deviceMotionActive, setDeviceMotionActive] = useState(false);
+  const [sensorActive, setSensorActive] = useState(false);
 
   const movingAverageFilter = (buffer: number[], windowSize: number = ACCELEROMETER_CONFIG.windowSize): number => {
     if (buffer.length === 0) return 0;
@@ -114,7 +116,7 @@ const StepCounter = () => {
     const intervals: number[] = [];
     let lastPeakTime = 0;
     calibrationData.current.forEach(data => {
-      if (data.magnitude > avgPeakMagnitude * 0.8) {
+      if (data.magnitude > avgPeakMagnitude * 0.7) {
         if (lastPeakTime > 0) {
           intervals.push(data.timestamp - lastPeakTime);
         }
@@ -124,13 +126,13 @@ const StepCounter = () => {
 
     const avgInterval = intervals.length > 0 
       ? intervals.reduce((a, b) => a + b, 0) / intervals.length 
-      : 300;
+      : 250;
 
     const newParameters = {
-      magnitudeThreshold: avgPeakMagnitude * 0.6, // Reduced from 0.7
-      averageThreshold: avgPeakAvgMagnitude * 0.5, // Reduced from 0.6
-      minStepInterval: Math.min(Math.max(avgInterval * 0.6, 180), 350),
-      peakThreshold: avgPeakMagnitude * 0.5 // Reduced from 0.6
+      magnitudeThreshold: avgPeakMagnitude * 0.5, // Reduzido para ser mais sensível
+      averageThreshold: avgPeakAvgMagnitude * 0.4, // Reduzido para ser mais sensível
+      minStepInterval: Math.min(Math.max(avgInterval * 0.5, 150), 300), // Intervalo mínimo menor
+      peakThreshold: avgPeakMagnitude * 0.4 // Reduzido para ser mais sensível
     };
 
     setParameters(newParameters);
@@ -171,13 +173,15 @@ const StepCounter = () => {
 
     setDebugInfo(`Mag: ${magnitude.toFixed(2)}, Avg: ${avgMagnitude.toFixed(2)}, Vrt: ${verticalChange.toFixed(2)}, T: ${timeSinceLastStep}`);
 
+    // Reduzindo os limiares para detecção mais sensível
     if (magnitude > parameters.peakThreshold && 
         !peakDetected && 
         timeSinceLastStep > parameters.minStepInterval) {
       setPeakDetected(true);
       
-      if ((verticalChange > parameters.magnitudeThreshold || magnitude > parameters.magnitudeThreshold * 1.5) && 
-          avgMagnitude > parameters.averageThreshold) {
+      if ((verticalChange > parameters.magnitudeThreshold * 0.8 || 
+           magnitude > parameters.magnitudeThreshold * 1.2) && 
+          avgMagnitude > parameters.averageThreshold * 0.9) {
         const newSteps = steps + 1;
         setSteps(newSteps);
         setLastStepTime(now);
@@ -192,7 +196,8 @@ const StepCounter = () => {
           parameters
         });
       }
-    } else if (magnitude < parameters.peakThreshold / 1.5) {
+    } else if (magnitude < parameters.peakThreshold / 1.8) {
+      // Reduzindo o limiar para reset do pico detectado
       setPeakDetected(false);
     }
     
@@ -210,73 +215,97 @@ const StepCounter = () => {
       if (permission !== 'granted') return;
 
       try {
-        if (typeof DeviceMotionEvent !== 'undefined' && 
-            typeof (DeviceMotionEvent as any).requestPermission === 'function') {
-          const permissionResult = await (DeviceMotionEvent as any).requestPermission();
-          if (permissionResult !== 'granted') {
-            toast.error('Permissão de movimento negada');
-            return;
-          }
-        }
-
-        // Check if Accelerometer API is available in a type-safe way
-        if (typeof window !== 'undefined' && 'Accelerometer' in window) {
-          try {
-            // Use type assertion to avoid TypeScript error
-            const AccelerometerClass = (window as any).Accelerometer;
-            sensor = new AccelerometerClass({ 
-              frequency: ACCELEROMETER_CONFIG.frequency
-            });
-            
-            let lastProcessTime = 0;
-            const processInterval = 1000 / ACCELEROMETER_CONFIG.frequency;
-
-            sensor.addEventListener('reading', () => {
-              const now = Date.now();
-              if (now - lastProcessTime >= processInterval) {
-                detectStep({
-                  x: sensor.x,
-                  y: sensor.y,
-                  z: sensor.z,
-                  timestamp: now
-                });
-                lastProcessTime = now;
+        // Primeiro, tentamos usar DeviceMotionEvent
+        const useDeviceMotion = async () => {
+          if (typeof DeviceMotionEvent !== 'undefined') {
+            try {
+              // Em iOS, precisamos solicitar permissão
+              if (typeof (DeviceMotionEvent as any).requestPermission === 'function') {
+                const permissionResult = await (DeviceMotionEvent as any).requestPermission();
+                if (permissionResult !== 'granted') {
+                  toast.error('Permissão de movimento negada');
+                  return false;
+                }
               }
-            });
-
-            sensor.start();
-            console.log('Acelerômetro iniciado');
-          } catch (accelerometerError) {
-            console.error('Erro ao iniciar Accelerometer API:', accelerometerError);
-            useDeviceMotionFallback();
+              
+              // Adicionamos o listener com uma frequência mais alta
+              const deviceMotionHandler = (event: DeviceMotionEvent) => {
+                if (event.accelerationIncludingGravity) {
+                  detectStep({
+                    x: event.accelerationIncludingGravity.x || 0,
+                    y: event.accelerationIncludingGravity.y || 0,
+                    z: event.accelerationIncludingGravity.z || 0,
+                    timestamp: Date.now()
+                  });
+                }
+              };
+              
+              window.addEventListener('devicemotion', deviceMotionHandler, { passive: true });
+              setDeviceMotionActive(true);
+              console.log('DeviceMotion iniciado com sucesso');
+              return true;
+            } catch (error) {
+              console.error('Erro ao iniciar DeviceMotion:', error);
+              return false;
+            }
           }
-        } else {
-          console.log('Accelerometer API não disponível, usando DeviceMotion como fallback');
-          useDeviceMotionFallback();
+          return false;
+        };
+
+        // Depois, tentamos usar a Accelerometer API
+        const useAccelerometerAPI = async () => {
+          if (typeof window !== 'undefined' && 'Accelerometer' in window) {
+            try {
+              const AccelerometerClass = (window as any).Accelerometer;
+              sensor = new AccelerometerClass({ 
+                frequency: ACCELEROMETER_CONFIG.frequency 
+              });
+              
+              let lastProcessTime = 0;
+              const processInterval = 1000 / ACCELEROMETER_CONFIG.frequency;
+
+              sensor.addEventListener('reading', () => {
+                const now = Date.now();
+                if (now - lastProcessTime >= processInterval) {
+                  detectStep({
+                    x: sensor.x,
+                    y: sensor.y,
+                    z: sensor.z,
+                    timestamp: now
+                  });
+                  lastProcessTime = now;
+                }
+              });
+
+              sensor.addEventListener('error', (error: any) => {
+                console.error('Erro no acelerômetro:', error);
+                sensor = null;
+                useDeviceMotion();
+              });
+
+              sensor.start();
+              setSensorActive(true);
+              console.log('Acelerômetro iniciado com sucesso');
+              return true;
+            } catch (accelerometerError) {
+              console.error('Erro ao iniciar Accelerometer API:', accelerometerError);
+              return false;
+            }
+          }
+          return false;
+        };
+
+        // Testamos ambas as abordagens
+        const deviceMotionSuccess = await useDeviceMotion();
+        if (!deviceMotionSuccess) {
+          const accelerometerSuccess = await useAccelerometerAPI();
+          if (!accelerometerSuccess) {
+            toast.error('Não foi possível iniciar o contador de passos');
+          }
         }
       } catch (error) {
-        console.error('Erro ao iniciar acelerômetro:', error);
-        toast.error('Erro ao iniciar o contador de passos. Tentando DeviceMotion como alternativa...');
-        useDeviceMotionFallback();
-      }
-    };
-
-    const useDeviceMotionFallback = () => {
-      try {
-        window.addEventListener('devicemotion', (event) => {
-          if (event.accelerationIncludingGravity) {
-            detectStep({
-              x: event.accelerationIncludingGravity.x || 0,
-              y: event.accelerationIncludingGravity.y || 0,
-              z: event.accelerationIncludingGravity.z || 0,
-              timestamp: Date.now()
-            });
-          }
-        });
-        console.log('DeviceMotion iniciado como fallback');
-      } catch (fallbackError) {
-        console.error('Erro ao iniciar DeviceMotion:', fallbackError);
-        toast.error('Não foi possível iniciar o contador de passos');
+        console.error('Erro ao iniciar sensores de movimento:', error);
+        toast.error('Erro ao iniciar o contador de passos');
       }
     };
 
@@ -302,16 +331,21 @@ const StepCounter = () => {
       if (sensor) {
         try {
           sensor.stop();
+          setSensorActive(false);
           console.log('Acelerômetro parado');
         } catch (error) {
           console.error('Erro ao parar acelerômetro:', error);
         }
       }
+      
+      if (deviceMotionActive) {
+        window.removeEventListener('devicemotion', () => {});
+        setDeviceMotionActive(false);
+      }
+      
       if (calibrationInterval) {
         clearInterval(calibrationInterval);
       }
-
-      window.removeEventListener('devicemotion', () => {});
     };
   }, [permission, isCalibrating]);
 
@@ -360,7 +394,7 @@ const StepCounter = () => {
           .select('reward_date')
           .eq('user_id', user.id)
           .eq('reward_date', today)
-          .single();
+          .maybeSingle();
           
         if (data) {
           setLastRewardDate(today);
@@ -427,6 +461,33 @@ const StepCounter = () => {
       toast.info('Tentando continuar sem permissão explícita');
     }
   };
+
+  // Adicionando detecção automática de movimento a cada 500ms via DeviceMotion
+  useEffect(() => {
+    if (permission === 'granted' && !deviceMotionActive && !sensorActive) {
+      const checkDeviceMotion = () => {
+        // Se ainda não temos sensores ativos, forçamos uma leitura via DeviceMotion
+        window.addEventListener('devicemotion', function handleMotion(event) {
+          if (event.accelerationIncludingGravity) {
+            detectStep({
+              x: event.accelerationIncludingGravity.x || 0,
+              y: event.accelerationIncludingGravity.y || 0,
+              z: event.accelerationIncludingGravity.z || 0,
+              timestamp: Date.now()
+            });
+          }
+          window.removeEventListener('devicemotion', handleMotion);
+        }, { once: true });
+      };
+      
+      // Verificamos periodicamente se há movimento
+      const motionCheckInterval = setInterval(checkDeviceMotion, 500);
+      
+      return () => {
+        clearInterval(motionCheckInterval);
+      };
+    }
+  }, [permission, deviceMotionActive, sensorActive]);
 
   const handleRewardSteps = async () => {
     try {
