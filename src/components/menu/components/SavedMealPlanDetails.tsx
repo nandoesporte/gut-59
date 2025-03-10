@@ -10,6 +10,8 @@ import { Recommendations } from "./Recommendations";
 import { MealPlan, Food, RecommendationsObject } from "../types";
 import { supabase } from "@/integrations/supabase/client";
 import { FoodReplacementDialog } from "./FoodReplacementDialog";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface SavedMealPlanDetailsProps {
   planId: string;
@@ -28,6 +30,16 @@ const dayNameMap: Record<string, string> = {
   sunday: "Domingo"
 };
 
+const dayNameShort: Record<string, string> = {
+  monday: "Seg",
+  tuesday: "Ter",
+  wednesday: "Qua",
+  thursday: "Qui",
+  friday: "Sex",
+  saturday: "Sáb",
+  sunday: "Dom"
+};
+
 export const SavedMealPlanDetails = ({ planId, planData, isOpen, onClose }: SavedMealPlanDetailsProps) => {
   const [selectedDay, setSelectedDay] = useState<string>("monday");
   const [replaceFoodDialogOpen, setReplaceFoodDialogOpen] = useState(false);
@@ -37,6 +49,9 @@ export const SavedMealPlanDetails = ({ planId, planData, isOpen, onClose }: Save
     mealType: string;
     index: number;
   } | null>(null);
+  const isMobile = useIsMobile();
+  const days = Object.keys(dayNameMap);
+  const currentDayIndex = days.indexOf(selectedDay);
 
   const handleReplaceFood = (food: Food, dayKey: string, mealType: string, index: number) => {
     setSelectedFood({ food, dayKey, mealType, index });
@@ -130,118 +145,119 @@ export const SavedMealPlanDetails = ({ planId, planData, isOpen, onClose }: Save
     return formatted;
   };
 
+  const navigateDay = (direction: 'prev' | 'next') => {
+    const totalDays = days.length;
+    let newIndex = currentDayIndex;
+    
+    if (direction === 'prev') {
+      newIndex = (currentDayIndex - 1 + totalDays) % totalDays;
+    } else {
+      newIndex = (currentDayIndex + 1) % totalDays;
+    }
+    
+    setSelectedDay(days[newIndex]);
+  };
+
   const renderDayPlan = (dayKey: string) => {
     const dayPlan = planData.weeklyPlan[dayKey];
     if (!dayPlan) return null;
 
     return (
-      <div className="space-y-6">
-        <div className="p-4 bg-muted rounded-md mb-6">
-          <h2 className="text-xl font-bold">📅 {dayNameMap[dayKey]} – Plano Alimentar</h2>
+      <div className="space-y-6 animate-fadeIn">
+        <div className="p-3 sm:p-4 bg-muted rounded-md mb-4 sm:mb-6">
+          <h2 className="text-xl font-bold flex items-center gap-2">
+            <span className="bg-primary/10 text-primary rounded-md p-1">📅</span>
+            {dayNameMap[dayKey]} – Plano Alimentar
+          </h2>
         </div>
 
         {dayPlan.meals.breakfast && (
-          <div className="relative">
+          <div className="relative border rounded-lg p-4 hover:shadow-md transition-shadow">
             <MealSection
               title="Café da Manhã"
               icon={<div className="w-5 h-5 text-primary">☀️</div>}
               meal={dayPlan.meals.breakfast}
             />
-            {dayPlan.meals.breakfast.foods.map((food, index) => (
-              <Button 
-                key={`breakfast-${index}`}
-                variant="outline" 
-                size="sm" 
-                className="absolute top-2 right-2"
-                onClick={() => handleReplaceFood(food, dayKey, "breakfast", index)}
-              >
-                Substituir
-              </Button>
-            ))}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="absolute top-2 right-2"
+              onClick={() => handleReplaceFood(dayPlan.meals.breakfast.foods[0], dayKey, "breakfast", 0)}
+            >
+              Substituir
+            </Button>
           </div>
         )}
 
         {dayPlan.meals.morningSnack && (
-          <div className="relative">
+          <div className="relative border rounded-lg p-4 hover:shadow-md transition-shadow">
             <MealSection
               title="Lanche da Manhã"
               icon={<div className="w-5 h-5 text-primary">🥪</div>}
               meal={dayPlan.meals.morningSnack}
             />
-            {dayPlan.meals.morningSnack.foods.map((food, index) => (
-              <Button 
-                key={`morningSnack-${index}`}
-                variant="outline" 
-                size="sm" 
-                className="absolute top-2 right-2"
-                onClick={() => handleReplaceFood(food, dayKey, "morningSnack", index)}
-              >
-                Substituir
-              </Button>
-            ))}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="absolute top-2 right-2"
+              onClick={() => handleReplaceFood(dayPlan.meals.morningSnack.foods[0], dayKey, "morningSnack", 0)}
+            >
+              Substituir
+            </Button>
           </div>
         )}
 
         {dayPlan.meals.lunch && (
-          <div className="relative">
+          <div className="relative border rounded-lg p-4 hover:shadow-md transition-shadow">
             <MealSection
               title="Almoço"
               icon={<div className="w-5 h-5 text-primary">🍽️</div>}
               meal={dayPlan.meals.lunch}
             />
-            {dayPlan.meals.lunch.foods.map((food, index) => (
-              <Button 
-                key={`lunch-${index}`}
-                variant="outline" 
-                size="sm" 
-                className="absolute top-2 right-2"
-                onClick={() => handleReplaceFood(food, dayKey, "lunch", index)}
-              >
-                Substituir
-              </Button>
-            ))}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="absolute top-2 right-2"
+              onClick={() => handleReplaceFood(dayPlan.meals.lunch.foods[0], dayKey, "lunch", 0)}
+            >
+              Substituir
+            </Button>
           </div>
         )}
 
         {dayPlan.meals.afternoonSnack && (
-          <div className="relative">
+          <div className="relative border rounded-lg p-4 hover:shadow-md transition-shadow">
             <MealSection
               title="Lanche da Tarde"
               icon={<div className="w-5 h-5 text-primary">🍎</div>}
               meal={dayPlan.meals.afternoonSnack}
             />
-            {dayPlan.meals.afternoonSnack.foods.map((food, index) => (
-              <Button 
-                key={`afternoonSnack-${index}`}
-                variant="outline" 
-                size="sm" 
-                className="absolute top-2 right-2"
-                onClick={() => handleReplaceFood(food, dayKey, "afternoonSnack", index)}
-              >
-                Substituir
-              </Button>
-            ))}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="absolute top-2 right-2"
+              onClick={() => handleReplaceFood(dayPlan.meals.afternoonSnack.foods[0], dayKey, "afternoonSnack", 0)}
+            >
+              Substituir
+            </Button>
           </div>
         )}
 
         {dayPlan.meals.dinner && (
-          <div className="relative">
+          <div className="relative border rounded-lg p-4 hover:shadow-md transition-shadow">
             <MealSection
               title="Jantar"
               icon={<div className="w-5 h-5 text-primary">🌙</div>}
               meal={dayPlan.meals.dinner}
             />
-            {dayPlan.meals.dinner.foods.map((food, index) => (
-              <Button 
-                key={`dinner-${index}`}
-                variant="outline" 
-                size="sm" 
-                className="absolute top-2 right-2"
-                onClick={() => handleReplaceFood(food, dayKey, "dinner", index)}
-              >
-                Substituir
-              </Button>
-            ))}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="absolute top-2 right-2"
+              onClick={() => handleReplaceFood(dayPlan.meals.dinner.foods[0], dayKey, "dinner", 0)}
+            >
+              Substituir
+            </Button>
           </div>
         )}
 
@@ -252,6 +268,33 @@ export const SavedMealPlanDetails = ({ planId, planData, isOpen, onClose }: Save
     );
   };
 
+  // Mobile day navigation with buttons
+  const renderMobileDayNav = () => (
+    <div className="flex items-center justify-between mb-4 bg-muted rounded-lg p-2">
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        onClick={() => navigateDay('prev')}
+        className="p-1 h-8 w-8"
+      >
+        <ChevronLeft className="h-5 w-5" />
+      </Button>
+      
+      <h3 className="text-lg font-medium">
+        {dayNameMap[selectedDay]}
+      </h3>
+      
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        onClick={() => navigateDay('next')}
+        className="p-1 h-8 w-8"
+      >
+        <ChevronRight className="h-5 w-5" />
+      </Button>
+    </div>
+  );
+
   if (!planData || !planData.weeklyPlan) {
     return null;
   }
@@ -259,27 +302,31 @@ export const SavedMealPlanDetails = ({ planId, planData, isOpen, onClose }: Save
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Detalhes do Plano Alimentar</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+          <DialogHeader className="mb-4 sm:mb-6">
+            <DialogTitle className="text-xl sm:text-2xl">Detalhes do Plano Alimentar</DialogTitle>
+            <DialogDescription className="text-base sm:text-lg">
               Visualize os detalhes do seu plano e faça substituições de alimentos se necessário
             </DialogDescription>
           </DialogHeader>
 
+          {isMobile && renderMobileDayNav()}
+
           <Tabs value={selectedDay} onValueChange={setSelectedDay} className="w-full">
-            <TabsList className="mb-6 w-full flex flex-nowrap overflow-x-auto pb-2 justify-start sm:justify-center gap-1 sm:gap-2">
-              {Object.entries(dayNameMap).map(([day, dayName]) => (
-                <TabsTrigger 
-                  key={day} 
-                  value={day}
-                  className="whitespace-nowrap text-sm sm:text-base px-2 sm:px-4"
-                >
-                  <span className="hidden sm:inline">{dayName}</span>
-                  <span className="sm:hidden">{dayName.split('-')[0]}</span>
-                </TabsTrigger>
-              ))}
-            </TabsList>
+            {!isMobile && (
+              <TabsList className="mb-6 w-full flex flex-nowrap overflow-x-auto pb-2 justify-start sm:justify-center gap-1 sm:gap-2">
+                {Object.entries(dayNameMap).map(([day, dayName]) => (
+                  <TabsTrigger 
+                    key={day} 
+                    value={day}
+                    className="whitespace-nowrap text-sm sm:text-base px-2 sm:px-4"
+                  >
+                    <span className="hidden sm:inline">{dayName}</span>
+                    <span className="sm:hidden">{dayNameShort[day]}</span>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            )}
 
             {Object.keys(dayNameMap).map(day => (
               <TabsContent key={day} value={day}>
@@ -289,7 +336,9 @@ export const SavedMealPlanDetails = ({ planId, planData, isOpen, onClose }: Save
           </Tabs>
 
           {planData.recommendations && (
-            <Recommendations recommendations={formatRecommendations(planData.recommendations)} />
+            <div className="mt-6">
+              <Recommendations recommendations={formatRecommendations(planData.recommendations)} />
+            </div>
           )}
         </DialogContent>
       </Dialog>

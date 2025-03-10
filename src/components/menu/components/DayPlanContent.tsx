@@ -37,57 +37,72 @@ export const DayPlanContent: React.FC<DayPlanContentProps> = ({
   };
 
   return (
-    <Card>
-      <CardContent className="p-4 sm:p-6">
-        <h3 className="font-bold text-lg mb-4 flex items-center">
+    <Card className="animate-fadeIn">
+      <CardContent className="p-3 sm:p-6">
+        <h3 className="font-bold text-xl mb-4 flex items-center">
           <Sun className="w-5 h-5 mr-2 text-blue-600" />
           {translateDayName(dayPlan.dayName) || dayLabel || "Dia da Semana"}
         </h3>
         
-        <div className="grid grid-cols-1 gap-6">
+        <div className="grid grid-cols-1 gap-4 sm:gap-6">
           {dayPlan.meals?.breakfast && (
-            <MealSection
-              title={mealTypeLabels["breakfast"] || "Café da Manhã"}
-              icon={<Coffee className="h-5 w-5 text-amber-500" />}
-              meal={dayPlan.meals.breakfast}
-              unitLabels={unitLabels}
-            />
+            <div className="border rounded-lg p-3 sm:p-4 hover:shadow-sm transition-shadow">
+              <MealSection
+                title={mealTypeLabels["breakfast"] || "Café da Manhã"}
+                icon={<Coffee className="h-5 w-5 text-amber-500" />}
+                meal={dayPlan.meals.breakfast}
+                unitLabels={unitLabels}
+                className="text-base sm:text-lg"
+              />
+            </div>
           )}
           
           {dayPlan.meals?.morningSnack && (
-            <MealSection
-              title={mealTypeLabels["morningSnack"] || "Lanche da Manhã"}
-              icon={<Apple className="h-5 w-5 text-red-500" />}
-              meal={dayPlan.meals.morningSnack}
-              unitLabels={unitLabels}
-            />
+            <div className="border rounded-lg p-3 sm:p-4 hover:shadow-sm transition-shadow">
+              <MealSection
+                title={mealTypeLabels["morningSnack"] || "Lanche da Manhã"}
+                icon={<Apple className="h-5 w-5 text-red-500" />}
+                meal={dayPlan.meals.morningSnack}
+                unitLabels={unitLabels}
+                className="text-base sm:text-lg"
+              />
+            </div>
           )}
           
           {dayPlan.meals?.lunch && (
-            <MealSection
-              title={mealTypeLabels["lunch"] || "Almoço"}
-              icon={<Utensils className="h-5 w-5 text-green-600" />}
-              meal={dayPlan.meals.lunch}
-              unitLabels={unitLabels}
-            />
+            <div className="border rounded-lg p-3 sm:p-4 hover:shadow-sm transition-shadow">
+              <MealSection
+                title={mealTypeLabels["lunch"] || "Almoço"}
+                icon={<Utensils className="h-5 w-5 text-green-600" />}
+                meal={dayPlan.meals.lunch}
+                unitLabels={unitLabels}
+                className="text-base sm:text-lg"
+              />
+            </div>
           )}
           
           {dayPlan.meals?.afternoonSnack && (
-            <MealSection
-              title={mealTypeLabels["afternoonSnack"] || "Lanche da Tarde"}
-              icon={<Apple className="h-5 w-5 text-orange-500" />}
-              meal={dayPlan.meals.afternoonSnack}
-              unitLabels={unitLabels}
-            />
+            <div className="border rounded-lg p-3 sm:p-4 hover:shadow-sm transition-shadow">
+              <MealSection
+                title={mealTypeLabels["afternoonSnack"] || "Lanche da Tarde"}
+                icon={<Apple className="h-5 w-5 text-orange-500" />}
+                meal={dayPlan.meals.afternoonSnack}
+                unitLabels={unitLabels}
+                className="text-base sm:text-lg"
+              />
+            </div>
           )}
           
           {dayPlan.meals?.dinner && (
-            <MealSection
-              title={mealTypeLabels["dinner"] || "Jantar"}
-              icon={<Moon className="h-5 w-5 text-indigo-500" />}
-              meal={dayPlan.meals.dinner}
-              unitLabels={unitLabels}
-            />
+            <div className="border rounded-lg p-3 sm:p-4 hover:shadow-sm transition-shadow">
+              <MealSection
+                title={mealTypeLabels["dinner"] || "Jantar"}
+                icon={<Moon className="h-5 w-5 text-indigo-500" />}
+                meal={dayPlan.meals.dinner}
+                unitLabels={unitLabels}
+                className="text-base sm:text-lg"
+              />
+            </div>
           )}
           
           <DailyTotals 

@@ -192,19 +192,19 @@ export const FoodReplacementDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle>Substituir Alimento</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-lg sm:text-xl">Substituir Alimento</DialogTitle>
+          <DialogDescription className="text-sm sm:text-base">
             Substituir {originalFood?.name} por outro alimento similar
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 my-4">
+        <div className="space-y-4 my-3 sm:my-4">
           <RadioGroup value={selectedOption} onValueChange={(value) => setSelectedOption(value as "suggestion" | "search" | "custom")}>
             <div className="flex items-center space-x-2 mb-2">
               <RadioGroupItem value="suggestion" id="suggestion" />
-              <Label htmlFor="suggestion">Usar uma sugestão</Label>
+              <Label htmlFor="suggestion" className="text-base">Usar uma sugestão</Label>
             </div>
 
             {selectedOption === "suggestion" && (
@@ -218,7 +218,7 @@ export const FoodReplacementDialog = ({
                     {suggestions.map((food, index) => (
                       <div key={index} className="flex items-center space-x-2">
                         <RadioGroupItem value={food.name} id={`suggestion-${index}`} />
-                        <Label htmlFor={`suggestion-${index}`}>{food.name}</Label>
+                        <Label htmlFor={`suggestion-${index}`} className="text-sm sm:text-base">{food.name}</Label>
                       </div>
                     ))}
                   </RadioGroup>
@@ -230,7 +230,7 @@ export const FoodReplacementDialog = ({
 
             <div className="flex items-center space-x-2 mb-2 mt-4">
               <RadioGroupItem value="search" id="search" />
-              <Label htmlFor="search">Buscar um alimento</Label>
+              <Label htmlFor="search" className="text-base">Buscar um alimento</Label>
             </div>
 
             {selectedOption === "search" && (
@@ -252,7 +252,7 @@ export const FoodReplacementDialog = ({
                     {searchResults.map((food, index) => (
                       <div key={index} className="flex items-center space-x-2">
                         <RadioGroupItem value={food.name} id={`search-${index}`} />
-                        <Label htmlFor={`search-${index}`}>{food.name}</Label>
+                        <Label htmlFor={`search-${index}`} className="text-sm sm:text-base">{food.name}</Label>
                       </div>
                     ))}
                   </RadioGroup>
@@ -262,50 +262,53 @@ export const FoodReplacementDialog = ({
 
             <div className="flex items-center space-x-2 mb-2 mt-4">
               <RadioGroupItem value="custom" id="custom" />
-              <Label htmlFor="custom">Adicionar manualmente</Label>
+              <Label htmlFor="custom" className="text-base">Adicionar manualmente</Label>
             </div>
 
             {selectedOption === "custom" && (
               <div className="ml-6 space-y-3">
                 <div>
-                  <Label htmlFor="food-name">Nome do alimento</Label>
+                  <Label htmlFor="food-name" className="text-sm sm:text-base">Nome do alimento</Label>
                   <Input
                     id="food-name"
                     value={customFood.name}
                     onChange={(e) => setCustomFood({ ...customFood, name: e.target.value })}
                     placeholder="Ex: Frango grelhado"
+                    className="mt-1"
                   />
                 </div>
                 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <Label htmlFor="food-portion">Porção</Label>
+                    <Label htmlFor="food-portion" className="text-sm sm:text-base">Porção</Label>
                     <Input
                       id="food-portion"
                       type="number"
                       value={customFood.portion}
                       onChange={(e) => setCustomFood({ ...customFood, portion: Number(e.target.value) })}
+                      className="mt-1"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="food-unit">Unidade</Label>
+                    <Label htmlFor="food-unit" className="text-sm sm:text-base">Unidade</Label>
                     <Input
                       id="food-unit"
                       value={customFood.unit}
                       onChange={(e) => setCustomFood({ ...customFood, unit: e.target.value })}
                       placeholder="Ex: g, ml, unidade"
+                      className="mt-1"
                     />
                   </div>
                 </div>
                 
                 <div>
-                  <Label htmlFor="food-details">Instruções de preparo</Label>
+                  <Label htmlFor="food-details" className="text-sm sm:text-base">Instruções de preparo</Label>
                   <Textarea
                     id="food-details"
                     value={customFood.details}
                     onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setCustomFood({ ...customFood, details: e.target.value })}
                     placeholder="Descreva como o alimento deve ser preparado"
-                    className="min-h-20"
+                    className="min-h-20 mt-1"
                   />
                 </div>
               </div>
@@ -313,9 +316,9 @@ export const FoodReplacementDialog = ({
           </RadioGroup>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={handleReplace} disabled={loading}>Substituir</Button>
+        <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0 mt-4">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">Cancelar</Button>
+          <Button onClick={handleReplace} disabled={loading} className="w-full sm:w-auto">Substituir</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
