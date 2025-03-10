@@ -49,26 +49,26 @@ export const MealSection: React.FC<MealSectionProps> = ({
       </div>
       
       <div className="flex flex-wrap gap-2 pt-2 text-sm">
-        {meal.nutrition && (
+        {meal.calories && (
+          <span className="bg-gray-100 px-2 py-1 rounded-md">
+            {meal.calories} kcal
+          </span>
+        )}
+        {meal.macros && (
           <>
-            {meal.nutrition.calories && (
-              <span className="bg-gray-100 px-2 py-1 rounded-md">
-                {meal.nutrition.calories} kcal
-              </span>
-            )}
-            {meal.nutrition.protein && (
+            {meal.macros.protein && (
               <span className="bg-blue-50 px-2 py-1 rounded-md">
-                Proteínas: {meal.nutrition.protein}g
+                Proteínas: {meal.macros.protein}g
               </span>
             )}
-            {meal.nutrition.carbs && (
+            {meal.macros.carbs && (
               <span className="bg-green-50 px-2 py-1 rounded-md">
-                Carboidratos: {meal.nutrition.carbs}g
+                Carboidratos: {meal.macros.carbs}g
               </span>
             )}
-            {meal.nutrition.fats && (
+            {meal.macros.fats && (
               <span className="bg-orange-50 px-2 py-1 rounded-md">
-                Gorduras: {meal.nutrition.fats}g
+                Gorduras: {meal.macros.fats}g
               </span>
             )}
           </>
