@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -126,125 +127,118 @@ const StepCounter = () => {
     });
   };
 
-  useEffect(() => {
-    let sensor: any = null;
+  const startAccelerometer = async () => {
+    console.log('Iniciando acelerômetro com permissão:', permission);
+    if (permission !== 'granted') {
+      console.log('Permissão não concedida para iniciar acelerômetro');
+      return;
+    }
 
-    const startAccelerometer = async () => {
-      if (permission !== 'granted') return;
-
-      try {
-        // Primeiro, tentamos usar DeviceMotionEvent
-        const useDeviceMotion = async () => {
-          if (typeof DeviceMotionEvent !== 'undefined') {
-            try {
-              // Em iOS, precisamos solicitar permissão
-              if (typeof (DeviceMotionEvent as any).requestPermission === 'function') {
-                const permissionResult = await (DeviceMotionEvent as any).requestPermission();
-                if (permissionResult !== 'granted') {
-                  toast.error('Permissão de movimento negada');
-                  return false;
-                }
+    try {
+      // Primeiro, tentamos usar DeviceMotionEvent
+      const useDeviceMotion = async () => {
+        if (typeof DeviceMotionEvent !== 'undefined') {
+          try {
+            // Em iOS, precisamos solicitar permissão
+            if (typeof (DeviceMotionEvent as any).requestPermission === 'function') {
+              const permissionResult = await (DeviceMotionEvent as any).requestPermission();
+              if (permissionResult !== 'granted') {
+                toast.error('Permissão de movimento negada');
+                return false;
               }
-              
-              // Adicionamos o listener com uma frequência mais alta
-              const deviceMotionHandler = (event: DeviceMotionEvent) => {
-                if (event.accelerationIncludingGravity) {
-                  detectStep({
-                    x: event.accelerationIncludingGravity.x || 0,
-                    y: event.accelerationIncludingGravity.y || 0,
-                    z: event.accelerationIncludingGravity.z || 0,
-                    timestamp: Date.now()
-                  });
-                }
-              };
-              
-              window.addEventListener('devicemotion', deviceMotionHandler, { passive: true });
-              setDeviceMotionActive(true);
-              console.log('DeviceMotion iniciado com sucesso');
-              return true;
-            } catch (error) {
-              console.error('Erro ao iniciar DeviceMotion:', error);
-              return false;
             }
-          }
-          return false;
-        };
-
-        // Depois, tentamos usar a Accelerometer API
-        const useAccelerometerAPI = async () => {
-          if (typeof window !== 'undefined' && 'Accelerometer' in window) {
-            try {
-              const AccelerometerClass = (window as any).Accelerometer;
-              sensor = new AccelerometerClass({ 
-                frequency: ACCELEROMETER_CONFIG.frequency 
-              });
-              
-              let lastProcessTime = 0;
-              const processInterval = 1000 / ACCELEROMETER_CONFIG.frequency;
-
-              sensor.addEventListener('reading', () => {
-                const now = Date.now();
-                if (now - lastProcessTime >= processInterval) {
-                  detectStep({
-                    x: sensor.x,
-                    y: sensor.y,
-                    z: sensor.z,
-                    timestamp: now
-                  });
-                  lastProcessTime = now;
-                }
-              });
-
-              sensor.addEventListener('error', (error: any) => {
-                console.error('Erro no acelerômetro:', error);
-                sensor = null;
-                useDeviceMotion();
-              });
-
-              sensor.start();
-              setSensorActive(true);
-              console.log('Acelerômetro iniciado com sucesso');
-              return true;
-            } catch (accelerometerError) {
-              console.error('Erro ao iniciar Accelerometer API:', accelerometerError);
-              return false;
-            }
-          }
-          return false;
-        };
-
-        // Testamos ambas as abordagens
-        const deviceMotionSuccess = await useDeviceMotion();
-        if (!deviceMotionSuccess) {
-          const accelerometerSuccess = await useAccelerometerAPI();
-          if (!accelerometerSuccess) {
-            toast.error('Não foi possível iniciar o contador de passos');
+            
+            // Adicionamos o listener com uma frequência mais alta
+            const deviceMotionHandler = (event: DeviceMotionEvent) => {
+              if (event.accelerationIncludingGravity) {
+                detectStep({
+                  x: event.accelerationIncludingGravity.x || 0,
+                  y: event.accelerationIncludingGravity.y || 0,
+                  z: event.accelerationIncludingGravity.z || 0,
+                  timestamp: Date.now()
+                });
+              }
+            };
+            
+            window.addEventListener('devicemotion', deviceMotionHandler, { passive: true });
+            setDeviceMotionActive(true);
+            console.log('DeviceMotion iniciado com sucesso');
+            return true;
+          } catch (error) {
+            console.error('Erro ao iniciar DeviceMotion:', error);
+            return false;
           }
         }
-      } catch (error) {
-        console.error('Erro ao iniciar sensores de movimento:', error);
-        toast.error('Erro ao iniciar o contador de passos');
-      }
-    };
+        return false;
+      };
 
-    startAccelerometer();
+      // Depois, tentamos usar a Accelerometer API
+      const useAccelerometerAPI = async () => {
+        if (typeof window !== 'undefined' && 'Accelerometer' in window) {
+          try {
+            const AccelerometerClass = (window as any).Accelerometer;
+            const sensor = new AccelerometerClass({ 
+              frequency: ACCELEROMETER_CONFIG.frequency 
+            });
+            
+            let lastProcessTime = 0;
+            const processInterval = 1000 / ACCELEROMETER_CONFIG.frequency;
 
-    return () => {
-      if (sensor) {
-        try {
-          sensor.stop();
-          setSensorActive(false);
-          console.log('Acelerômetro parado');
-        } catch (error) {
-          console.error('Erro ao parar acelerômetro:', error);
+            sensor.addEventListener('reading', () => {
+              const now = Date.now();
+              if (now - lastProcessTime >= processInterval) {
+                detectStep({
+                  x: sensor.x,
+                  y: sensor.y,
+                  z: sensor.z,
+                  timestamp: now
+                });
+                lastProcessTime = now;
+              }
+            });
+
+            sensor.addEventListener('error', (error: any) => {
+              console.error('Erro no acelerômetro:', error);
+              useDeviceMotion();
+            });
+
+            sensor.start();
+            setSensorActive(true);
+            console.log('Acelerômetro iniciado com sucesso');
+            return true;
+          } catch (accelerometerError) {
+            console.error('Erro ao iniciar Accelerometer API:', accelerometerError);
+            return false;
+          }
+        }
+        return false;
+      };
+
+      // Testamos ambas as abordagens
+      const deviceMotionSuccess = await useDeviceMotion();
+      if (!deviceMotionSuccess) {
+        const accelerometerSuccess = await useAccelerometerAPI();
+        if (!accelerometerSuccess) {
+          console.error('Não foi possível iniciar nenhum sensor de movimento');
+          toast.error('Não foi possível iniciar o contador de passos');
         }
       }
-      
-      if (deviceMotionActive) {
-        window.removeEventListener('devicemotion', () => {});
-        setDeviceMotionActive(false);
-      }
-    };
+    } catch (error) {
+      console.error('Erro ao iniciar sensores de movimento:', error);
+      toast.error('Erro ao iniciar o contador de passos');
+    }
+  };
+
+  // Efeito para iniciar sensores quando componente é montado ou permissão concedida
+  useEffect(() => {
+    if (permission === 'granted') {
+      startAccelerometer();
+    }
+    
+    // Também tentamos iniciar automaticamente se o dispositivo permitir
+    if (!permission) {
+      requestPermission();
+    }
   }, [permission]);
 
   useEffect(() => {
@@ -301,84 +295,71 @@ const StepCounter = () => {
     checkLastReward();
   }, []);
 
+  // Verificação periódica para garantir que sensores estão ativos
   useEffect(() => {
-    if (permission === 'granted' && !deviceMotionActive && !sensorActive) {
-      const checkDeviceMotion = () => {
-        // Se ainda não temos sensores ativos, forçamos uma leitura via DeviceMotion
-        window.addEventListener('devicemotion', function handleMotion(event) {
-          if (event.accelerationIncludingGravity) {
-            detectStep({
-              x: event.accelerationIncludingGravity.x || 0,
-              y: event.accelerationIncludingGravity.y || 0,
-              z: event.accelerationIncludingGravity.z || 0,
-              timestamp: Date.now()
-            });
-          }
-          window.removeEventListener('devicemotion', handleMotion);
-        }, { once: true });
-      };
-      
-      // Verificamos periodicamente se há movimento
-      const motionCheckInterval = setInterval(checkDeviceMotion, 500);
-      
-      return () => {
-        clearInterval(motionCheckInterval);
-      };
-    }
+    const checkSensorStatus = () => {
+      if (permission === 'granted' && !deviceMotionActive && !sensorActive) {
+        console.log('Sensores não ativos, reiniciando...');
+        startAccelerometer();
+      }
+    };
+    
+    const interval = setInterval(checkSensorStatus, 3000);
+    return () => clearInterval(interval);
   }, [permission, deviceMotionActive, sensorActive]);
 
   const requestPermission = async () => {
     try {
       console.log('Solicitando permissão para o acelerômetro');
       
+      let permissionGranted = false;
+      
       if (typeof DeviceMotionEvent !== 'undefined' && 
           typeof (DeviceMotionEvent as any).requestPermission === 'function') {
         const permissionResult = await (DeviceMotionEvent as any).requestPermission();
-        setPermission(permissionResult);
-        
-        if (permissionResult === 'granted') {
-          localStorage.setItem(STORAGE_KEYS.PERMISSION_GRANTED, 'true');
-          toast.success('Permissão concedida!');
-        } else {
-          toast.error('Permissão negada');
-        }
-        return;
-      }
-      
-      if (navigator.permissions) {
+        permissionGranted = permissionResult === 'granted';
+      } else if (navigator.permissions) {
         try {
           const result = await (navigator.permissions as any).query({ 
             name: 'accelerometer' 
           });
-
-          console.log('Resultado da permissão:', result.state);
-          setPermission(result.state);
           
-          if (result.state === 'granted') {
-            localStorage.setItem(STORAGE_KEYS.PERMISSION_GRANTED, 'true');
-            toast.success('Permissão concedida!');
-          } else {
-            toast.error('Permissão negada');
-          }
+          console.log('Resultado da permissão:', result.state);
+          permissionGranted = result.state === 'granted';
         } catch (error) {
           console.error('Erro ao solicitar permissão via Permissions API:', error);
-          setPermission('granted');
-          localStorage.setItem(STORAGE_KEYS.PERMISSION_GRANTED, 'true');
-          toast.success('Permissão presumida concedida');
+          // Em caso de erro, presumimos que a permissão foi concedida
+          permissionGranted = true;
         }
       } else {
         console.log('Permissions API não suportada, presumindo permissão');
+        permissionGranted = true;
+      }
+      
+      if (permissionGranted) {
         setPermission('granted');
         localStorage.setItem(STORAGE_KEYS.PERMISSION_GRANTED, 'true');
-        toast.success('Permissão presumida concedida');
+        toast.success('Contador de passos ativado!');
+        
+        // Iniciar acelerômetro imediatamente após permissão concedida
+        setTimeout(() => {
+          startAccelerometer();
+        }, 500);
+      } else {
+        toast.error('Permissão para contador de passos negada');
       }
     } catch (error) {
       console.error('Erro ao solicitar permissão:', error);
-      toast.error('Erro ao solicitar permissão');
       
+      // Em caso de erro, presumimos permissão e tentamos continuar
       setPermission('granted');
       localStorage.setItem(STORAGE_KEYS.PERMISSION_GRANTED, 'true');
-      toast.info('Tentando continuar sem permissão explícita');
+      toast.info('Permissão para contador de passos presumida');
+      
+      // Iniciar acelerômetro
+      setTimeout(() => {
+        startAccelerometer();
+      }, 500);
     }
   };
 
@@ -507,7 +488,7 @@ const StepCounter = () => {
         {permission === 'granted' && (
           <Button
             onClick={handleRewardSteps}
-            disabled={!canReceiveReward}
+            disabled={!lastRewardDate === today}
             className="w-full bg-primary hover:bg-primary-600 text-white text-base sm:text-lg py-5 sm:py-6"
           >
             {lastRewardDate === today
