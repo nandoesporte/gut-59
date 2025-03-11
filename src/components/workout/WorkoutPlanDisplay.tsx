@@ -1,7 +1,7 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Dumbbell, RotateCcw, RefreshCw, Save, Share } from "lucide-react";
+import { Dumbbell, RotateCcw, RefreshCw } from "lucide-react";
 import { WorkoutPreferences } from "./types";
 import { WorkoutLoadingState } from "./components/WorkoutLoadingState";
 import { useWorkoutPlanGeneration } from "./hooks/useWorkoutPlanGeneration";
@@ -46,22 +46,22 @@ export const WorkoutPlanDisplay = ({
 
   if (error) {
     return (
-      <div className="text-center p-4 sm:p-8 space-y-4">
-        <div className="inline-flex items-center justify-center p-2 bg-red-100 rounded-full mb-4">
-          <Dumbbell className="w-6 h-6 text-red-500" />
+      <div className="text-center p-3 sm:p-8 space-y-3 sm:space-y-4">
+        <div className="inline-flex items-center justify-center p-2 bg-red-100 rounded-full mb-3 sm:mb-4">
+          <Dumbbell className="w-5 h-5 sm:w-6 sm:h-6 text-red-500" />
         </div>
-        <h3 className="text-xl font-semibold text-red-600">
+        <h3 className="text-lg sm:text-xl font-semibold text-red-600">
           Erro ao gerar o plano de treino
         </h3>
-        <p className="text-muted-foreground max-w-md mx-auto">
+        <p className="text-sm text-muted-foreground max-w-md mx-auto">
           {error || "Ocorreu um erro durante a geração do plano. Por favor, tente novamente."}
         </p>
-        <div className="flex flex-col sm:flex-row justify-center gap-2 mt-6">
-          <Button onClick={generatePlan} className="w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row justify-center gap-2 mt-4 sm:mt-6">
+          <Button onClick={generatePlan} className="w-full sm:w-auto text-sm">
             Tentar Novamente
           </Button>
-          <Button onClick={onReset} variant="outline" className="w-full sm:w-auto">
-            <RotateCcw className="w-4 h-4 mr-2" />
+          <Button onClick={onReset} variant="outline" className="w-full sm:w-auto text-sm">
+            <RotateCcw className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
             Alterar Preferências
           </Button>
         </div>
@@ -71,22 +71,22 @@ export const WorkoutPlanDisplay = ({
 
   if (!workoutPlan) {
     return (
-      <div className="text-center p-4 sm:p-8">
-        <div className="inline-flex items-center justify-center p-2 bg-amber-100 rounded-full mb-4">
-          <Dumbbell className="w-6 h-6 text-amber-500" />
+      <div className="text-center p-3 sm:p-8">
+        <div className="inline-flex items-center justify-center p-2 bg-amber-100 rounded-full mb-3 sm:mb-4">
+          <Dumbbell className="w-5 h-5 sm:w-6 sm:h-6 text-amber-500" />
         </div>
-        <h3 className="text-xl font-semibold text-amber-600">
+        <h3 className="text-lg sm:text-xl font-semibold text-amber-600">
           Aguardando plano de treino
         </h3>
-        <p className="text-muted-foreground max-w-md mx-auto mt-2">
+        <p className="text-sm text-muted-foreground max-w-md mx-auto mt-2">
           O plano de treino ainda não está pronto. Aguarde enquanto ele é preparado ou tente novamente.
         </p>
-        <div className="flex flex-col sm:flex-row justify-center gap-2 mt-6">
-          <Button onClick={generatePlan} className="w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row justify-center gap-2 mt-4 sm:mt-6">
+          <Button onClick={generatePlan} className="w-full sm:w-auto text-sm">
             Gerar Plano
           </Button>
-          <Button onClick={onReset} variant="outline" className="w-full sm:w-auto">
-            <RotateCcw className="w-4 h-4 mr-2" />
+          <Button onClick={onReset} variant="outline" className="w-full sm:w-auto text-sm">
+            <RotateCcw className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
             Alterar Preferências
           </Button>
         </div>
@@ -95,27 +95,27 @@ export const WorkoutPlanDisplay = ({
   }
 
   return (
-    <div className="space-y-6 animate-fadeIn">
+    <div className="space-y-4 sm:space-y-6 animate-fadeIn">
       <CurrentWorkoutPlan plan={workoutPlan} />
       
-      <div className={`flex ${isMobile ? 'flex-col' : 'justify-center'} gap-3 mt-6`}>
+      <div className={`flex ${isMobile ? 'flex-col' : 'justify-center'} gap-2 sm:gap-3 mt-4 sm:mt-6`}>
         <Button 
           onClick={generatePlan} 
           variant="default" 
-          className="flex items-center gap-2"
+          className="flex items-center gap-1.5 sm:gap-2 text-sm"
           size={isMobile ? "default" : "lg"}
         >
-          <RefreshCw className="w-4 h-4" />
+          <RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           {isMobile ? "Novo Plano" : "Novo Plano com Diferentes Exercícios"}
         </Button>
         
         <Button 
           onClick={onReset} 
           variant="outline" 
-          className="flex items-center gap-2"
+          className="flex items-center gap-1.5 sm:gap-2 text-sm"
           size={isMobile ? "default" : "lg"}
         >
-          <RotateCcw className="w-4 h-4" />
+          <RotateCcw className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           {isMobile ? "Mudar Preferências" : "Alterar Preferências"}
         </Button>
       </div>

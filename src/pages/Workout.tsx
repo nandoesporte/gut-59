@@ -86,12 +86,12 @@ const Workout = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
-      <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6 space-y-5 sm:space-y-6 pb-20 sm:pb-24">
-        <div className="text-center space-y-2 sm:space-y-3">
-          <div className="inline-flex items-center justify-center p-2 bg-primary/10 rounded-full">
-            <Dumbbell className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+      <div className="container mx-auto px-2 sm:px-4 py-3 sm:py-6 space-y-4 sm:space-y-6 pb-20 sm:pb-24">
+        <div className="text-center space-y-2">
+          <div className="inline-flex items-center justify-center p-1.5 sm:p-2 bg-primary/10 rounded-full">
+            <Dumbbell className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
           </div>
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary-600">
+          <h1 className="text-lg sm:text-2xl md:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary-600">
             Plano de Treino Personalizado
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground max-w-lg mx-auto px-2">
@@ -99,7 +99,7 @@ const Workout = () => {
           </p>
         </div>
 
-        <div className="max-w-4xl mx-auto space-y-5 sm:space-y-6">
+        <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
           {!preferences ? (
             <div className="transform transition-all duration-300 hover:scale-[1.01]">
               <PreferencesForm onSubmit={handlePreferencesSubmit} />
@@ -112,7 +112,7 @@ const Workout = () => {
             />
           )}
 
-          <div className="mt-5 sm:mt-6">
+          <div className="mt-4 sm:mt-6">
             <WorkoutHistory
               plans={historyPlans}
               isLoading={isLoadingHistory}
