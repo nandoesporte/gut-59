@@ -93,23 +93,23 @@ const Layout = () => {
   return (
     <div className="min-h-screen bg-background">
       <header className="bg-card/70 backdrop-blur-lg shadow-md fixed top-0 left-0 right-0 z-50 border-b border-border">
-        <div className="w-full px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-center relative">
-          <div className="flex items-center gap-3">
+        <div className="w-full px-3 sm:px-4 h-14 sm:h-16 flex items-center justify-center relative">
+          <div className="flex items-center gap-2 sm:gap-3">
             <img 
               src="/lovable-uploads/9456a3bf-9bc8-45d6-9105-dd939e3362f5.png" 
               alt="Mais Saúde" 
-              className="h-8 w-auto sm:h-10"
+              className="h-7 w-auto sm:h-8 sm:w-auto"
             />
-            <h1 className="text-xl sm:text-2xl font-bold text-primary">
+            <h1 className="text-lg sm:text-xl font-bold text-primary">
               Mais Saúde
             </h1>
           </div>
           {hasNewMessage && (
-            <div className="absolute top-4 right-4 w-3 h-3 bg-primary rounded-full animate-pulse" />
+            <div className="absolute top-4 right-4 w-2 h-2 sm:w-3 sm:h-3 bg-primary rounded-full animate-pulse" />
           )}
         </div>
       </header>
-      <main className="w-full px-2 sm:px-6 lg:px-8 py-4 pb-28 animate-fadeIn mt-16">
+      <main className="w-full px-2 sm:px-6 lg:px-8 py-3 sm:py-4 pb-24 sm:pb-28 animate-fadeIn mt-14 sm:mt-16">
         <Outlet />
       </main>
       <Navigation />

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +7,7 @@ import { Footprints, Activity, MapPin } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useWallet } from '@/hooks/useWallet';
 import { REWARDS } from '@/constants/rewards';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface StepReward {
   id: string;
@@ -74,6 +74,7 @@ const StepCounter = () => {
   const [peakDetected, setPeakDetected] = useState(false);
   const [deviceMotionActive, setDeviceMotionActive] = useState(false);
   const [sensorActive, setSensorActive] = useState(false);
+  const isMobile = useIsMobile();
 
   const movingAverageFilter = (buffer: number[], windowSize: number = ACCELEROMETER_CONFIG.windowSize): number => {
     if (buffer.length === 0) return 0;
@@ -300,7 +301,6 @@ const StepCounter = () => {
     checkLastReward();
   }, []);
 
-  // Adicionando detecção automática de movimento a cada 500ms via DeviceMotion
   useEffect(() => {
     if (permission === 'granted' && !deviceMotionActive && !sensorActive) {
       const checkDeviceMotion = () => {
@@ -435,59 +435,59 @@ const StepCounter = () => {
 
   return (
     <Card className="bg-gradient-to-br from-primary-50 to-white border-none shadow-lg">
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-2 px-3 sm:px-6">
         <CardTitle className="flex items-center justify-between text-primary-600">
           <div className="flex items-center gap-2">
-            <Footprints className="w-7 h-7" />
-            <span className="text-xl">Atividade Diária</span>
+            <Footprints className="w-6 h-6 sm:w-7 sm:h-7" />
+            <span className="text-lg sm:text-xl">Atividade Diária</span>
           </div>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-4 sm:space-y-6 px-3 sm:px-6">
         <div>
-          <div className="text-center space-y-2">
-            <span className="text-7xl font-bold text-primary-600">
+          <div className="text-center space-y-1 sm:space-y-2 mb-2 sm:mb-4">
+            <span className="text-5xl sm:text-7xl font-bold text-primary-600">
               {steps.toLocaleString()}
             </span>
-            <div className="text-base text-muted-foreground">
+            <div className="text-sm sm:text-base text-muted-foreground">
               / {goalSteps.toLocaleString()} passos
             </div>
           </div>
           
           <Progress 
             value={progress} 
-            className="h-3 w-full bg-primary-100"
+            className="h-2 sm:h-3 w-full bg-primary-100 mb-3 sm:mb-5"
           />
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white p-4 rounded-xl shadow-sm">
-              <div className="flex items-center gap-2 text-base text-muted-foreground mb-1">
-                <Activity className="w-5 h-5" />
+          <div className="grid grid-cols-2 gap-2 sm:gap-4">
+            <div className="bg-white p-3 sm:p-4 rounded-xl shadow-sm">
+              <div className="flex items-center gap-1 sm:gap-2 text-sm sm:text-base text-muted-foreground mb-0.5 sm:mb-1">
+                <Activity className="w-4 h-4 sm:w-5 sm:h-5" />
                 Calorias
               </div>
-              <div className="text-xl font-semibold text-primary-600">
+              <div className="text-lg sm:text-xl font-semibold text-primary-600">
                 {calories} kcal
               </div>
             </div>
             
-            <div className="bg-white p-4 rounded-xl shadow-sm">
-              <div className="flex items-center gap-2 text-base text-muted-foreground mb-1">
-                <MapPin className="w-5 h-5" />
+            <div className="bg-white p-3 sm:p-4 rounded-xl shadow-sm">
+              <div className="flex items-center gap-1 sm:gap-2 text-sm sm:text-base text-muted-foreground mb-0.5 sm:mb-1">
+                <MapPin className="w-4 h-4 sm:w-5 sm:h-5" />
                 Distância
               </div>
-              <div className="text-xl font-semibold text-primary-600">
+              <div className="text-lg sm:text-xl font-semibold text-primary-600">
                 {distance} km
               </div>
             </div>
           </div>
 
           {process.env.NODE_ENV === 'development' && (
-            <div className="text-sm text-gray-500 mt-2 text-center">
+            <div className="text-xs sm:text-sm text-gray-500 mt-2 text-center">
               <Button 
                 onClick={addStepForTesting} 
                 size="sm" 
                 variant="outline" 
-                className="h-7 text-sm"
+                className="h-6 sm:h-7 text-xs sm:text-sm"
               >
                 +1 (Test)
               </Button>
@@ -498,7 +498,7 @@ const StepCounter = () => {
         {permission !== 'granted' && (
           <Button 
             onClick={requestPermission} 
-            className="w-full bg-primary hover:bg-primary-600 text-white text-lg py-6"
+            className="w-full bg-primary hover:bg-primary-600 text-white text-base sm:text-lg py-5 sm:py-6"
           >
             Permitir contagem de passos
           </Button>
@@ -508,7 +508,7 @@ const StepCounter = () => {
           <Button
             onClick={handleRewardSteps}
             disabled={!canReceiveReward}
-            className="w-full bg-primary hover:bg-primary-600 text-white text-lg py-6"
+            className="w-full bg-primary hover:bg-primary-600 text-white text-base sm:text-lg py-5 sm:py-6"
           >
             {lastRewardDate === today
               ? 'Recompensa já recebida hoje'

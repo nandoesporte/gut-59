@@ -5,9 +5,15 @@
 
 @layer base {
   html {
-    font-size: 18px; /* Increased from 16px */
+    font-size: 16px; /* Mobile base font size */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  @media (min-width: 640px) {
+    html {
+      font-size: 18px; /* Desktop base font size */
+    }
   }
 
   :root {
@@ -80,22 +86,24 @@
 
   body {
     @apply bg-background text-foreground text-base leading-relaxed;
+    /* Avoid text selection on mobile taps */
+    -webkit-tap-highlight-color: transparent;
   }
 
   h1 {
-    @apply text-4xl font-bold tracking-tight; /* Increased from text-3xl */
+    @apply text-3xl sm:text-4xl font-bold tracking-tight;
   }
 
   h2 {
-    @apply text-3xl font-semibold tracking-tight; /* Increased from text-2xl */
+    @apply text-2xl sm:text-3xl font-semibold tracking-tight;
   }
 
   h3 {
-    @apply text-2xl font-semibold tracking-tight; /* Increased from text-xl */
+    @apply text-xl sm:text-2xl font-semibold tracking-tight;
   }
 
   p {
-    @apply text-lg leading-relaxed; /* Increased from text-base */
+    @apply text-base sm:text-lg leading-relaxed;
   }
 }
 
@@ -117,10 +125,58 @@
   
   /* New utility classes for larger text */
   .text-display {
-    @apply text-5xl font-bold tracking-tight;
+    @apply text-4xl sm:text-5xl font-bold tracking-tight;
   }
   
   .text-large {
-    @apply text-xl leading-relaxed;
+    @apply text-lg sm:text-xl leading-relaxed;
+  }
+  
+  /* Mobile-specific utilities */
+  .touch-feedback {
+    @apply active:opacity-70 transition-opacity;
+  }
+  
+  .mobile-container {
+    @apply px-3 sm:px-6 py-2 sm:py-4;
+  }
+  
+  .mobile-padding {
+    @apply p-3 sm:p-6;
+  }
+  
+  .mobile-gap {
+    @apply gap-2 sm:gap-4;
+  }
+}
+
+/* Mobile-specific improvements */
+@media (max-width: 640px) {
+  /* Improve tap target sizes */
+  button, 
+  [role="button"],
+  a {
+    @apply min-h-[40px] min-w-[40px];
+  }
+  
+  /* Improve form elements */
+  input, 
+  select, 
+  textarea {
+    @apply text-base;
+  }
+  
+  /* Fix iOS input zoom issues */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="url"],
+  select,
+  textarea {
+    @apply text-base;
+    font-size: 16px !important;
   }
 }

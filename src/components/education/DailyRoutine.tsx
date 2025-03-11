@@ -5,6 +5,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import MealsList from './MealsList';
 import SupplementsList from './SupplementsList';
 import { DayRoutine } from '@/types/education';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface DailyRoutineProps {
   day: DayRoutine;
@@ -14,6 +15,8 @@ interface DailyRoutineProps {
 }
 
 const DailyRoutine = ({ day, dayIndex, isOpen, onToggle }: DailyRoutineProps) => {
+  const isMobile = useIsMobile();
+  
   return (
     <Collapsible
       open={isOpen}
@@ -21,19 +24,19 @@ const DailyRoutine = ({ day, dayIndex, isOpen, onToggle }: DailyRoutineProps) =>
       className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden"
     >
       <CollapsibleTrigger className="w-full">
-        <div className="bg-gradient-to-r from-primary-100 to-primary-50 px-4 py-3 flex justify-between items-center">
-          <h4 className="font-semibold text-primary-700 text-lg">
+        <div className="bg-gradient-to-r from-primary-100 to-primary-50 px-3 sm:px-4 py-2 sm:py-3 flex justify-between items-center">
+          <h4 className="font-semibold text-primary-700 text-base sm:text-lg">
             Dia {dayIndex + 1}
           </h4>
           {isOpen ? (
-            <ChevronUp className="h-5 w-5 text-primary-500" />
+            <ChevronUp className="h-4 w-4 sm:h-5 sm:w-5 text-primary-500" />
           ) : (
-            <ChevronDown className="h-5 w-5 text-primary-500" />
+            <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-primary-500" />
           )}
         </div>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="p-6 space-y-6">
+        <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
           <MealsList meals={day.meals} />
           <SupplementsList supplements={day.supplements} />
         </div>
