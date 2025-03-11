@@ -488,7 +488,7 @@ const StepCounter = () => {
         {permission === 'granted' && (
           <Button
             onClick={handleRewardSteps}
-            disabled={!lastRewardDate === today}
+            disabled={!canReceiveReward}
             className="w-full bg-primary hover:bg-primary-600 text-white text-base sm:text-lg py-5 sm:py-6"
           >
             {lastRewardDate === today
