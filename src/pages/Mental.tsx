@@ -1,17 +1,20 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Brain, Headphones, BookOpen, MessageCircle, Smile, SmilePlus, Frown, Meh, Angry, Loader2, CalendarIcon, ArrowUpDown } from "lucide-react";
+import { Brain, Headphones, BookOpen, MessageCircle, Smile, SmilePlus, Frown, Meh, Angry, Loader2, CalendarIcon, ArrowUpDown, BarChart } from "lucide-react";
 import { MentalHealthResources } from '@/components/mental/MentalHealthResources';
 import { MentalModules } from '@/components/mental/MentalModules';
 import { MentalHealthChat } from '@/components/mental/MentalHealthChat';
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
+import { useIsMobile } from '@/hooks/use-mobile';
+import { useLocation, useSearchParams } from 'react-router-dom';
+import { AssessmentsList } from '@/components/mental/assessments/AssessmentsList';
+import { AssessmentView } from '@/components/mental/assessments/AssessmentView';
 
 interface EmotionLog {
   id?: string;
@@ -27,15 +30,24 @@ const Mental = () => {
   const [isLoadingGuidance, setIsLoadingGuidance] = useState(false);
   const [emotionHistory, setEmotionHistory] = useState<EmotionLog[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
-
+  const [searchParams] = useSearchParams();
+  const isMobile = useIsMobile();
+  
   useEffect(() => {
     fetchEmotionHistory();
-  }, []);
+    
+    // Handle URL parameters for tab selection
+    const tabParam = searchParams.get('tab');
+    if (tabParam) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
 
   const menuItems = [
     { id: 'breathing', icon: <ArrowUpDown className="w-6 h-6" />, label: 'Respiração', color: 'bg-[#D3E4FD]' },
     { id: 'meditation', icon: <Headphones className="w-6 h-6" />, label: 'Meditação', color: 'bg-[#F2FCE2]' },
     { id: 'diary', icon: <Brain className="w-6 h-6" />, label: 'Diário', color: 'bg-[#FEF7CD]' },
+    { id: 'assessments', icon: <BarChart className="w-6 h-6" />, label: 'Avaliações', color: 'bg-[#E8E0FF]' },
     { id: 'ai', icon: <MessageCircle className="w-6 h-6" />, label: 'IA Conselheira', color: 'bg-[#FFDEE2]' },
     { id: 'resources', icon: <BookOpen className="w-6 h-6" />, label: 'Recursos', color: 'bg-[#FEC6A1]' },
   ];
@@ -159,11 +171,13 @@ const Mental = () => {
     return emotions.find(e => e.id === emotionId)?.color || '';
   };
 
+  const isAssessmentView = activeTab === 'assessments' && searchParams.get('type');
+
   return (
     <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 space-y-4 sm:space-y-8 animate-fadeIn pb-20">
       <h1 className="text-2xl sm:text-3xl font-bold text-center text-primary mb-6">Saúde Mental</h1>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 mb-8">
         {menuItems.map((item) => (
           <button
             key={item.id}
@@ -284,6 +298,14 @@ const Mental = () => {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="assessments">
+          {isAssessmentView ? (
+            <AssessmentView />
+          ) : (
+            <AssessmentsList />
+          )}
         </TabsContent>
 
         <TabsContent value="ai">

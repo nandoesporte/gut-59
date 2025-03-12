@@ -16,6 +16,7 @@ import { PaymentSettingsTab } from "@/components/admin/PaymentSettingsTab";
 import { AIAgentsTab } from "@/components/admin/ai-agents/AIAgentsTab";
 import { MentalHealthTab } from "@/components/admin/mental/MentalHealthTab";
 import { FoodPreferencesTab } from "@/components/admin/food/FoodPreferencesTab";
+import { HealthAssessmentsTab } from "@/components/admin/mental/HealthAssessmentsTab";
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -70,13 +71,14 @@ const Admin = () => {
     <div className="container mx-auto py-6">
       <h1 className="text-2xl font-bold mb-6">Painel Administrativo</h1>
       <Tabs defaultValue="users">
-        <TabsList>
+        <TabsList className="mb-4 flex flex-wrap">
           <TabsTrigger value="users">Usuários</TabsTrigger>
           <TabsTrigger value="training">Instruções</TabsTrigger>
           <TabsTrigger value="professionals">Profissionais</TabsTrigger>
           <TabsTrigger value="payments">Pagamentos</TabsTrigger>
           <TabsTrigger value="ai-agents">Agentes de IA</TabsTrigger>
           <TabsTrigger value="mental-health">Saúde Mental</TabsTrigger>
+          <TabsTrigger value="health-assessments">Avaliações de Saúde</TabsTrigger>
           <TabsTrigger value="food-preferences">Preferências Alimentares</TabsTrigger>
         </TabsList>
         <TabsContent value="users">
@@ -96,6 +98,9 @@ const Admin = () => {
         </TabsContent>
         <TabsContent value="mental-health">
           <MentalHealthTab />
+        </TabsContent>
+        <TabsContent value="health-assessments">
+          <HealthAssessmentsTab />
         </TabsContent>
         <TabsContent value="food-preferences">
           <FoodPreferencesTab />
