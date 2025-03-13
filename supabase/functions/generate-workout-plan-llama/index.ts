@@ -97,8 +97,18 @@ serve(async (req) => {
       exercises = allExercises; // Fallback to all exercises if filtered set is too small
     }
     
-    // Shuffle the exercises for randomness
-    const shuffledExercises = [...exercises].sort(() => Math.random() - 0.5);
+    // Create a more effective shuffle function to ensure true randomness
+    const shuffleArray = (array: any[]) => {
+      // Fisher-Yates shuffle algorithm
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    };
+    
+    // Shuffle the exercises for randomness - use our improved shuffle function
+    const shuffledExercises = shuffleArray([...exercises]);
     
     // Ensure we have exercises for all major muscle groups
     const muscleGroups = ["chest", "back", "legs", "shoulders", "arms", "core"];
@@ -142,31 +152,115 @@ serve(async (req) => {
         activityLevelGuidance = "Design a balanced program appropriate for the user's activity level.";
     }
     
-    // Take only a subset of exercises for the current plan to ensure uniqueness
-    // Adjust this to get different exercises for each plan generation
+    // Improved exercise selection algorithm to ensure balanced distribution
     const selectExercisesForPlan = (total: number) => {
       const selectedExercises: any[] = [];
+      const usedExerciseIds = new Set<string>();
       
-      // First, ensure we have at least one exercise per muscle group
-      muscleGroups.forEach(group => {
-        if (exercisesByMuscleGroup[group].length > 0) {
-          const exercise = exercisesByMuscleGroup[group].shift(); // Take and remove the first exercise
-          if (exercise) selectedExercises.push(exercise);
+      // Create workout splits based on activity level and days per week
+      const createWorkoutSplits = () => {
+        if (daysPerWeek <= 3) {
+          // For fewer days, use full-body splits
+          return Array(daysPerWeek).fill(muscleGroups);
+        } else if (daysPerWeek === 4) {
+          // 4-day split
+          return [
+            ["chest", "shoulders", "triceps"],
+            ["back", "biceps"],
+            ["legs", "core"],
+            ["shoulders", "arms", "core"]
+          ];
+        } else if (daysPerWeek === 5) {
+          // 5-day split
+          return [
+            ["chest", "triceps"],
+            ["back", "biceps"],
+            ["legs"],
+            ["shoulders", "core"],
+            ["arms", "core"]
+          ];
+        } else {
+          // 6-day PPL split
+          return [
+            ["chest", "shoulders", "triceps"],
+            ["back", "biceps"],
+            ["legs", "core"],
+            ["chest", "shoulders", "triceps"],
+            ["back", "biceps"],
+            ["legs", "core"]
+          ];
         }
+      };
+      
+      const workoutSplits = createWorkoutSplits();
+      
+      // First, ensure we have at least one exercise per muscle group for each workout day
+      workoutSplits.forEach((dailySplit, dayIndex) => {
+        const dayExercises: any[] = [];
+        
+        // Get required muscle groups for this day
+        const uniqueMuscleGroups = [...new Set(dailySplit)];
+        
+        // Add at least one exercise for each muscle group in this day's split
+        uniqueMuscleGroups.forEach(group => {
+          const availableExercises = exercisesByMuscleGroup[group].filter(ex => !usedExerciseIds.has(ex.id));
+          
+          if (availableExercises.length > 0) {
+            const exercise = availableExercises[0];
+            dayExercises.push(exercise);
+            usedExerciseIds.add(exercise.id);
+            exercisesByMuscleGroup[group] = exercisesByMuscleGroup[group].filter(ex => ex.id !== exercise.id);
+          }
+        });
+        
+        // If we don't have enough exercises for this day yet, add more from appropriate muscle groups
+        while (dayExercises.length < minExercisesPerDay) {
+          // Prioritize the muscle groups for this day
+          let added = false;
+          
+          for (const group of uniqueMuscleGroups) {
+            const availableExercises = exercisesByMuscleGroup[group].filter(ex => !usedExerciseIds.has(ex.id));
+            
+            if (availableExercises.length > 0) {
+              const exercise = availableExercises[0];
+              dayExercises.push(exercise);
+              usedExerciseIds.add(exercise.id);
+              exercisesByMuscleGroup[group] = exercisesByMuscleGroup[group].filter(ex => ex.id !== exercise.id);
+              added = true;
+              break;
+            }
+          }
+          
+          // If we couldn't add from priority groups, try any other muscle group
+          if (!added) {
+            let anyExerciseAdded = false;
+            
+            for (const group of muscleGroups) {
+              const availableExercises = exercisesByMuscleGroup[group].filter(ex => !usedExerciseIds.has(ex.id));
+              
+              if (availableExercises.length > 0) {
+                const exercise = availableExercises[0];
+                dayExercises.push(exercise);
+                usedExerciseIds.add(exercise.id);
+                exercisesByMuscleGroup[group] = exercisesByMuscleGroup[group].filter(ex => ex.id !== exercise.id);
+                anyExerciseAdded = true;
+                break;
+              }
+            }
+            
+            // If we still couldn't add any exercise, break the loop to avoid infinite loop
+            if (!anyExerciseAdded) break;
+          }
+        }
+        
+        // Add all exercises for this day to the selected exercises array
+        selectedExercises.push(...dayExercises);
       });
-      
-      // Flatten remaining exercises and shuffle again
-      const remainingExercises = Object.values(exercisesByMuscleGroup).flat().sort(() => Math.random() - 0.5);
-      
-      // Add remaining exercises until we reach the total
-      while (selectedExercises.length < total && remainingExercises.length > 0) {
-        selectedExercises.push(remainingExercises.shift());
-      }
       
       return selectedExercises;
     };
     
-    // Get enough exercises for the workout plan
+    // Get enough exercises for the workout plan using our improved algorithm
     const selectedExercises = selectExercisesForPlan(totalExercisesNeeded);
     
     if (selectedExercises.length < totalExercisesNeeded) {
@@ -194,9 +288,14 @@ Each workout session should have between ${minExercisesPerDay} and 8 exercises, 
 Provide a comprehensive, structured workout plan for ${daysPerWeek} days per week.
 ${activityLevelGuidance}
 Ensure the plan follows proper exercise science principles like progressive overload, adequate recovery, and muscle group balance.
-Create a balanced distribution of exercises covering ALL major muscle groups across each workout session.
+Create balanced workouts by distributing exercises carefully across different muscle groups.
 
-CRITICAL RULE: Every exercise must be used EXACTLY ONCE throughout the entire workout plan. NO EXERCISE can appear in multiple days.`;
+CRITICAL RULES:
+1. Every exercise must be used EXACTLY ONCE throughout the entire workout plan
+2. NO EXERCISE can appear in multiple days
+3. You MUST use the exact GIF URLs provided with each exercise - do not substitute or create new ones
+4. Each workout day should have a unique name/focus (like "Upper Body", "Lower Body", "Push", "Pull", etc.)
+5. The workout plan should follow proper exercise science principles`;
 
     // Create user prompt with preferences
     const userPrompt = `Create a personalized workout plan for someone with the following characteristics:
@@ -211,33 +310,34 @@ ${body.preferences.preferred_exercise_types ? `- Preferred exercise types: ${bod
 ${body.preferences.available_equipment ? `- Available equipment: ${body.preferences.available_equipment.join(", ")}` : ""}
 - Days per week: ${daysPerWeek}
 
-I need a full workout plan with ${daysPerWeek} different workout sessions. Each day should have AT LEAST ${minExercisesPerDay} different exercises, but no more than 8 exercises. Every workout session must include exercises for each major muscle group (chest, back, legs, shoulders, arms, core) to ensure balanced training.
+I need a full workout plan with ${daysPerWeek} different workout sessions. Each day should have AT LEAST ${minExercisesPerDay} different exercises, but no more than 8 exercises.
 
-MOST IMPORTANT RULE:
+MOST IMPORTANT RULES:
 - NEVER USE THE SAME EXERCISE MORE THAN ONCE IN THE ENTIRE PLAN
 - Every exercise can only be used in ONE workout day 
 - Verify that NO EXERCISES ARE REPEATED between different days before finalizing the plan
 - Double check the IDs to make sure no ID appears more than once in your entire response
+- Each workout day should have a clear FOCUS or THEME (like "Upper Body", "Lower Body", "Push Day", etc.)
 
 IMPORTANT WORKOUT STRUCTURE RULES: 
 - You MUST use exercises from the following list (use the exact name and ID)
 - DO NOT REPEAT THE SAME EXERCISE WITHIN A SINGLE WORKOUT SESSION
 - DO NOT REPEAT EXERCISES ACROSS DIFFERENT WORKOUT DAYS - each exercise should be used only ONCE in the entire plan
 - Each exercise should appear at most ONCE in the entire workout plan
-- EACH WORKOUT SESSION MUST INCLUDE AT LEAST ONE EXERCISE FOR EACH MAJOR MUSCLE GROUP 
 - Follow a scientifically-backed training split (Push/Pull/Legs or similar approach)
 - Organize exercises in each session based on optimal training order (compound movements first)
+- MAKE SURE TO USE THE EXACT GIF URL PROVIDED WITH EACH EXERCISE
 
 Here are the exercises you can use:
-${exercisesForLLM.slice(0, Math.min(exercisesForLLM.length, 100)).map(e => 
+${exercisesForLLM.map(e => 
   `- ${e.name} (ID: ${e.id}, Muscle Group: ${e.muscle_group}, GIF: ${e.gif_url ? "Available" : "Not Available"})`
 ).join("\n")}
 
 For each workout day, provide:
-1. Day name/focus (e.g., "Day 1: Chest and Triceps")
-2. A brief warmup routine
+1. Day name/focus (e.g., "Day 1: Upper Body" or "Day 1: Push Day")
+2. A brief warmup routine specific to that day's focus
 3. Main exercises with exact sets, reps, and rest periods
-4. A brief cooldown
+4. A brief cooldown specific to that day's focus
 
 YOUR RESPONSE MUST BE VALID JSON. Don't include any text before or after the JSON.
 Format the response as a valid JSON object with this exact structure:
@@ -246,6 +346,7 @@ Format the response as a valid JSON object with this exact structure:
     {
       "day_number": 1,
       "day_name": "Day 1: [Focus]",
+      "focus": "[Main Focus]",
       "warmup_description": "5-10 minute warmup...",
       "cooldown_description": "5-minute cooldown...",
       "session_exercises": [
@@ -272,11 +373,10 @@ Format the response as a valid JSON object with this exact structure:
 }
 
 Ensure:
-- The workout plan targets ALL major muscle groups appropriately throughout the week
+- The workout plan has a logical structure and progressive overload
 - Each workout day has AT LEAST ${minExercisesPerDay} UNIQUE exercises, but no more than 8
 - NO DUPLICATE EXERCISES within the same workout session
 - NO DUPLICATE EXERCISES across different workout days - EVERY exercise should be used exactly ONCE in the entire plan
-- EVERY SESSION includes at least one exercise for each major muscle group
 - The plan follows proper exercise science for progression and recovery
 - You use ONLY exercises from the provided list (with correct IDs and GIF URLs)
 - The JSON structure exactly matches the format provided above
@@ -370,6 +470,16 @@ Ensure:
         let hasDuplicates = false;
         
         workoutPlan.workout_sessions.forEach((session, sessionIndex) => {
+          // Make sure each session has a focus field
+          if (!session.focus && session.day_name) {
+            const dayNameParts = session.day_name.split(':');
+            if (dayNameParts.length > 1) {
+              session.focus = dayNameParts[1].trim();
+            } else {
+              session.focus = "Treino Completo";
+            }
+          }
+          
           if (session.session_exercises) {
             session.session_exercises.forEach((ex, exIndex) => {
               if (ex.exercise && ex.exercise.id) {
@@ -391,9 +501,10 @@ Ensure:
                   hasDuplicates = true;
                   
                   // Replace the duplicate with a different, unused exercise
-                  const unusedExercise = selectedExercises.find(e => 
+                  const unusedExercise = allExercises.find(e => 
                     !Array.from(usedExerciseIds.keys()).includes(e.id) && 
-                    e.muscle_group === ex.exercise.muscle_group
+                    e.muscle_group === ex.exercise.muscle_group &&
+                    e.gif_url  // Make sure it has a GIF
                   );
                   
                   if (unusedExercise) {
@@ -440,8 +551,9 @@ Ensure:
               session.session_exercises = session.session_exercises || [];
               
               // Find unused exercises
-              const unusedExercises = selectedExercises.filter(e => 
-                !Array.from(usedExerciseIds.keys()).includes(e.id)
+              const unusedExercises = allExercises.filter(e => 
+                !Array.from(usedExerciseIds.keys()).includes(e.id) &&
+                e.gif_url // Make sure it has a GIF
               );
               
               // Try to add exercises for missing muscle groups first
