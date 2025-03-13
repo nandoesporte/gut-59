@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,6 +16,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { AssessmentsList } from '@/components/mental/assessments/AssessmentsList';
 import { AssessmentView } from '@/components/mental/assessments/AssessmentView';
+import { AssessmentHistory } from '@/components/mental/assessments/AssessmentHistory';
 
 interface EmotionLog {
   id?: string;
@@ -48,6 +50,7 @@ const Mental = () => {
     { id: 'meditation', icon: <Headphones className="w-6 h-6" />, label: 'Meditação', color: 'bg-[#F2FCE2]' },
     { id: 'diary', icon: <Brain className="w-6 h-6" />, label: 'Diário', color: 'bg-[#FEF7CD]' },
     { id: 'assessments', icon: <BarChart className="w-6 h-6" />, label: 'Avaliações', color: 'bg-[#E8E0FF]' },
+    { id: 'history', icon: <CalendarIcon className="w-6 h-6" />, label: 'Histórico', color: 'bg-[#FFE0FB]' },
     { id: 'ai', icon: <MessageCircle className="w-6 h-6" />, label: 'IA Conselheira', color: 'bg-[#FFDEE2]' },
     { id: 'resources', icon: <BookOpen className="w-6 h-6" />, label: 'Recursos', color: 'bg-[#FEC6A1]' },
   ];
@@ -177,7 +180,7 @@ const Mental = () => {
     <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 space-y-4 sm:space-y-8 animate-fadeIn pb-20">
       <h1 className="text-2xl sm:text-3xl font-bold text-center text-primary mb-6">Saúde Mental</h1>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-3 mb-8">
         {menuItems.map((item) => (
           <button
             key={item.id}
@@ -306,6 +309,10 @@ const Mental = () => {
           ) : (
             <AssessmentsList />
           )}
+        </TabsContent>
+        
+        <TabsContent value="history">
+          <AssessmentHistory />
         </TabsContent>
 
         <TabsContent value="ai">
