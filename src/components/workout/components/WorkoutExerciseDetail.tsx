@@ -25,6 +25,9 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     setImageLoaded(true);
   };
   
+  // Get the correct image URL, handling null or empty strings
+  const imageUrl = exercise.gif_url ? formatImageUrl(exercise.gif_url) : '';
+  
   return (
     <Card className="overflow-hidden border-none shadow-sm hover:shadow-md transition-shadow duration-200">
       <CardContent className="p-0">
@@ -43,13 +46,15 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
               </div>
             )}
             
-            <img 
-              src={formatImageUrl(exercise.gif_url)} 
-              alt={exercise.name}
-              className={`h-36 md:h-40 object-cover ${imageLoaded && !imageError ? 'block' : 'hidden'}`}
-              onLoad={() => setImageLoaded(true)}
-              onError={handleImageError}
-            />
+            {imageUrl && (
+              <img 
+                src={imageUrl} 
+                alt={exercise.name}
+                className={`h-36 md:h-40 object-cover ${imageLoaded && !imageError ? 'block' : 'hidden'}`}
+                onLoad={() => setImageLoaded(true)}
+                onError={handleImageError}
+              />
+            )}
           </div>
           
           {/* Exercise Details */}
