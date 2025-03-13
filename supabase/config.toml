@@ -27,3 +27,6 @@ verify_jwt = false
 
 [functions.nutri-plus-agent]
 verify_jwt = false
+
+[functions.analyze-assessment-results]
+verify_jwt = false
