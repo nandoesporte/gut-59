@@ -45,6 +45,22 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
     }));
   };
 
+  // Format goal for display
+  const formatGoal = (goal: string | undefined) => {
+    if (!goal) return "Não definido";
+    
+    switch(goal) {
+      case "gain_mass":
+        return "Ganho de Massa";
+      case "lose_weight":
+        return "Perda de Peso";
+      case "maintain":
+        return "Manter Peso";
+      default:
+        return goal;
+    }
+  };
+
   const renderExerciseImage = (exercise: any) => {
     const hasError = imageLoadErrors[exercise.id];
     const gifUrl = exercise.gif_url;
@@ -89,7 +105,7 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
             </div>
             <div className="flex items-center">
               <Target className="h-4 w-4 text-primary mr-1.5" />
-              <span className="text-xs font-medium">{plan?.goal || "Não definido"}</span>
+              <span className="text-xs font-medium">{formatGoal(plan?.goal)}</span>
             </div>
           </div>
         )}

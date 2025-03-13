@@ -27,6 +27,22 @@ export const SavedWorkoutPlanDetails = ({ plan }: SavedWorkoutPlanDetailsProps) 
     }
   };
 
+  // Format goal for display
+  const formatGoal = (goal: string | undefined) => {
+    if (!goal) return "Não definido";
+    
+    switch(goal) {
+      case "gain_mass":
+        return "Ganho de Massa";
+      case "lose_weight":
+        return "Perda de Peso";
+      case "maintain":
+        return "Manter Peso";
+      default:
+        return goal;
+    }
+  };
+
   // Count total exercises across all sessions
   const totalExercises = plan.workout_sessions.reduce((total, session) => {
     return total + (session.session_exercises?.length || 0);
@@ -53,7 +69,7 @@ export const SavedWorkoutPlanDetails = ({ plan }: SavedWorkoutPlanDetailsProps) 
             <div className="flex items-center gap-2">
               <Target className="h-4 w-4 text-primary" />
               <span className="font-medium">Objetivo:</span>
-              <span>{plan.goal}</span>
+              <span>{formatGoal(plan.goal)}</span>
             </div>
             
             <div className="flex items-center gap-2">

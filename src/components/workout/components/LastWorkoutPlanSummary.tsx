@@ -17,7 +17,6 @@ import { ptBR } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { WorkoutPlan } from "../types/workout-plan";
-// Removing incorrect import and we're not using this component here anyway
 
 export const LastWorkoutPlanSummary = () => {
   const [lastPlan, setLastPlan] = useState<WorkoutPlan | null>(null);
@@ -53,7 +52,7 @@ export const LastWorkoutPlanSummary = () => {
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(1)
-          .maybeSingle(); // Changed from .single() to .maybeSingle() to avoid errors when no data is found
+          .maybeSingle();
 
         if (error) {
           console.error("Erro ao buscar último plano de treino:", error);
@@ -89,6 +88,22 @@ export const LastWorkoutPlanSummary = () => {
       return format(new Date(dateString), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
     } catch (e) {
       return "Data indisponível";
+    }
+  };
+
+  // Format goal for display
+  const formatGoal = (goal: string | undefined) => {
+    if (!goal) return "Não definido";
+    
+    switch(goal) {
+      case "gain_mass":
+        return "Ganho de Massa";
+      case "lose_weight":
+        return "Perda de Peso";
+      case "maintain":
+        return "Manter Peso";
+      default:
+        return goal;
     }
   };
 
@@ -158,7 +173,7 @@ export const LastWorkoutPlanSummary = () => {
                 <Target className="h-4 w-4" />
               </div>
               <p className="text-xs text-center text-blue-800 font-medium">Objetivo</p>
-              <p className="text-sm font-bold text-center text-blue-700">{lastPlan.goal}</p>
+              <p className="text-sm font-bold text-center text-blue-700">{formatGoal(lastPlan.goal)}</p>
             </div>
             
             <div className="bg-purple-50 rounded-lg p-2 transition-all">
