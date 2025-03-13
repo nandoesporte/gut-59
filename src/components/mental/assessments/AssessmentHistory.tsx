@@ -49,6 +49,7 @@ export const AssessmentHistory = () => {
         if (error) {
           console.error("Erro ao buscar avaliações:", error);
         } else if (data) {
+          console.log("Avaliações encontradas:", data.length); // Debug log
           setAssessments(data as HealthAssessment[]);
         }
       } catch (error) {
