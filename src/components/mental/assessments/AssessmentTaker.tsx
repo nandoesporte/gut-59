@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   Card, CardContent, CardDescription, 
@@ -97,7 +96,8 @@ export const AssessmentTaker = ({ assessment }: AssessmentTakerProps) => {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (user) {
-        const assessmentResponse: AssessmentResponse = {
+        // Create a properly structured object for insertion
+        const assessmentData = {
           user_id: user.id,
           assessment_type: assessment.id,
           responses: responses,
@@ -106,7 +106,7 @@ export const AssessmentTaker = ({ assessment }: AssessmentTakerProps) => {
         
         const { error } = await supabase
           .from('health_assessments')
-          .insert([assessmentResponse]);
+          .insert(assessmentData);
           
         if (error) {
           console.error("Error saving assessment result:", error);
