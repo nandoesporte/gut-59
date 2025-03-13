@@ -3,6 +3,7 @@ import React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatImageUrl } from '@/utils/imageUtils';
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface WorkoutExerciseDetailProps {
   exerciseSession: any;
@@ -11,20 +12,38 @@ interface WorkoutExerciseDetailProps {
 
 export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: WorkoutExerciseDetailProps) => {
   const exercise = exerciseSession.exercise;
+  const [imageLoaded, setImageLoaded] = React.useState(false);
+  const [imageError, setImageError] = React.useState(false);
   
   if (!exercise) return null;
   
-  // Format the exercise name and add badge for exercise type
   return (
     <Card className="overflow-hidden border-none shadow-sm">
       <CardContent className="p-0">
         <div className="flex flex-col md:flex-row gap-3">
           {/* Exercise GIF/Image */}
-          <div className="w-full md:w-1/4 bg-gray-100 overflow-hidden flex items-center justify-center">
+          <div className="w-full md:w-1/4 bg-gray-100 overflow-hidden flex items-center justify-center h-36">
+            {!imageLoaded && !imageError && (
+              <Skeleton className="h-36 w-full" />
+            )}
+            
+            {imageError && (
+              <div className="flex items-center justify-center h-full w-full bg-muted">
+                <p className="text-xs text-muted-foreground text-center px-2">
+                  Imagem não disponível
+                </p>
+              </div>
+            )}
+            
             <img 
               src={formatImageUrl(exercise.gif_url)} 
               alt={exercise.name}
-              className="h-36 object-cover"
+              className={`h-36 object-cover ${imageLoaded && !imageError ? 'block' : 'hidden'}`}
+              onLoad={() => setImageLoaded(true)}
+              onError={() => {
+                setImageError(true);
+                setImageLoaded(true);
+              }}
             />
           </div>
           
