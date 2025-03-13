@@ -32,10 +32,10 @@ interface Tip {
 }
 
 const themes = [
-  { name: 'saúde', color: 'bg-cyan-50 hover:bg-cyan-100 border-cyan-200' },
+  { name: 'saúde', color: 'bg-teal-50 hover:bg-teal-100 border-teal-200' },
   { name: 'produtividade', color: 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200' },
-  { name: 'bem-estar', color: 'bg-teal-50 hover:bg-teal-100 border-teal-200' },
-  { name: 'curiosidades', color: 'bg-slate-50 hover:bg-slate-100 border-slate-200' },
+  { name: 'bem-estar', color: 'bg-cyan-50 hover:bg-cyan-100 border-cyan-200' },
+  { name: 'curiosidades', color: 'bg-indigo-50 hover:bg-indigo-100 border-indigo-200' },
 ];
 
 const defaultTips = Array.from({ length: 30 }, (_, i) => ({
@@ -167,12 +167,12 @@ const TipsCalendar = () => {
           description: `Dica do dia ${tipId} concluída`
         });
         
-        toast.success(`Dica concluída! +${REWARDS.DAILY_TIP} FITs`);
+        toast.success(`Desafio concluído! +${REWARDS.DAILY_TIP} FITs`);
       }
       setSelectedTip(null);
     } catch (error) {
       console.error('Erro ao marcar dica como lida:', error);
-      toast.error('Erro ao registrar conclusão da dica');
+      toast.error('Erro ao registrar conclusão do desafio');
     }
   };
 
@@ -191,24 +191,29 @@ const TipsCalendar = () => {
   }
 
   return (
-    <div className="w-full px-4 py-6 bg-gradient-to-br from-slate-50 to-white rounded-lg shadow-sm border border-slate-200">
+    <div className="w-full px-6 py-6 bg-gradient-to-br from-teal-50 to-white rounded-lg shadow-md border border-teal-100">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-primary-500">
-          Desafio Diário
-        </h2>
+        <div className="flex items-center gap-3">
+          <div className="bg-teal-100 p-2.5 rounded-full">
+            <Check className="w-5 h-5 text-teal-600" />
+          </div>
+          <h2 className="text-xl font-bold text-teal-800">
+            Desafio Diário
+          </h2>
+        </div>
         <Button 
           variant="outline" 
           size="sm" 
           onClick={generateNewChallenges}
           disabled={isGenerating}
-          className="flex items-center gap-1"
+          className="flex items-center gap-1.5 bg-white hover:bg-teal-50 border-teal-200 text-teal-700"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${isGenerating ? 'animate-spin' : ''}`} />
           <span>Atualizar</span>
         </Button>
       </div>
       
-      <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-7 lg:grid-cols-10 gap-2">
+      <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-7 lg:grid-cols-10 gap-2.5">
         {tips.map((tip) => (
           <motion.div
             key={tip.id}
@@ -219,8 +224,8 @@ const TipsCalendar = () => {
             <Card
               onClick={() => handleTipClick(tip)}
               className={`relative w-full aspect-square ${getThemeColor(tip.theme)} 
-                transition-all duration-300 cursor-pointer overflow-hidden group border
-                ${tip.isUnlocked ? 'shadow-sm hover:shadow-md' : 'opacity-80'}`}
+                transition-all duration-300 cursor-pointer overflow-hidden group border-2
+                ${tip.isUnlocked ? 'shadow-sm hover:shadow-md' : 'opacity-75'}`}
             >
               <div className="absolute inset-0 p-2 flex flex-col items-center justify-center">
                 <span className="text-xs font-semibold mb-1 text-slate-700">Dia {tip.id}</span>
@@ -232,9 +237,9 @@ const TipsCalendar = () => {
                   <Unlock className="w-4 h-4 text-teal-600" />
                 )}
                 {tip.isUnlocked && !tip.isRead && (
-                  <div className="absolute inset-0 bg-gradient-to-br from-white/90 to-white/95 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-2 flex items-center justify-center">
-                    <p className="text-xs font-medium text-slate-600">
-                      Clique para ver o desafio
+                  <div className="absolute inset-0 bg-gradient-to-br from-white/95 to-white/80 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-2 flex items-center justify-center">
+                    <p className="text-xs font-medium text-teal-700">
+                      Ver desafio
                     </p>
                   </div>
                 )}
@@ -245,18 +250,18 @@ const TipsCalendar = () => {
       </div>
 
       <Dialog open={!!selectedTip} onOpenChange={() => setSelectedTip(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md border-teal-200 bg-gradient-to-br from-teal-50/80 to-white">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <span className="text-lg text-slate-800">
+            <DialogTitle className="flex items-center gap-2 text-teal-800">
+              <span className="text-lg">
                 Desafio do Dia {selectedTip?.id}
               </span>
-              <span className="text-sm text-slate-500 italic">
+              <span className="text-sm text-teal-600 italic">
                 ({selectedTip?.theme})
               </span>
             </DialogTitle>
           </DialogHeader>
-          <div className="p-4 bg-gradient-to-br from-slate-50 to-white rounded-lg border border-slate-200">
+          <div className="p-4 bg-white/80 rounded-lg border border-teal-100">
             <p className="text-slate-700 leading-relaxed">
               {selectedTip?.content}
             </p>
@@ -268,7 +273,7 @@ const TipsCalendar = () => {
             <Button
               onClick={() => selectedTip && markTipAsRead(selectedTip.id)}
               disabled={selectedTip?.isRead}
-              className="bg-green-500 hover:bg-green-600"
+              className="bg-teal-500 hover:bg-teal-600 text-white"
             >
               {selectedTip?.isRead ? 'Concluído' : 'Confirmar Leitura'}
             </Button>

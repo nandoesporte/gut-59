@@ -76,46 +76,52 @@ const Index = () => {
 
   return (
     <div className="space-y-6 flex flex-col items-center">
-      {/* Profile Section with shadow effect */}
+      {/* Profile Section */}
       <div className="w-full">
         <Profile />
       </div>
       
       {/* Summary cards with enhanced styling */}
       <div className="w-full grid grid-cols-1 gap-4">
-        {/* Mental Health Summary with enhanced styling */}
-        <div className="w-full transform transition-all duration-300 hover:translate-y-[-2px] hover:shadow-lg">
-          <MentalHealthSummary />
+        {/* Mental Health Summary */}
+        <div className="w-full">
+          <Card className="overflow-hidden border-none shadow-md bg-gradient-to-br from-violet-50 to-white">
+            <MentalHealthSummary />
+          </Card>
         </div>
         
-        {/* Meal Plan Summary with enhanced styling */}
-        <div className="w-full transform transition-all duration-300 hover:translate-y-[-2px] hover:shadow-lg">
-          <LastMealPlanSummary />
+        {/* Meal Plan Summary */}
+        <div className="w-full">
+          <Card className="overflow-hidden border-none shadow-md bg-gradient-to-br from-emerald-50 to-white">
+            <LastMealPlanSummary />
+          </Card>
         </div>
         
-        {/* Workout Plan Summary with enhanced styling */}
-        <div className="w-full transform transition-all duration-300 hover:translate-y-[-2px] hover:shadow-lg">
-          <LastWorkoutPlanSummary />
+        {/* Workout Plan Summary */}
+        <div className="w-full">
+          <Card className="overflow-hidden border-none shadow-md bg-gradient-to-br from-blue-50 to-white">
+            <LastWorkoutPlanSummary />
+          </Card>
         </div>
       </div>
       
-      {/* Instructions Card with better visual hierarchy */}
+      {/* Instructions Card */}
       <div className="w-full">
-        <Card className="p-6 border-none shadow-sm bg-gradient-to-br from-blue-50 to-white overflow-hidden">
+        <Card className="p-6 border-none shadow-md bg-gradient-to-br from-cyan-50 to-white overflow-hidden">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="bg-blue-100 p-2 rounded-full">
-                <GraduationCap className="h-6 w-6 text-blue-600" />
+              <div className="bg-cyan-100 p-2.5 rounded-full">
+                <GraduationCap className="h-6 w-6 text-cyan-600" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-blue-800">Instruções</h2>
-                <p className="text-sm text-blue-600/80">Aprenda como utilizar a plataforma</p>
+                <h2 className="text-lg font-semibold text-cyan-800">Instruções</h2>
+                <p className="text-sm text-cyan-600/80">Aprenda como utilizar a plataforma</p>
               </div>
             </div>
             <Button 
               onClick={() => navigate('/instructions')} 
               variant="outline"
-              className="bg-white hover:bg-blue-50 border-blue-200 text-blue-700 gap-1"
+              className="bg-white hover:bg-cyan-50 border-cyan-200 text-cyan-700 gap-1"
             >
               Ver Instruções <ChevronRight className="h-4 w-4" />
             </Button>
@@ -123,31 +129,39 @@ const Index = () => {
         </Card>
       </div>
       
-      {/* Reorganizing tracking components */}
+      {/* Tracking components */}
       <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="w-full transform transition-all duration-300 hover:translate-y-[-2px] hover:shadow-lg">
-          <StepCounter />
+        <div className="w-full">
+          <Card className="overflow-hidden border-none shadow-md bg-gradient-to-br from-orange-50 to-white">
+            <StepCounter />
+          </Card>
         </div>
         
-        <div className="w-full transform transition-all duration-300 hover:translate-y-[-2px] hover:shadow-lg">
-          <WaterTracker />
+        <div className="w-full">
+          <Card className="overflow-hidden border-none shadow-md bg-gradient-to-br from-sky-50 to-white">
+            <WaterTracker />
+          </Card>
         </div>
       </div>
       
       {/* Messages Section with role-specific display */}
       {isAdmin ? (
         <div className="w-full">
-          <MessagesTab />
+          <Card className="overflow-hidden border-none shadow-md bg-gradient-to-br from-slate-50 to-white">
+            <MessagesTab />
+          </Card>
         </div>
       ) : isPersonal ? (
         <div className="w-full">
-          <MessagesPersonal />
+          <Card className="overflow-hidden border-none shadow-md bg-gradient-to-br from-slate-50 to-white">
+            <MessagesPersonal />
+          </Card>
         </div>
       ) : (
-        <div className="w-full grid grid-cols-1 gap-4">
-          <Card className="border-none shadow-sm bg-gradient-to-br from-indigo-50 to-white p-4">
+        <div className="w-full">
+          <Card className="border-none shadow-md bg-gradient-to-br from-indigo-50 to-white p-4">
             <div className="flex items-center gap-3 mb-3">
-              <div className="bg-indigo-100 p-2 rounded-full">
+              <div className="bg-indigo-100 p-2.5 rounded-full">
                 <ShieldCheck className="h-5 w-5 text-indigo-600" />
               </div>
               <h3 className="text-lg font-semibold text-indigo-800">Comunicação</h3>
@@ -160,8 +174,8 @@ const Index = () => {
         </div>
       )}
       
-      {/* Daily Challenges with improved styling - Changed from Tips Calendar */}
-      <div className="w-full transform transition-all duration-300 hover:translate-y-[-2px] hover:shadow-lg">
+      {/* Daily Challenges */}
+      <div className="w-full">
         <TipsCalendar />
       </div>
     </div>

@@ -16,10 +16,10 @@ const goals = [
     label: "Perder peso",
     description: "Foco em queima de gordura",
     icon: Scale,
-    color: "bg-primary-50",
-    hoverColor: "hover:bg-primary-100",
-    borderColor: "border-primary-200",
-    iconColor: "text-primary-500",
+    color: "bg-rose-50",
+    hoverColor: "hover:bg-rose-100",
+    borderColor: "border-rose-200",
+    iconColor: "text-rose-500",
     factor: 0.8
   },
   {
@@ -27,10 +27,10 @@ const goals = [
     label: "Manter peso",
     description: "Melhorar condicionamento",
     icon: ArrowRight,
-    color: "bg-[#E8F4FF]",
-    hoverColor: "hover:bg-[#D5EBFF]",
-    borderColor: "border-blue-200",
-    iconColor: "text-blue-500",
+    color: "bg-cyan-50",
+    hoverColor: "hover:bg-cyan-100",
+    borderColor: "border-cyan-200",
+    iconColor: "text-cyan-500",
     factor: 1
   },
   {
@@ -38,10 +38,10 @@ const goals = [
     label: "Ganhar massa",
     description: "Foco em hipertrofia",
     icon: Dumbbell,
-    color: "bg-[#F2FCE2]",
-    hoverColor: "hover:bg-[#E5F7CC]",
-    borderColor: "border-green-200",
-    iconColor: "text-green-500",
+    color: "bg-emerald-50",
+    hoverColor: "hover:bg-emerald-100",
+    borderColor: "border-emerald-200",
+    iconColor: "text-emerald-500",
     factor: 1.2
   }
 ];
@@ -57,21 +57,23 @@ export const GoalCards = ({ selectedGoal, onSelect }: GoalCardsProps) => {
           <Card
             key={goal.id}
             className={cn(
-              "p-6 cursor-pointer transition-all duration-200 transform hover:scale-105",
+              "p-6 cursor-pointer transition-all duration-300 transform hover:scale-102",
               goal.color,
               goal.hoverColor,
               goal.borderColor,
-              isSelected ? "ring-2 ring-primary-500 ring-offset-2" : ""
+              isSelected ? "ring-2 ring-teal-500 ring-offset-2 shadow-md" : ""
             )}
             onClick={() => onSelect(goal.id as Goal)}
           >
             <div className="flex flex-col items-center space-y-3">
-              <Icon className={cn("w-8 h-8", goal.iconColor)} />
+              <div className={`p-2.5 rounded-full ${isSelected ? 'bg-white' : `bg-white/70`}`}>
+                <Icon className={cn("w-7 h-7", goal.iconColor)} />
+              </div>
               <div className="text-center">
-                <span className="text-lg font-medium text-gray-700">
+                <span className="text-lg font-medium text-gray-800">
                   {goal.label}
                 </span>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-sm text-gray-500 mt-1.5">
                   {goal.description}
                 </p>
               </div>
