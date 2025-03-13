@@ -87,7 +87,7 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
             <TabsList className={`mb-2 w-full justify-start ${isMobile ? 'h-9' : ''}`}>
               {plan?.workout_sessions?.map((session: any, index: number) => (
                 <TabsTrigger
-                  key={session.id}
+                  key={`tab-${session.id || index}`}
                   value={`session-${index + 1}`}
                   onClick={() => setActiveSessionIndex(index)}
                   className={`${isMobile ? 'px-2 py-1 text-xs' : 'min-w-[80px] px-3'}`}
@@ -99,7 +99,7 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
           </ScrollArea>
           
           {plan?.workout_sessions?.map((session: any, index: number) => (
-            <TabsContent key={session.id} value={`session-${index + 1}`} className="space-y-3 sm:space-y-4 animate-fadeIn">
+            <TabsContent key={`content-${session.id || index}`} value={`session-${index + 1}`} className="space-y-3 sm:space-y-4 animate-fadeIn">
               <div className="rounded-lg bg-primary/5 p-2 sm:p-3">
                 <div className="flex justify-between items-center">
                   <h3 className="text-sm sm:text-lg font-semibold text-primary">
@@ -157,9 +157,9 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
                   </Badge>
                 </div>
                 <div className="space-y-2 sm:space-y-3">
-                  {session?.session_exercises?.map((exerciseSession: any) => (
+                  {session?.session_exercises?.map((exerciseSession: any, exIndex: number) => (
                     <WorkoutExerciseDetail 
-                      key={exerciseSession.id} 
+                      key={`exercise-${exerciseSession.id || exIndex}-${exerciseSession.exercise?.id || 'unknown'}`} 
                       exerciseSession={exerciseSession} 
                     />
                   ))}

@@ -1,10 +1,10 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatImageUrl } from '@/utils/imageUtils';
 import { Skeleton } from "@/components/ui/skeleton";
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Dumbbell } from 'lucide-react';
 
 interface WorkoutExerciseDetailProps {
   exerciseSession: any;
@@ -13,46 +13,70 @@ interface WorkoutExerciseDetailProps {
 
 export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: WorkoutExerciseDetailProps) => {
   const exercise = exerciseSession.exercise;
-  const [imageLoaded, setImageLoaded] = React.useState(false);
-  const [imageError, setImageError] = React.useState(false);
-  const [expandDescription, setExpandDescription] = React.useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  const [expandDescription, setExpandDescription] = useState(false);
+  const [hasAttemptedToLoadImage, setHasAttemptedToLoadImage] = useState(false);
   
   if (!exercise) return null;
+  
+  // Reset image states if exercise changes
+  useEffect(() => {
+    setImageLoaded(false);
+    setImageError(false);
+    setHasAttemptedToLoadImage(false);
+  }, [exercise.id]);
   
   const handleImageError = () => {
     console.warn(`Failed to load image for exercise: ${exercise.name} (${exercise.id})`);
     setImageError(true);
     setImageLoaded(true);
+    setHasAttemptedToLoadImage(true);
+  };
+  
+  const handleImageLoad = () => {
+    setImageLoaded(true);
+    setHasAttemptedToLoadImage(true);
   };
   
   // Get the correct image URL, handling null or empty strings
-  const imageUrl = exercise.gif_url ? formatImageUrl(exercise.gif_url) : '';
+  const imageUrl = exercise.gif_url 
+    ? formatImageUrl(exercise.gif_url) 
+    : '';
+  
+  // Check if URL is likely valid (not just a placeholder)
+  const isLikelyValidUrl = imageUrl && 
+                          !imageUrl.includes('placeholder') && 
+                          !imageUrl.includes('example.') &&
+                          imageUrl.trim().length > 10;
   
   return (
     <Card className="overflow-hidden border-none shadow-sm hover:shadow-md transition-shadow duration-200">
       <CardContent className="p-0">
         <div className="flex flex-col md:flex-row gap-3">
           {/* Exercise GIF/Image */}
-          <div className="w-full md:w-1/4 bg-gray-100 dark:bg-gray-800 overflow-hidden flex items-center justify-center h-36 md:h-40">
-            {!imageLoaded && !imageError && (
-              <Skeleton className="h-36 md:h-40 w-full" />
+          <div className="w-full md:w-1/4 bg-gray-100 dark:bg-gray-800 overflow-hidden flex items-center justify-center h-36 md:h-40 relative">
+            {!imageLoaded && !imageError && isLikelyValidUrl && (
+              <Skeleton className="h-36 md:h-40 w-full absolute inset-0" />
             )}
             
-            {imageError && (
-              <div className="flex items-center justify-center h-full w-full bg-muted">
-                <p className="text-xs text-muted-foreground text-center px-2">
-                  Imagem não disponível
+            {(!isLikelyValidUrl || imageError || (hasAttemptedToLoadImage && !imageLoaded)) && (
+              <div className="flex flex-col items-center justify-center h-full w-full bg-muted text-center px-2">
+                <Dumbbell className="h-8 w-8 mb-2 text-primary/40" />
+                <p className="text-xs text-muted-foreground">
+                  {exercise.name}
                 </p>
               </div>
             )}
             
-            {imageUrl && (
+            {isLikelyValidUrl && (
               <img 
                 src={imageUrl} 
                 alt={exercise.name}
-                className={`h-36 md:h-40 object-cover ${imageLoaded && !imageError ? 'block' : 'hidden'}`}
-                onLoad={() => setImageLoaded(true)}
+                className={`h-36 md:h-40 object-contain ${imageLoaded && !imageError ? 'block' : 'hidden'}`}
+                onLoad={handleImageLoad}
                 onError={handleImageError}
+                loading="lazy"
               />
             )}
           </div>

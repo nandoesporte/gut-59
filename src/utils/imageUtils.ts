@@ -23,7 +23,18 @@ export const formatImageUrl = (url: string | null | undefined): string => {
   if (cleanUrl === 'example.com' || 
       cleanUrl.includes('example.com') || 
       cleanUrl === 'example.gif' ||
-      cleanUrl === 'placeholder.gif') {
+      cleanUrl === 'placeholder.gif' ||
+      cleanUrl.includes('undefined') ||
+      cleanUrl.includes('null') ||
+      cleanUrl.length < 10 ||
+      /^[0-9a-f]{32}$/.test(cleanUrl) || // Likely an MD5 hash or similar with no extension
+      cleanUrl.includes('.gif.gif')) {  // Duplicate extensions
+    return '/placeholder.svg';
+  }
+
+  // If URL doesn't have an extension/format that indicates an image, return placeholder
+  const hasImageExtension = /\.(gif|jpe?g|png|svg|webp)$/i.test(cleanUrl);
+  if (!hasImageExtension && !cleanUrl.includes('storage') && !cleanUrl.includes('object')) {
     return '/placeholder.svg';
   }
 
