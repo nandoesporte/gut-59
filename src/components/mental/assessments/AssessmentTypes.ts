@@ -36,3 +36,13 @@ export interface AssessmentType {
   };
   getResult: (score: number) => AssessmentResult;
 }
+
+// Database typings for the health_assessments table
+export type HealthAssessment = {
+  id: string;
+  user_id: string;
+  assessment_type: 'burnout' | 'anxiety' | 'stress' | 'depression';
+  responses: Record<number, number>;
+  score: number;
+  created_at: string;
+}

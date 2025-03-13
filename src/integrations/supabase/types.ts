@@ -439,6 +439,33 @@ export type Database = {
         }
         Relationships: []
       }
+      health_assessments: {
+        Row: {
+          assessment_type: string
+          created_at: string
+          id: string
+          responses: Json
+          score: number
+          user_id: string
+        }
+        Insert: {
+          assessment_type: string
+          created_at?: string
+          id?: string
+          responses: Json
+          score: number
+          user_id: string
+        }
+        Update: {
+          assessment_type?: string
+          created_at?: string
+          id?: string
+          responses?: Json
+          score?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       meal_guidelines: {
         Row: {
           created_at: string | null

@@ -11,10 +11,10 @@ import {
   Table, TableBody, TableCaption, TableCell, 
   TableHead, TableHeader, TableRow 
 } from "@/components/ui/table";
-import { AssessmentResponse } from '@/components/mental/assessments/AssessmentTypes';
+import { AssessmentResponse, HealthAssessment } from '@/components/mental/assessments/AssessmentTypes';
 import { toast } from 'sonner';
 
-interface AssessmentWithUser extends AssessmentResponse {
+interface AssessmentWithUser extends HealthAssessment {
   user_name?: string;
   user_email?: string;
 }
@@ -61,10 +61,10 @@ export const HealthAssessmentsTab = () => {
       
       setUserDetails(userDetailsMap);
       
-      const assessmentsWithUsers = data.map((assessment: AssessmentResponse) => ({
+      const assessmentsWithUsers = data.map((assessment: HealthAssessment) => ({
         ...assessment,
-        user_name: userDetailsMap[assessment.user_id!]?.name,
-        user_email: userDetailsMap[assessment.user_id!]?.email
+        user_name: userDetailsMap[assessment.user_id]?.name,
+        user_email: userDetailsMap[assessment.user_id]?.email
       }));
       
       setAssessments(assessmentsWithUsers);
