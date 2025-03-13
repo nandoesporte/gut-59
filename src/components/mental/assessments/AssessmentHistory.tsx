@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart, Loader2, Calendar, Filter } from 'lucide-react';
+import { BarChart, Loader2, Calendar, Filter, History } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
@@ -117,7 +117,7 @@ export const AssessmentHistory = () => {
       <CardHeader className="pb-2">
         <div className="flex justify-between items-center">
           <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
-            <BarChart className="h-5 w-5" />
+            <History className="h-5 w-5" />
             Histórico de Avaliações
           </CardTitle>
           <div className="flex items-center gap-2">
