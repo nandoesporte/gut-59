@@ -32,6 +32,27 @@ export const formatImageUrl = (url: string | null | undefined): string => {
     return '/placeholder.svg';
   }
 
+  // Handle Supabase storage URLs - ensure they're properly formatted
+  if (cleanUrl.includes('storage.googleapis.com') || 
+      cleanUrl.includes('storage/v1/object/public') || 
+      cleanUrl.includes('supabase')) {
+    // If it's already a full URL, return it as is
+    if (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://')) {
+      return cleanUrl;
+    }
+    
+    // For Supabase storage paths without protocol, ensure they have the correct format
+    if (cleanUrl.startsWith('/storage/v1/')) {
+      // Get base URL from window.location if in browser
+      const baseUrl = typeof window !== 'undefined' 
+        ? `${window.location.protocol}//${window.location.host}`
+        : '';
+      return `${baseUrl}${cleanUrl}`;
+    }
+    
+    return cleanUrl;
+  }
+
   // If URL doesn't have an extension/format that indicates an image, return placeholder
   const hasImageExtension = /\.(gif|jpe?g|png|svg|webp)$/i.test(cleanUrl);
   if (!hasImageExtension && !cleanUrl.includes('storage') && !cleanUrl.includes('object')) {

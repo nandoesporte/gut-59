@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatImageUrl } from '@/utils/imageUtils';
 import { Skeleton } from "@/components/ui/skeleton";
-import { ExternalLink, Dumbbell } from 'lucide-react';
+import { ExternalLink, Dumbbell, ImageOff, AlertCircle } from 'lucide-react';
 
 interface WorkoutExerciseDetailProps {
   exerciseSession: any;
@@ -28,21 +28,21 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
   }, [exercise.id]);
   
   const handleImageError = () => {
-    console.warn(`Failed to load image for exercise: ${exercise.name} (${exercise.id})`);
+    console.warn(`Failed to load image for exercise: ${exercise.name} (${exercise.id}). URL: ${exercise.gif_url}`);
     setImageError(true);
     setImageLoaded(true);
     setHasAttemptedToLoadImage(true);
   };
   
   const handleImageLoad = () => {
+    console.log(`Successfully loaded image for exercise: ${exercise.name} (${exercise.id})`);
     setImageLoaded(true);
     setHasAttemptedToLoadImage(true);
   };
   
   // Get the correct image URL, handling null or empty strings
-  const imageUrl = exercise.gif_url 
-    ? formatImageUrl(exercise.gif_url) 
-    : '';
+  const rawImageUrl = exercise.gif_url || '';
+  const imageUrl = formatImageUrl(rawImageUrl);
   
   // Check if URL is likely valid (not just a placeholder)
   const isLikelyValidUrl = imageUrl && 
@@ -62,10 +62,17 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
             
             {(!isLikelyValidUrl || imageError || (hasAttemptedToLoadImage && !imageLoaded)) && (
               <div className="flex flex-col items-center justify-center h-full w-full bg-muted text-center px-2">
-                <Dumbbell className="h-8 w-8 mb-2 text-primary/40" />
+                {imageError ? (
+                  <AlertCircle className="h-8 w-8 mb-2 text-amber-500" />
+                ) : (
+                  <Dumbbell className="h-8 w-8 mb-2 text-primary/40" />
+                )}
                 <p className="text-xs text-muted-foreground">
                   {exercise.name}
                 </p>
+                <span className="text-[10px] text-muted-foreground/70 mt-1">
+                  {imageError ? 'Imagem não disponível' : 'Sem imagem'}
+                </span>
               </div>
             )}
             

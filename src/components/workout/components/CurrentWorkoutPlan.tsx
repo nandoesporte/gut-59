@@ -159,7 +159,7 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
                 <div className="space-y-2 sm:space-y-3">
                   {session?.session_exercises?.map((exerciseSession: any, exIndex: number) => (
                     <WorkoutExerciseDetail 
-                      key={`exercise-${exerciseSession.id || exIndex}-${exerciseSession.exercise?.id || 'unknown'}`} 
+                      key={`exercise-${exerciseSession.id || `${session.id}-${exIndex}`}-${exerciseSession.exercise?.id || `unknown-${exIndex}`}`} 
                       exerciseSession={exerciseSession} 
                     />
                   ))}
