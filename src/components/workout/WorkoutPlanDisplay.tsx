@@ -32,6 +32,10 @@ export const WorkoutPlanDisplay = ({
   
   const isMobile = useIsMobile();
 
+  const handleGenerateNewPlan = () => {
+    generatePlan();
+  };
+
   if (loading) {
     return (
       <WorkoutLoadingState
@@ -82,7 +86,7 @@ export const WorkoutPlanDisplay = ({
           O plano de treino ainda não está pronto. Aguarde enquanto ele é preparado ou tente novamente.
         </p>
         <div className="flex flex-col sm:flex-row justify-center gap-2 mt-4 sm:mt-6">
-          <Button onClick={generatePlan} className="w-full sm:w-auto text-sm">
+          <Button onClick={handleGenerateNewPlan} className="w-full sm:w-auto text-sm">
             Gerar Plano
           </Button>
           <Button onClick={onReset} variant="outline" className="w-full sm:w-auto text-sm">
@@ -100,7 +104,7 @@ export const WorkoutPlanDisplay = ({
       
       <div className={`flex ${isMobile ? 'flex-col' : 'justify-center'} gap-2 sm:gap-3 mt-4 sm:mt-6`}>
         <Button 
-          onClick={generatePlan} 
+          onClick={handleGenerateNewPlan} 
           variant="default" 
           className="flex items-center gap-1.5 sm:gap-2 text-sm"
           size={isMobile ? "default" : "lg"}
