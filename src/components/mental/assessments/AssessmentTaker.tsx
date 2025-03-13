@@ -6,7 +6,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { 
   ChevronLeft, ChevronRight, RotateCcw, CheckCircle, 
-  AlertTriangle, Info, Loader2, ArrowLeft 
+  AlertTriangle, Info, Loader2, ArrowLeft, BrainCircuit 
 } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -32,6 +32,8 @@ export const AssessmentTaker = ({ assessment }: AssessmentTakerProps) => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
+  const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
 
   const totalQuestions = assessment.questions.length;
   const currentQuestion = assessment.questions[currentQuestionIndex];
@@ -61,6 +63,28 @@ export const AssessmentTaker = ({ assessment }: AssessmentTakerProps) => {
       ...prev,
       [questionId]: value
     }));
+  };
+
+  const getAIAnalysis = async (assessmentData: any) => {
+    setIsLoadingAnalysis(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("analyze-assessment-results", {
+        body: { assessmentData },
+      });
+
+      if (error) throw error;
+
+      if (data?.analysis) {
+        setAiAnalysis(data.analysis);
+      } else {
+        throw new Error("Análise não recebida");
+      }
+    } catch (error) {
+      console.error("Erro ao obter análise da IA:", error);
+      toast.error("Não foi possível obter a análise da IA. Tente novamente mais tarde.");
+    } finally {
+      setIsLoadingAnalysis(false);
+    }
   };
 
   const calculateResult = async () => {
@@ -113,6 +137,9 @@ export const AssessmentTaker = ({ assessment }: AssessmentTakerProps) => {
           toast.error("Erro ao salvar resultado. Tente novamente.");
         } else {
           toast.success("Avaliação concluída com sucesso!");
+          
+          // Get AI analysis
+          getAIAnalysis(assessmentData);
         }
       } else {
         // If user is not logged in, just show the result without saving
@@ -130,6 +157,7 @@ export const AssessmentTaker = ({ assessment }: AssessmentTakerProps) => {
     setCurrentQuestionIndex(0);
     setResponses({});
     setResult(null);
+    setAiAnalysis(null);
   };
 
   const getAnswerLabel = (value: number) => {
@@ -238,6 +266,25 @@ export const AssessmentTaker = ({ assessment }: AssessmentTakerProps) => {
                 <p className="font-medium mb-2">Interpretação:</p>
                 <p className="text-sm mb-4">{result.interpretation}</p>
               </div>
+              
+              {aiAnalysis ? (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <BrainCircuit className="h-5 w-5 text-blue-600" />
+                    <h3 className="font-medium text-blue-800">Análise da IA Conselheira</h3>
+                  </div>
+                  <div className="text-sm text-blue-900 whitespace-pre-line">
+                    {aiAnalysis}
+                  </div>
+                </div>
+              ) : isLoadingAnalysis ? (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+                  <div className="flex justify-center items-center py-4">
+                    <Loader2 className="h-5 w-5 animate-spin mr-2 text-blue-600" />
+                    <span className="text-blue-800">Obtendo análise da IA Conselheira...</span>
+                  </div>
+                </div>
+              ) : null}
               
               <div>
                 <p className="font-medium mb-2">Recomendações:</p>
