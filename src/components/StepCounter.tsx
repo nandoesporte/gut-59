@@ -39,10 +39,10 @@ const ACCELEROMETER_CONFIG = {
 
 // Parâmetros otimizados para detecção de passos
 const STEP_DETECTION_PARAMS = {
-  magnitudeThreshold: 0.7,
-  averageThreshold: 0.35,
-  minStepInterval: 180,
-  peakThreshold: 0.55
+  magnitudeThreshold: 0.65, // Diminuído para maior sensibilidade
+  averageThreshold: 0.32,   // Diminuído para maior sensibilidade
+  minStepInterval: 150,     // Menor intervalo para detectar passos mais rapidamente
+  peakThreshold: 0.5        // Limiar para detectar picos de aceleração
 };
 
 const loadStoredSteps = () => {
@@ -75,6 +75,7 @@ const StepCounter = () => {
   const [peakDetected, setPeakDetected] = useState(false);
   const [deviceMotionActive, setDeviceMotionActive] = useState(false);
   const [sensorActive, setSensorActive] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(false);
   const isMobile = useIsMobile();
 
   const movingAverageFilter = (buffer: number[], windowSize: number = ACCELEROMETER_CONFIG.windowSize): number => {
@@ -85,12 +86,17 @@ const StepCounter = () => {
   };
 
   const calculateMagnitude = (acc: AccelerationData): number => {
-    return Math.sqrt(acc.x * acc.x + acc.y * acc.y * 2 + acc.z * acc.z);
+    return Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
   };
 
   const detectStep = (acceleration: AccelerationData) => {
     const now = Date.now();
     const magnitude = calculateMagnitude(acceleration);
+    
+    // Log para depuração durante desenvolvimento
+    if (process.env.NODE_ENV === 'development' && Math.random() < 0.01) { 
+      console.log(`Magnitude: ${magnitude.toFixed(2)}`);
+    }
     
     setAccelerationBuffer(prev => {
       const newBuffer = [...prev, magnitude];
@@ -109,15 +115,20 @@ const StepCounter = () => {
       setPeakDetected(true);
       
       if ((verticalChange > STEP_DETECTION_PARAMS.magnitudeThreshold * 0.8 || 
-           magnitude > STEP_DETECTION_PARAMS.magnitudeThreshold * 1.2) && 
+           magnitude > STEP_DETECTION_PARAMS.magnitudeThreshold * 1.1) && 
           avgMagnitude > STEP_DETECTION_PARAMS.averageThreshold * 0.9) {
         const newSteps = steps + 1;
         setSteps(newSteps);
         setLastStepTime(now);
         localStorage.setItem(STORAGE_KEYS.STEPS, newSteps.toString());
         localStorage.setItem(STORAGE_KEYS.LAST_STEP_TIME, now.toString());
+        
+        // Log para depuração
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`Passo detectado! Total: ${newSteps}`);
+        }
       }
-    } else if (magnitude < STEP_DETECTION_PARAMS.peakThreshold / 1.8) {
+    } else if (magnitude < STEP_DETECTION_PARAMS.peakThreshold / 1.5) {
       setPeakDetected(false);
     }
     
@@ -133,6 +144,13 @@ const StepCounter = () => {
       console.log('Permissão não concedida para iniciar acelerômetro');
       return;
     }
+    
+    if (isInitializing) {
+      console.log('Já inicializando sensores, aguarde...');
+      return;
+    }
+    
+    setIsInitializing(true);
 
     try {
       // Primeiro, tentamos usar DeviceMotionEvent
@@ -148,18 +166,10 @@ const StepCounter = () => {
               }
             }
             
-            // Adicionamos o listener com uma frequência mais alta
-            const deviceMotionHandler = (event: DeviceMotionEvent) => {
-              if (event.accelerationIncludingGravity) {
-                detectStep({
-                  x: event.accelerationIncludingGravity.x || 0,
-                  y: event.accelerationIncludingGravity.y || 0,
-                  z: event.accelerationIncludingGravity.z || 0,
-                  timestamp: Date.now()
-                });
-              }
-            };
+            // Removemos listeners anteriores para evitar duplicações
+            window.removeEventListener('devicemotion', deviceMotionHandler);
             
+            // Adicionamos o listener com uma frequência mais alta
             window.addEventListener('devicemotion', deviceMotionHandler, { passive: true });
             setDeviceMotionActive(true);
             console.log('DeviceMotion iniciado com sucesso');
@@ -170,6 +180,18 @@ const StepCounter = () => {
           }
         }
         return false;
+      };
+      
+      // Handler para os eventos de deviceMotion
+      const deviceMotionHandler = (event: DeviceMotionEvent) => {
+        if (event.accelerationIncludingGravity) {
+          detectStep({
+            x: event.accelerationIncludingGravity.x || 0,
+            y: event.accelerationIncludingGravity.y || 0,
+            z: event.accelerationIncludingGravity.z || 0,
+            timestamp: Date.now()
+          });
+        }
       };
 
       // Depois, tentamos usar a Accelerometer API
@@ -221,11 +243,29 @@ const StepCounter = () => {
         if (!accelerometerSuccess) {
           console.error('Não foi possível iniciar nenhum sensor de movimento');
           toast.error('Não foi possível iniciar o contador de passos');
+          
+          // Como último recurso, vamos simular passos para testes
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Iniciando modo de simulação de passos para desenvolvimento');
+            const interval = setInterval(() => {
+              detectStep({
+                x: Math.random() * 2 - 1,
+                y: Math.random() * 2 - 1,
+                z: Math.random() * 2 - 1,
+                timestamp: Date.now()
+              });
+            }, 1000);
+            
+            // Limpa o intervalo quando o componente é desmontado
+            return () => clearInterval(interval);
+          }
         }
       }
     } catch (error) {
       console.error('Erro ao iniciar sensores de movimento:', error);
       toast.error('Erro ao iniciar o contador de passos');
+    } finally {
+      setIsInitializing(false);
     }
   };
 
@@ -239,6 +279,15 @@ const StepCounter = () => {
     if (!permission) {
       requestPermission();
     }
+    
+    return () => {
+      // Limpeza ao desmontar o componente
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('devicemotion', () => {
+          console.log('Removendo event listener de devicemotion');
+        });
+      }
+    };
   }, [permission]);
 
   useEffect(() => {
@@ -253,12 +302,19 @@ const StepCounter = () => {
     }
   }, [lastStepTime, initialLastStepTime]);
 
+  // Sincronização quando a página volta a ficar visível
   useEffect(() => {
     const syncOnVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         const currentSteps = loadStoredSteps();
         if (currentSteps !== steps) {
           setSteps(currentSteps);
+        }
+        
+        // Reiniciar sensores se necessário
+        if (permission === 'granted' && !deviceMotionActive && !sensorActive) {
+          console.log('Reiniciando sensores após visibilidade');
+          startAccelerometer();
         }
       }
     };
@@ -267,7 +323,7 @@ const StepCounter = () => {
     return () => {
       document.removeEventListener('visibilitychange', syncOnVisibilityChange);
     };
-  }, [steps]);
+  }, [steps, permission, deviceMotionActive, sensorActive]);
 
   useEffect(() => {
     const checkLastReward = async () => {
@@ -298,7 +354,7 @@ const StepCounter = () => {
   // Verificação periódica para garantir que sensores estão ativos
   useEffect(() => {
     const checkSensorStatus = () => {
-      if (permission === 'granted' && !deviceMotionActive && !sensorActive) {
+      if (permission === 'granted' && !deviceMotionActive && !sensorActive && !isInitializing) {
         console.log('Sensores não ativos, reiniciando...');
         startAccelerometer();
       }
@@ -306,11 +362,18 @@ const StepCounter = () => {
     
     const interval = setInterval(checkSensorStatus, 3000);
     return () => clearInterval(interval);
-  }, [permission, deviceMotionActive, sensorActive]);
+  }, [permission, deviceMotionActive, sensorActive, isInitializing]);
 
   const requestPermission = async () => {
     try {
       console.log('Solicitando permissão para o acelerômetro');
+      
+      if (isInitializing) {
+        console.log('Já inicializando, aguarde...');
+        return;
+      }
+      
+      setIsInitializing(true);
       
       let permissionGranted = false;
       
@@ -318,13 +381,14 @@ const StepCounter = () => {
           typeof (DeviceMotionEvent as any).requestPermission === 'function') {
         const permissionResult = await (DeviceMotionEvent as any).requestPermission();
         permissionGranted = permissionResult === 'granted';
+        console.log('Resultado da permissão (iOS):', permissionResult);
       } else if (navigator.permissions) {
         try {
           const result = await (navigator.permissions as any).query({ 
             name: 'accelerometer' 
           });
           
-          console.log('Resultado da permissão:', result.state);
+          console.log('Resultado da permissão (Permissions API):', result.state);
           permissionGranted = result.state === 'granted';
         } catch (error) {
           console.error('Erro ao solicitar permissão via Permissions API:', error);
@@ -360,6 +424,8 @@ const StepCounter = () => {
       setTimeout(() => {
         startAccelerometer();
       }, 500);
+    } finally {
+      setIsInitializing(false);
     }
   };
 
