@@ -27,10 +27,10 @@ const goals = [
     label: "Manter peso",
     description: "Melhorar condicionamento",
     icon: ArrowRight,
-    color: "bg-cyan-50",
-    hoverColor: "hover:bg-cyan-100",
-    borderColor: "border-cyan-200",
-    iconColor: "text-cyan-500",
+    color: "bg-sky-50",
+    hoverColor: "hover:bg-sky-100",
+    borderColor: "border-sky-200",
+    iconColor: "text-sky-500",
     factor: 1
   },
   {
@@ -57,16 +57,16 @@ export const GoalCards = ({ selectedGoal, onSelect }: GoalCardsProps) => {
           <Card
             key={goal.id}
             className={cn(
-              "p-6 cursor-pointer transition-all duration-300 transform hover:scale-102",
+              "p-6 cursor-pointer transition-all duration-300 transform hover:scale-102 shadow-sm hover:shadow-md",
               goal.color,
               goal.hoverColor,
-              goal.borderColor,
-              isSelected ? "ring-2 ring-teal-500 ring-offset-2 shadow-md" : ""
+              "border-transparent",
+              isSelected ? "ring-2 ring-teal-500 ring-offset-2" : ""
             )}
             onClick={() => onSelect(goal.id as Goal)}
           >
             <div className="flex flex-col items-center space-y-3">
-              <div className={`p-2.5 rounded-full ${isSelected ? 'bg-white' : `bg-white/70`}`}>
+              <div className={`p-2.5 rounded-full ${isSelected ? 'bg-white shadow-sm' : `bg-white/70`}`}>
                 <Icon className={cn("w-7 h-7", goal.iconColor)} />
               </div>
               <div className="text-center">
