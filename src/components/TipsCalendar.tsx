@@ -194,7 +194,7 @@ const TipsCalendar = () => {
     <div className="w-full px-4 py-6 bg-gradient-to-br from-slate-50 to-white rounded-lg shadow-sm border border-slate-200">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-primary-500">
-          Atividades Diárias
+          Desafio Diário
         </h2>
         <Button 
           variant="outline" 
@@ -263,7 +263,7 @@ const TipsCalendar = () => {
           </div>
           <DialogFooter className="sm:justify-between">
             <span className="text-sm text-slate-500">
-              {selectedTip?.isRead ? 'Atividade já concluída' : 'Marque como concluído após ler'}
+              {selectedTip?.isRead ? 'Desafio já concluído' : 'Marque como concluído após ler'}
             </span>
             <Button
               onClick={() => selectedTip && markTipAsRead(selectedTip.id)}

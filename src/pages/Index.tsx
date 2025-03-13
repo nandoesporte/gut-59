@@ -15,7 +15,6 @@ import { Button } from "@/components/ui/button";
 import { 
   GraduationCap, 
   ChevronRight,
-  Lightbulb,
   ShieldCheck
 } from "lucide-react";
 import { LastMealPlanSummary } from "@/components/menu/components/LastMealPlanSummary";
@@ -161,19 +160,9 @@ const Index = () => {
         </div>
       )}
       
-      {/* Tips Calendar with improved styling */}
+      {/* Daily Challenges with improved styling - Changed from Tips Calendar */}
       <div className="w-full transform transition-all duration-300 hover:translate-y-[-2px] hover:shadow-lg">
-        <Card className="border-none shadow-sm overflow-hidden">
-          <div className="bg-gradient-to-r from-amber-50 to-orange-50 p-4 flex items-center gap-3">
-            <div className="bg-amber-100 p-2 rounded-full">
-              <Lightbulb className="h-5 w-5 text-amber-600" />
-            </div>
-            <h3 className="text-lg font-semibold text-amber-800">Atividades Diárias</h3>
-          </div>
-          <div className="p-4">
-            <TipsCalendar />
-          </div>
-        </Card>
+        <TipsCalendar />
       </div>
     </div>
   );
