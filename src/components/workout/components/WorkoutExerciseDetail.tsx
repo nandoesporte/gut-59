@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatImageUrl } from '@/utils/imageUtils';
@@ -16,7 +16,9 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [expandDescription, setExpandDescription] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const [hasAttemptedToLoadImage, setHasAttemptedToLoadImage] = useState(false);
+  const imageRef = useRef<HTMLImageElement>(null);
   
   if (!exercise) return null;
   
@@ -25,19 +27,46 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     setImageLoaded(false);
     setImageError(false);
     setHasAttemptedToLoadImage(false);
+    setRetryCount(0);
   }, [exercise.id]);
   
+  // Função para tentar carregar novamente a imagem (até 2 tentativas)
+  const retryLoadImage = () => {
+    if (retryCount < 2) {
+      console.log(`Tentando carregar imagem novamente para: ${exercise.name} (${exercise.id}). Tentativa: ${retryCount + 1}`);
+      setImageError(false);
+      setImageLoaded(false);
+      setRetryCount(prevCount => prevCount + 1);
+      
+      // Força o recarregamento da imagem atualizando o src com um timestamp
+      if (imageRef.current) {
+        const currentSrc = imageRef.current.src;
+        const newSrc = currentSrc.includes('?') 
+          ? currentSrc.replace(/[?&]t=\d+/, `&t=${Date.now()}`) 
+          : `${currentSrc}?t=${Date.now()}`;
+        imageRef.current.src = newSrc;
+      }
+    }
+  };
+  
   const handleImageError = () => {
-    console.warn(`Failed to load image for exercise: ${exercise.name} (${exercise.id}). URL: ${exercise.gif_url}`);
-    setImageError(true);
-    setImageLoaded(true);
-    setHasAttemptedToLoadImage(true);
+    console.warn(`Falha ao carregar imagem para exercício: ${exercise.name} (${exercise.id}). URL: ${exercise.gif_url}`);
+    
+    if (retryCount < 2) {
+      // Tentar carregar novamente automaticamente após um pequeno delay
+      setTimeout(retryLoadImage, 1000);
+    } else {
+      setImageError(true);
+      setImageLoaded(true);
+      setHasAttemptedToLoadImage(true);
+    }
   };
   
   const handleImageLoad = () => {
-    console.log(`Successfully loaded image for exercise: ${exercise.name} (${exercise.id})`);
+    console.log(`Imagem carregada com sucesso para: ${exercise.name} (${exercise.id})`);
     setImageLoaded(true);
     setHasAttemptedToLoadImage(true);
+    setImageError(false);
   };
   
   // Get the correct image URL, handling null or empty strings
@@ -57,7 +86,12 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
           {/* Exercise GIF/Image */}
           <div className="w-full md:w-1/4 bg-gray-100 dark:bg-gray-800 overflow-hidden flex items-center justify-center h-36 md:h-40 relative">
             {!imageLoaded && !imageError && isLikelyValidUrl && (
-              <Skeleton className="h-36 md:h-40 w-full absolute inset-0" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <Skeleton className="h-36 md:h-40 w-full absolute inset-0" />
+                <span className="text-xs text-muted-foreground z-10 bg-background/80 px-2 py-1 rounded-md">
+                  Carregando...
+                </span>
+              </div>
             )}
             
             {(!isLikelyValidUrl || imageError || (hasAttemptedToLoadImage && !imageLoaded)) && (
@@ -73,11 +107,20 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                 <span className="text-[10px] text-muted-foreground/70 mt-1">
                   {imageError ? 'Imagem não disponível' : 'Sem imagem'}
                 </span>
+                {imageError && retryCount >= 2 && (
+                  <button 
+                    className="text-[10px] text-primary mt-1 hover:underline"
+                    onClick={retryLoadImage}
+                  >
+                    Tentar novamente
+                  </button>
+                )}
               </div>
             )}
             
             {isLikelyValidUrl && (
               <img 
+                ref={imageRef}
                 src={imageUrl} 
                 alt={exercise.name}
                 className={`h-36 md:h-40 object-contain ${imageLoaded && !imageError ? 'block' : 'hidden'}`}

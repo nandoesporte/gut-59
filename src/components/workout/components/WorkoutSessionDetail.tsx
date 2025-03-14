@@ -1,4 +1,3 @@
-
 import { AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { WorkoutSession } from "../types/workout-plan";
@@ -81,14 +80,14 @@ export const WorkoutSessionDetail = ({ session, getDayName }: WorkoutSessionDeta
             {/* Display exercises grouped by muscle group */}
             <div className="space-y-6">
               {muscleGroups.map((muscleGroup) => (
-                <div key={muscleGroup} className="space-y-4">
+                <div key={`mg-${session.day_number}-${muscleGroup}`} className="space-y-4">
                   <h5 className="font-medium text-sm text-gray-700 uppercase border-b pb-1">
                     {muscleGroup.charAt(0).toUpperCase() + muscleGroup.slice(1)}
                   </h5>
                   <div className="space-y-4 pl-2">
                     {exercisesByMuscleGroup[muscleGroup].map((exerciseSession, index) => {
                       // Create a truly unique key using multiple identifiers
-                      const uniqueKey = `${session.day_number}-${muscleGroup}-${index}-${exerciseSession.id || 'unknown'}-${exerciseSession.exercise.id || 'no-id'}`;
+                      const uniqueKey = `ex-${session.day_number}-${muscleGroup}-${index}-${exerciseSession.id || 'unknown'}-${exerciseSession.exercise.id || 'no-id'}-${Date.now()}`;
                       
                       return (
                         <WorkoutExerciseDetail 
