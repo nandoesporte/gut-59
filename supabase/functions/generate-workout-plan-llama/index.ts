@@ -270,14 +270,15 @@ serve(async (req) => {
     console.log(`Request ID: ${requestId} - Selected ${selectedExercises.length} exercises for the workout plan`);
     
     // Create a simplified list of exercises for the LLM
+    // Include only the necessary fields and make sure to include the name field
     const exercisesForLLM = selectedExercises.map(e => ({
       id: e.id,
-      name: e.name,
+      name: e.name, // Make sure the name is always included
       muscle_group: e.muscle_group,
       exercise_type: e.exercise_type,
       difficulty: e.difficulty,
       description: e.description,
-      gif_url: e.gif_url
+      gif_url: e.gif_url ? `${e.gif_url}?t=${Date.now()}` : null // Add timestamp to avoid caching issues
     }));
     
     // Create system prompt
@@ -295,7 +296,8 @@ CRITICAL RULES:
 2. NO EXERCISE can appear in multiple days
 3. You MUST use the exact GIF URLs provided with each exercise - do not substitute or create new ones
 4. Each workout day should have a unique name/focus (like "Upper Body", "Lower Body", "Push", "Pull", etc.)
-5. The workout plan should follow proper exercise science principles`;
+5. The workout plan should follow proper exercise science principles
+6. ALWAYS use the exact name field provided for each exercise`;
 
     // Create user prompt with preferences
     const userPrompt = `Create a personalized workout plan for someone with the following characteristics:
@@ -318,6 +320,7 @@ MOST IMPORTANT RULES:
 - Verify that NO EXERCISES ARE REPEATED between different days before finalizing the plan
 - Double check the IDs to make sure no ID appears more than once in your entire response
 - Each workout day should have a clear FOCUS or THEME (like "Upper Body", "Lower Body", "Push Day", etc.)
+- ALWAYS use the exact name field for the exercise that is provided
 
 IMPORTANT WORKOUT STRUCTURE RULES: 
 - You MUST use exercises from the following list (use the exact name and ID)
@@ -327,6 +330,7 @@ IMPORTANT WORKOUT STRUCTURE RULES:
 - Follow a scientifically-backed training split (Push/Pull/Legs or similar approach)
 - Organize exercises in each session based on optimal training order (compound movements first)
 - MAKE SURE TO USE THE EXACT GIF URL PROVIDED WITH EACH EXERCISE
+- ALWAYS refer to exercises by the exact name that is provided in the exercise list
 
 Here are the exercises you can use:
 ${exercisesForLLM.map(e => 
@@ -379,6 +383,7 @@ Ensure:
 - NO DUPLICATE EXERCISES across different workout days - EVERY exercise should be used exactly ONCE in the entire plan
 - The plan follows proper exercise science for progression and recovery
 - You use ONLY exercises from the provided list (with correct IDs and GIF URLs)
+- You ALWAYS use the exact name that is provided in the list for each exercise
 - The JSON structure exactly matches the format provided above
 - YOUR ENTIRE RESPONSE MUST BE VALID JSON - NO TEXT BEFORE OR AFTER THE JSON
 - VERIFY THAT NO EXERCISE ID APPEARS MORE THAN ONCE IN THE ENTIRE PLAN BEFORE RETURNING THE RESULT`;
@@ -488,8 +493,21 @@ Ensure:
                 // Make sure the exercise exists in our database
                 const matchingExercise = selectedExercises.find(e => e.id === exerciseId);
                 if (matchingExercise) {
-                  // Update the GIF URL to ensure it uses the correct one from the database
-                  ex.exercise.gif_url = matchingExercise.gif_url;
+                  // Update the exercise name to exactly match the database
+                  ex.exercise.name = matchingExercise.name;
+                  
+                  // Update the GIF URL to ensure it uses the correct one from the database with timestamp
+                  const timestamp = Date.now();
+                  const gifUrl = matchingExercise.gif_url;
+                  if (gifUrl) {
+                    if (gifUrl.includes('?')) {
+                      ex.exercise.gif_url = `${gifUrl}&t=${timestamp}`;
+                    } else {
+                      ex.exercise.gif_url = `${gifUrl}?t=${timestamp}`;
+                    }
+                  } else {
+                    ex.exercise.gif_url = null;
+                  }
                 } else {
                   console.warn(`Unknown exercise ID: ${exerciseId}. This might be AI hallucination.`);
                 }
@@ -509,11 +527,24 @@ Ensure:
                   
                   if (unusedExercise) {
                     console.log(`Replacing duplicate exercise with ${unusedExercise.name} (${unusedExercise.id})`);
+                    
+                    // Add timestamp to the GIF URL
+                    const timestamp = Date.now();
+                    let updatedGifUrl = unusedExercise.gif_url;
+                    if (updatedGifUrl) {
+                      if (updatedGifUrl.includes('?')) {
+                        updatedGifUrl = `${updatedGifUrl}&t=${timestamp}`;
+                      } else {
+                        updatedGifUrl = `${updatedGifUrl}?t=${timestamp}`;
+                      }
+                    }
+                    
                     ex.exercise.id = unusedExercise.id;
                     ex.exercise.name = unusedExercise.name;
                     ex.exercise.description = unusedExercise.description;
                     ex.exercise.muscle_group = unusedExercise.muscle_group;
-                    ex.exercise.gif_url = unusedExercise.gif_url;
+                    ex.exercise.gif_url = updatedGifUrl;
+                    
                     // Now record this replacement
                     usedExerciseIds.set(unusedExercise.id, {
                       dayNumber: session.day_number,
@@ -565,13 +596,25 @@ Ensure:
                 const unusedForGroup = unusedExercises.filter(e => e.muscle_group === group);
                 if (unusedForGroup.length > 0) {
                   const exercise = unusedForGroup[0];
+                  
+                  // Add timestamp to the GIF URL
+                  const timestamp = Date.now();
+                  let updatedGifUrl = exercise.gif_url;
+                  if (updatedGifUrl) {
+                    if (updatedGifUrl.includes('?')) {
+                      updatedGifUrl = `${updatedGifUrl}&t=${timestamp}`;
+                    } else {
+                      updatedGifUrl = `${updatedGifUrl}?t=${timestamp}`;
+                    }
+                  }
+                  
                   session.session_exercises.push({
                     exercise: {
                       id: exercise.id,
                       name: exercise.name,
                       description: exercise.description,
                       muscle_group: exercise.muscle_group,
-                      gif_url: exercise.gif_url
+                      gif_url: updatedGifUrl
                     },
                     sets: 3,
                     reps: 12,
@@ -599,13 +642,24 @@ Ensure:
                 const exercise = unusedExercises.shift();
                 if (!exercise) break;
                 
+                // Add timestamp to the GIF URL
+                const timestamp = Date.now();
+                let updatedGifUrl = exercise.gif_url;
+                if (updatedGifUrl) {
+                  if (updatedGifUrl.includes('?')) {
+                    updatedGifUrl = `${updatedGifUrl}&t=${timestamp}`;
+                  } else {
+                    updatedGifUrl = `${updatedGifUrl}?t=${timestamp}`;
+                  }
+                }
+                
                 session.session_exercises.push({
                   exercise: {
                     id: exercise.id,
                     name: exercise.name,
                     description: exercise.description,
                     muscle_group: exercise.muscle_group,
-                    gif_url: exercise.gif_url
+                    gif_url: updatedGifUrl
                   },
                   sets: 3,
                   reps: 12,
