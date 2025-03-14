@@ -193,15 +193,15 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
           {/* Exercise Details */}
           <div className="flex-1 p-3 md:p-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-2">
-              <h4 className="font-medium text-md">{exercise.name}</h4>
+              <h4 className="font-medium text-lg md:text-md">{exercise.name}</h4>
               <div className="flex flex-wrap gap-1.5 md:gap-2">
                 {exercise.muscle_group && (
-                  <Badge variant="outline" className="bg-muted/50 text-xs">
+                  <Badge variant="outline" className="bg-muted/50 text-sm">
                     {exercise.muscle_group.charAt(0).toUpperCase() + exercise.muscle_group.slice(1)}
                   </Badge>
                 )}
                 {exercise.exercise_type && (
-                  <Badge variant="outline" className="bg-primary/10 text-primary text-xs">
+                  <Badge variant="outline" className="bg-primary/10 text-primary text-sm">
                     {exercise.exercise_type === 'strength' ? 'Força' : 
                      exercise.exercise_type === 'cardio' ? 'Cardio' : 
                      exercise.exercise_type === 'mobility' ? 'Mobilidade' : 
@@ -213,7 +213,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
             
             {showDetails && (
               <>
-                <div className="flex flex-wrap gap-2 md:gap-3 my-2 text-xs">
+                <div className="flex flex-wrap gap-2 md:gap-3 my-2 text-sm">
                   <span className="bg-muted px-2 py-1 rounded-md">
                     {exerciseSession.sets} séries
                   </span>
@@ -227,12 +227,12 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                 
                 {exercise.description && (
                   <div className="mt-2">
-                    <p className={`text-xs text-muted-foreground ${!expandDescription && 'line-clamp-2'}`}>
+                    <p className={`text-sm text-muted-foreground ${!expandDescription && 'line-clamp-2'}`}>
                       {exercise.description}
                     </p>
                     {exercise.description.length > 120 && (
                       <button 
-                        className="text-xs text-primary mt-1" 
+                        className="text-sm text-primary mt-1 hover:underline" 
                         onClick={() => setExpandDescription(!expandDescription)}
                       >
                         {expandDescription ? 'Mostrar menos' : 'Mostrar mais'}

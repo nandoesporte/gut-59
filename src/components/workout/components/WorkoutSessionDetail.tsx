@@ -1,3 +1,4 @@
+
 import { AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { WorkoutSession } from "../types/workout-plan";
@@ -53,11 +54,11 @@ export const WorkoutSessionDetail = ({ session, getDayName }: WorkoutSessionDeta
     <AccordionItem key={session.day_number} value={`day-${session.day_number}`}>
       <AccordionTrigger className="bg-white rounded-t-lg shadow px-4 hover:no-underline hover:bg-gray-50">
         <div className="flex items-center gap-3 text-left">
-          <span className="font-semibold">
+          <span className="font-semibold text-base md:text-lg">
             {session.day_name || getDayName(session.day_number)}
           </span>
           {session.focus && (
-            <Badge variant="outline" className="bg-primary/5">
+            <Badge variant="outline" className="bg-primary/5 text-sm">
               {session.focus}
             </Badge>
           )}
@@ -67,13 +68,13 @@ export const WorkoutSessionDetail = ({ session, getDayName }: WorkoutSessionDeta
         <div className="space-y-6">
           {/* Warmup */}
           <div className="border-l-4 border-blue-400 pl-4 py-1">
-            <h4 className="font-medium text-blue-800">Aquecimento</h4>
-            <p className="mt-1 text-gray-700">{session.warmup_description}</p>
+            <h4 className="font-medium text-blue-800 text-base md:text-lg">Aquecimento</h4>
+            <p className="mt-1 text-gray-700 text-sm md:text-base">{session.warmup_description}</p>
           </div>
           
           {/* Exercises by Muscle Group */}
           <div>
-            <h4 className="font-medium text-primary mb-3">
+            <h4 className="font-medium text-primary mb-3 text-base md:text-lg">
               Exercícios ({uniqueExercises.length})
             </h4>
             
@@ -81,7 +82,7 @@ export const WorkoutSessionDetail = ({ session, getDayName }: WorkoutSessionDeta
             <div className="space-y-6">
               {muscleGroups.map((muscleGroup) => (
                 <div key={`mg-${session.day_number}-${muscleGroup}`} className="space-y-4">
-                  <h5 className="font-medium text-sm text-gray-700 uppercase border-b pb-1">
+                  <h5 className="font-medium text-sm md:text-base text-gray-700 uppercase border-b pb-1">
                     {muscleGroup.charAt(0).toUpperCase() + muscleGroup.slice(1)}
                   </h5>
                   <div className="space-y-4 pl-2">
@@ -107,8 +108,8 @@ export const WorkoutSessionDetail = ({ session, getDayName }: WorkoutSessionDeta
           
           {/* Cooldown */}
           <div className="border-l-4 border-green-400 pl-4 py-1">
-            <h4 className="font-medium text-green-800">Volta à Calma</h4>
-            <p className="mt-1 text-gray-700">{session.cooldown_description}</p>
+            <h4 className="font-medium text-green-800 text-base md:text-lg">Volta à Calma</h4>
+            <p className="mt-1 text-gray-700 text-sm md:text-base">{session.cooldown_description}</p>
           </div>
         </div>
       </AccordionContent>
