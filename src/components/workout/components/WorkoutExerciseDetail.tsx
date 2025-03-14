@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatImageUrl } from '@/utils/imageUtils';
 import { Skeleton } from "@/components/ui/skeleton";
-import { ExternalLink, Dumbbell, ImageOff, AlertCircle, RefreshCw, Maximize } from 'lucide-react';
+import { Dumbbell, ImageOff, AlertCircle, RefreshCw, Maximize } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -22,7 +22,6 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
   const [retryCount, setRetryCount] = useState(0);
   const [hasAttemptedToLoadImage, setHasAttemptedToLoadImage] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
-  const [showLargeImage, setShowLargeImage] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
   const isMobile = useIsMobile();
   
@@ -162,7 +161,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                   <DialogTrigger asChild>
                     <button 
                       className={`absolute top-1 right-1 p-1 bg-black/50 rounded-full text-white z-20 ${imageLoaded && !imageError ? 'block' : 'hidden'}`}
-                      onClick={() => setShowLargeImage(true)}
+                      onClick={() => {}}
                     >
                       <Maximize className="h-3.5 w-3.5" />
                     </button>
@@ -233,11 +232,10 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                     </p>
                     {exercise.description.length > 120 && (
                       <button 
-                        className="text-xs text-primary mt-1 flex items-center" 
+                        className="text-xs text-primary mt-1" 
                         onClick={() => setExpandDescription(!expandDescription)}
                       >
                         {expandDescription ? 'Mostrar menos' : 'Mostrar mais'}
-                        <ExternalLink className="ml-1 h-3 w-3" />
                       </button>
                     )}
                   </div>
@@ -250,4 +248,3 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     </Card>
   );
 };
-
