@@ -4,8 +4,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatImageUrl } from '@/utils/imageUtils';
 import { Skeleton } from "@/components/ui/skeleton";
-import { ExternalLink, Dumbbell, ImageOff, AlertCircle, RefreshCw } from 'lucide-react';
+import { ExternalLink, Dumbbell, ImageOff, AlertCircle, RefreshCw, Maximize } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface WorkoutExerciseDetailProps {
   exerciseSession: any;
@@ -20,7 +22,9 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
   const [retryCount, setRetryCount] = useState(0);
   const [hasAttemptedToLoadImage, setHasAttemptedToLoadImage] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
+  const [showLargeImage, setShowLargeImage] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
+  const isMobile = useIsMobile();
   
   if (!exercise) return null;
 
@@ -115,10 +119,10 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
       <CardContent className="p-0">
         <div className="flex flex-col md:flex-row gap-3">
           {/* Exercise GIF/Image */}
-          <div className="w-full md:w-1/4 bg-gray-100 dark:bg-gray-800 overflow-hidden flex items-center justify-center h-36 md:h-40 relative">
+          <div className="w-full md:w-1/3 bg-gray-100 dark:bg-gray-800 overflow-hidden flex items-center justify-center h-48 md:h-44 relative">
             {(!imageLoaded || isRetrying) && !imageError && isLikelyValidUrl && (
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <Skeleton className="h-36 md:h-40 w-full absolute inset-0" />
+                <Skeleton className="h-48 md:h-44 w-full absolute inset-0" />
                 <span className="text-xs text-muted-foreground z-10 bg-background/80 px-2 py-1 rounded-md flex items-center gap-1">
                   {isRetrying && <RefreshCw className="h-3 w-3 animate-spin" />}
                   {isRetrying ? 'Tentando novamente...' : 'Carregando...'}
@@ -153,15 +157,37 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
             )}
             
             {isLikelyValidUrl && (
-              <img 
-                ref={imageRef}
-                src={imageUrl} 
-                alt={exercise.name}
-                className={`h-36 md:h-40 object-contain ${imageLoaded && !imageError ? 'block' : 'hidden'}`}
-                onLoad={handleImageLoad}
-                onError={handleImageError}
-                loading="lazy"
-              />
+              <>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <button 
+                      className={`absolute top-1 right-1 p-1 bg-black/50 rounded-full text-white z-20 ${imageLoaded && !imageError ? 'block' : 'hidden'}`}
+                      onClick={() => setShowLargeImage(true)}
+                    >
+                      <Maximize className="h-3.5 w-3.5" />
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-lg max-h-[90vh] flex items-center justify-center p-1 md:p-2">
+                    <div className="w-full h-full flex items-center justify-center overflow-hidden">
+                      <img 
+                        src={imageUrl} 
+                        alt={exercise.name}
+                        className="max-h-[80vh] max-w-full object-contain"
+                      />
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
+                <img 
+                  ref={imageRef}
+                  src={imageUrl} 
+                  alt={exercise.name}
+                  className={`h-48 md:h-44 object-contain ${imageLoaded && !imageError ? 'block' : 'hidden'}`}
+                  onLoad={handleImageLoad}
+                  onError={handleImageError}
+                  loading="lazy"
+                />
+              </>
             )}
           </div>
           
@@ -224,3 +250,4 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     </Card>
   );
 };
+

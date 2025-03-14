@@ -19,6 +19,9 @@ export default {
       },
     },
     extend: {
+      fontSize: {
+        'xxs': '0.65rem', // Extra small text for mobile
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
