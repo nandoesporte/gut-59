@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatImageUrl } from '@/utils/imageUtils';
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dumbbell, ImageOff, AlertCircle, RefreshCw, Maximize } from 'lucide-react';
+import { Dumbbell, AlertCircle, RefreshCw, Maximize } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -34,49 +34,47 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     setHasAttemptedToLoadImage(false);
     setRetryCount(0);
     setIsRetrying(false);
-  }, [exercise.id]);
+    
+    // Tentar carregar a imagem quando o componente for montado
+    const imageUrl = formatImageUrl(exercise.gif_url);
+    console.log(`Tentando carregar imagem para exercício: ${exercise.name} (${exercise.id}), URL: ${imageUrl}`);
+  }, [exercise.id, exercise.gif_url, exercise.name]);
   
   // Função para tentar carregar novamente a imagem (até 3 tentativas)
   const retryLoadImage = async () => {
-    if (retryCount < 3) {
-      setIsRetrying(true);
-      console.log(`Tentando carregar imagem novamente para: ${exercise.name} (${exercise.id}). Tentativa: ${retryCount + 1}`);
-      setImageError(false);
-      setImageLoaded(false);
-      setRetryCount(prevCount => prevCount + 1);
-      
-      // Se a URL vier da Supabase Storage, tente buscar do banco de dados novamente
-      if (exercise.gif_url?.includes('supabase.co/storage')) {
-        try {
-          const { data, error } = await supabase
-            .from('exercises')
-            .select('gif_url')
-            .eq('id', exercise.id)
-            .single();
-            
-          if (!error && data && data.gif_url) {
-            const newGifUrl = formatImageUrl(data.gif_url);
-            if (imageRef.current) {
-              imageRef.current.src = newGifUrl + `?t=${Date.now()}`;
-            }
-          }
-        } catch (error) {
-          console.error('Erro ao buscar URL atualizada:', error);
-        }
-      } else {
-        // Força o recarregamento da imagem atualizando o src com um timestamp
+    if (retryCount >= 3) return;
+    
+    setIsRetrying(true);
+    console.log(`Tentando carregar imagem novamente para: ${exercise.name} (${exercise.id}). Tentativa: ${retryCount + 1}`);
+    setImageError(false);
+    setImageLoaded(false);
+    setRetryCount(prevCount => prevCount + 1);
+    
+    // Buscar a URL mais recente do banco de dados
+    try {
+      const { data, error } = await supabase
+        .from('exercises')
+        .select('gif_url')
+        .eq('id', exercise.id)
+        .single();
+        
+      if (!error && data && data.gif_url) {
+        const newGifUrl = formatImageUrl(data.gif_url + `?t=${Date.now()}`);
+        console.log(`Nova URL obtida: ${newGifUrl}`);
         if (imageRef.current) {
-          const currentSrc = imageRef.current.src;
-          const newSrc = currentSrc.includes('?') 
-            ? currentSrc.replace(/[?&]t=\d+/, `&t=${Date.now()}`) 
-            : `${currentSrc}?t=${Date.now()}`;
-          imageRef.current.src = newSrc;
+          imageRef.current.src = newGifUrl;
         }
+      } else if (error) {
+        console.error('Erro ao buscar URL atualizada:', error);
       }
-      
+    } catch (error) {
+      console.error('Erro ao buscar URL atualizada:', error);
+    } finally {
       // Definir um timeout para limpar o estado de retry se a imagem não carregar
       setTimeout(() => {
-        setIsRetrying(false);
+        if (isRetrying) {
+          setIsRetrying(false);
+        }
       }, 5000);
     }
   };
@@ -104,14 +102,16 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
   };
   
   // Get the correct image URL, handling null or empty strings
-  const rawImageUrl = exercise.gif_url || '';
-  const imageUrl = formatImageUrl(rawImageUrl);
+  const imageUrl = formatImageUrl(exercise.gif_url);
   
   // Check if URL is likely valid (not just a placeholder)
   const isLikelyValidUrl = imageUrl && 
                           !imageUrl.includes('placeholder') && 
                           !imageUrl.includes('example.') &&
                           imageUrl.trim().length > 10;
+  
+  // Adicionar log para depuração
+  console.log(`Renderizando exercício: ${exercise.name}, URL: ${imageUrl}, É válida: ${isLikelyValidUrl}`);
   
   return (
     <Card className="overflow-hidden border-none shadow-sm hover:shadow-md transition-shadow duration-200">
@@ -136,19 +136,19 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                 ) : (
                   <Dumbbell className="h-8 w-8 mb-2 text-primary/40" />
                 )}
-                <p className="text-xs text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                   {exercise.name}
                 </p>
-                <span className="text-[10px] text-muted-foreground/70 mt-1">
+                <span className="text-xs text-muted-foreground/70 mt-1">
                   {imageError ? 'Imagem não disponível' : 'Sem imagem'}
                 </span>
                 {imageError && !isRetrying && (
                   <button 
-                    className="text-[10px] text-primary mt-1 hover:underline flex items-center gap-1"
+                    className="text-xs text-primary mt-1 hover:underline flex items-center gap-1"
                     onClick={retryLoadImage}
                     disabled={isRetrying}
                   >
-                    <RefreshCw className="h-2 w-2" />
+                    <RefreshCw className="h-3 w-3" />
                     Tentar novamente
                   </button>
                 )}
@@ -169,7 +169,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                   <DialogContent className="sm:max-w-lg max-h-[90vh] flex items-center justify-center p-1 md:p-2">
                     <div className="w-full h-full flex items-center justify-center overflow-hidden">
                       <img 
-                        src={imageUrl} 
+                        src={`${imageUrl}?t=${Date.now()}`}
                         alt={exercise.name}
                         className="max-h-[80vh] max-w-full object-contain"
                       />
@@ -179,7 +179,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
 
                 <img 
                   ref={imageRef}
-                  src={imageUrl} 
+                  src={`${imageUrl}?t=${Date.now()}`}
                   alt={exercise.name}
                   className={`h-48 md:h-44 object-contain ${imageLoaded && !imageError ? 'block' : 'hidden'}`}
                   onLoad={handleImageLoad}
@@ -193,7 +193,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
           {/* Exercise Details */}
           <div className="flex-1 p-3 md:p-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-2">
-              <h4 className="font-medium text-lg md:text-md">{exercise.name}</h4>
+              <h4 className="font-medium text-lg md:text-lg">{exercise.name}</h4>
               <div className="flex flex-wrap gap-1.5 md:gap-2">
                 {exercise.muscle_group && (
                   <Badge variant="outline" className="bg-muted/50 text-sm">

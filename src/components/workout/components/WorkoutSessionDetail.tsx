@@ -20,7 +20,10 @@ export const WorkoutSessionDetail = ({ session, getDayName }: WorkoutSessionDeta
     // First pass to collect only unique exercises by ID
     return session.session_exercises.filter(ex => {
       // Skip if exercise or exercise.id is undefined
-      if (!ex.exercise || !ex.exercise.id) return false;
+      if (!ex.exercise || !ex.exercise.id) {
+        console.log('Exercício inválido encontrado', ex);
+        return false;
+      }
       
       const exerciseId = ex.exercise.id;
       
@@ -36,6 +39,7 @@ export const WorkoutSessionDetail = ({ session, getDayName }: WorkoutSessionDeta
   };
 
   const uniqueExercises = getUniqueExercises();
+  console.log(`Sessão ${session.day_number}: ${uniqueExercises.length} exercícios únicos encontrados`);
   
   // Group exercises by muscle group
   const exercisesByMuscleGroup: Record<string, any[]> = {};

@@ -18,6 +18,7 @@ export const formatImageUrl = (url: string | null | undefined): string => {
 
   // Se a URL estiver vazia após a remoção de espaços, retorne o placeholder
   if (!cleanUrl) {
+    console.log("URL vazia, usando placeholder");
     return '/placeholder.svg';
   }
 
@@ -31,10 +32,11 @@ export const formatImageUrl = (url: string | null | undefined): string => {
       cleanUrl.length < 10 ||
       /^[0-9a-f]{32}$/.test(cleanUrl) || // Provavelmente um hash MD5 ou similar sem extensão
       cleanUrl.includes('.gif.gif')) {  // Extensões duplicadas
+    console.log(`URL inválida detectada: ${cleanUrl}`);
     return '/placeholder.svg';
   }
 
-  // Se a URL já é uma URL HTTP(S) válida, retorne-a como está
+  // Se a URL já é uma URL HTTP(S) válida
   if (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://')) {
     // Mas verifique se é uma URL de placeholder
     if (cleanUrl.includes('example.com') || cleanUrl.includes('example.org')) {
@@ -43,9 +45,9 @@ export const formatImageUrl = (url: string | null | undefined): string => {
     
     // Adicionar timestamp para evitar cache em URLs do Supabase Storage
     if (cleanUrl.includes('supabase.co/storage/v1/object/public')) {
-      // Adiciona um timestamp como parâmetro de consulta para forçar reload da imagem
-      const separator = cleanUrl.includes('?') ? '&' : '?';
-      return `${cleanUrl}${separator}t=${Date.now()}`;
+      // Não adicione timestamp aqui, será adicionado quando a imagem for renderizada
+      console.log(`URL Supabase detectada: ${cleanUrl}`);
+      return cleanUrl;
     }
     
     return cleanUrl;
@@ -53,8 +55,8 @@ export const formatImageUrl = (url: string | null | undefined): string => {
 
   // Lidar com URLs que começam com "storage/v1/" mas não incluem o domínio supabase
   if (cleanUrl.startsWith('storage/v1/')) {
-    // Adicionar timestamp como parâmetro de consulta para evitar cache
-    return `${SUPABASE_URL}/${cleanUrl}?t=${Date.now()}`;
+    console.log(`Adicionando prefixo Supabase à URL: ${cleanUrl}`);
+    return `${SUPABASE_URL}/${cleanUrl}`;
   }
 
   // Para URLs relativas começando com "/"
@@ -68,9 +70,11 @@ export const formatImageUrl = (url: string | null | undefined): string => {
 
   // Para outras URLs, assuma que podem ser do armazenamento Supabase
   // e adicione o URL do Supabase se parecerem com caminhos de armazenamento parcial
-  if (cleanUrl.includes('batch/') || cleanUrl.includes('exercise-gifs/')) {
-    // Adicionar timestamp como parâmetro de consulta para evitar cache
-    return `${SUPABASE_URL}/storage/v1/object/public/${cleanUrl}?t=${Date.now()}`;
+  if (cleanUrl.includes('batch/') || 
+      cleanUrl.includes('exercise-gifs/') || 
+      cleanUrl.includes('exercises/')) {
+    console.log(`Adicionando prefixo Supabase para caminho de armazenamento: ${cleanUrl}`);
+    return `${SUPABASE_URL}/storage/v1/object/public/${cleanUrl}`;
   }
 
   // Se a URL não tiver uma extensão que indique uma imagem, verifique mais detalhadamente
@@ -78,19 +82,23 @@ export const formatImageUrl = (url: string | null | undefined): string => {
   if (!hasImageExtension) {
     // Verifique se pode ser uma URL de armazenamento Supabase sem extensão
     if (cleanUrl.includes('storage') || cleanUrl.includes('object/public')) {
-      // Adicionar parâmetro de tempo para evitar cache
-      const separator = cleanUrl.includes('?') ? '&' : '?';
-      return `${cleanUrl}${separator}t=${Date.now()}`;
+      console.log(`URL de armazenamento sem extensão: ${cleanUrl}`);
+      return cleanUrl;
     }
     
     // Tente identificar URLs que podem precisar de https:// prefixado
     if (cleanUrl.includes('supabase.co') && !cleanUrl.startsWith('http')) {
-      return `https://${cleanUrl}?t=${Date.now()}`;
+      console.log(`Adicionando https:// à URL: ${cleanUrl}`);
+      return `https://${cleanUrl}`;
     }
     
+    console.log(`URL sem extensão de imagem: ${cleanUrl}`);
     return '/placeholder.svg';
   }
 
+  // Log para depuração
+  console.log(`URL não modificada: ${cleanUrl}`);
+  
   // Retorne como está para qualquer outro caso
   return cleanUrl;
 };
