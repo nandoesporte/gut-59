@@ -1,23 +1,15 @@
 
-import { type Config } from "tailwindcss";
-import tailwindAnimate from "tailwindcss-animate";
+import type { Config } from "tailwindcss";
 
-const config: Config = {
+export default {
   darkMode: ["class"],
   content: [
-    './pages/**/*.{ts,tsx}',
-    './components/**/*.{ts,tsx}',
-    './app/**/*.{ts,tsx}',
-    './src/**/*.{ts,tsx}',
-	],
-  safelist: [
-    'animate-pulse',
-    'scale-0',
-    'scale-100',
-    'transition-transform',
-    'duration-300',
-    'transform',
+    "./pages/**/*.{ts,tsx}",
+    "./components/**/*.{ts,tsx}",
+    "./app/**/*.{ts,tsx}",
+    "./src/**/*.{ts,tsx}",
   ],
+  prefix: "",
   theme: {
     container: {
       center: true,
@@ -27,9 +19,6 @@ const config: Config = {
       },
     },
     extend: {
-      fontSize: {
-        '2xs': '0.625rem', // Tamanho menor que xs para dispositivos móveis
-      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -37,23 +26,32 @@ const config: Config = {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
-          "50": "#f0fdfa",
-          "100": "#ccfbf1",
-          "200": "#99f6e4",
-          "300": "#5eead4",
-          "400": "#2dd4bf",
-          "500": "#14b8a6",
-          "600": "#0d9488",
-          "700": "#0f766e",
-          "800": "#115e59",
-          "900": "#134e4a",
-          "950": "#042f2e",
+          DEFAULT: "#0FA0CE",
+          foreground: "#FFFFFF",
+          50: "#E6F8FC",
+          100: "#CCF1F9",
+          200: "#99E3F3",
+          300: "#66D5ED",
+          400: "#33C7E7",
+          500: "#0FA0CE",
+          600: "#0B7A9D",
+          700: "#08536C",
+          800: "#042D3B",
+          900: "#00060A",
         },
         secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
+          DEFAULT: "#221F26",
+          foreground: "#FFFFFF",
+          50: "#E6E5E7",
+          100: "#CDCCCF",
+          200: "#9B989F",
+          300: "#69656F",
+          400: "#37323F",
+          500: "#221F26",
+          600: "#1A181D",
+          700: "#121114",
+          800: "#0A090B",
+          900: "#020202",
         },
         destructive: {
           DEFAULT: "hsl(var(--destructive))",
@@ -91,18 +89,16 @@ const config: Config = {
           to: { height: "0" },
         },
         fadeIn: {
-          from: { opacity: "0", transform: "translateY(10px)" },
-          to: { opacity: "1", transform: "translateY(0)" },
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "fadeIn": "fadeIn 0.5s ease-out forwards",
+        fadeIn: "fadeIn 0.5s ease-out",
       },
     },
   },
-  plugins: [tailwindAnimate],
-};
-
-export default config;
+  plugins: [require("tailwindcss-animate")],
+} satisfies Config;

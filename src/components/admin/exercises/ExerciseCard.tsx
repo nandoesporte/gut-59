@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, Dumbbell } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { formatImageUrl } from "@/utils/imageUtils";
@@ -23,19 +23,21 @@ export const ExerciseCard = ({ exercise, onUpdate }: ExerciseCardProps) => {
     
     if (exercise.gif_url) {
       const url = formatImageUrl(exercise.gif_url);
+      console.log(`Exercise ${exercise.id} (${exercise.name}) - Formatted URL: ${url}`);
       setImgSrc(url);
     } else {
       setImgSrc("/placeholder.svg");
       setIsLoading(false);
     }
-  }, [exercise.gif_url]);
+  }, [exercise.gif_url, exercise.id, exercise.name]);
 
   const handleImageLoad = () => {
+    console.log(`Successfully loaded image for ${exercise.name}`);
     setIsLoading(false);
   };
 
   const handleImageError = () => {
-    console.error("Error loading GIF:", exercise.gif_url);
+    console.error(`Error loading GIF for ${exercise.name}:`, exercise.gif_url);
     setImgError(true);
     setImgSrc("/placeholder.svg");
     setIsLoading(false);
@@ -84,11 +86,10 @@ export const ExerciseCard = ({ exercise, onUpdate }: ExerciseCardProps) => {
           )}
           {imgError ? (
             <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center bg-gray-100 rounded-md">
-              <div className="text-gray-400 text-xs text-center p-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 mx-auto mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                Imagem não disponível
+              <div className="text-gray-400 text-center p-2">
+                <Dumbbell className="h-10 w-10 mx-auto mb-1" />
+                <p className="text-xs">{exercise.name}</p>
+                <p className="text-xs mt-1">Imagem não disponível</p>
               </div>
             </div>
           ) : (

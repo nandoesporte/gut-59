@@ -1,12 +1,16 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Dumbbell, RotateCcw, RefreshCw } from "lucide-react";
+import { Dumbbell, RotateCcw, RefreshCw, Trash2 } from "lucide-react";
 import { WorkoutPreferences } from "./types";
 import { WorkoutLoadingState } from "./components/WorkoutLoadingState";
 import { useWorkoutPlanGeneration } from "./hooks/useWorkoutPlanGeneration";
 import { CurrentWorkoutPlan } from "./components/CurrentWorkoutPlan";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { DeleteWorkoutDialog } from "./components/DeleteWorkoutDialog";
+import { useState } from "react";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface WorkoutPlanDisplayProps {
   preferences: WorkoutPreferences;
@@ -31,6 +35,41 @@ export const WorkoutPlanDisplay = ({
   } = useWorkoutPlanGeneration(preferences, onPlanGenerated);
   
   const isMobile = useIsMobile();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isDeletingPlan, setIsDeletingPlan] = useState(false);
+
+  const handleGenerateNewPlan = () => {
+    generatePlan();
+  };
+
+  const handleDeletePlan = async () => {
+    if (!workoutPlan?.id) return;
+    
+    try {
+      setIsDeletingPlan(true);
+      
+      const { error } = await supabase
+        .from('workout_plans')
+        .delete()
+        .eq('id', workoutPlan.id);
+
+      if (error) {
+        console.error('Error deleting workout plan:', error);
+        toast.error('Erro ao excluir plano de treino');
+        return;
+      }
+
+      toast.success('Plano de treino excluído com sucesso');
+      onReset();
+      if (onPlanGenerated) onPlanGenerated();
+    } catch (error) {
+      console.error('Error in deletion process:', error);
+      toast.error('Erro ao excluir plano de treino');
+    } finally {
+      setIsDeletingPlan(false);
+      setDeleteDialogOpen(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -82,7 +121,7 @@ export const WorkoutPlanDisplay = ({
           O plano de treino ainda não está pronto. Aguarde enquanto ele é preparado ou tente novamente.
         </p>
         <div className="flex flex-col sm:flex-row justify-center gap-2 mt-4 sm:mt-6">
-          <Button onClick={generatePlan} className="w-full sm:w-auto text-sm">
+          <Button onClick={handleGenerateNewPlan} className="w-full sm:w-auto text-sm">
             Gerar Plano
           </Button>
           <Button onClick={onReset} variant="outline" className="w-full sm:w-auto text-sm">
@@ -100,7 +139,7 @@ export const WorkoutPlanDisplay = ({
       
       <div className={`flex ${isMobile ? 'flex-col' : 'justify-center'} gap-2 sm:gap-3 mt-4 sm:mt-6`}>
         <Button 
-          onClick={generatePlan} 
+          onClick={handleGenerateNewPlan} 
           variant="default" 
           className="flex items-center gap-1.5 sm:gap-2 text-sm"
           size={isMobile ? "default" : "lg"}
@@ -118,6 +157,16 @@ export const WorkoutPlanDisplay = ({
           <RotateCcw className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           {isMobile ? "Mudar Preferências" : "Alterar Preferências"}
         </Button>
+        
+        <Button 
+          onClick={() => setDeleteDialogOpen(true)} 
+          variant="destructive" 
+          className="flex items-center gap-1.5 sm:gap-2 text-sm"
+          size={isMobile ? "default" : "lg"}
+        >
+          <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          {isMobile ? "Excluir" : "Excluir Plano"}
+        </Button>
       </div>
       
       {planGenerationCount > 1 && (
@@ -126,6 +175,12 @@ export const WorkoutPlanDisplay = ({
           Cada plano contém exercícios diferentes para variar seus treinos.
         </p>
       )}
+      
+      <DeleteWorkoutDialog 
+        isOpen={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onConfirm={handleDeletePlan}
+      />
     </div>
   );
 };
