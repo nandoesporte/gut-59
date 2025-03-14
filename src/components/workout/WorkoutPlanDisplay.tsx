@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Dumbbell, RotateCcw, RefreshCw, Trash2 } from "lucide-react";
@@ -11,6 +10,7 @@ import { DeleteWorkoutDialog } from "./components/DeleteWorkoutDialog";
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { WorkoutError } from "./components/WorkoutError";
 
 interface WorkoutPlanDisplayProps {
   preferences: WorkoutPreferences;
@@ -85,26 +85,10 @@ export const WorkoutPlanDisplay = ({
 
   if (error) {
     return (
-      <div className="text-center p-3 sm:p-8 space-y-3 sm:space-y-4">
-        <div className="inline-flex items-center justify-center p-2 bg-red-100 rounded-full mb-3 sm:mb-4">
-          <Dumbbell className="w-5 h-5 sm:w-6 sm:h-6 text-red-500" />
-        </div>
-        <h3 className="text-lg sm:text-xl font-semibold text-red-600">
-          Erro ao gerar o plano de treino
-        </h3>
-        <p className="text-sm text-muted-foreground max-w-md mx-auto">
-          {error || "Ocorreu um erro durante a geração do plano. Por favor, tente novamente."}
-        </p>
-        <div className="flex flex-col sm:flex-row justify-center gap-2 mt-4 sm:mt-6">
-          <Button onClick={generatePlan} className="w-full sm:w-auto text-sm">
-            Tentar Novamente
-          </Button>
-          <Button onClick={onReset} variant="outline" className="w-full sm:w-auto text-sm">
-            <RotateCcw className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
-            Alterar Preferências
-          </Button>
-        </div>
-      </div>
+      <WorkoutError 
+        onReset={onReset}
+        errorMessage={error}
+      />
     );
   }
 

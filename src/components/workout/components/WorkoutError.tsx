@@ -12,7 +12,9 @@ interface WorkoutErrorProps {
 export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
   const isInitializationError = errorMessage.includes("inicialização") || 
                                errorMessage.includes("booted") || 
-                               errorMessage.includes("função de geração");
+                               errorMessage.includes("função de geração") ||
+                               errorMessage.includes("autenticado") ||
+                               errorMessage.includes("autenticação");
                                
   const isNetworkError = errorMessage.includes("conexão") || 
                          errorMessage.includes("API") || 
@@ -34,16 +36,17 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
 
           <div className="space-y-2">
             <h3 className="text-xl font-semibold">Erro ao Gerar Plano de Treino</h3>
-            <p className="text-muted-foreground">{errorMessage}</p>
+            <p className="text-muted-foreground text-base">{errorMessage}</p>
           </div>
 
           <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 p-4 rounded-md text-sm">
             {isInitializationError ? (
               <div className="space-y-2">
-                <p className="font-medium">Erro de inicialização do serviço</p>
-                <p>Isso geralmente ocorre quando o serviço está sobrecarregado ou em manutenção.</p>
+                <p className="font-medium">Erro de inicialização ou autenticação</p>
+                <p>Isso geralmente ocorre quando você não está autenticado ou o serviço está sobrecarregado.</p>
                 <p>Recomendamos:</p>
                 <ul className="text-left list-disc pl-5 space-y-1">
+                  <li>Verificar se você está logado na plataforma</li>
                   <li>Recarregar a página completa</li>
                   <li>Tentar novamente em alguns minutos</li>
                 </ul>
@@ -57,6 +60,7 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
               <div className="space-y-2">
                 <p className="font-medium">Dicas para resolver o problema:</p>
                 <ul className="text-left list-disc pl-5 space-y-1">
+                  <li>Verifique se você está logado</li>
                   <li>Verifique suas preferências e tente novamente</li>
                   <li>Tente com diferentes tipos de exercícios</li>
                 </ul>
@@ -70,6 +74,7 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
                 variant="default" 
                 onClick={() => window.location.reload()}
                 className="gap-2"
+                size="lg"
               >
                 <RefreshCw className="w-4 h-4" />
                 Recarregar Página
@@ -79,6 +84,7 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
               variant={isInitializationError ? "outline" : "default"} 
               onClick={onReset}
               className="gap-2"
+              size="lg"
             >
               <RotateCcw className="w-4 h-4" />
               Voltar às Preferências

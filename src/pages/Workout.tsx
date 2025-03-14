@@ -5,19 +5,23 @@ import { WorkoutPreferences } from '@/components/workout/types';
 import { PreferencesForm } from '@/components/workout/PreferencesForm';
 import { WorkoutPlanDisplay } from '@/components/workout/WorkoutPlanDisplay';
 import WorkoutHistory from '@/components/workout/components/WorkoutHistory';
-import { Dumbbell } from 'lucide-react';
+import { Dumbbell, LogIn } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import type { WorkoutPlan } from '@/components/workout/types/workout-plan';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams, useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 
 const Workout = () => {
   const [preferences, setPreferences] = useState<WorkoutPreferences | null>(null);
   const [historyPlans, setHistoryPlans] = useState<WorkoutPlan[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const isMobile = useIsMobile();
   
   // Check URL parameters for plan ID and view mode
@@ -30,6 +34,27 @@ const Workout = () => {
       setSelectedPlanId(planId);
     }
   }, [searchParams]);
+
+  // Check authentication status
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setIsAuthenticated(!!user);
+      console.log("Authentication status:", !!user);
+    };
+    
+    checkAuth();
+    
+    // Listen for auth changes
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      setIsAuthenticated(!!session?.user);
+      console.log("Auth state change:", event, !!session?.user);
+    });
+    
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
 
   const fetchWorkoutHistory = useCallback(async () => {
     try {
@@ -71,8 +96,10 @@ const Workout = () => {
   }, []);
 
   useEffect(() => {
-    fetchWorkoutHistory();
-  }, [fetchWorkoutHistory]);
+    if (isAuthenticated) {
+      fetchWorkoutHistory();
+    }
+  }, [fetchWorkoutHistory, isAuthenticated]);
 
   const handlePreferencesSubmit = (prefs: WorkoutPreferences) => {
     console.log('Preferências submetidas no componente Workout:', prefs);
@@ -83,6 +110,46 @@ const Workout = () => {
     // Refresh history after a new plan is generated
     fetchWorkoutHistory();
   };
+
+  const handleLoginClick = () => {
+    navigate('/login?redirect=/workout');
+  };
+
+  // Show loading state while checking authentication
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+        <div className="container mx-auto px-4 py-6 flex items-center justify-center h-screen">
+          <p className="text-center text-lg text-muted-foreground">Verificando autenticação...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show login prompt if not authenticated
+  if (isAuthenticated === false) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+        <div className="container mx-auto px-4 py-6 flex items-center justify-center h-screen">
+          <Card className="w-full max-w-md">
+            <CardContent className="p-6 text-center space-y-6">
+              <div className="inline-flex items-center justify-center p-2 bg-primary/10 rounded-full">
+                <Dumbbell className="w-6 h-6 text-primary" />
+              </div>
+              <h2 className="text-2xl font-bold">Autenticação Necessária</h2>
+              <p className="text-muted-foreground">
+                Você precisa estar logado para acessar os planos de treino personalizados.
+              </p>
+              <Button onClick={handleLoginClick} size="lg" className="gap-2">
+                <LogIn className="w-4 h-4" />
+                Fazer Login
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">

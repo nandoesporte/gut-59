@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from "react";
 import { WorkoutPreferences } from "../types";
 import { toast } from "sonner";
@@ -53,7 +52,6 @@ export const useWorkoutPlanGeneration = (
         setLoadingTime(prev => {
           const newTime = prev + 1;
           
-          // Update loading phase based on time
           if (newTime === 5 && loadingPhase === "preparing") {
             setLoadingPhase("analyzing");
           } else if (newTime === 15 && loadingPhase === "analyzing") {
@@ -70,7 +68,6 @@ export const useWorkoutPlanGeneration = (
         clearInterval(loadingTimer.current);
         loadingTimer.current = null;
       }
-      // Reset loading phase when loading completes
       setLoadingPhase("preparing");
     }
     
@@ -113,11 +110,20 @@ export const useWorkoutPlanGeneration = (
     edgeFunctionStarted.current = false;
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      console.log("Checking authentication status...");
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError) {
+        console.error("Authentication error:", authError);
+        throw new Error(`Erro de autenticação: ${authError.message}`);
+      }
       
       if (!user) {
-        throw new Error("Usuário não autenticado");
+        console.error("User not authenticated");
+        throw new Error("Usuário não autenticado. Por favor, faça login para gerar um plano de treino.");
       }
+      
+      console.log("User authenticated:", user.id);
       
       const activityDesc = activityLevelDescriptions[preferences.activity_level as keyof typeof activityLevelDescriptions] || 
                            "Personalizado";
@@ -137,7 +143,6 @@ export const useWorkoutPlanGeneration = (
       console.log("Starting generation of workout plan with Trenner2025...");
       console.log(`Activity level: ${preferences.activity_level}`);
       
-      // Add timestamp to make each request unique
       const timestamp = Date.now();
       const requestId = `${user.id}_${timestamp}`;
       
@@ -185,11 +190,9 @@ export const useWorkoutPlanGeneration = (
       
       setWorkoutPlan(savedPlan);
       
-      // Update plan generation count in database and local state
       await updatePlanGenerationCount(user.id);
       setPlanGenerationCount(prev => prev + 1);
       
-      // Fetch current count from database
       const { data: countData } = await supabase
         .from('plan_generation_counts')
         .select('workout_count')
@@ -203,7 +206,6 @@ export const useWorkoutPlanGeneration = (
       toast.success(`Plano de treino ${activityDesc} gerado com sucesso!`);
       console.log("Workout plan generation and saving completed successfully");
       
-      // Call the callback if provided
       if (onPlanGenerated) {
         onPlanGenerated();
       }
@@ -212,6 +214,14 @@ export const useWorkoutPlanGeneration = (
       setLoadingTime(0);
     } catch (err: any) {
       console.error("Erro na geração do plano de treino:", err);
+      
+      const isAuthError = err.message && (
+        err.message.includes("autenticado") ||
+        err.message.includes("autenticação") ||
+        err.message.includes("login") ||
+        err.message.includes("authentication") ||
+        err.message.includes("authenticated")
+      );
       
       const isNetworkError = err.message && (
         err.message.includes("Failed to send a request to the Edge Function") ||
@@ -227,50 +237,19 @@ export const useWorkoutPlanGeneration = (
         err.message.includes("presa no estágio")
       );
       
-      const isInitializationError = err.message && (
-        err.message.includes("presa no estágio") ||
-        err.message.includes("booted") ||
-        err.message.includes("Timeout ao iniciar")
-      );
-      
-      if ((isNetworkError || isInitializationError) && retryCount.current < MAX_RETRIES) {
-        retryCount.current += 1;
-        toast.warning(`Problema de conexão. Tentando novamente (${retryCount.current}/${MAX_RETRIES})...`);
-        
-        const backoffTime = 2000 * Math.pow(2, retryCount.current - 1);
-        console.log(`Retrying in ${backoffTime}ms...`);
-        
-        setTimeout(() => {
-          generationInProgress.current = false;
-          generatePlan();
-        }, backoffTime);
-        return;
-      }
-      
-      if (err.message) {
-        if (err.message.includes("Invalid API Key") || 
-            err.message.includes("invalid_api_key") ||
-            err.message.includes("Groq API Error") ||
-            err.message.includes("Validation errors") ||
-            err.message.includes("json_validate_failed")) {
-          
-          setError(err.message);
-          toast.error(err.message);
-        } else if (isInitializationError) {
-          const initErrorMsg = "Erro de inicialização da função de geração de plano. A função não conseguiu iniciar corretamente. Por favor, tente novamente ou contate o suporte.";
-          setError(initErrorMsg);
-          toast.error("Erro de inicialização. Tente novamente.");
-        } else if (isNetworkError) {
-          const networkErrorMsg = "Erro de conexão com o serviço de geração de plano. Por favor, verifique sua conexão e tente novamente.";
-          setError(networkErrorMsg);
-          toast.error("Erro de conexão. Tente novamente mais tarde.");
-        } else {
-          setError(`Erro ao gerar plano de treino: ${err.message}`);
-          toast.error(err.message || "Erro ao gerar plano de treino");
-        }
+      if (isAuthError) {
+        const authErrorMsg = "Você precisa estar autenticado para gerar um plano de treino. Por favor, faça login e tente novamente.";
+        setError(authErrorMsg);
+        toast.error("Autenticação necessária", {
+          description: "Faça login para gerar um plano de treino"
+        });
+      } else if (isNetworkError) {
+        const networkErrorMsg = "Erro de conexão com o serviço de geração de plano. Por favor, verifique sua conexão e tente novamente.";
+        setError(networkErrorMsg);
+        toast.error("Erro de conexão. Tente novamente mais tarde.");
       } else {
-        setError("Erro desconhecido ao gerar o plano de treino");
-        toast.error("Erro desconhecido ao gerar o plano de treino");
+        setError(`Erro ao gerar plano de treino: ${err.message}`);
+        toast.error(err.message || "Erro ao gerar plano de treino");
       }
     } finally {
       setLoading(false);
@@ -284,7 +263,6 @@ export const useWorkoutPlanGeneration = (
       generatePlan();
     }
     
-    // Fetch the current plan generation count when component mounts
     const fetchGenerationCount = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
