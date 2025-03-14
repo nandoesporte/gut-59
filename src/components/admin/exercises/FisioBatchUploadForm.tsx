@@ -34,6 +34,7 @@ const jointAreaOptions: Record<PhysioJointArea, string> = {
   elbow_hand: "Cotovelo e Mão"
 };
 
+// This map is kept for internal use to determine the default condition based on joint area
 const conditionsByArea: Record<PhysioJointArea, Array<{ value: PhysioCondition; label: string }>> = {
   ankle_foot: [
     { value: "plantar_fasciitis", label: "Fascite Plantar" },
@@ -85,12 +86,16 @@ export const FisioBatchUploadForm = ({
 }: FisioBatchUploadFormProps) => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [selectedJointArea, setSelectedJointArea] = useState<PhysioJointArea>("knee");
-  const [selectedCondition, setSelectedCondition] = useState<PhysioCondition>("patellofemoral");
   const [difficulty, setDifficulty] = useState<Difficulty>("beginner");
   const [exerciseType, setExerciseType] = useState<ExerciseType>("mobility");
   const [isCompoundMovement, setIsCompoundMovement] = useState(false);
   const [requiresEquipment, setRequiresEquipment] = useState(false);
   const MAX_FILE_SIZE = 20 * 1024 * 1024;
+
+  // Get default condition based on selected joint area
+  const getDefaultCondition = (jointArea: PhysioJointArea): PhysioCondition => {
+    return conditionsByArea[jointArea][0].value;
+  };
 
   const validateFile = (file: File): boolean => {
     if (!file.type.includes('gif')) {
@@ -125,11 +130,14 @@ export const FisioBatchUploadForm = ({
 
     try {
       for (const file of selectedFiles) {
+        // Get the default condition for the selected joint area
+        const defaultCondition = getDefaultCondition(selectedJointArea);
+        
         const exerciseData: PhysioExercise = {
           name: file.name.replace('.gif', ''),
           description: '',
           joint_area: selectedJointArea,
-          condition: selectedCondition,
+          condition: defaultCondition, // Use the default condition
           exercise_type: exerciseType,
           difficulty: difficulty,
           is_compound_movement: isCompoundMovement,
@@ -148,7 +156,7 @@ export const FisioBatchUploadForm = ({
           rest_time_seconds: 30,
           keywords: [file.name.replace('.gif', '').toLowerCase()],
           primary_goals: ['rehabilitation'],
-          target_symptoms: [selectedCondition]
+          target_symptoms: [defaultCondition] // Use the default condition
         };
         
         await onUpload(exerciseData, file);
@@ -167,13 +175,7 @@ export const FisioBatchUploadForm = ({
   const handleJointAreaChange = (value: string) => {
     const jointArea = value as PhysioJointArea;
     setSelectedJointArea(jointArea);
-    // Ao mudar a área, seleciona a primeira condição disponível para essa área
-    const firstCondition = conditionsByArea[jointArea][0].value;
-    setSelectedCondition(firstCondition);
-  };
-
-  const handleConditionChange = (value: string) => {
-    setSelectedCondition(value as PhysioCondition);
+    // No need to explicitly select a condition as we'll use the default one
   };
 
   return (
@@ -203,27 +205,8 @@ export const FisioBatchUploadForm = ({
               </Select>
             </div>
 
-            <div>
-              <Label>Condição</Label>
-              <Select
-                value={selectedCondition}
-                onValueChange={handleConditionChange}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a condição" />
-                </SelectTrigger>
-                <SelectContent>
-                  {conditionsByArea[selectedJointArea].map(({ value, label }) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* The condition selector has been removed */}
+            
             <div>
               <Label>Nível de Dificuldade</Label>
               <Select
