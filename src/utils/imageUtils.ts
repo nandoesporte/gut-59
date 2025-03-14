@@ -1,4 +1,6 @@
 
+import { SUPABASE_URL } from '@/integrations/supabase/client';
+
 /**
  * Formata uma URL de imagem para garantir que seja exibida corretamente
  * Lida com diferentes formatos de URL (URLs de armazenamento Supabase, URLs completas, etc.)
