@@ -29,7 +29,7 @@ const Fisio = () => {
             *,
             rehab_session_exercises (
               *,
-              exercise:exercises (*)
+              exercise:physio_exercises (*)
             )
           )
         `)

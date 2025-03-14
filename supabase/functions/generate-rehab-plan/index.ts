@@ -73,13 +73,13 @@ serve(async (req) => {
       throw new Error('Nenhum exercício de fisioterapia disponível no banco de dados');
     }
 
-    // Filtrar exercícios relevantes para a condição
+    // Filtrar exercícios relevantes para a área articular
     const relevantExercises = preferences.joint_area 
-      ? exercises.filter(e => e.joint_area === preferences.joint_area || e.condition === preferences.condition)
+      ? exercises.filter(e => e.joint_area === preferences.joint_area)
       : exercises;
     
     const exercisesToUse = relevantExercises.length > 0 ? relevantExercises : exercises;
-    console.log(`Usando ${exercisesToUse.length} exercícios relevantes para a condição`);
+    console.log(`Usando ${exercisesToUse.length} exercícios relevantes para a área articular`);
 
     // Criar um plano básico inicial
     const today = new Date();
@@ -104,7 +104,7 @@ serve(async (req) => {
         user_id: userId,
         joint_area: preferences.joint_area,
         condition: preferences.condition,
-        goal: preferences.goal,
+        goal: preferences.goal || 'pain_relief',
         start_date: today.toISOString().split('T')[0],
         end_date: endDate.toISOString().split('T')[0]
       })
@@ -123,10 +123,10 @@ serve(async (req) => {
     const userPrompt = `
 Crie um plano de reabilitação personalizado com as seguintes características:
 - Área articular afetada: ${preferences.joint_area}
-- Condição médica: ${preferences.condition}
-- Objetivo da reabilitação: ${preferences.goal}
+- Objetivo da reabilitação: ${preferences.goal || 'pain_relief'}
 - Nível de dor (0-10): ${preferences.pain_level || 'Não informado'}
-- Tempo desde a lesão: ${preferences.injury_time || 'Não informado'}
+- Nível de mobilidade: ${preferences.mobility_level || 'moderate'}
+- Nível de atividade física: ${preferences.activity_level || 'moderate'}
 
 O plano deve conter 3 sessões de reabilitação, cada uma com 3-4 exercícios específicos.
 Inclua apenas exercícios dos IDs a seguir (retorne EXATAMENTE esses IDs): ${JSON.stringify(exercisesToUse.slice(0, 20).map(e => ({ id: e.id, name: e.name })))}
