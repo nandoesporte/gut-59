@@ -10,10 +10,7 @@ import { SavedWorkoutPlanDetails } from "./SavedWorkoutPlanDetails";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Calendar, ClipboardList, RefreshCcw, Trash2, Loader2 } from "lucide-react";
-import { DeleteWorkoutDialog } from "./DeleteWorkoutDialog";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { Calendar, ClipboardList, RefreshCcw } from "lucide-react";
 
 interface WorkoutHistoryProps {
   plans: WorkoutPlan[];
@@ -25,9 +22,6 @@ interface WorkoutHistoryProps {
 const WorkoutHistory = ({ plans, isLoading, onRefresh, selectedPlanId }: WorkoutHistoryProps) => {
   const [selectedPlan, setSelectedPlan] = useState<WorkoutPlan | null>(null);
   const [activeTab, setActiveTab] = useState<string>("plans-list");
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [planToDelete, setPlanToDelete] = useState<string | null>(null);
-  const [deletingPlan, setDeletingPlan] = useState(false);
   const isMobile = useIsMobile();
 
   // Set initial active tab based on selectedPlanId
@@ -56,50 +50,6 @@ const WorkoutHistory = ({ plans, isLoading, onRefresh, selectedPlanId }: Workout
       return format(parseISO(dateString), "dd 'de' MMMM", { locale: ptBR });
     } catch (e) {
       return "Data indisponível";
-    }
-  };
-
-  const openDeleteDialog = (planId: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent triggering the view plan action
-    setPlanToDelete(planId);
-    setDeleteDialogOpen(true);
-  };
-
-  const handleDeletePlan = async () => {
-    if (!planToDelete) return;
-
-    try {
-      setDeletingPlan(true);
-      
-      // Delete the plan from the database
-      const { error } = await supabase
-        .from('workout_plans')
-        .delete()
-        .eq('id', planToDelete);
-
-      if (error) {
-        console.error('Error deleting workout plan:', error);
-        toast.error('Erro ao excluir plano de treino');
-        return;
-      }
-
-      toast.success('Plano de treino excluído com sucesso');
-      
-      // Check if the deleted plan is the currently selected one
-      if (selectedPlan && selectedPlan.id === planToDelete) {
-        setSelectedPlan(null);
-        setActiveTab("plans-list");
-      }
-      
-      // Refresh the list
-      onRefresh();
-    } catch (error) {
-      console.error('Error in deletion process:', error);
-      toast.error('Erro ao excluir plano de treino');
-    } finally {
-      setDeletingPlan(false);
-      setDeleteDialogOpen(false);
-      setPlanToDelete(null);
     }
   };
 
@@ -165,19 +115,9 @@ const WorkoutHistory = ({ plans, isLoading, onRefresh, selectedPlanId }: Workout
                           {formatDate(plan.created_at)}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button 
-                          variant="destructive" 
-                          size="sm" 
-                          className="h-8"
-                          onClick={(e) => openDeleteDialog(plan.id, e)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" className="h-8">
-                          Visualizar
-                        </Button>
-                      </div>
+                      <Button variant="ghost" size="sm" className="h-8">
+                        Visualizar
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -211,12 +151,6 @@ const WorkoutHistory = ({ plans, isLoading, onRefresh, selectedPlanId }: Workout
           </TabsContent>
         </Tabs>
       </CardContent>
-
-      <DeleteWorkoutDialog 
-        isOpen={deleteDialogOpen}
-        onClose={() => setDeleteDialogOpen(false)}
-        onConfirm={handleDeletePlan}
-      />
     </Card>
   );
 };

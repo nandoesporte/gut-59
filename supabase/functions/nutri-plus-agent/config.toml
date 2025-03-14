@@ -1,0 +1,9 @@
+
+project_id = "sxjafhzikftdenqnkcri"
+# Add any shared secrets required here
+LLAMA_API_KEY = "{{ LLAMA_API_KEY }}"
+DEEPSEEK_API_KEY = "{{ DEEPSEEK_API_KEY }}"
+GROQ_API_KEY = "{{ GROQ_API_KEY }}"
+
+# This provides a URL for users to report issues with the function
+report_issues_url = "https://github.com/supabase/functions"
