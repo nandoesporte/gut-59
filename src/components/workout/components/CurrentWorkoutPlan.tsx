@@ -158,7 +158,7 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
                 </div>
                 <div className="space-y-2 sm:space-y-3">
                   {session?.session_exercises?.map((exerciseSession: any, exIndex: number) => {
-                    // Create a truly unique key that includes all identifiers
+                    // Criar uma chave realmente única que inclua todos os identificadores
                     const uniqueKey = `exercise-${session.id || index}-${exIndex}-${exerciseSession.id || 'unknown'}-${exerciseSession.exercise?.id || 'no-id'}`;
                     
                     return (

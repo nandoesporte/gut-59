@@ -59,28 +59,32 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
         .single();
         
       if (!error && data && data.gif_url) {
-        const newGifUrl = formatImageUrl(data.gif_url + `?t=${Date.now()}`);
+        // Forçar recarregamento da imagem adicionando um timestamp à URL
+        const newGifUrl = formatImageUrl(data.gif_url) + `?t=${Date.now()}`;
         console.log(`Nova URL obtida: ${newGifUrl}`);
         if (imageRef.current) {
           imageRef.current.src = newGifUrl;
         }
       } else if (error) {
         console.error('Erro ao buscar URL atualizada:', error);
+        setImageError(true);
       }
     } catch (error) {
       console.error('Erro ao buscar URL atualizada:', error);
+      setImageError(true);
     } finally {
       // Definir um timeout para limpar o estado de retry se a imagem não carregar
       setTimeout(() => {
         if (isRetrying) {
           setIsRetrying(false);
+          setImageError(true);
         }
-      }, 5000);
+      }, 8000);
     }
   };
   
   const handleImageError = () => {
-    console.warn(`Falha ao carregar imagem para exercício: ${exercise.name} (${exercise.id}). URL: ${exercise.gif_url}`);
+    console.error(`Falha ao carregar imagem para exercício: ${exercise.name} (${exercise.id}). URL: ${exercise.gif_url}`);
     
     if (retryCount < 3) {
       // Tentar carregar novamente automaticamente após um pequeno delay
@@ -109,9 +113,6 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                           !imageUrl.includes('placeholder') && 
                           !imageUrl.includes('example.') &&
                           imageUrl.trim().length > 10;
-  
-  // Adicionar log para depuração
-  console.log(`Renderizando exercício: ${exercise.name}, URL: ${imageUrl}, É válida: ${isLikelyValidUrl}`);
   
   return (
     <Card className="overflow-hidden border-none shadow-sm hover:shadow-md transition-shadow duration-200">
@@ -146,7 +147,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                   <button 
                     className="text-xs text-primary mt-1 hover:underline flex items-center gap-1"
                     onClick={retryLoadImage}
-                    disabled={isRetrying}
+                    disabled={isRetrying || retryCount >= 3}
                   >
                     <RefreshCw className="h-3 w-3" />
                     Tentar novamente
@@ -161,7 +162,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                   <DialogTrigger asChild>
                     <button 
                       className={`absolute top-1 right-1 p-1 bg-black/50 rounded-full text-white z-20 ${imageLoaded && !imageError ? 'block' : 'hidden'}`}
-                      onClick={() => {}}
+                      onClick={(e) => e.stopPropagation()}
                     >
                       <Maximize className="h-3.5 w-3.5" />
                     </button>

@@ -10,6 +10,7 @@ import { SUPABASE_URL } from '@/integrations/supabase/client';
  */
 export const formatImageUrl = (url: string | null | undefined): string => {
   if (!url) {
+    console.log("URL vazia, usando placeholder");
     return '/placeholder.svg';
   }
 
@@ -43,10 +44,9 @@ export const formatImageUrl = (url: string | null | undefined): string => {
       return '/placeholder.svg';
     }
     
-    // Adicionar timestamp para evitar cache em URLs do Supabase Storage
+    // Verificar se é URL Supabase Storage
     if (cleanUrl.includes('supabase.co/storage/v1/object/public')) {
-      // Não adicione timestamp aqui, será adicionado quando a imagem for renderizada
-      console.log(`URL Supabase detectada: ${cleanUrl}`);
+      console.log(`URL Supabase detectada e será usada: ${cleanUrl}`);
       return cleanUrl;
     }
     
@@ -92,7 +92,7 @@ export const formatImageUrl = (url: string | null | undefined): string => {
       return `https://${cleanUrl}`;
     }
     
-    console.log(`URL sem extensão de imagem: ${cleanUrl}`);
+    console.log(`URL sem extensão de imagem: ${cleanUrl}, usando placeholder`);
     return '/placeholder.svg';
   }
 
