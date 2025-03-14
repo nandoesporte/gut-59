@@ -32,30 +32,49 @@ export const formatImageUrl = (url: string | null | undefined): string => {
     return '/placeholder.svg';
   }
 
-  // Handle Supabase storage URLs - ensure they're properly formatted
-  if (cleanUrl.includes('storage.googleapis.com') || 
-      cleanUrl.includes('storage/v1/object/public') || 
-      cleanUrl.includes('supabase')) {
-    // If it's already a full URL, return it as is
+  // Explicitly handle Supabase storage URLs
+  if (cleanUrl.includes('supabase.co/storage/v1/object/public')) {
+    // If it's already a full URL starting with https://, return it as is
     if (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://')) {
       return cleanUrl;
     }
     
-    // For Supabase storage paths without protocol, ensure they have the correct format
+    // If URL starts with /storage/v1/, add the base URL
     if (cleanUrl.startsWith('/storage/v1/')) {
-      // Get base URL from window.location if in browser
       const baseUrl = typeof window !== 'undefined' 
         ? `${window.location.protocol}//${window.location.host}`
         : '';
       return `${baseUrl}${cleanUrl}`;
     }
     
+    // If URL doesn't have protocol but has supabase domain, add https://
+    if (cleanUrl.includes('supabase.co') && !cleanUrl.startsWith('http')) {
+      return `https://${cleanUrl}`;
+    }
+    
+    return cleanUrl;
+  }
+  
+  // Special handling for storage.googleapis.com URLs
+  if (cleanUrl.includes('storage.googleapis.com')) {
+    if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+      return `https://${cleanUrl}`;
+    }
     return cleanUrl;
   }
 
-  // If URL doesn't have an extension/format that indicates an image, return placeholder
+  // Handle URLs that start with "storage/v1/" but don't include supabase domain
+  if (cleanUrl.startsWith('storage/v1/')) {
+    return `https://sxjafhzikftdenqnkcri.supabase.co/${cleanUrl}`;
+  }
+
+  // If URL doesn't have an extension that indicates an image, check more thoroughly
   const hasImageExtension = /\.(gif|jpe?g|png|svg|webp)$/i.test(cleanUrl);
-  if (!hasImageExtension && !cleanUrl.includes('storage') && !cleanUrl.includes('object')) {
+  if (!hasImageExtension) {
+    // Check if it might be a Supabase storage URL without extension
+    if (cleanUrl.includes('storage') || cleanUrl.includes('object/public')) {
+      return cleanUrl;
+    }
     return '/placeholder.svg';
   }
 
@@ -78,6 +97,11 @@ export const formatImageUrl = (url: string | null | undefined): string => {
   }
 
   // For other URLs, assume they might be from Supabase storage
-  // and return them as is (the browser will resolve them)
+  // and prepend the Supabase URL if they look like partial storage paths
+  if (cleanUrl.includes('batch/') || cleanUrl.includes('exercise-gifs/')) {
+    return `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/${cleanUrl}`;
+  }
+
+  // Return as is for any other case
   return cleanUrl;
 };

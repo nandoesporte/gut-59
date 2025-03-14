@@ -157,12 +157,17 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
                   </Badge>
                 </div>
                 <div className="space-y-2 sm:space-y-3">
-                  {session?.session_exercises?.map((exerciseSession: any, exIndex: number) => (
-                    <WorkoutExerciseDetail 
-                      key={`exercise-${exerciseSession.id || `${session.id}-${exIndex}`}-${exerciseSession.exercise?.id || `unknown-${exIndex}`}`} 
-                      exerciseSession={exerciseSession} 
-                    />
-                  ))}
+                  {session?.session_exercises?.map((exerciseSession: any, exIndex: number) => {
+                    // Create a truly unique key that includes all identifiers
+                    const uniqueKey = `exercise-${session.id || index}-${exIndex}-${exerciseSession.id || 'unknown'}-${exerciseSession.exercise?.id || 'no-id'}`;
+                    
+                    return (
+                      <WorkoutExerciseDetail 
+                        key={uniqueKey}
+                        exerciseSession={exerciseSession}
+                      />
+                    );
+                  })}
                 </div>
               </div>
 
