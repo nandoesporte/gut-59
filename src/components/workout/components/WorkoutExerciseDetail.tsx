@@ -4,7 +4,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatImageUrl } from '@/utils/imageUtils';
 import { Skeleton } from "@/components/ui/skeleton";
-import { ExternalLink, Dumbbell, ImageOff, AlertCircle } from 'lucide-react';
+import { ExternalLink, Dumbbell, ImageOff, AlertCircle, RefreshCw } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface WorkoutExerciseDetailProps {
   exerciseSession: any;
@@ -18,47 +19,76 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
   const [expandDescription, setExpandDescription] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [hasAttemptedToLoadImage, setHasAttemptedToLoadImage] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
   
   if (!exercise) return null;
-  
+
   // Reset image states if exercise changes
   useEffect(() => {
     setImageLoaded(false);
     setImageError(false);
     setHasAttemptedToLoadImage(false);
     setRetryCount(0);
+    setIsRetrying(false);
   }, [exercise.id]);
   
-  // Função para tentar carregar novamente a imagem (até 2 tentativas)
-  const retryLoadImage = () => {
-    if (retryCount < 2) {
+  // Função para tentar carregar novamente a imagem (até 3 tentativas)
+  const retryLoadImage = async () => {
+    if (retryCount < 3) {
+      setIsRetrying(true);
       console.log(`Tentando carregar imagem novamente para: ${exercise.name} (${exercise.id}). Tentativa: ${retryCount + 1}`);
       setImageError(false);
       setImageLoaded(false);
       setRetryCount(prevCount => prevCount + 1);
       
-      // Força o recarregamento da imagem atualizando o src com um timestamp
-      if (imageRef.current) {
-        const currentSrc = imageRef.current.src;
-        const newSrc = currentSrc.includes('?') 
-          ? currentSrc.replace(/[?&]t=\d+/, `&t=${Date.now()}`) 
-          : `${currentSrc}?t=${Date.now()}`;
-        imageRef.current.src = newSrc;
+      // Se a URL vier da Supabase Storage, tente buscar do banco de dados novamente
+      if (exercise.gif_url?.includes('supabase.co/storage')) {
+        try {
+          const { data, error } = await supabase
+            .from('exercises')
+            .select('gif_url')
+            .eq('id', exercise.id)
+            .single();
+            
+          if (!error && data && data.gif_url) {
+            const newGifUrl = formatImageUrl(data.gif_url);
+            if (imageRef.current) {
+              imageRef.current.src = newGifUrl + `?t=${Date.now()}`;
+            }
+          }
+        } catch (error) {
+          console.error('Erro ao buscar URL atualizada:', error);
+        }
+      } else {
+        // Força o recarregamento da imagem atualizando o src com um timestamp
+        if (imageRef.current) {
+          const currentSrc = imageRef.current.src;
+          const newSrc = currentSrc.includes('?') 
+            ? currentSrc.replace(/[?&]t=\d+/, `&t=${Date.now()}`) 
+            : `${currentSrc}?t=${Date.now()}`;
+          imageRef.current.src = newSrc;
+        }
       }
+      
+      // Definir um timeout para limpar o estado de retry se a imagem não carregar
+      setTimeout(() => {
+        setIsRetrying(false);
+      }, 5000);
     }
   };
   
   const handleImageError = () => {
     console.warn(`Falha ao carregar imagem para exercício: ${exercise.name} (${exercise.id}). URL: ${exercise.gif_url}`);
     
-    if (retryCount < 2) {
+    if (retryCount < 3) {
       // Tentar carregar novamente automaticamente após um pequeno delay
-      setTimeout(retryLoadImage, 1000);
+      setTimeout(retryLoadImage, 1500);
     } else {
       setImageError(true);
       setImageLoaded(true);
       setHasAttemptedToLoadImage(true);
+      setIsRetrying(false);
     }
   };
   
@@ -67,6 +97,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     setImageLoaded(true);
     setHasAttemptedToLoadImage(true);
     setImageError(false);
+    setIsRetrying(false);
   };
   
   // Get the correct image URL, handling null or empty strings
@@ -85,11 +116,12 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
         <div className="flex flex-col md:flex-row gap-3">
           {/* Exercise GIF/Image */}
           <div className="w-full md:w-1/4 bg-gray-100 dark:bg-gray-800 overflow-hidden flex items-center justify-center h-36 md:h-40 relative">
-            {!imageLoaded && !imageError && isLikelyValidUrl && (
+            {(!imageLoaded || isRetrying) && !imageError && isLikelyValidUrl && (
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <Skeleton className="h-36 md:h-40 w-full absolute inset-0" />
-                <span className="text-xs text-muted-foreground z-10 bg-background/80 px-2 py-1 rounded-md">
-                  Carregando...
+                <span className="text-xs text-muted-foreground z-10 bg-background/80 px-2 py-1 rounded-md flex items-center gap-1">
+                  {isRetrying && <RefreshCw className="h-3 w-3 animate-spin" />}
+                  {isRetrying ? 'Tentando novamente...' : 'Carregando...'}
                 </span>
               </div>
             )}
@@ -107,11 +139,13 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                 <span className="text-[10px] text-muted-foreground/70 mt-1">
                   {imageError ? 'Imagem não disponível' : 'Sem imagem'}
                 </span>
-                {imageError && retryCount >= 2 && (
+                {imageError && !isRetrying && (
                   <button 
-                    className="text-[10px] text-primary mt-1 hover:underline"
+                    className="text-[10px] text-primary mt-1 hover:underline flex items-center gap-1"
                     onClick={retryLoadImage}
+                    disabled={isRetrying}
                   >
+                    <RefreshCw className="h-2 w-2" />
                     Tentar novamente
                   </button>
                 )}

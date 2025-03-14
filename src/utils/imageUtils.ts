@@ -52,7 +52,7 @@ export const formatImageUrl = (url: string | null | undefined): string => {
   // Lidar com URLs que começam com "storage/v1/" mas não incluem o domínio supabase
   if (cleanUrl.startsWith('storage/v1/')) {
     // Adicionar timestamp como parâmetro de consulta para evitar cache
-    return `https://sxjafhzikftdenqnkcri.supabase.co/${cleanUrl}?t=${Date.now()}`;
+    return `${SUPABASE_URL}/${cleanUrl}?t=${Date.now()}`;
   }
 
   // Para URLs relativas começando com "/"
@@ -68,7 +68,7 @@ export const formatImageUrl = (url: string | null | undefined): string => {
   // e adicione o URL do Supabase se parecerem com caminhos de armazenamento parcial
   if (cleanUrl.includes('batch/') || cleanUrl.includes('exercise-gifs/')) {
     // Adicionar timestamp como parâmetro de consulta para evitar cache
-    return `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/${cleanUrl}?t=${Date.now()}`;
+    return `${SUPABASE_URL}/storage/v1/object/public/${cleanUrl}?t=${Date.now()}`;
   }
 
   // Se a URL não tiver uma extensão que indique uma imagem, verifique mais detalhadamente

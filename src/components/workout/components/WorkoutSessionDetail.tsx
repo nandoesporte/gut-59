@@ -87,7 +87,7 @@ export const WorkoutSessionDetail = ({ session, getDayName }: WorkoutSessionDeta
                   <div className="space-y-4 pl-2">
                     {exercisesByMuscleGroup[muscleGroup].map((exerciseSession, index) => {
                       // Create a truly unique key using multiple identifiers
-                      const uniqueKey = `ex-${session.day_number}-${muscleGroup}-${index}-${exerciseSession.id || 'unknown'}-${exerciseSession.exercise.id || 'no-id'}-${Date.now()}`;
+                      const uniqueKey = `ex-${session.day_number}-${muscleGroup}-${index}-${exerciseSession.id || 'unknown'}-${exerciseSession.exercise.id || 'no-id'}`;
                       
                       return (
                         <WorkoutExerciseDetail 
