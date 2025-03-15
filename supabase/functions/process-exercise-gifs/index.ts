@@ -18,6 +18,7 @@ serve(async (req) => {
     const formData = await req.formData()
     const zipFile = formData.get('file') as File
     const category = formData.get('category') as string
+    const targetTable = formData.get('targetTable') as string || 'exercises' // New parameter to determine target table
 
     if (!zipFile || !category) {
       console.error('Arquivo ZIP ou categoria não fornecidos');
@@ -27,7 +28,7 @@ serve(async (req) => {
       )
     }
 
-    console.log(`Arquivo recebido: ${zipFile.name}, Categoria: ${category}`);
+    console.log(`Arquivo recebido: ${zipFile.name}, Categoria: ${category}, Tabela destino: ${targetTable}`);
     console.log(`Tamanho do arquivo: ${zipFile.size} bytes`);
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
@@ -89,8 +90,15 @@ serve(async (req) => {
 
           // Use timestamp + random string for unique filenames to avoid caching issues
           const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-          // Put videos in a separate folder
-          const folderPath = isVideo ? `${category}/videos` : category;
+          
+          // Determine folder path based on target table and file type
+          let folderPath = category;
+          if (targetTable === 'physio_exercises') {
+            folderPath = isVideo ? `physio/videos` : 'physio';
+          } else {
+            folderPath = isVideo ? `${category}/videos` : category;
+          }
+          
           const filePath = `${folderPath}/${uniqueId}_${sanitizedName}`
           
           console.log(`Enviando para caminho: ${filePath}`);
@@ -128,53 +136,120 @@ serve(async (req) => {
 
           console.log(`URL pública gerada: ${publicUrl}`);
 
-          // Criar registro do exercício
-          const exerciseData = {
-            name: exerciseName,
-            description: `Exercício ${exerciseName}`,
-            gif_url: publicUrl,
-            muscle_group: category,
-            exercise_type: category === 'cardio' ? 'cardio' : 
+          // Create record in the appropriate table based on targetTable parameter
+          if (targetTable === 'physio_exercises') {
+            // For physio_exercises table
+            const physioExerciseData = {
+              name: exerciseName,
+              description: `Exercício de fisioterapia: ${exerciseName}`,
+              gif_url: publicUrl,
+              joint_area: category, // using category as joint_area
+              condition: getDefaultCondition(category),
+              exercise_type: category === 'cardio' ? 'cardio' : 
+                           category === 'mobility' ? 'mobility' : 'strength',
+              difficulty: 'beginner',
+              is_video: isVideo,
+              balance_requirement: 'moderate',
+              coordination_requirement: 'moderate',
+              strength_requirement: 'moderate',
+              flexibility_requirement: 'moderate',
+              movement_speed: 'moderate',
+              resistance_level: 'bodyweight',
+              pain_level_threshold: 5,
+              progression_level: 1,
+              recommended_repetitions: 10,
+              recommended_sets: 3,
+              hold_time_seconds: 10,
+              rest_time_seconds: 30,
+              primary_goals: ['rehabilitation'],
+              target_symptoms: [getDefaultCondition(category)]
+            };
+
+            console.log(`Inserindo exercício fisioterapêutico no banco de dados: ${exerciseName}`);
+            
+            const { data: insertedPhysioExercise, error: dbPhysioError } = await supabase
+              .from('physio_exercises')
+              .insert(physioExerciseData)
+              .select()
+              .single()
+
+            if (dbPhysioError) {
+              console.error(`Erro ao inserir no banco (physio_exercises): ${dbPhysioError.message}`);
+              throw dbPhysioError;
+            }
+
+            uploadedFiles.push({
+              name: filename,
+              url: publicUrl,
+              is_video: isVideo,
+              exercise: insertedPhysioExercise
+            });
+            
+          } else {
+            // For regular exercises table
+            const exerciseData = {
+              name: exerciseName,
+              description: `Exercício ${exerciseName}`,
+              gif_url: publicUrl,
+              muscle_group: category,
+              exercise_type: category === 'cardio' ? 'cardio' : 
                           category === 'mobility' ? 'mobility' : 'strength',
-            difficulty: 'beginner',
-            min_reps: 8,
-            max_reps: 12,
-            min_sets: 3,
-            max_sets: 5,
-            rest_time_seconds: 60,
-            alternative_exercises: [],
-            equipment_needed: [],
-            primary_muscles_worked: [category],
-            is_video: isVideo
-          }
+              difficulty: 'beginner',
+              min_reps: 8,
+              max_reps: 12,
+              min_sets: 3,
+              max_sets: 5,
+              rest_time_seconds: 60,
+              alternative_exercises: [],
+              equipment_needed: [],
+              primary_muscles_worked: [category],
+              is_video: isVideo
+            };
 
-          console.log(`Inserindo exercício no banco de dados: ${exerciseName}`);
-          
-          const { data: insertedExercise, error: dbError } = await supabase
-            .from('exercises')
-            .insert(exerciseData)
-            .select()
-            .single()
+            console.log(`Inserindo exercício no banco de dados: ${exerciseName}`);
+            
+            const { data: insertedExercise, error: dbError } = await supabase
+              .from('exercises')
+              .insert(exerciseData)
+              .select()
+              .single()
 
-          if (dbError) {
-            console.error(`Erro ao inserir no banco: ${dbError.message}`);
-            throw dbError;
+            if (dbError) {
+              console.error(`Erro ao inserir no banco (exercises): ${dbError.message}`);
+              throw dbError;
+            }
+
+            uploadedFiles.push({
+              name: filename,
+              url: publicUrl,
+              is_video: isVideo,
+              exercise: insertedExercise
+            });
           }
 
           console.log(`Exercício ${exerciseName} processado com sucesso`);
           processedCount++;
-          uploadedFiles.push({
-            name: filename,
-            url: publicUrl,
-            is_video: isVideo,
-            exercise: insertedExercise
-          });
 
         } catch (error) {
           console.error(`Erro processando ${filename}:`, error);
           errors.push(`Erro ao processar ${filename}: ${error.message}`);
         }
       });
+    }
+
+    // Helper function to get default condition based on joint area
+    function getDefaultCondition(jointArea) {
+      const conditionMapping = {
+        'ankle_foot': 'plantar_fasciitis',
+        'leg': 'shin_splints',
+        'knee': 'patellofemoral',
+        'hip': 'trochanteric_bursitis',
+        'spine': 'disc_protrusion',
+        'shoulder': 'rotator_cuff',
+        'elbow_hand': 'lateral_epicondylitis'
+      };
+      
+      return conditionMapping[jointArea] || 'patellofemoral'; // Default to patellofemoral if not found
     }
 
     // Processar arquivos sequencialmente para evitar sobrecarga

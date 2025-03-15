@@ -1,4 +1,3 @@
-
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ExerciseForm } from "./exercises/ExerciseForm";
 import { BatchUploadForm } from "./exercises/BatchUploadForm";
@@ -30,28 +29,22 @@ export const ExerciseGifsTab = () => {
         throw new Error('Arquivo GIF é obrigatório');
       }
 
-      // Upload the GIF file
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('exercise-gifs')
         .upload(`${crypto.randomUUID()}.gif`, file);
 
       if (uploadError) throw uploadError;
 
-      // Get the public URL
       const { data: { publicUrl } } = supabase.storage
         .from('exercise-gifs')
         .getPublicUrl(uploadData.path);
 
-      // Ensure the exercise type is valid according to the database constraints
-      // Map "flexibility" to "mobility" if it's present in the data
       const validExerciseType = exerciseData.exercise_type === "strength" || 
                                 exerciseData.exercise_type === "cardio" || 
                                 exerciseData.exercise_type === "mobility" 
                                 ? exerciseData.exercise_type 
                                 : "mobility";
-      
-      // Create the exercise record with all the additional fields
-      // Explicitly cast difficulty to "beginner" | "intermediate" | "advanced" for the database
+
       const safeData = {
         ...exerciseData,
         gif_url: publicUrl,
@@ -109,34 +102,28 @@ export const ExerciseGifsTab = () => {
         throw new Error('Arquivo é obrigatório');
       }
 
-      // Determine folder based on file type
       const isVideo = !file.type.includes('gif');
       const folderPath = isVideo ? 'physio/videos' : 'physio';
       
-      // Generate unique filename to avoid collisions
       const fileExtension = file.name.split('.').pop();
       const uniqueFilename = `${crypto.randomUUID()}.${fileExtension}`;
       
-      // Upload the file
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('exercise-gifs')
         .upload(`${folderPath}/${uniqueFilename}`, file);
 
       if (uploadError) throw uploadError;
 
-      // Get the public URL
       const { data: { publicUrl } } = supabase.storage
         .from('exercise-gifs')
         .getPublicUrl(uploadData.path);
 
-      // Ensure the exercise type is valid according to the database constraints
       const validExerciseType = exerciseData.exercise_type === "strength" || 
                                 exerciseData.exercise_type === "cardio" || 
                                 exerciseData.exercise_type === "mobility" 
                                 ? exerciseData.exercise_type 
                                 : "mobility";
 
-      // Cast the difficulty type for database compatibility
       const safeData = {
         ...exerciseData,
         gif_url: publicUrl,
@@ -145,7 +132,6 @@ export const ExerciseGifsTab = () => {
         is_video: isVideo
       };
 
-      // Create the exercise record in the physio_exercises table
       const { error: insertError } = await supabase
         .from('physio_exercises')
         .insert(safeData);
