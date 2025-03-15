@@ -1,3 +1,4 @@
+
 import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -9,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { SelectCard } from "@/components/workout/components/SelectCard";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
-import { FisioPreferences, JointArea, Condition } from "./types";
+import { FisioPreferences, JointArea } from "./types";
 import { Stethoscope, ArrowRight, CreditCard } from "lucide-react";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { usePaymentHandling } from "@/components/menu/hooks/usePaymentHandling";
@@ -91,11 +92,7 @@ export const FisioPreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
         pain_level: data.pain_level,
         mobility_level: data.mobility_level,
         previous_treatment: data.previous_treatment,
-        activity_level: data.activity_level,
-        // Add more descriptive fields to help the AI generate better plans
-        painLocation: getJointAreaLabel(data.joint_area),
-        injuryDescription: `${getDefaultConditionLabel(getDefaultCondition(data.joint_area))} - Mobilidade ${getMobilityLabel(data.mobility_level)}`,
-        equipmentAvailable: getDefaultEquipment(data.activity_level)
+        activity_level: data.activity_level
       };
       
       toast.info("Gerando seu plano de reabilitação personalizado...");
@@ -131,62 +128,6 @@ export const FisioPreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
       console.error("Erro no processo de pagamento:", error);
       toast.error("Erro ao processar pagamento. Por favor, tente novamente.");
     }
-  };
-
-  const getJointAreaLabel = (jointArea: JointArea): string => {
-    return jointAreaOptions[jointArea] || jointArea;
-  };
-
-  const getMobilityLabel = (mobility: string): string => {
-    switch (mobility) {
-      case "limited": return "Limitada";
-      case "moderate": return "Moderada";
-      case "good": return "Boa";
-      default: return mobility;
-    }
-  };
-
-  const getDefaultConditionLabel = (condition: Condition): string => {
-    const conditionLabels: Record<Condition, string> = {
-      ankle_sprain: "Entorse de Tornozelo",
-      shin_splints: "Canelite",
-      patellofemoral: "Síndrome Patelofemoral",
-      trochanteric_bursitis: "Bursite Trocantérica",
-      disc_protrusion: "Protrusão Discal",
-      rotator_cuff: "Lesão do Manguito Rotador",
-      lateral_epicondylitis: "Epicondilite Lateral (Cotovelo de Tenista)",
-      plantar_fasciitis: "Fascite Plantar",
-      calcaneal_spur: "Esporão do Calcâneo",
-      anterior_compartment: "Síndrome do Compartimento Anterior",
-      achilles_tendinitis: "Tendinite de Aquiles",
-      patellar_tendinitis: "Tendinite Patelar",
-      acl_postop: "Pós-operatório de Ligamento Cruzado Anterior",
-      mcl_injury: "Lesão do Ligamento Colateral Medial",
-      meniscus_injury: "Lesão de Menisco",
-      knee_arthrosis: "Artrose de Joelho",
-      piriformis_syndrome: "Síndrome do Piriforme",
-      sports_hernia: "Hérnia Esportiva",
-      it_band_syndrome: "Síndrome da Banda Iliotibial",
-      herniated_disc: "Hérnia de Disco",
-      cervical_lordosis: "Alteração da Lordose Cervical",
-      frozen_shoulder: "Ombro Congelado",
-      shoulder_bursitis: "Bursite do Ombro",
-      impingement: "Síndrome do Impacto",
-      medial_epicondylitis: "Epicondilite Medial (Cotovelo de Golfista)",
-      carpal_tunnel: "Síndrome do Túnel do Carpo"
-    };
-    
-    return conditionLabels[condition] || condition;
-  };
-
-  const getDefaultEquipment = (activityLevel: string): string[] => {
-    const baseEquipment = ["Faixa elástica", "Toalha", "Garrafa de água como peso"];
-    
-    if (activityLevel === "moderate" || activityLevel === "active") {
-      return [...baseEquipment, "Halteres leves", "Bola de pilates"];
-    }
-    
-    return baseEquipment;
   };
 
   return (

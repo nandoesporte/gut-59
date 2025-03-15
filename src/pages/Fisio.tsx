@@ -1,34 +1,27 @@
 
 import * as React from 'react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { FisioPreferences } from '@/components/fisio/types';
 import { FisioPreferencesForm } from '@/components/fisio/PreferencesForm';
 import { ExercisePlanDisplay } from '@/components/fisio/ExercisePlanDisplay';
-import { Stethoscope, AlertTriangle } from 'lucide-react';
+import { Stethoscope } from 'lucide-react';
 import { FisioHistoryView } from '@/components/fisio/components/FisioHistory';
 import { supabase } from '@/integrations/supabase/client';
 import type { RehabPlan } from '@/components/fisio/types/rehab-plan';
-import { toast } from 'sonner';
 
 const Fisio = () => {
   const [preferences, setPreferences] = useState<FisioPreferences | null>(null);
   const [historyPlans, setHistoryPlans] = useState<RehabPlan[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const fetchFisioHistory = async () => {
     try {
       setIsLoadingHistory(true);
-      setError(null);
-      
       const { data: { user } } = await supabase.auth.getUser();
       
-      if (!user) {
-        setError("Usuário não autenticado. Por favor, faça login.");
-        return;
-      }
+      if (!user) return;
 
-      const { data: plansData, error: fetchError } = await supabase
+      const { data: plansData, error } = await supabase
         .from('rehab_plans')
         .select(`
           *,
@@ -43,73 +36,41 @@ const Fisio = () => {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (fetchError) {
-        console.error("Erro ao buscar histórico de reabilitação:", fetchError);
-        setError("Erro ao buscar seu histórico de reabilitação. Por favor, tente novamente.");
-        throw fetchError;
-      }
+      if (error) throw error;
 
       // Transform the data to match RehabPlan type
-      const transformedPlans: RehabPlan[] = (plansData || []).map(plan => {
-        // Create basic plan structure
-        const transformedPlan: RehabPlan = {
-          id: plan.id,
-          user_id: plan.user_id,
-          goal: plan.goal,
-          start_date: plan.start_date,
-          end_date: plan.end_date,
-          rehab_sessions: (plan.rehab_sessions || []).map((session: any) => ({
-            day_number: session.day_number,
-            warmup_description: session.warmup_description,
-            cooldown_description: session.cooldown_description,
-            exercises: (session.rehab_session_exercises || []).map((se: any) => ({
-              name: se.exercise.name,
-              sets: se.sets,
-              reps: se.reps,
-              rest_time_seconds: se.rest_time_seconds,
-              gifUrl: se.exercise.gif_url,
-              notes: se.exercise.description
-            }))
+      const transformedPlans: RehabPlan[] = (plansData || []).map(plan => ({
+        id: plan.id,
+        user_id: plan.user_id,
+        goal: plan.goal,
+        start_date: plan.start_date,
+        end_date: plan.end_date,
+        rehab_sessions: (plan.rehab_sessions || []).map((session: any) => ({
+          day_number: session.day_number,
+          warmup_description: session.warmup_description,
+          cooldown_description: session.cooldown_description,
+          exercises: (session.rehab_session_exercises || []).map((se: any) => ({
+            name: se.exercise.name,
+            sets: se.sets,
+            reps: se.reps,
+            rest_time_seconds: se.rest_time_seconds,
+            gifUrl: se.exercise.gif_url,
+            notes: se.exercise.description
           }))
-        };
-        
-        // Add plan_data if available
-        if (plan.plan_data && typeof plan.plan_data === 'object') {
-          transformedPlan.plan_data = plan.plan_data;
-          
-          // For backward compatibility, also set these properties directly
-          transformedPlan.days = plan.plan_data.days;
-          transformedPlan.overview = plan.plan_data.overview;
-          transformedPlan.recommendations = plan.plan_data.overview?.recommendations || [];
-        }
-        
-        return transformedPlan;
-      });
+        }))
+      }));
 
       setHistoryPlans(transformedPlans);
     } catch (error) {
       console.error('Error fetching rehab history:', error);
-      toast.error("Falha ao carregar histórico de planos");
     } finally {
       setIsLoadingHistory(false);
     }
   };
 
-  useEffect(() => {
+  React.useEffect(() => {
     fetchFisioHistory();
   }, []);
-
-  const handlePreferencesSubmit = (newPreferences: FisioPreferences) => {
-    setError(null);
-    setPreferences(newPreferences);
-  };
-
-  const handleReset = () => {
-    setPreferences(null);
-    setError(null);
-    // Refresh history after creating a new plan
-    fetchFisioHistory();
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
@@ -124,24 +85,17 @@ const Fisio = () => {
           <p className="text-muted-foreground max-w-2xl mx-auto">
             Crie um plano de reabilitação personalizado baseado em suas necessidades específicas
           </p>
-          
-          {error && (
-            <div className="mt-4 p-4 bg-red-50 rounded-lg flex items-center justify-center space-x-3 max-w-2xl mx-auto">
-              <AlertTriangle className="text-red-500 w-5 h-5" />
-              <p className="text-red-700 text-sm">{error}</p>
-            </div>
-          )}
         </div>
 
         <div className="max-w-4xl mx-auto space-y-8">
           {!preferences ? (
             <div className="transform transition-all duration-500 hover:scale-[1.01]">
-              <FisioPreferencesForm onSubmit={handlePreferencesSubmit} />
+              <FisioPreferencesForm onSubmit={setPreferences} />
             </div>
           ) : (
             <ExercisePlanDisplay 
               preferences={preferences} 
-              onReset={handleReset} 
+              onReset={() => setPreferences(null)} 
             />
           )}
 

@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { FisioPreferences } from "./types";
 import { RehabPlan } from "./types/rehab-plan";
 import { Card, CardContent } from "@/components/ui/card";
-import { RotateCcw, FileDown, AlertTriangle } from "lucide-react";
+import { RotateCcw, FileDown } from "lucide-react";
 import { WorkoutLoadingState } from "../workout/components/WorkoutLoadingState";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -22,9 +23,6 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
   const [rehabPlan, setRehabPlan] = useState<RehabPlan | null>(null);
   const [selectedDay, setSelectedDay] = useState<string>("day1");
   const [loadingTime, setLoadingTime] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
-  const MAX_RETRIES = 3;
 
   useEffect(() => {
     let interval: number | null = null;
@@ -42,47 +40,28 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
     try {
       setLoading(true);
       setLoadingTime(0);
-      setError(null);
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        setError("Usuário não autenticado");
         toast.error("Usuário não autenticado");
         return;
       }
 
-      console.log("Iniciando geração do plano de reabilitação...");
-      const startTime = Date.now();
-      
-      const { data: response, error: invokeError } = await supabase.functions.invoke('fisio-plus-agent', {
+      const { data: response, error } = await supabase.functions.invoke('generate-rehab-plan-groq', {
         body: { 
           preferences, 
           userId: user.id
         }
       });
 
-      console.log(`Tempo de resposta: ${Date.now() - startTime}ms`);
-      
-      if (invokeError) {
-        console.error("Erro na invocação da função:", invokeError);
-        throw new Error(invokeError.message || "Erro ao invocar o agente Fisio+");
-      }
-
-      if (!response) {
-        console.error("Nenhum plano foi gerado - resposta vazia");
-        throw new Error("Nenhum plano foi gerado");
-      }
-
-      if (response.error) {
-        console.error("Erro retornado pela função:", response.error);
-        throw new Error(response.error);
-      }
+      if (error) throw error;
+      if (!response) throw new Error("Nenhum plano foi gerado");
 
       if (response) {
         await addTransaction({
           amount: REWARDS.REHAB_PLAN,
           type: 'physio_plan',
-          description: 'Geração de plano de reabilitação com Fisio+ (Llama 3)'
+          description: 'Geração de plano de reabilitação com Groq'
         });
         
         setRehabPlan(response);
@@ -90,15 +69,8 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
       }
     } catch (error: any) {
       console.error("Erro ao gerar plano:", error);
-      setError(error.message || "Erro ao gerar plano de reabilitação");
-      if (retryCount < MAX_RETRIES) {
-        toast.error(`Tentativa ${retryCount + 1} falhou. Tentando novamente...`);
-        setRetryCount(prev => prev + 1);
-        setTimeout(generatePlan, 3000); // Retry after 3 seconds
-      } else {
-        toast.error(error.message || "Erro ao gerar plano de reabilitação após várias tentativas");
-        setRehabPlan(null);
-      }
+      toast.error(error.message || "Erro ao gerar plano de reabilitação");
+      setRehabPlan(null);
     } finally {
       setLoading(false);
     }
@@ -116,24 +88,17 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
     />;
   }
 
-  if (error || !rehabPlan) {
+  if (!rehabPlan) {
     return (
       <div className="text-center space-y-4 p-12">
-        <AlertTriangle className="w-12 h-12 text-red-500 mx-auto" />
         <h3 className="text-xl font-semibold text-red-600">
           Erro ao gerar o plano de reabilitação
         </h3>
         <p className="text-muted-foreground">
-          {error || "Não foi possível gerar seu plano. Por favor, tente novamente."}
+          Não foi possível gerar seu plano. Por favor, tente novamente.
         </p>
-        <Button onClick={onReset} variant="outline" size="lg" className="mr-2">
+        <Button onClick={onReset} variant="outline" size="lg">
           <RotateCcw className="w-4 h-4 mr-2" />
-          Voltar
-        </Button>
-        <Button onClick={() => {
-          setRetryCount(0);
-          generatePlan();
-        }} variant="default" size="lg">
           Tentar Novamente
         </Button>
       </div>
@@ -172,50 +137,7 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
   };
 
   const renderExerciseItem = (exerciseName: string, exerciseDetails: any) => {
-    if (!exerciseDetails || !exerciseDetails.exercises || exerciseDetails.exercises.length === 0) {
-      const exercises = Array.isArray(exerciseDetails) ? exerciseDetails : 
-                      (exerciseDetails.name && exerciseDetails.sets) ? [exerciseDetails] : [];
-                      
-      if (exercises.length === 0) return null;
-      
-      return (
-        <div className="mb-6">
-          <h3 className="text-lg font-semibold flex items-center mb-3">
-            <span className="text-primary mr-2">💪</span> {exerciseName}
-          </h3>
-          <div className="space-y-2 pl-5">
-            {exercises.map((exercise: any, idx: number) => (
-              <div key={idx} className="flex flex-col mb-3">
-                <div className="flex items-baseline font-medium">
-                  <span className="mr-1">{exercise.name}</span>
-                  <span className="text-sm text-gray-700 ml-2">
-                    {exercise.sets} séries x {exercise.reps} repetições
-                  </span>
-                </div>
-                {exercise.description && (
-                  <span className="text-sm text-gray-500 ml-2 mt-1">{exercise.description}</span>
-                )}
-                {exercise.rest_time_seconds && (
-                  <span className="text-sm text-blue-600 ml-2 mt-1">
-                    Descanso: {exercise.rest_time_seconds} segundos
-                  </span>
-                )}
-                {exercise.tips && exercise.tips.length > 0 && (
-                  <div className="ml-2 mt-2">
-                    <p className="text-xs font-medium text-gray-700">Dicas:</p>
-                    <ul className="list-disc pl-4 text-xs text-gray-600">
-                      {exercise.tips.map((tip: string, tipIdx: number) => (
-                        <li key={tipIdx}>{tip}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-    }
+    if (!exerciseDetails || !exerciseDetails.exercises || exerciseDetails.exercises.length === 0) return null;
     
     return (
       <div className="mb-6">
@@ -236,10 +158,8 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
               {exercise.description && (
                 <span className="text-sm text-gray-500 ml-2 mt-1">{exercise.description}</span>
               )}
-              {(exercise.rest_time_seconds || exercise.restTime) && (
-                <span className="text-sm text-blue-600 ml-2 mt-1">
-                  Descanso: {exercise.rest_time_seconds || exercise.restTime} segundos
-                </span>
+              {exercise.restTime && (
+                <span className="text-sm text-blue-600 ml-2 mt-1">Descanso: {exercise.restTime}</span>
               )}
             </div>
           ))}
@@ -267,7 +187,7 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
           {dayPlan.exercises?.map((section: any, idx: number) => (
             <Card key={idx} className="overflow-hidden">
               <CardContent className="p-6">
-                {renderExerciseItem(section.name || "Exercício", section)}
+                {renderExerciseItem(section.title, section)}
               </CardContent>
             </Card>
           ))}
@@ -323,11 +243,7 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
         {rehabPlan.overview && (
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-2">Visão Geral</h3>
-            <p className="text-gray-600">
-              {typeof rehabPlan.overview === 'string' 
-                ? rehabPlan.overview 
-                : rehabPlan.overview.title || 'Plano de reabilitação personalizado'}
-            </p>
+            <p className="text-gray-600">{rehabPlan.overview}</p>
           </div>
         )}
 

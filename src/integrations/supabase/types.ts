@@ -270,7 +270,6 @@ export type Database = {
           goals: string[] | null
           id: string
           is_compound_movement: boolean | null
-          is_video: boolean | null
           max_reps: number
           max_sets: number
           min_reps: number
@@ -318,7 +317,6 @@ export type Database = {
           goals?: string[] | null
           id?: string
           is_compound_movement?: boolean | null
-          is_video?: boolean | null
           max_reps?: number
           max_sets?: number
           min_reps?: number
@@ -366,7 +364,6 @@ export type Database = {
           goals?: string[] | null
           id?: string
           is_compound_movement?: boolean | null
-          is_video?: boolean | null
           max_reps?: number
           max_sets?: number
           min_reps?: number
@@ -1046,7 +1043,6 @@ export type Database = {
           hold_time_seconds: number | null
           id: string
           is_compound_movement: boolean | null
-          is_video: boolean | null
           joint_area: Database["public"]["Enums"]["physio_joint_area"]
           keywords: string[] | null
           maintenance_phase_suitable: boolean | null
@@ -1092,7 +1088,6 @@ export type Database = {
           hold_time_seconds?: number | null
           id?: string
           is_compound_movement?: boolean | null
-          is_video?: boolean | null
           joint_area: Database["public"]["Enums"]["physio_joint_area"]
           keywords?: string[] | null
           maintenance_phase_suitable?: boolean | null
@@ -1138,7 +1133,6 @@ export type Database = {
           hold_time_seconds?: number | null
           id?: string
           is_compound_movement?: boolean | null
-          is_video?: boolean | null
           joint_area?: Database["public"]["Enums"]["physio_joint_area"]
           keywords?: string[] | null
           maintenance_phase_suitable?: boolean | null
