@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { supabaseClient } from "../_shared/supabase-client.ts";
 
@@ -25,6 +26,207 @@ interface WorkoutPlanRequestBody {
   settings?: any;
   requestId?: string;
   exercises?: any[];
+}
+
+// Function to create a fallback workout plan when the LLM fails
+function createFallbackWorkoutPlan(exercises: any[], daysPerWeek: number, minExercisesPerDay: number, goal: string) {
+  try {
+    console.log("Creating fallback workout plan with structured approach");
+    
+    // Basic structure for workout plan
+    const workoutPlan = {
+      id: crypto.randomUUID(),
+      user_id: "", // Will be filled later
+      goal: goal || "General fitness",
+      start_date: new Date().toISOString().split('T')[0],
+      end_date: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      created_at: new Date().toISOString(),
+      workout_sessions: []
+    };
+    
+    // Distribute exercises across days
+    const dayNames = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
+    const muscleGroups = ["chest", "back", "legs", "shoulders", "arms", "core"];
+    
+    // Create workout splits based on days per week
+    let workoutSplits = [];
+    if (daysPerWeek <= 3) {
+      // Full body workouts for fewer days
+      workoutSplits = Array(daysPerWeek).fill(muscleGroups);
+    } else if (daysPerWeek === 4) {
+      // 4-day split
+      workoutSplits = [
+        ["chest", "shoulders", "triceps"],
+        ["back", "biceps"],
+        ["legs", "core"],
+        ["shoulders", "arms", "core"]
+      ];
+    } else if (daysPerWeek === 5) {
+      // 5-day split
+      workoutSplits = [
+        ["chest", "triceps"],
+        ["back", "biceps"],
+        ["legs"],
+        ["shoulders", "core"],
+        ["arms", "core"]
+      ];
+    } else {
+      // 6-day PPL split
+      workoutSplits = [
+        ["chest", "shoulders", "triceps"],
+        ["back", "biceps"],
+        ["legs", "core"],
+        ["chest", "shoulders", "triceps"],
+        ["back", "biceps"],
+        ["legs", "core"]
+      ];
+    }
+    
+    // Randomize the order of exercises
+    const shuffledExercises = [...exercises].sort(() => Math.random() - 0.5);
+    let exerciseIndex = 0;
+    
+    // Create sessions
+    for (let i = 0; i < daysPerWeek; i++) {
+      const dayFocus = workoutSplits[i] || muscleGroups;
+      const session = {
+        id: crypto.randomUUID(),
+        day_number: i + 1,
+        day_name: `Dia ${i + 1}: ${dayNames[i % 7]}`,
+        focus: Array.isArray(dayFocus) ? dayFocus.join(", ") : "Treino completo",
+        intensity: getIntensityForDay(i, daysPerWeek),
+        warmup_description: "Realize 5-10 minutos de aquecimento cardiovascular leve, seguido de movimentos dinâmicos específicos para os grupos musculares que serão trabalhados hoje.",
+        cooldown_description: "Finalize com 5 minutos de alongamento estático, focando nos músculos trabalhados durante o treino.",
+        session_exercises: []
+      };
+      
+      // Get target muscle groups for this day
+      const targetGroups = Array.isArray(dayFocus) ? dayFocus : muscleGroups;
+      
+      // First, add exercises for the target muscle groups
+      const exercisesForDay = [];
+      for (const group of targetGroups) {
+        const groupExercises = shuffledExercises.filter(ex => 
+          ex.muscle_group === group && !exercisesForDay.some(e => e.id === ex.id)
+        );
+        
+        if (groupExercises.length > 0) {
+          // Take one exercise for each target muscle group
+          exercisesForDay.push(groupExercises[0]);
+          if (exercisesForDay.length >= minExercisesPerDay) break;
+        }
+      }
+      
+      // If we don't have enough exercises yet, add more from any muscle group
+      while (exercisesForDay.length < minExercisesPerDay && exerciseIndex < shuffledExercises.length) {
+        const exercise = shuffledExercises[exerciseIndex++];
+        if (!exercisesForDay.some(e => e.id === exercise.id)) {
+          exercisesForDay.push(exercise);
+        }
+        
+        // If we've used all exercises but still need more, reset the index
+        if (exerciseIndex >= shuffledExercises.length) {
+          exerciseIndex = 0;
+        }
+      }
+      
+      // Add selected exercises to the session
+      for (const exercise of exercisesForDay) {
+        // Add timestamp to GIF URL
+        let gifUrl = exercise.gif_url;
+        if (gifUrl) {
+          const timestamp = Date.now();
+          if (gifUrl.includes('?')) {
+            gifUrl = `${gifUrl}&t=${timestamp}`;
+          } else {
+            gifUrl = `${gifUrl}?t=${timestamp}`;
+          }
+        }
+        
+        // Create weight recommendations based on exercise
+        const weightRecommendations = createWeightRecommendations(exercise);
+        
+        session.session_exercises.push({
+          exercise: {
+            id: exercise.id,
+            name: exercise.name || `Exercise ${exercise.id.substring(0, 8)}`,
+            description: exercise.description || "",
+            muscle_group: exercise.muscle_group,
+            gif_url: gifUrl
+          },
+          sets: generateSetsBasedOnGoal(goal),
+          reps: generateRepsBasedOnGoal(goal),
+          rest_time_seconds: generateRestTimeBasedOnGoal(goal),
+          weight_recommendations: weightRecommendations
+        });
+      }
+      
+      workoutPlan.workout_sessions.push(session);
+    }
+    
+    return workoutPlan;
+  } catch (error) {
+    console.error("Error in createFallbackWorkoutPlan:", error);
+    throw new Error(`Failed to create fallback workout plan: ${error.message}`);
+  }
+}
+
+// Helper functions for fallback plan generation
+function getIntensityForDay(dayNumber: number, totalDays: number): string {
+  const intensities = ["Moderada", "Alta", "Média", "Moderada", "Alta", "Média", "Recuperação"];
+  return intensities[dayNumber % intensities.length];
+}
+
+function generateSetsBasedOnGoal(goal: string): number {
+  switch (goal) {
+    case "gain_mass": return 4;
+    case "lose_weight": return 3;
+    default: return 3;
+  }
+}
+
+function generateRepsBasedOnGoal(goal: string): number {
+  switch (goal) {
+    case "gain_mass": return 8;
+    case "lose_weight": return 12;
+    default: return 10;
+  }
+}
+
+function generateRestTimeBasedOnGoal(goal: string): number {
+  switch (goal) {
+    case "gain_mass": return 90;
+    case "lose_weight": return 45;
+    default: return 60;
+  }
+}
+
+function createWeightRecommendations(exercise: any): any {
+  // If the exercise already has weight recommendations, use those
+  if (exercise.beginner_weight || exercise.moderate_weight || exercise.advanced_weight) {
+    return {
+      beginner: exercise.beginner_weight || "Peso leve",
+      moderate: exercise.moderate_weight || "Peso moderado",
+      advanced: exercise.advanced_weight || "Peso avançado"
+    };
+  }
+  
+  // Default values based on muscle group
+  const defaultRecommendations: Record<string, any> = {
+    chest: { beginner: "5-10kg", moderate: "15-20kg", advanced: "25kg+" },
+    back: { beginner: "5-10kg", moderate: "15-20kg", advanced: "25kg+" },
+    legs: { beginner: "10-15kg", moderate: "20-30kg", advanced: "35kg+" },
+    shoulders: { beginner: "3-8kg", moderate: "10-15kg", advanced: "20kg+" },
+    arms: { beginner: "3-8kg", moderate: "10-15kg", advanced: "17kg+" },
+    core: { beginner: "Peso corporal", moderate: "5kg", advanced: "10kg+" }
+  };
+  
+  // Return defaults based on muscle group or generic if not found
+  return defaultRecommendations[exercise.muscle_group] || {
+    beginner: "Peso leve", 
+    moderate: "Peso moderado", 
+    advanced: "Peso avançado"
+  };
 }
 
 serve(async (req) => {
@@ -702,12 +904,13 @@ REMEMBER:
                     },
                     sets: 3,
                     reps: 12,
-                    rest_time_seconds: 60
+                    rest_time_seconds: 60,
+                    weight_recommendations: createWeightRecommendations(exercise)
                   });
                   
                   // Remove this exercise from unusedExercises
-                  const index = unusedExercises.findIndex(e => e.id === exercise.id);
-                  if (index >= 0) unusedExercises.splice(index, 1);
+                  const idx = unusedExercises.findIndex(e => e.id === exercise.id);
+                  if (idx >= 0) unusedExercises.splice(idx, 1);
                   
                   // Record as used
                   usedExerciseIds.set(exercise.id, {
@@ -747,7 +950,8 @@ REMEMBER:
                   },
                   sets: 3,
                   reps: 12,
-                  rest_time_seconds: 60
+                  rest_time_seconds: 60,
+                  weight_recommendations: createWeightRecommendations(exercise)
                 });
                 
                 // Record as used
@@ -773,6 +977,87 @@ REMEMBER:
       // Set goal from user preferences
       workoutPlan.goal = body.preferences.goal;
       
+      // Add user ID
+      workoutPlan.user_id = body.userId;
+      
+      // Add ID if not present
+      if (!workoutPlan.id) {
+        workoutPlan.id = crypto.randomUUID();
+      }
+      
+      // Add created_at if not present
+      if (!workoutPlan.created_at) {
+        workoutPlan.created_at = new Date().toISOString();
+      }
+      
+      console.log(`Request ID: ${requestId} - Successfully validated and processed workout plan`);
+      console.log(`Request ID: ${requestId} - Plan has ${workoutPlan.workout_sessions.length} sessions`);
+      
+      // Return the workout plan
+      return new Response(
+        JSON.stringify({
+          workoutPlan,
+          message: "Workout plan successfully generated",
+          success: true
+        }),
+        {
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json"
+          }
+        }
+      );
+      
     } catch (error) {
-      console.error(`Request ID: ${requestId} - Error parsing workout plan JSON:`, error);
-      console.log
+      console.error(`Request ID: ${requestId} - Error parsing or processing workout plan:`, error);
+      
+      // Try to use fallback plan generation on error
+      try {
+        console.log(`Request ID: ${requestId} - Using fallback workout plan generation`);
+        const fallbackPlan = createFallbackWorkoutPlan(
+          selectedExercises, 
+          daysPerWeek, 
+          minExercisesPerDay, 
+          body.preferences.goal
+        );
+        
+        // Set user ID in fallback plan
+        fallbackPlan.user_id = body.userId;
+        
+        return new Response(
+          JSON.stringify({
+            workoutPlan: fallbackPlan,
+            message: "Workout plan generated using fallback mechanism due to API response processing error",
+            success: true
+          }),
+          {
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json"
+            }
+          }
+        );
+      } catch (fallbackError) {
+        console.error(`Request ID: ${requestId} - Even fallback plan generation failed:`, fallbackError);
+        throw new Error(`Failed to generate workout plan with both primary and fallback methods: ${error.message}`);
+      }
+    }
+  } catch (error) {
+    console.error(`Error in generate-workout-plan-llama:`, error);
+    
+    return new Response(
+      JSON.stringify({
+        error: error.message || "Erro ao gerar o plano de treino",
+        message: "Falha ao processar sua solicitação. Por favor, tente novamente.",
+        success: false
+      }),
+      {
+        status: 500,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+  }
+});
