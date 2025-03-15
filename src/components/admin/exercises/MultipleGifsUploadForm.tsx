@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -29,7 +30,6 @@ export const MultipleGifsUploadForm = ({
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [exerciseType, setExerciseType] = useState<ExerciseType>("strength");
-  const [difficulty, setDifficulty] = useState<Difficulty>("beginner");
   const [muscleGroup, setMuscleGroup] = useState<MuscleGroup>("chest");
   const [trainingLocation, setTrainingLocation] = useState("gym");
   const [goal, setGoal] = useState<string>("weight_loss");
@@ -53,13 +53,6 @@ export const MultipleGifsUploadForm = ({
     { value: "anywhere", label: "Qualquer Lugar" },
   ];
   
-  const difficultyOptions = [
-    { value: "beginner", label: "Sedentário - Pouco ou nenhum exercício" },
-    { value: "intermediate", label: "Leve - 1-3 dias por semana" },
-    { value: "moderate", label: "Moderado - 3-5 dias por semana" },
-    { value: "advanced", label: "Intenso - 6-7 dias por semana" },
-  ];
-
   const goalOptions = [
     { value: "weight_loss", label: "Perder Peso - Foco em queima de gordura" },
     { value: "maintenance", label: "Manter Peso - Melhorar condicionamento" },
@@ -123,14 +116,15 @@ export const MultipleGifsUploadForm = ({
                                  ? exerciseType 
                                  : "mobility";
         
-        const validDifficulty = difficulty === "expert" ? "advanced" : difficulty;
+        // Use a default difficulty value since we removed the selector
+        const defaultDifficulty: Difficulty = "beginner";
 
         const exerciseData = {
           name: exerciseName,
           description: `Exercício de ${muscleGroupOptions.find(m => m.value === muscleGroup)?.label}`,
           gif_url: publicUrl,
           exercise_type: validExerciseType,
-          difficulty: validDifficulty,
+          difficulty: defaultDifficulty,
           muscle_group: muscleGroup,
           primary_muscles_worked: [muscleGroup],
           goals: [goal],
@@ -171,7 +165,7 @@ export const MultipleGifsUploadForm = ({
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <Label>Tipo de Exercício</Label>
               <Select
@@ -185,25 +179,6 @@ export const MultipleGifsUploadForm = ({
                   <SelectItem value="strength">Força</SelectItem>
                   <SelectItem value="cardio">Cardio</SelectItem>
                   <SelectItem value="mobility">Mobilidade</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label>Dificuldade</Label>
-              <Select
-                value={difficulty}
-                onValueChange={(value: Difficulty) => setDifficulty(value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a dificuldade" />
-                </SelectTrigger>
-                <SelectContent>
-                  {difficultyOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value as Difficulty}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
                 </SelectContent>
               </Select>
             </div>

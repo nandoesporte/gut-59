@@ -86,7 +86,6 @@ export const FisioBatchUploadForm = ({
 }: FisioBatchUploadFormProps) => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [selectedJointArea, setSelectedJointArea] = useState<PhysioJointArea>("knee");
-  const [difficulty, setDifficulty] = useState<Difficulty>("beginner");
   const [exerciseType, setExerciseType] = useState<ExerciseType>("mobility");
   const [isCompoundMovement, setIsCompoundMovement] = useState(false);
   const [requiresEquipment, setRequiresEquipment] = useState(false);
@@ -133,13 +132,16 @@ export const FisioBatchUploadForm = ({
         // Get the default condition for the selected joint area
         const defaultCondition = getDefaultCondition(selectedJointArea);
         
+        // Use a default difficulty value since we removed the selector
+        const defaultDifficulty: Difficulty = "beginner";
+        
         const exerciseData: PhysioExercise = {
           name: file.name.replace('.gif', ''),
           description: '',
           joint_area: selectedJointArea,
           condition: defaultCondition, // Use the default condition
           exercise_type: exerciseType,
-          difficulty: difficulty,
+          difficulty: defaultDifficulty, // Use default difficulty
           is_compound_movement: isCompoundMovement,
           required_equipment: requiresEquipment ? ['basic'] : [],
           balance_requirement: 'moderate',
@@ -201,25 +203,6 @@ export const FisioBatchUploadForm = ({
                       {label}
                     </SelectItem>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* The condition selector has been removed */}
-            
-            <div>
-              <Label>Nível de Dificuldade</Label>
-              <Select
-                value={difficulty}
-                onValueChange={(value: Difficulty) => setDifficulty(value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o nível" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="beginner">Iniciante</SelectItem>
-                  <SelectItem value="intermediate">Intermediário</SelectItem>
-                  <SelectItem value="advanced">Avançado</SelectItem>
                 </SelectContent>
               </Select>
             </div>
