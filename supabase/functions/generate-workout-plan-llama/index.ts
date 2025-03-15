@@ -302,7 +302,7 @@ function constructUserPrompt(preferences, exercises) {
   `;
 
   // Add health conditions if available
-  if (preferences.health_conditions && preferences.health_conditions.length > 0) {
+  if (preferences.health_conditions && Array.isArray(preferences.health_conditions) && preferences.health_conditions.length > 0) {
     prompt += `Condições de saúde: ${preferences.health_conditions.join(', ')}\n`;
   }
 
