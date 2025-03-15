@@ -60,9 +60,18 @@ export const WorkoutPlanDisplay = ({ preferences, onReset, onPlanGenerated }: Wo
         toast.error('Erro ao carregar configurações de IA');
       }
 
+      // Ensure preferences has all required fields, including days_per_week
+      const enhancedPreferences = {
+        ...preferences,
+        days_per_week: preferences.days_per_week || 3 // Default to 3 days if not specified
+      };
+
+      // Add console log to debug the preferences being sent
+      console.log('Sending preferences to workout plan generator:', enhancedPreferences);
+
       const { data: response, error } = await supabase.functions.invoke('generate-workout-plan-llama', {
         body: { 
-          preferences, 
+          preferences: enhancedPreferences, 
           userId: user.id,
           settings: settingsData || {}
         }
@@ -70,6 +79,8 @@ export const WorkoutPlanDisplay = ({ preferences, onReset, onPlanGenerated }: Wo
 
       if (error) throw error;
       if (!response) throw new Error("Nenhum plano foi gerado");
+
+      console.log('Workout plan response received:', response);
 
       if (response.workoutPlan) {
         setWorkoutPlan(response.workoutPlan);
@@ -100,6 +111,11 @@ export const WorkoutPlanDisplay = ({ preferences, onReset, onPlanGenerated }: Wo
   }, [generateWorkoutPlan]);
 
   const renderExerciseItem = (exercise: any) => {
+    if (!exercise || !exercise.exercise) {
+      console.error("Invalid exercise data:", exercise);
+      return null;
+    }
+    
     return (
       <div key={exercise.exercise.id} className="mb-4 p-4 bg-gray-50 rounded-md shadow-sm">
         <h4 className="text-lg font-semibold flex items-center mb-2">
@@ -169,7 +185,7 @@ export const WorkoutPlanDisplay = ({ preferences, onReset, onPlanGenerated }: Wo
         </CardContent>
       </Card>
 
-      {workoutPlan.workout_sessions.map((session, index) => (
+      {workoutPlan.workout_sessions && workoutPlan.workout_sessions.map((session, index) => (
         <Card key={index} className="transform transition-all duration-300 hover:scale-[1.01]">
           <CardHeader>
             <CardTitle>
@@ -186,7 +202,7 @@ export const WorkoutPlanDisplay = ({ preferences, onReset, onPlanGenerated }: Wo
             </div>
             <div className="space-y-2">
               <h4 className="text-md font-medium">Exercícios</h4>
-              {session.session_exercises.map(exercise => renderExerciseItem(exercise))}
+              {session.session_exercises && session.session_exercises.map(exercise => renderExerciseItem(exercise))}
             </div>
             <div className="space-y-2">
               <h4 className="text-md font-medium">Volta à Calma</h4>
