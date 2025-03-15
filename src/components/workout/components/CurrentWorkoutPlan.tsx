@@ -30,14 +30,14 @@ export const CurrentWorkoutPlan = ({ plan, formatGoal }: CurrentWorkoutPlanProps
   };
 
   return (
-    <Card className="border border-primary/10">
+    <Card className="border border-primary/10 overflow-hidden">
       <WorkoutPlanHeader 
         goal={getFormattedGoal()}
         startDate={plan.start_date}
         endDate={plan.end_date}
       />
       <Separator />
-      <CardContent className="p-0 overflow-hidden">
+      <CardContent className="p-0">
         <ScrollArea className="h-auto max-h-[70vh]">
           <WorkoutPlanDetailed plan={plan} />
         </ScrollArea>

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,7 @@ import { SavedWorkoutPlanDetails } from "./SavedWorkoutPlanDetails";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Calendar, ClipboardList, RefreshCcw, Trash2, Loader2 } from "lucide-react";
+import { Calendar, ClipboardList, RefreshCcw, Trash2 } from "lucide-react";
 import { DeleteWorkoutDialog } from "./DeleteWorkoutDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -187,12 +188,12 @@ const WorkoutHistory = ({ plans, isLoading, onRefresh, selectedPlanId }: Workout
                         <Button 
                           variant="destructive" 
                           size="sm" 
-                          className="h-8"
+                          className="h-8 w-8 p-0"
                           onClick={(e) => openDeleteDialog(plan.id, e)}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-8">
+                        <Button variant="outline" size="sm" className="h-8">
                           Visualizar
                         </Button>
                       </div>
@@ -215,7 +216,7 @@ const WorkoutHistory = ({ plans, isLoading, onRefresh, selectedPlanId }: Workout
                   ← Voltar para a lista
                 </Button>
                 
-                <CurrentWorkoutPlan plan={selectedPlan} />
+                <CurrentWorkoutPlan plan={selectedPlan} formatGoal={formatGoalName} />
                 
                 <Separator className="my-4" />
                 
