@@ -106,13 +106,21 @@ export const ExerciseGifsTab = () => {
   const uploadPhysioExerciseMutation = useMutation({
     mutationFn: async ({ exerciseData, file }: { exerciseData: PhysioExercise, file: File }) => {
       if (!file) {
-        throw new Error('Arquivo GIF é obrigatório');
+        throw new Error('Arquivo é obrigatório');
       }
 
-      // Upload the GIF file
+      // Determine folder based on file type
+      const isVideo = !file.type.includes('gif');
+      const folderPath = isVideo ? 'physio/videos' : 'physio';
+      
+      // Generate unique filename to avoid collisions
+      const fileExtension = file.name.split('.').pop();
+      const uniqueFilename = `${crypto.randomUUID()}.${fileExtension}`;
+      
+      // Upload the file
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('exercise-gifs')
-        .upload(`physio/${crypto.randomUUID()}.gif`, file);
+        .upload(`${folderPath}/${uniqueFilename}`, file);
 
       if (uploadError) throw uploadError;
 
@@ -133,7 +141,8 @@ export const ExerciseGifsTab = () => {
         ...exerciseData,
         gif_url: publicUrl,
         exercise_type: validExerciseType,
-        difficulty: exerciseData.difficulty as "beginner" | "intermediate" | "advanced"
+        difficulty: exerciseData.difficulty as "beginner" | "intermediate" | "advanced",
+        is_video: isVideo
       };
 
       // Create the exercise record in the physio_exercises table

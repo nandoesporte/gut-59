@@ -89,7 +89,7 @@ export const FisioBatchUploadForm = ({
   const [exerciseType, setExerciseType] = useState<ExerciseType>("mobility");
   const [isCompoundMovement, setIsCompoundMovement] = useState(false);
   const [requiresEquipment, setRequiresEquipment] = useState(false);
-  const MAX_FILE_SIZE = 20 * 1024 * 1024;
+  const MAX_FILE_SIZE = 100 * 1024 * 1024; // Increased to 100MB to accommodate video files
 
   // Get default condition based on selected joint area
   const getDefaultCondition = (jointArea: PhysioJointArea): PhysioCondition => {
@@ -97,13 +97,15 @@ export const FisioBatchUploadForm = ({
   };
 
   const validateFile = (file: File): boolean => {
-    if (!file.type.includes('gif')) {
-      toast.error(`${file.name} não é um arquivo GIF`);
+    const validTypes = ['image/gif', 'video/mp4', 'video/quicktime', 'video/webm'];
+    
+    if (!validTypes.includes(file.type)) {
+      toast.error(`${file.name} não é um arquivo válido. Aceitos: GIF, MP4, MOV, WEBM`);
       return false;
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      toast.error(`${file.name} é muito grande. O tamanho máximo é 20MB`);
+      toast.error(`${file.name} é muito grande. O tamanho máximo é 100MB`);
       return false;
     }
 
@@ -136,7 +138,7 @@ export const FisioBatchUploadForm = ({
         const defaultDifficulty: Difficulty = "beginner";
         
         const exerciseData: PhysioExercise = {
-          name: file.name.replace('.gif', ''),
+          name: file.name.replace(/\.(gif|mp4|mov|webm)$/i, ''),
           description: '',
           joint_area: selectedJointArea,
           condition: defaultCondition, // Use the default condition
@@ -156,9 +158,11 @@ export const FisioBatchUploadForm = ({
           recommended_sets: 3,
           hold_time_seconds: 10,
           rest_time_seconds: 30,
-          keywords: [file.name.replace('.gif', '').toLowerCase()],
+          keywords: [file.name.replace(/\.(gif|mp4|mov|webm)$/i, '').toLowerCase()],
           primary_goals: ['rehabilitation'],
-          target_symptoms: [defaultCondition] // Use the default condition
+          target_symptoms: [defaultCondition], // Use the default condition
+          // Identify if it's a video
+          is_video: !file.type.includes('gif')
         };
         
         await onUpload(exerciseData, file);
@@ -246,18 +250,18 @@ export const FisioBatchUploadForm = ({
           </div>
 
           <div>
-            <Label htmlFor="files">Selecionar GIFs</Label>
+            <Label htmlFor="files">Selecionar GIFs ou Vídeos</Label>
             <Input
               id="files"
               type="file"
-              accept=".gif"
+              accept=".gif,.mp4,.mov,.webm"
               multiple
               onChange={handleFileSelect}
               disabled={uploading}
               className="mt-1"
             />
             <p className="text-sm text-gray-500 mt-1">
-              Selecione múltiplos arquivos GIF (máx. 20MB cada). Os nomes dos arquivos serão usados como nomes dos exercícios.
+              Selecione múltiplos arquivos GIF ou vídeos (MP4, MOV, WEBM) com máximo de 100MB cada. Os nomes dos arquivos serão usados como nomes dos exercícios.
             </p>
           </div>
 

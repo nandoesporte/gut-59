@@ -60,19 +60,28 @@ serve(async (req) => {
         continue;
       }
 
-      if (!filename.toLowerCase().endsWith('.gif')) {
-        console.log(`${filename} não é um GIF, ignorando...`);
-        errors.push(`${filename} não é um arquivo GIF`);
+      // Check for valid file types - now supports videos as well
+      const isValidFile = filename.toLowerCase().endsWith('.gif') || 
+                          filename.toLowerCase().endsWith('.mp4') || 
+                          filename.toLowerCase().endsWith('.mov') || 
+                          filename.toLowerCase().endsWith('.webm');
+      
+      if (!isValidFile) {
+        console.log(`${filename} não é um arquivo válido (GIF/MP4/MOV/WEBM), ignorando...`);
+        errors.push(`${filename} não é um arquivo suportado. Formatos aceitos: GIF, MP4, MOV, WEBM`);
         continue;
       }
 
-      // Adicionar à lista de promessas
+      // Determine if it's a video or a GIF
+      const isVideo = !filename.toLowerCase().endsWith('.gif');
+      
+      // Add to processing queue
       filePromises.push(async () => {
         try {
           console.log(`Processando ${filename}...`);
           const content = await file.async('blob')
           const sanitizedName = filename.split('/').pop()?.replace(/[^a-zA-Z0-9.-]/g, '_')
-          const exerciseName = sanitizedName?.replace('.gif', '').replace(/_/g, ' ')
+          const exerciseName = sanitizedName?.replace(/\.(gif|mp4|mov|webm)$/i, '').replace(/_/g, ' ')
 
           if (!sanitizedName || !exerciseName) {
             throw new Error('Nome do arquivo inválido');
@@ -80,15 +89,27 @@ serve(async (req) => {
 
           // Use timestamp + random string for unique filenames to avoid caching issues
           const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-          const filePath = `${category}/${uniqueId}_${sanitizedName}`
+          // Put videos in a separate folder
+          const folderPath = isVideo ? `${category}/videos` : category;
+          const filePath = `${folderPath}/${uniqueId}_${sanitizedName}`
           
           console.log(`Enviando para caminho: ${filePath}`);
           
-          // Upload do arquivo
+          // Upload file with appropriate content type
+          let contentType = 'image/gif';
+          if (filename.toLowerCase().endsWith('.mp4')) {
+            contentType = 'video/mp4';
+          } else if (filename.toLowerCase().endsWith('.mov')) {
+            contentType = 'video/quicktime';
+          } else if (filename.toLowerCase().endsWith('.webm')) {
+            contentType = 'video/webm';
+          }
+          
+          // Upload the file
           const { data: uploadData, error: uploadError } = await supabase.storage
             .from('exercise-gifs')
             .upload(filePath, content, {
-              contentType: 'image/gif',
+              contentType: contentType,
               cacheControl: 'no-cache, max-age=0',
               upsert: true
             })
@@ -123,7 +144,8 @@ serve(async (req) => {
             rest_time_seconds: 60,
             alternative_exercises: [],
             equipment_needed: [],
-            primary_muscles_worked: [category]
+            primary_muscles_worked: [category],
+            is_video: isVideo
           }
 
           console.log(`Inserindo exercício no banco de dados: ${exerciseName}`);
@@ -144,6 +166,7 @@ serve(async (req) => {
           uploadedFiles.push({
             name: filename,
             url: publicUrl,
+            is_video: isVideo,
             exercise: insertedExercise
           });
 
