@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Upload } from "lucide-react";
+import { Plus, Upload, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { ExerciseForm } from './ExerciseForm';
@@ -11,9 +12,11 @@ import { ExerciseCard } from './ExerciseCard';
 
 export const ExerciseList = () => {
   const [exercises, setExercises] = useState<any[]>([]);
+  const [filteredExercises, setFilteredExercises] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showBatchUpload, setShowBatchUpload] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const fetchExercises = async () => {
     try {
@@ -25,6 +28,7 @@ export const ExerciseList = () => {
 
       if (error) throw error;
       setExercises(data || []);
+      setFilteredExercises(data || []);
     } catch (error) {
       console.error('Error fetching exercises:', error);
       toast.error('Erro ao carregar exercícios');
@@ -36,6 +40,24 @@ export const ExerciseList = () => {
   useEffect(() => {
     fetchExercises();
   }, []);
+
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setFilteredExercises(exercises);
+    } else {
+      const lowerCaseQuery = searchQuery.toLowerCase();
+      const filtered = exercises.filter((exercise) => {
+        return (
+          exercise.name.toLowerCase().includes(lowerCaseQuery) ||
+          exercise.exercise_type.toLowerCase().includes(lowerCaseQuery) ||
+          exercise.muscle_group.toLowerCase().includes(lowerCaseQuery) ||
+          (exercise.description && 
+            exercise.description.toLowerCase().includes(lowerCaseQuery))
+        );
+      });
+      setFilteredExercises(filtered);
+    }
+  }, [searchQuery, exercises]);
 
   const handleAddSuccess = () => {
     setShowAddForm(false);
@@ -87,8 +109,19 @@ export const ExerciseList = () => {
         </Card>
       )}
 
+      <div className="relative">
+        <Input
+          type="text"
+          placeholder="Pesquisar exercícios por nome, tipo ou grupo muscular..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10 mb-4"
+        />
+        <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {exercises.map(exercise => (
+        {filteredExercises.map(exercise => (
           <ExerciseCard 
             key={exercise.id}
             exercise={exercise}
@@ -98,8 +131,13 @@ export const ExerciseList = () => {
       </div>
 
       {loading && <p>Carregando exercícios...</p>}
-      {!loading && exercises.length === 0 && (
-        <p className="text-center text-muted-foreground">
+      {!loading && filteredExercises.length === 0 && searchQuery && (
+        <p className="text-center text-muted-foreground py-8">
+          Nenhum exercício encontrado para "{searchQuery}".
+        </p>
+      )}
+      {!loading && exercises.length === 0 && !searchQuery && (
+        <p className="text-center text-muted-foreground py-8">
           Nenhum exercício cadastrado ainda.
         </p>
       )}
