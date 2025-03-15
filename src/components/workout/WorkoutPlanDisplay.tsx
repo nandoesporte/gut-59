@@ -21,7 +21,7 @@ export const WorkoutPlanDisplay = ({ preferences, onReset, onPlanGenerated }: Wo
   const [workoutPlan, setWorkoutPlan] = useState<WorkoutPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingTime, setLoadingTime] = useState(0);
-  const [isMobile] = useIsMobile();
+  const isMobile = useIsMobile();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
