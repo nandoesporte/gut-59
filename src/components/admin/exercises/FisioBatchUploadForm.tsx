@@ -68,7 +68,7 @@ export const FisioBatchUploadForm = ({ onUpload, uploading: isUploading }: Fisio
       const formData = new FormData();
       formData.append('file', file);
       formData.append('category', jointArea);
-      formData.append('targetTable', 'physio_exercises'); // Add the targetTable parameter
+      formData.append('targetTable', 'physio_exercises'); // Define a tabela alvo como physio_exercises
 
       const { data: functionData, error: functionError } = await supabase.functions.invoke('process-exercise-gifs', {
         body: formData,
