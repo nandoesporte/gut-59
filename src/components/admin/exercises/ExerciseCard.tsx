@@ -132,6 +132,18 @@ export const ExerciseCard = ({ exercise, onUpdate }: ExerciseCardProps) => {
             <p><strong>Grupo Muscular:</strong> {exercise.muscle_group}</p>
             <p><strong>Séries:</strong> {exercise.min_sets}-{exercise.max_sets}</p>
             <p><strong>Repetições:</strong> {exercise.min_reps}-{exercise.max_reps}</p>
+            
+            {(exercise.beginner_weight || exercise.moderate_weight || exercise.advanced_weight) && (
+              <div className="mt-3 p-2 bg-gray-50 rounded-md">
+                <p className="font-medium text-sm">Recomendações de Carga:</p>
+                <ul className="text-xs space-y-1 mt-1">
+                  {exercise.beginner_weight && <li><span className="font-medium">Iniciante:</span> {exercise.beginner_weight}</li>}
+                  {exercise.moderate_weight && <li><span className="font-medium">Moderado:</span> {exercise.moderate_weight}</li>}
+                  {exercise.advanced_weight && <li><span className="font-medium">Avançado:</span> {exercise.advanced_weight}</li>}
+                </ul>
+              </div>
+            )}
+            
             {exercise.description && (
               <p className="text-muted-foreground">{exercise.description}</p>
             )}

@@ -22,7 +22,10 @@ const exerciseSchema = z.object({
   min_reps: z.number().min(1),
   max_reps: z.number().min(1),
   rest_time_seconds: z.number().min(1),
-  goals: z.array(z.string())
+  goals: z.array(z.string()),
+  beginner_weight: z.string().optional(),
+  moderate_weight: z.string().optional(),
+  advanced_weight: z.string().optional()
 });
 
 interface ExerciseFormProps {
@@ -47,7 +50,10 @@ export const ExerciseForm = ({ onSuccess, onCancel, exerciseData, editMode = fal
       min_reps: 8,
       max_reps: 12,
       rest_time_seconds: 60,
-      goals: []
+      goals: [],
+      beginner_weight: '',
+      moderate_weight: '',
+      advanced_weight: ''
     }
   });
 
@@ -143,6 +149,143 @@ export const ExerciseForm = ({ onSuccess, onCancel, exerciseData, editMode = fal
             </FormItem>
           )}
         />
+
+        <FormField
+          control={form.control}
+          name="muscle_group"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Grupo Muscular</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o grupo muscular" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="legs">Pernas</SelectItem>
+                  <SelectItem value="chest">Peito</SelectItem>
+                  <SelectItem value="back">Costas</SelectItem>
+                  <SelectItem value="shoulders">Ombros</SelectItem>
+                  <SelectItem value="arms">Braços</SelectItem>
+                  <SelectItem value="core">Core</SelectItem>
+                  <SelectItem value="full_body">Corpo Completo</SelectItem>
+                </SelectContent>
+              </Select>
+            </FormItem>
+          )}
+        />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="min_sets"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Séries Mínimas</FormLabel>
+                <FormControl>
+                  <Input {...field} type="number" onChange={e => field.onChange(parseInt(e.target.value))} />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+          
+          <FormField
+            control={form.control}
+            name="max_sets"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Séries Máximas</FormLabel>
+                <FormControl>
+                  <Input {...field} type="number" onChange={e => field.onChange(parseInt(e.target.value))} />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="min_reps"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Repetições Mínimas</FormLabel>
+                <FormControl>
+                  <Input {...field} type="number" onChange={e => field.onChange(parseInt(e.target.value))} />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+          
+          <FormField
+            control={form.control}
+            name="max_reps"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Repetições Máximas</FormLabel>
+                <FormControl>
+                  <Input {...field} type="number" onChange={e => field.onChange(parseInt(e.target.value))} />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <FormField
+          control={form.control}
+          name="rest_time_seconds"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Tempo de Descanso (segundos)</FormLabel>
+              <FormControl>
+                <Input {...field} type="number" onChange={e => field.onChange(parseInt(e.target.value))} />
+              </FormControl>
+            </FormItem>
+          )}
+        />
+
+        <div className="space-y-2 p-4 border rounded-lg">
+          <h3 className="font-medium text-lg">Recomendações de Carga</h3>
+          <p className="text-sm text-muted-foreground mb-3">Sugestões de carga para diferentes níveis (ex: "10-15kg", "Barra sem peso", "50% do peso corporal")</p>
+          
+          <FormField
+            control={form.control}
+            name="beginner_weight"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Nível Iniciante</FormLabel>
+                <FormControl>
+                  <Input {...field} placeholder="Ex: 5-10kg" />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+          
+          <FormField
+            control={form.control}
+            name="moderate_weight"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Nível Moderado</FormLabel>
+                <FormControl>
+                  <Input {...field} placeholder="Ex: 15-20kg" />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+          
+          <FormField
+            control={form.control}
+            name="advanced_weight"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Nível Avançado</FormLabel>
+                <FormControl>
+                  <Input {...field} placeholder="Ex: 25-30kg" />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+        </div>
 
         <div className="flex gap-4">
           <Button type="submit">{editMode ? 'Atualizar' : 'Salvar'}</Button>

@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { supabaseClient } from "../_shared/supabase-client.ts";
 
@@ -310,7 +309,7 @@ CRITICAL RULES:
 6. Each workout day should have a unique name/focus (like "Upper Body", "Lower Body", "Push", "Pull", etc.)
 7. Always include full details for each exercise including name, ID, and muscle group`;
 
-    // Create user prompt with preferences 
+    // In the userPrompt, add instructions for including weight recommendations
     const userPrompt = `Create a personalized workout plan for someone with the following characteristics:
 - Weight: ${body.preferences.weight} kg
 - Height: ${body.preferences.height} cm
@@ -324,6 +323,16 @@ ${body.preferences.available_equipment ? `- Available equipment: ${body.preferen
 - Days per week: ${daysPerWeek}
 
 I need a full workout plan with ${daysPerWeek} different workout sessions. Each day should have AT LEAST ${minExercisesPerDay} different exercises, but no more than 8 exercises.
+
+INCLUDE WEIGHT RECOMMENDATIONS:
+- For each exercise, analyze and provide appropriate weight recommendations
+- For exercises that have pre-defined weight recommendations, use those recommendations
+- For exercises without pre-defined recommendations, suggest appropriate weights based on:
+  - The user's experience level (derived from activity_level)
+  - The exercise type and muscle group
+  - The number of reps (higher reps typically use lighter weights)
+- Format recommendations as "Beginners: X, Moderate: Y, Advanced: Z"
+- For bodyweight exercises, specify "Bodyweight" or appropriate progression
 
 MOST IMPORTANT RULES:
 - Use ONLY the exact exercises from the provided list - DO NOT make up new exercises
@@ -343,7 +352,8 @@ For each workout day, provide:
 1. Day name/focus (e.g., "Day 1: Upper Body" or "Day 1: Push Day")
 2. A brief warmup routine specific to that day's focus
 3. Main exercises with exact sets, reps, and rest periods
-4. A brief cooldown specific to that day's focus
+4. Weight recommendations for each exercise (beginner, moderate, advanced levels)
+5. A brief cooldown specific to that day's focus
 
 YOUR RESPONSE MUST BE VALID JSON with this exact structure:
 {
@@ -365,7 +375,12 @@ YOUR RESPONSE MUST BE VALID JSON with this exact structure:
           },
           "sets": 3,
           "reps": 12,
-          "rest_time_seconds": 60
+          "rest_time_seconds": 60,
+          "weight_recommendations": {
+            "beginner": "5-10kg or specific recommendation",
+            "moderate": "15-20kg or appropriate progression",
+            "advanced": "25-30kg or advanced variation"
+          }
         },
         ... more exercises ...
       ]
@@ -382,7 +397,8 @@ REMEMBER:
 - ALWAYS use the exact ID provided for each exercise
 - NEVER leave the exercise name blank or empty
 - VERIFY all exercise IDs are from the provided list
-- MAKE SURE no exercise ID is used more than once in the entire plan`;
+- MAKE SURE no exercise ID is used more than once in the entire plan
+- INCLUDE weight recommendations for EVERY exercise`;
 
     console.log(`Request ID: ${requestId} - Calling Groq API`);
     console.log(`System prompt length: ${systemPrompt.length} chars`);
@@ -759,329 +775,4 @@ REMEMBER:
       
     } catch (error) {
       console.error(`Request ID: ${requestId} - Error parsing workout plan JSON:`, error);
-      console.log("Raw response first 500 chars:", assistantMessage.substring(0, 500));
-      
-      // Attempt to use fallback plan generation
-      console.log(`Request ID: ${requestId} - Attempting fallback plan generation after JSON parsing error`);
-      const fallbackPlan = createFallbackWorkoutPlan(
-        selectedExercises, 
-        daysPerWeek, 
-        minExercisesPerDay, 
-        body.preferences.goal
-      );
-      
-      return new Response(
-        JSON.stringify({
-          workoutPlan: fallbackPlan,
-          message: "Fallback workout plan generated due to JSON parsing error",
-          jsonError: error.message,
-          rawResponseSample: assistantMessage.substring(0, 200) // First 200 chars for debugging
-        }),
-        {
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json"
-          }
-        }
-      );
-    }
-
-    // Return the workout plan
-    return new Response(
-      JSON.stringify({
-        workoutPlan,
-        message: "Workout plan generated successfully",
-        rawLlamaResponse: result
-      }),
-      {
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json"
-        }
-      }
-    );
-  } catch (error) {
-    console.error("Error:", error.message);
-    
-    // Add special handling for JSON validation errors from Groq
-    if (error.message && error.message.includes("json_validate_failed")) {
-      console.error("JSON validation failed - likely due to duplicate exercises or empty names");
-      
-      // Attempt to create a fallback workout plan if we have access to the original data
-      try {
-        const body = await req.json();
-        
-        if (body && body.userId && body.preferences) {
-          const supabase = supabaseClient();
-          const { data: allExercises } = await supabase
-            .from("exercises")
-            .select("*")
-            .not("gif_url", "is", null);
-          
-          if (allExercises && allExercises.length > 0) {
-            const daysPerWeek = body.preferences.days_per_week || 3;
-            const minExercisesPerDay = body.preferences.min_exercises_per_day || 6;
-            
-            const fallbackPlan = createFallbackWorkoutPlan(
-              allExercises,
-              daysPerWeek,
-              minExercisesPerDay,
-              body.preferences.goal
-            );
-            
-            return new Response(
-              JSON.stringify({
-                workoutPlan: fallbackPlan,
-                message: "Fallback workout plan generated after JSON validation error",
-                error: error.message
-              }),
-              {
-                headers: {
-                  ...corsHeaders,
-                  "Content-Type": "application/json"
-                }
-              }
-            );
-          }
-        }
-      } catch (fallbackError) {
-        console.error("Error creating fallback plan:", fallbackError);
-      }
-      
-      // Return a more specific error to the client
-      return new Response(
-        JSON.stringify({
-          error: "Erro na geração do plano de treino: erro de validação do JSON. Por favor, tente novamente.",
-          details: error.message
-        }),
-        {
-          status: 400, // Bad request
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json"
-          }
-        }
-      );
-    }
-    
-    return new Response(
-      JSON.stringify({
-        error: error.message
-      }),
-      {
-        status: 500,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json"
-        }
-      }
-    );
-  }
-});
-
-// Helper function to create a fallback workout plan when the LLM generation fails
-function createFallbackWorkoutPlan(exercises: any[], daysPerWeek: number, minExercisesPerDay: number, goal: string) {
-  // Create a more deterministic workout plan structure without relying on the LLM
-  const workoutPlan = {
-    goal: goal,
-    start_date: new Date().toISOString().split('T')[0],
-    end_date: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    workout_sessions: [] as any[]
-  };
-  
-  // Categorize exercises by muscle group
-  const muscleGroups = ["chest", "back", "legs", "shoulders", "arms", "core"];
-  const exercisesByMuscleGroup: Record<string, any[]> = {};
-  
-  muscleGroups.forEach(group => {
-    exercisesByMuscleGroup[group] = exercises.filter(e => e.muscle_group === group);
-  });
-  
-  // Create workout splits based on days per week
-  const workoutSplits = createWorkoutSplitsByDays(daysPerWeek);
-  
-  // Create a map to track used exercises
-  const usedExerciseIds = new Set<string>();
-  
-  // Generate workout sessions
-  for (let day = 0; day < daysPerWeek; day++) {
-    const dayGroups = workoutSplits[day];
-    const dayExercises = [];
-    
-    // Get focus for the day based on muscle groups
-    const dayName = getDayName(day, workoutSplits);
-    
-    // Get exercises for each muscle group in this day
-    for (const group of dayGroups) {
-      const availableExercises = exercisesByMuscleGroup[group].filter(ex => !usedExerciseIds.has(ex.id));
-      
-      // Add up to 2 exercises per group, but make sure we leave enough for other days
-      const exercisesToAdd = Math.min(2, availableExercises.length);
-      for (let i = 0; i < exercisesToAdd; i++) {
-        if (availableExercises.length > 0) {
-          const exercise = availableExercises[i];
-          
-          // Add timestamp to the GIF URL
-          const timestamp = Date.now();
-          let updatedGifUrl = exercise.gif_url;
-          if (updatedGifUrl) {
-            if (updatedGifUrl.includes('?')) {
-              updatedGifUrl = `${updatedGifUrl}&t=${timestamp}`;
-            } else {
-              updatedGifUrl = `${updatedGifUrl}?t=${timestamp}`;
-            }
-          }
-          
-          dayExercises.push({
-            exercise: {
-              id: exercise.id,
-              name: exercise.name || `Exercise-${exercise.id.substring(0, 8)}`,
-              description: exercise.description || "",
-              muscle_group: exercise.muscle_group,
-              gif_url: updatedGifUrl
-            },
-            sets: 3,
-            reps: 12,
-            rest_time_seconds: 60
-          });
-          
-          usedExerciseIds.add(exercise.id);
-        }
-      }
-    }
-    
-    // If we don't have enough exercises for this day, add more from any available groups
-    while (dayExercises.length < minExercisesPerDay) {
-      let added = false;
-      
-      for (const group of muscleGroups) {
-        const availableExercises = exercisesByMuscleGroup[group].filter(ex => !usedExerciseIds.has(ex.id));
-        
-        if (availableExercises.length > 0) {
-          const exercise = availableExercises[0];
-          
-          // Add timestamp to the GIF URL
-          const timestamp = Date.now();
-          let updatedGifUrl = exercise.gif_url;
-          if (updatedGifUrl) {
-            if (updatedGifUrl.includes('?')) {
-              updatedGifUrl = `${updatedGifUrl}&t=${timestamp}`;
-            } else {
-              updatedGifUrl = `${updatedGifUrl}?t=${timestamp}`;
-            }
-          }
-          
-          dayExercises.push({
-            exercise: {
-              id: exercise.id,
-              name: exercise.name || `Exercise-${exercise.id.substring(0, 8)}`,
-              description: exercise.description || "",
-              muscle_group: exercise.muscle_group,
-              gif_url: updatedGifUrl
-            },
-            sets: 3,
-            reps: 12,
-            rest_time_seconds: 60
-          });
-          
-          usedExerciseIds.add(exercise.id);
-          exercisesByMuscleGroup[group] = exercisesByMuscleGroup[group].filter(ex => ex.id !== exercise.id);
-          
-          added = true;
-          break;
-        }
-      }
-      
-      if (!added) {
-        // If we cannot add more unique exercises, break to avoid infinite loop
-        break;
-      }
-    }
-    
-    // Add the workout session
-    workoutPlan.workout_sessions.push({
-      day_number: day + 1,
-      day_name: dayName,
-      focus: getFocusFromDayName(dayName),
-      warmup_description: "5-10 minutos de aquecimento com cardio leve e alongamento dinâmico",
-      cooldown_description: "5 minutos de volta à calma com alongamento estático",
-      session_exercises: dayExercises
-    });
-  }
-  
-  return workoutPlan;
-}
-
-// Helper function to create workout splits by days
-function createWorkoutSplitsByDays(daysPerWeek: number) {
-  const muscleGroups = ["chest", "back", "legs", "shoulders", "arms", "core"];
-  
-  if (daysPerWeek <= 3) {
-    // Full body workouts for up to 3 days
-    return Array(daysPerWeek).fill(muscleGroups);
-  } else if (daysPerWeek === 4) {
-    // 4-day split
-    return [
-      ["chest", "shoulders", "triceps"],
-      ["back", "biceps"],
-      ["legs", "core"],
-      ["shoulders", "arms", "core"]
-    ];
-  } else if (daysPerWeek === 5) {
-    // 5-day split
-    return [
-      ["chest", "triceps"],
-      ["back", "biceps"],
-      ["legs"],
-      ["shoulders", "core"],
-      ["arms", "core"]
-    ];
-  } else {
-    // 6-day PPL split
-    return [
-      ["chest", "shoulders", "triceps"],
-      ["back", "biceps"],
-      ["legs", "core"],
-      ["chest", "shoulders", "triceps"],
-      ["back", "biceps"],
-      ["legs", "core"]
-    ];
-  }
-}
-
-// Helper function to get day name based on muscle groups
-function getDayName(dayIndex: number, workoutSplits: string[][]) {
-  const dayGroups = workoutSplits[dayIndex];
-  
-  // If the day has chest and triceps, it's a push day
-  if (dayGroups.includes("chest") && (dayGroups.includes("triceps") || dayGroups.includes("shoulders"))) {
-    return `Dia ${dayIndex + 1}: Treino de Push (Peito, Ombros, Tríceps)`;
-  }
-  
-  // If the day has back and biceps, it's a pull day
-  if (dayGroups.includes("back") && dayGroups.includes("biceps")) {
-    return `Dia ${dayIndex + 1}: Treino de Pull (Costas, Bíceps)`;
-  }
-  
-  // If the day has legs, it's a leg day
-  if (dayGroups.includes("legs")) {
-    return `Dia ${dayIndex + 1}: Treino de Pernas`;
-  }
-  
-  // If the day has shoulders or arms, it's an upper body day
-  if (dayGroups.includes("shoulders") || dayGroups.includes("arms")) {
-    return `Dia ${dayIndex + 1}: Treino de Membros Superiores`;
-  }
-  
-  // Fallback to a simple naming
-  return `Dia ${dayIndex + 1}: Treino Completo`;
-}
-
-// Helper function to extract focus from day name
-function getFocusFromDayName(dayName: string) {
-  if (dayName.includes("Push")) return "Push (Peito, Ombros, Tríceps)";
-  if (dayName.includes("Pull")) return "Pull (Costas, Bíceps)";
-  if (dayName.includes("Pernas")) return "Pernas";
-  if (dayName.includes("Superiores")) return "Membros Superiores";
-  return "Treino Completo";
-}
+      console.log
