@@ -1,10 +1,10 @@
+
 import * as React from 'react';
 import { useState, useEffect, useCallback } from 'react';
 import { WorkoutPreferences } from '@/components/workout/types';
 import { PreferencesForm } from '@/components/workout/PreferencesForm';
 import { WorkoutPlanDisplay } from '@/components/workout/WorkoutPlanDisplay';
 import WorkoutHistory from '@/components/workout/components/WorkoutHistory';
-import { ExerciseLibrary } from '@/components/workout/components/ExerciseLibrary';
 import { Dumbbell, LogIn } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import type { WorkoutPlan } from '@/components/workout/types/workout-plan';
@@ -24,6 +24,7 @@ const Workout = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   
+  // Check URL parameters for plan ID and view mode
   useEffect(() => {
     const planId = searchParams.get('planId');
     const viewMode = searchParams.get('view');
@@ -34,6 +35,7 @@ const Workout = () => {
     }
   }, [searchParams]);
 
+  // Check authentication status
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -43,6 +45,7 @@ const Workout = () => {
     
     checkAuth();
     
+    // Listen for auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       setIsAuthenticated(!!session?.user);
       console.log("Auth state change:", event, !!session?.user);
@@ -104,6 +107,7 @@ const Workout = () => {
   }
 
   const handleWorkoutPlanGenerated = () => {
+    // Refresh history after a new plan is generated
     fetchWorkoutHistory();
   };
 
@@ -111,6 +115,7 @@ const Workout = () => {
     navigate('/login?redirect=/workout');
   };
 
+  // Show loading state while checking authentication
   if (isAuthenticated === null) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
@@ -121,6 +126,7 @@ const Workout = () => {
     );
   }
 
+  // Show login prompt if not authenticated
   if (isAuthenticated === false) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
@@ -172,8 +178,6 @@ const Workout = () => {
               onPlanGenerated={handleWorkoutPlanGenerated}
             />
           )}
-
-          <ExerciseLibrary />
 
           <div className="mt-4 sm:mt-6">
             <WorkoutHistory

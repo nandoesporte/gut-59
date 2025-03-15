@@ -250,10 +250,8 @@ export type Database = {
       }
       exercises: {
         Row: {
-          advanced_weight: string | null
           alternative_exercises: string[] | null
           balance_requirement: string | null
-          beginner_weight: string | null
           breathing_pattern: string | null
           calories_burned_per_hour: number | null
           common_mistakes: string[] | null
@@ -275,7 +273,6 @@ export type Database = {
           min_reps: number
           min_sets: number
           mobility_requirements: string | null
-          moderate_weight: string | null
           movement_pattern: string | null
           muscle_group: Database["public"]["Enums"]["muscle_group"]
           name: string
@@ -297,10 +294,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          advanced_weight?: string | null
           alternative_exercises?: string[] | null
           balance_requirement?: string | null
-          beginner_weight?: string | null
           breathing_pattern?: string | null
           calories_burned_per_hour?: number | null
           common_mistakes?: string[] | null
@@ -322,7 +317,6 @@ export type Database = {
           min_reps?: number
           min_sets?: number
           mobility_requirements?: string | null
-          moderate_weight?: string | null
           movement_pattern?: string | null
           muscle_group: Database["public"]["Enums"]["muscle_group"]
           name: string
@@ -344,10 +338,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          advanced_weight?: string | null
           alternative_exercises?: string[] | null
           balance_requirement?: string | null
-          beginner_weight?: string | null
           breathing_pattern?: string | null
           calories_burned_per_hour?: number | null
           common_mistakes?: string[] | null
@@ -369,7 +361,6 @@ export type Database = {
           min_reps?: number
           min_sets?: number
           mobility_requirements?: string | null
-          moderate_weight?: string | null
           movement_pattern?: string | null
           muscle_group?: Database["public"]["Enums"]["muscle_group"]
           name?: string
