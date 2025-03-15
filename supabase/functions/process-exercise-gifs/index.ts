@@ -30,10 +30,12 @@ serve(async (req) => {
     console.log(`Arquivo recebido: ${zipFile.name}, Categoria: ${category}`);
     console.log(`Tamanho do arquivo: ${zipFile.size} bytes`);
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    
+    console.log(`Conectando ao Supabase: ${supabaseUrl}`);
+    
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
     console.log('Carregando arquivo ZIP...');
     const arrayBuffer = await zipFile.arrayBuffer()
@@ -76,21 +78,34 @@ serve(async (req) => {
             throw new Error('Nome do arquivo inválido');
           }
 
-          const filePath = `${category}/${sanitizedName}`
+          // Use timestamp + random string for unique filenames to avoid caching issues
+          const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+          const filePath = `${category}/${uniqueId}_${sanitizedName}`
+          
+          console.log(`Enviando para caminho: ${filePath}`);
           
           // Upload do arquivo
-          const { error: uploadError } = await supabase.storage
+          const { data: uploadData, error: uploadError } = await supabase.storage
             .from('exercise-gifs')
             .upload(filePath, content, {
               contentType: 'image/gif',
+              cacheControl: 'no-cache, max-age=0',
               upsert: true
             })
 
-          if (uploadError) throw uploadError;
+          if (uploadError) {
+            console.error(`Erro no upload: ${uploadError.message}`);
+            throw uploadError;
+          }
 
+          console.log(`Upload bem sucedido para: ${filePath}`);
+          
+          // Generate absolute URL with proper structure
           const { data: { publicUrl } } = supabase.storage
             .from('exercise-gifs')
             .getPublicUrl(filePath)
+
+          console.log(`URL pública gerada: ${publicUrl}`);
 
           // Criar registro do exercício
           const exerciseData = {
@@ -107,16 +122,22 @@ serve(async (req) => {
             max_sets: 5,
             rest_time_seconds: 60,
             alternative_exercises: [],
-            equipment_needed: []
+            equipment_needed: [],
+            primary_muscles_worked: [category]
           }
 
+          console.log(`Inserindo exercício no banco de dados: ${exerciseName}`);
+          
           const { data: insertedExercise, error: dbError } = await supabase
             .from('exercises')
             .insert(exerciseData)
             .select()
             .single()
 
-          if (dbError) throw dbError;
+          if (dbError) {
+            console.error(`Erro ao inserir no banco: ${dbError.message}`);
+            throw dbError;
+          }
 
           console.log(`Exercício ${exerciseName} processado com sucesso`);
           processedCount++;

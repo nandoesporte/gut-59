@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { X, Upload } from "lucide-react";
+import { X, Upload, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -96,60 +96,97 @@ export const MultipleGifsUploadForm = ({
 
       const totalFiles = selectedFiles.length;
       let completedFiles = 0;
+      let successCount = 0;
+      let errorCount = 0;
 
       for (const file of selectedFiles) {
-        const exerciseName = file.name.replace(".gif", "").replace(/_/g, " ");
+        try {
+          const exerciseName = file.name.replace(".gif", "").replace(/_/g, " ");
 
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from("exercise-gifs")
-          .upload(`batch/${crypto.randomUUID()}.gif`, file);
+          // Create a unique filename with timestamp to avoid caching issues
+          const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+          const filePath = `batch/${uniqueId}_${file.name.replace(/\s+/g, "_")}`;
 
-        if (uploadError) throw uploadError;
+          console.log(`Uploading file: ${filePath}`);
 
-        const { data: { publicUrl } } = supabase.storage
-          .from("exercise-gifs")
-          .getPublicUrl(uploadData.path);
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from("exercise-gifs")
+            .upload(filePath, file, {
+              cacheControl: "no-cache, max-age=0",
+              upsert: true
+            });
 
-        const validExerciseType = exerciseType === "strength" || 
+          if (uploadError) {
+            console.error(`Upload error for ${file.name}:`, uploadError);
+            errorCount++;
+            throw uploadError;
+          }
+
+          const { data: { publicUrl } } = supabase.storage
+            .from("exercise-gifs")
+            .getPublicUrl(uploadData.path);
+
+          console.log(`File uploaded successfully. Public URL: ${publicUrl}`);
+
+          const validExerciseType = exerciseType === "strength" || 
                                  exerciseType === "cardio" || 
                                  exerciseType === "mobility" 
                                  ? exerciseType 
                                  : "mobility";
-        
-        // Use a default difficulty value since we removed the selector
-        const defaultDifficulty: Difficulty = "beginner";
+          
+          // Use a default difficulty value since we removed the selector
+          const defaultDifficulty: Difficulty = "beginner";
 
-        const exerciseData = {
-          name: exerciseName,
-          description: `Exercício de ${muscleGroupOptions.find(m => m.value === muscleGroup)?.label}`,
-          gif_url: publicUrl,
-          exercise_type: validExerciseType,
-          difficulty: defaultDifficulty,
-          muscle_group: muscleGroup,
-          primary_muscles_worked: [muscleGroup],
-          goals: [goal],
-          equipment_needed: [],
-          is_compound_movement: false,
-          max_reps: 12,
-          min_reps: 8, 
-          max_sets: 5,
-          min_sets: 3,
-          rest_time_seconds: 60
-        };
+          const exerciseData = {
+            name: exerciseName,
+            description: `Exercício de ${muscleGroupOptions.find(m => m.value === muscleGroup)?.label}`,
+            gif_url: publicUrl,
+            exercise_type: validExerciseType,
+            difficulty: defaultDifficulty,
+            muscle_group: muscleGroup,
+            primary_muscles_worked: [muscleGroup],
+            goals: [goal],
+            equipment_needed: [],
+            is_compound_movement: false,
+            max_reps: 12,
+            min_reps: 8, 
+            max_sets: 5,
+            min_sets: 3,
+            rest_time_seconds: 60
+          };
 
-        const { error: insertError } = await supabase
-          .from("exercises")
-          .insert(exerciseData);
+          console.log("Inserting exercise data:", exerciseData);
 
-        if (insertError) throw insertError;
+          const { error: insertError } = await supabase
+            .from("exercises")
+            .insert(exerciseData);
 
-        completedFiles++;
-        setUploadProgress(Math.floor((completedFiles / totalFiles) * 100));
+          if (insertError) {
+            console.error(`Database error for ${file.name}:`, insertError);
+            errorCount++;
+            throw insertError;
+          }
+
+          successCount++;
+        } catch (error) {
+          console.error(`Error processing ${file.name}:`, error);
+          // Continue with the next file
+        } finally {
+          completedFiles++;
+          setUploadProgress(Math.floor((completedFiles / totalFiles) * 100));
+        }
       }
 
-      toast.success("Todos os GIFs foram enviados com sucesso!");
-      setSelectedFiles([]);
-      onSuccess();
+      if (successCount > 0) {
+        toast.success(`${successCount} GIFs foram enviados com sucesso!`);
+        if (errorCount > 0) {
+          toast.error(`${errorCount} GIFs não puderam ser processados.`);
+        }
+        setSelectedFiles([]);
+        onSuccess();
+      } else {
+        toast.error("Nenhum GIF foi enviado com sucesso. Verifique os erros no console.");
+      }
     } catch (error) {
       console.error("Erro no upload:", error);
       toast.error("Erro ao fazer upload dos arquivos. Tente novamente.");
@@ -296,8 +333,17 @@ export const MultipleGifsUploadForm = ({
               disabled={uploading || selectedFiles.length === 0}
               className="flex-1"
             >
-              <Upload className="mr-2 h-4 w-4" />
-              {uploading ? "Enviando..." : "Enviar Todos"}
+              {uploading ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                <>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Enviar Todos
+                </>
+              )}
             </Button>
             <Button 
               variant="outline" 

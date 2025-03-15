@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Pencil, Trash2, Dumbbell } from "lucide-react";
+import { Pencil, Trash2, Dumbbell, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { formatImageUrl } from "@/utils/imageUtils";
@@ -25,6 +25,20 @@ export const ExerciseCard = ({ exercise, onUpdate }: ExerciseCardProps) => {
       const url = formatImageUrl(exercise.gif_url);
       console.log(`Exercise ${exercise.id} (${exercise.name}) - Formatted URL: ${url}`);
       setImgSrc(url);
+
+      // Pre-fetch the image to test if it loads correctly
+      const img = new Image();
+      img.onload = () => {
+        console.log(`Pre-fetch successful for exercise card: ${exercise.name}`);
+        setIsLoading(false);
+      };
+      img.onerror = () => {
+        console.error(`Pre-fetch failed for exercise card: ${exercise.name}`);
+        setImgError(true);
+        setImgSrc("/placeholder.svg");
+        setIsLoading(false);
+      };
+      img.src = `${url}?t=${Date.now()}`;
     } else {
       setImgSrc("/placeholder.svg");
       setIsLoading(false);
@@ -81,7 +95,7 @@ export const ExerciseCard = ({ exercise, onUpdate }: ExerciseCardProps) => {
         <div className="mb-4 relative pt-[56.25%] flex items-center justify-center bg-white">
           {isLoading && (
             <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center bg-gray-100 rounded-md">
-              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+              <Loader2 className="w-8 h-8 text-primary animate-spin" />
             </div>
           )}
           {imgError ? (
@@ -94,7 +108,7 @@ export const ExerciseCard = ({ exercise, onUpdate }: ExerciseCardProps) => {
             </div>
           ) : (
             <img
-              src={imgSrc || "/placeholder.svg"}
+              src={`${imgSrc || "/placeholder.svg"}?t=${Date.now()}`}
               alt={exercise.name}
               className="absolute top-0 left-0 w-full h-full object-contain rounded-md"
               onError={handleImageError}

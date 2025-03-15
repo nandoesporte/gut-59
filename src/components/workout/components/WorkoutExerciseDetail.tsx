@@ -4,10 +4,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatImageUrl } from '@/utils/imageUtils';
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dumbbell, AlertCircle, RefreshCw, Maximize } from 'lucide-react';
+import { Dumbbell, AlertCircle, RefreshCw, Maximize, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { toast } from 'sonner';
 
 interface WorkoutExerciseDetailProps {
   exerciseSession: any;
@@ -35,17 +36,45 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     setRetryCount(0);
     setIsRetrying(false);
     
-    // Tentar carregar a imagem quando o componente for montado
-    const imageUrl = formatImageUrl(exercise.gif_url);
-    console.log(`Tentando carregar imagem para exercício: ${exercise.name} (${exercise.id}), URL: ${imageUrl}`);
+    // Force image load attempt when component mounts
+    const loadImage = async () => {
+      try {
+        const imageUrl = formatImageUrl(exercise.gif_url);
+        console.log(`Attempting to load image for exercise: ${exercise.name} (${exercise.id}), URL: ${imageUrl}`);
+        
+        // Pre-fetch the image to test if it loads correctly
+        const img = new Image();
+        img.onload = () => {
+          console.log(`Pre-fetch successful for: ${exercise.name}`);
+          setImageLoaded(true);
+          setImageError(false);
+          setHasAttemptedToLoadImage(true);
+        };
+        img.onerror = () => {
+          console.error(`Pre-fetch failed for: ${exercise.name}`);
+          setImageError(true);
+          setHasAttemptedToLoadImage(true);
+        };
+        img.src = `${imageUrl}?t=${Date.now()}`;
+      } catch (error) {
+        console.error(`Error pre-fetching image for ${exercise.name}:`, error);
+        setImageError(true);
+        setHasAttemptedToLoadImage(true);
+      }
+    };
+    
+    loadImage();
   }, [exercise.id, exercise.gif_url, exercise.name]);
   
   // Função para tentar carregar novamente a imagem (até 3 tentativas)
   const retryLoadImage = async () => {
-    if (retryCount >= 3) return;
+    if (retryCount >= 3) {
+      toast.error(`Não foi possível carregar a imagem após ${retryCount} tentativas`);
+      return;
+    }
     
     setIsRetrying(true);
-    console.log(`Tentando carregar imagem novamente para: ${exercise.name} (${exercise.id}). Tentativa: ${retryCount + 1}`);
+    console.log(`Retrying image load for: ${exercise.name} (${exercise.id}). Attempt: ${retryCount + 1}`);
     setImageError(false);
     setImageLoaded(false);
     setRetryCount(prevCount => prevCount + 1);
@@ -61,19 +90,37 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
       if (!error && data && data.gif_url) {
         // Forçar recarregamento da imagem adicionando um timestamp à URL
         const newGifUrl = formatImageUrl(data.gif_url) + `?t=${Date.now()}`;
-        console.log(`Nova URL obtida: ${newGifUrl}`);
-        if (imageRef.current) {
-          imageRef.current.src = newGifUrl;
-        }
+        console.log(`New URL retrieved: ${newGifUrl}`);
+        
+        // Create a new image to test loading
+        const img = new Image();
+        img.onload = () => {
+          if (imageRef.current) {
+            imageRef.current.src = newGifUrl;
+          }
+          setImageLoaded(true);
+          setImageError(false);
+          setIsRetrying(false);
+          console.log(`Retry successful for: ${exercise.name}`);
+        };
+        img.onerror = () => {
+          setImageError(true);
+          setImageLoaded(false);
+          setIsRetrying(false);
+          console.error(`Retry failed for: ${exercise.name}`);
+        };
+        img.src = newGifUrl;
       } else if (error) {
-        console.error('Erro ao buscar URL atualizada:', error);
+        console.error('Error fetching updated URL:', error);
         setImageError(true);
+        setIsRetrying(false);
       }
     } catch (error) {
-      console.error('Erro ao buscar URL atualizada:', error);
+      console.error('Error fetching updated URL:', error);
       setImageError(true);
+      setIsRetrying(false);
     } finally {
-      // Definir um timeout para limpar o estado de retry se a imagem não carregar
+      // Set a timeout to clear the retry state if the image doesn't load
       setTimeout(() => {
         if (isRetrying) {
           setIsRetrying(false);
@@ -84,10 +131,10 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
   };
   
   const handleImageError = () => {
-    console.error(`Falha ao carregar imagem para exercício: ${exercise.name} (${exercise.id}). URL: ${exercise.gif_url}`);
+    console.error(`Failed to load image for exercise: ${exercise.name} (${exercise.id}). URL: ${exercise.gif_url}`);
     
     if (retryCount < 3) {
-      // Tentar carregar novamente automaticamente após um pequeno delay
+      // Try loading again automatically after a small delay
       setTimeout(retryLoadImage, 1500);
     } else {
       setImageError(true);
@@ -98,7 +145,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
   };
   
   const handleImageLoad = () => {
-    console.log(`Imagem carregada com sucesso para: ${exercise.name} (${exercise.id})`);
+    console.log(`Image loaded successfully for: ${exercise.name} (${exercise.id})`);
     setImageLoaded(true);
     setHasAttemptedToLoadImage(true);
     setImageError(false);
@@ -124,7 +171,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <Skeleton className="h-48 md:h-44 w-full absolute inset-0" />
                 <span className="text-xs text-muted-foreground z-10 bg-background/80 px-2 py-1 rounded-md flex items-center gap-1">
-                  {isRetrying && <RefreshCw className="h-3 w-3 animate-spin" />}
+                  {isRetrying ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Loader2 className="h-3 w-3 animate-spin" />}
                   {isRetrying ? 'Tentando novamente...' : 'Carregando...'}
                 </span>
               </div>
@@ -185,7 +232,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                   className={`h-48 md:h-44 object-contain ${imageLoaded && !imageError ? 'block' : 'hidden'}`}
                   onLoad={handleImageLoad}
                   onError={handleImageError}
-                  loading="lazy"
+                  loading="eager"
                 />
               </>
             )}
