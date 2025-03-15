@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { FisioPreferences } from "./types";
@@ -47,7 +46,7 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
         return;
       }
 
-      const { data: response, error } = await supabase.functions.invoke('generate-rehab-plan-groq', {
+      const { data: response, error } = await supabase.functions.invoke('fisio-plus-agent', {
         body: { 
           preferences, 
           userId: user.id
@@ -61,7 +60,7 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
         await addTransaction({
           amount: REWARDS.REHAB_PLAN,
           type: 'physio_plan',
-          description: 'Geração de plano de reabilitação com Groq'
+          description: 'Geração de plano de reabilitação com Fisio+ (Llama 3)'
         });
         
         setRehabPlan(response);
