@@ -122,4 +122,5 @@ export interface PhysioExercise {
   keywords?: string[];
   primary_goals?: string[];
   target_symptoms?: string[];
+  is_video?: boolean; // New field to indicate if the exercise media is a video
 }
