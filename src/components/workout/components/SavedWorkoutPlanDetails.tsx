@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -38,8 +37,18 @@ export const SavedWorkoutPlanDetails = ({ plan }: SavedWorkoutPlanDetailsProps) 
         return "Perda de Peso";
       case "maintain":
         return "Manter Peso";
+      case "strength":
+        return "Força";
+      case "hypertrophy":
+        return "Hipertrofia";
+      case "endurance":
+        return "Resistência";
+      case "flexibility":
+        return "Flexibilidade";
       default:
-        return goal;
+        return goal.split('_')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
     }
   };
 
