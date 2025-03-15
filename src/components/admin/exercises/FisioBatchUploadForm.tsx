@@ -13,13 +13,13 @@ interface FisioBatchUploadFormProps {
   uploading: boolean;
 }
 
-export const FisioBatchUploadForm = ({ onUpload, uploading }: FisioBatchUploadFormProps) => {
+export const FisioBatchUploadForm = ({ onUpload, uploading: isUploading }: FisioBatchUploadFormProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [jointArea, setJointArea] = useState<PhysioJointArea>("knee");
   const [condition, setCondition] = useState<PhysioCondition>("patellofemoral");
   const [processingStatus, setProcessingStatus] = useState<string>("");
   const [processingResults, setProcessingResults] = useState<any>(null);
-  const [uploading, setUploading] = useState(false);
+  const [localUploading, setLocalUploading] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -61,7 +61,7 @@ export const FisioBatchUploadForm = ({ onUpload, uploading }: FisioBatchUploadFo
       return;
     }
 
-    setUploading(true);
+    setLocalUploading(true);
     setProcessingStatus("Enviando arquivo...");
 
     try {
@@ -86,7 +86,7 @@ export const FisioBatchUploadForm = ({ onUpload, uploading }: FisioBatchUploadFo
       setProcessingStatus(`Erro: ${error.message}`);
       toast.error(`Erro ao processar arquivo: ${error.message}`);
     } finally {
-      setUploading(false);
+      setLocalUploading(false);
     }
   };
 
@@ -163,10 +163,10 @@ export const FisioBatchUploadForm = ({ onUpload, uploading }: FisioBatchUploadFo
       </div>
 
       <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-        <Button onClick={handleIndividualUpload} disabled={uploading || !file || file.name.endsWith('.zip')}>
+        <Button onClick={handleIndividualUpload} disabled={isUploading || localUploading || !file || file.name.endsWith('.zip')}>
           Upload Individual
         </Button>
-        <Button onClick={handleBatchUpload} disabled={uploading || !file || !file.name.endsWith('.zip')}>
+        <Button onClick={handleBatchUpload} disabled={isUploading || localUploading || !file || !file.name.endsWith('.zip')}>
           Upload em Lote
         </Button>
       </div>
