@@ -1,10 +1,10 @@
 
 import React from "react";
-import { WorkoutSessionExercise } from "../types/workout-plan";
+import { SessionExercise } from "../types/workout-plan";
 import { Badge } from "@/components/ui/badge";
 
 interface WorkoutExerciseDetailProps {
-  exerciseSession: WorkoutSessionExercise;
+  exerciseSession: SessionExercise;
 }
 
 export const WorkoutExerciseDetail = ({ exerciseSession }: WorkoutExerciseDetailProps) => {

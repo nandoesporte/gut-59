@@ -28,13 +28,13 @@ export const WorkoutPlanDetailed = ({ plan }: WorkoutPlanDetailedProps) => {
   };
   
   // Calculate session stats
-  const getSessionExerciseCount = (dayNumber: number) => {
+  const getSessionExerciseCount = (dayNumber: string) => {
     const session = sortedSessions.find(s => s.day_number === parseInt(dayNumber));
     return session?.session_exercises?.length || 0;
   };
   
   // Estimate workout duration (in minutes)
-  const estimateSessionDuration = (dayNumber: number) => {
+  const estimateSessionDuration = (dayNumber: string) => {
     const session = sortedSessions.find(s => s.day_number === parseInt(dayNumber));
     if (!session) return "0";
     
