@@ -28,13 +28,14 @@ const exerciseSchema = z.object({
 interface ExerciseFormProps {
   onSuccess: () => void;
   onCancel: () => void;
-  exercise?: any;
+  exerciseData?: any;
+  editMode?: boolean;
 }
 
-export const ExerciseForm = ({ onSuccess, onCancel, exercise }: ExerciseFormProps) => {
+export const ExerciseForm = ({ onSuccess, onCancel, exerciseData, editMode = false }: ExerciseFormProps) => {
   const form = useForm({
     resolver: zodResolver(exerciseSchema),
-    defaultValues: exercise || {
+    defaultValues: exerciseData || {
       name: '',
       description: '',
       gif_url: '',
@@ -65,11 +66,11 @@ export const ExerciseForm = ({ onSuccess, onCancel, exercise }: ExerciseFormProp
         difficulty: data.difficulty || "beginner"
       };
       
-      if (exercise?.id) {
+      if (editMode && exerciseData?.id) {
         await supabase
           .from('exercises')
           .update(safeData)
-          .eq('id', exercise.id);
+          .eq('id', exerciseData.id);
       } else {
         await supabase
           .from('exercises')
@@ -144,7 +145,7 @@ export const ExerciseForm = ({ onSuccess, onCancel, exercise }: ExerciseFormProp
         />
 
         <div className="flex gap-4">
-          <Button type="submit">Salvar</Button>
+          <Button type="submit">{editMode ? 'Atualizar' : 'Salvar'}</Button>
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancelar
           </Button>
