@@ -16,9 +16,6 @@ verify_jwt = false
 [functions.generate-meal-plan]
 verify_jwt = false
 
-[functions.generate-rehab-plan]
-verify_jwt = false
-
 [functions.generate-meal-plan-llama]
 verify_jwt = false
 
