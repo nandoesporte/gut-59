@@ -5,6 +5,7 @@ import { WorkoutPreferences } from '@/components/workout/types';
 import { PreferencesForm } from '@/components/workout/PreferencesForm';
 import { WorkoutPlanDisplay } from '@/components/workout/WorkoutPlanDisplay';
 import WorkoutHistory from '@/components/workout/components/WorkoutHistory';
+import ExerciseLibrary from '@/components/workout/components/ExerciseLibrary';
 import { Dumbbell, LogIn } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import type { WorkoutPlan } from '@/components/workout/types/workout-plan';
@@ -180,6 +181,8 @@ const Workout = () => {
           )}
 
           <div className="mt-4 sm:mt-6">
+            <ExerciseLibrary />
+            
             <WorkoutHistory
               plans={historyPlans}
               isLoading={isLoadingHistory}
