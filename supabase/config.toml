@@ -19,9 +19,6 @@ verify_jwt = false
 [functions.generate-rehab-plan]
 verify_jwt = false
 
-[functions.generate-meal-plan-llama]
-verify_jwt = false
-
 [functions.generate-workout-plan-llama]
 verify_jwt = false
 
@@ -69,3 +66,7 @@ verify_jwt = false
 
 [functions.grant-plan-access]
 verify_jwt = false
+
+# Temporarily disabled functions to stay within limits
+# [functions.generate-meal-plan-llama]
+# verify_jwt = false
