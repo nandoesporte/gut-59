@@ -8,7 +8,8 @@ import {
   Tag, 
   MapPin, 
   Target,
-  ArrowLeft
+  ArrowLeft,
+  Image
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -19,6 +20,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { Exercise } from '@/components/admin/exercises/types';
 import { toast } from 'sonner';
+import { formatImageUrl } from '@/utils/imageUtils';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const ExerciseLibrary = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -97,6 +100,77 @@ const ExerciseLibrary = () => {
     setSelectedExercise(null);
   };
 
+  // Exercise thumbnail component
+  const ExerciseThumbnail = ({ exercise }: { exercise: Exercise }) => {
+    const [imageLoaded, setImageLoaded] = useState(false);
+    const [imageError, setImageError] = useState(false);
+    const imageUrl = formatImageUrl(exercise.gif_url);
+    
+    return (
+      <div 
+        onClick={() => handleExerciseSelect(exercise)}
+        className="cursor-pointer hover:scale-105 transition-transform"
+      >
+        <div className="aspect-square w-full h-24 relative overflow-hidden rounded-md border bg-muted/40">
+          {!imageLoaded && !imageError && (
+            <Skeleton className="absolute inset-0 h-full w-full" />
+          )}
+          
+          {imageError || !exercise.gif_url ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center">
+              <Image className="h-6 w-6 text-muted-foreground mb-1" />
+              <span className="text-xs text-muted-foreground line-clamp-2">
+                {exercise.name}
+              </span>
+            </div>
+          ) : (
+            <img 
+              src={imageUrl}
+              alt={exercise.name}
+              className={`object-cover h-full w-full ${imageLoaded ? 'block' : 'hidden'}`}
+              onLoad={() => setImageLoaded(true)}
+              onError={() => setImageError(true)}
+              loading="lazy"
+            />
+          )}
+          
+          <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-2 py-1">
+            <p className="text-white text-xs truncate">{exercise.name}</p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Exercise grid component for displaying thumbnails
+  const ExerciseGrid = ({ exercises }: { exercises: Exercise[] }) => {
+    if (isLoading) {
+      return (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          {[...Array(8)].map((_, i) => (
+            <Skeleton key={i} className="aspect-square h-24 rounded-md" />
+          ))}
+        </div>
+      );
+    }
+    
+    if (exercises.length === 0) {
+      return (
+        <p className="text-muted-foreground text-sm py-2">
+          Nenhum exercício encontrado
+        </p>
+      );
+    }
+    
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[320px] overflow-y-auto p-1">
+        {exercises.map(exercise => (
+          <ExerciseThumbnail key={exercise.id} exercise={exercise} />
+        ))}
+      </div>
+    );
+  };
+
   return (
     <Card className="w-full border border-primary/10 mb-4 animate-slideDown overflow-hidden">
       <Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-full">
@@ -134,7 +208,7 @@ const ExerciseLibrary = () => {
                     {selectedExercise.gif_url ? (
                       <div className="aspect-square relative overflow-hidden bg-muted">
                         <img 
-                          src={selectedExercise.gif_url} 
+                          src={formatImageUrl(selectedExercise.gif_url)} 
                           alt={selectedExercise.name}
                           className="w-full h-full object-cover"
                         />
@@ -229,69 +303,21 @@ const ExerciseLibrary = () => {
                       <Card className="shadow-sm hover:shadow-md transition-shadow">
                         <CardContent className="p-4">
                           <h4 className="font-medium mb-2">Força</h4>
-                          <div className="max-h-48 overflow-y-auto space-y-1">
-                            {isLoading ? (
-                              <p className="text-muted-foreground text-sm">Carregando...</p>
-                            ) : getExercisesByType('strength').length > 0 ? (
-                              getExercisesByType('strength').map(exercise => (
-                                <div 
-                                  key={exercise.id}
-                                  onClick={() => handleExerciseSelect(exercise)}
-                                  className="p-2 rounded text-sm hover:bg-muted cursor-pointer"
-                                >
-                                  {exercise.name}
-                                </div>
-                              ))
-                            ) : (
-                              <p className="text-muted-foreground text-sm">Nenhum exercício encontrado</p>
-                            )}
-                          </div>
+                          <ExerciseGrid exercises={getExercisesByType('strength')} />
                         </CardContent>
                       </Card>
                       
                       <Card className="shadow-sm hover:shadow-md transition-shadow">
                         <CardContent className="p-4">
                           <h4 className="font-medium mb-2">Cardio</h4>
-                          <div className="max-h-48 overflow-y-auto space-y-1">
-                            {isLoading ? (
-                              <p className="text-muted-foreground text-sm">Carregando...</p>
-                            ) : getExercisesByType('cardio').length > 0 ? (
-                              getExercisesByType('cardio').map(exercise => (
-                                <div 
-                                  key={exercise.id}
-                                  onClick={() => handleExerciseSelect(exercise)}
-                                  className="p-2 rounded text-sm hover:bg-muted cursor-pointer"
-                                >
-                                  {exercise.name}
-                                </div>
-                              ))
-                            ) : (
-                              <p className="text-muted-foreground text-sm">Nenhum exercício encontrado</p>
-                            )}
-                          </div>
+                          <ExerciseGrid exercises={getExercisesByType('cardio')} />
                         </CardContent>
                       </Card>
                       
                       <Card className="shadow-sm hover:shadow-md transition-shadow">
                         <CardContent className="p-4">
                           <h4 className="font-medium mb-2">Mobilidade</h4>
-                          <div className="max-h-48 overflow-y-auto space-y-1">
-                            {isLoading ? (
-                              <p className="text-muted-foreground text-sm">Carregando...</p>
-                            ) : getExercisesByType('mobility').length > 0 ? (
-                              getExercisesByType('mobility').map(exercise => (
-                                <div 
-                                  key={exercise.id}
-                                  onClick={() => handleExerciseSelect(exercise)}
-                                  className="p-2 rounded text-sm hover:bg-muted cursor-pointer"
-                                >
-                                  {exercise.name}
-                                </div>
-                              ))
-                            ) : (
-                              <p className="text-muted-foreground text-sm">Nenhum exercício encontrado</p>
-                            )}
-                          </div>
+                          <ExerciseGrid exercises={getExercisesByType('mobility')} />
                         </CardContent>
                       </Card>
                     </div>
@@ -309,23 +335,7 @@ const ExerciseLibrary = () => {
                               group === 'shoulders' ? 'Ombros' : 
                               group === 'arms' ? 'Braços' : 'Core'}
                             </h4>
-                            <div className="max-h-48 overflow-y-auto space-y-1">
-                              {isLoading ? (
-                                <p className="text-muted-foreground text-sm">Carregando...</p>
-                              ) : getExercisesByMuscleGroup(group).length > 0 ? (
-                                getExercisesByMuscleGroup(group).map(exercise => (
-                                  <div 
-                                    key={exercise.id}
-                                    onClick={() => handleExerciseSelect(exercise)}
-                                    className="p-2 rounded text-sm hover:bg-muted cursor-pointer"
-                                  >
-                                    {exercise.name}
-                                  </div>
-                                ))
-                              ) : (
-                                <p className="text-muted-foreground text-sm">Nenhum exercício encontrado</p>
-                              )}
-                            </div>
+                            <ExerciseGrid exercises={getExercisesByMuscleGroup(group)} />
                           </CardContent>
                         </Card>
                       ))}
@@ -343,23 +353,7 @@ const ExerciseLibrary = () => {
                               location === 'outdoors' ? 'Ao ar livre' : 
                               'Sem equipamento'}
                             </h4>
-                            <div className="max-h-48 overflow-y-auto space-y-1">
-                              {isLoading ? (
-                                <p className="text-muted-foreground text-sm">Carregando...</p>
-                              ) : getExercisesByEquipment(location).length > 0 ? (
-                                getExercisesByEquipment(location).map(exercise => (
-                                  <div 
-                                    key={exercise.id}
-                                    onClick={() => handleExerciseSelect(exercise)}
-                                    className="p-2 rounded text-sm hover:bg-muted cursor-pointer"
-                                  >
-                                    {exercise.name}
-                                  </div>
-                                ))
-                              ) : (
-                                <p className="text-muted-foreground text-sm">Nenhum exercício encontrado</p>
-                              )}
-                            </div>
+                            <ExerciseGrid exercises={getExercisesByEquipment(location)} />
                           </CardContent>
                         </Card>
                       ))}
@@ -378,23 +372,7 @@ const ExerciseLibrary = () => {
                               goal === 'weight_loss' ? 'Perda de peso' : 
                               'Flexibilidade'}
                             </h4>
-                            <div className="max-h-48 overflow-y-auto space-y-1">
-                              {isLoading ? (
-                                <p className="text-muted-foreground text-sm">Carregando...</p>
-                              ) : getExercisesByGoal(goal).length > 0 ? (
-                                getExercisesByGoal(goal).map(exercise => (
-                                  <div 
-                                    key={exercise.id}
-                                    onClick={() => handleExerciseSelect(exercise)}
-                                    className="p-2 rounded text-sm hover:bg-muted cursor-pointer"
-                                  >
-                                    {exercise.name}
-                                  </div>
-                                ))
-                              ) : (
-                                <p className="text-muted-foreground text-sm">Nenhum exercício encontrado</p>
-                              )}
-                            </div>
+                            <ExerciseGrid exercises={getExercisesByGoal(goal)} />
                           </CardContent>
                         </Card>
                       ))}
