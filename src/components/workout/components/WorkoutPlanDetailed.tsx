@@ -20,22 +20,20 @@ export const WorkoutPlanDetailed = ({ plan }: WorkoutPlanDetailedProps) => {
   };
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'md:grid-cols-2'}`}>
         <WorkoutGeneralInfo plan={plan} />
         {plan.critique && <WorkoutCritique plan={plan} />}
       </div>
       
       <Accordion type="single" collapsible className="w-full">
-        {plan.workout_sessions
-          .sort((a, b) => a.day_number - b.day_number)
-          .map((session) => (
-            <WorkoutSessionDetail 
-              key={session.day_number}
-              session={session} 
-              getDayName={getDayName}
-            />
-          ))}
+        {plan.workout_sessions.map((session) => (
+          <WorkoutSessionDetail 
+            key={session.day_number}
+            session={session} 
+            getDayName={getDayName}
+          />
+        ))}
       </Accordion>
     </div>
   );
