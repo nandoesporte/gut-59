@@ -23,23 +23,42 @@ serve(async (req) => {
       },
     });
 
-    const { body } = await req.json();
+    // Parse request body and validate it has required fields
+    const requestData = await req.json();
+    
+    if (!requestData) {
+      console.error('Request body is empty');
+      return new Response(JSON.stringify({ message: 'Request body is empty' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
+    console.log('Received request data:', requestData);
+    
+    const { preferences, userId, settings, exercises } = requestData;
 
-    console.log('Received workout preferences:', body.preferences);
-    console.log('User ID:', body.userId);
-    console.log('AI Settings:', body.settings);
-    console.log('Exercises:', body.exercises);
-
-    // Validate request body
-    if (!body || !body.preferences || !body.userId) {
-      console.error('Invalid request body:', body);
-      return new Response(JSON.stringify({ message: 'Invalid request body' }), {
+    // Validate required fields
+    if (!preferences) {
+      console.error('Missing preferences in request body:', requestData);
+      return new Response(JSON.stringify({ message: 'Missing preferences in request body' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const { preferences, userId, settings, exercises } = body;
+    if (!userId) {
+      console.error('Missing userId in request body:', requestData);
+      return new Response(JSON.stringify({ message: 'Missing userId in request body' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('Received workout preferences:', preferences);
+    console.log('User ID:', userId);
+    console.log('AI Settings:', settings);
+    console.log('Exercises:', exercises);
 
     // Fetch user profile to get additional information
     const { data: userProfile, error: profileError } = await supabaseClient
@@ -277,9 +296,9 @@ function constructUserPrompt(preferences, exercises) {
   Altura: ${preferences.height} cm
   Sexo: ${preferences.gender}
   Nível de atividade: ${preferences.activity_level}
-  Dias por semana: ${preferences.days_per_week}
-  Tipos de exercício preferidos: ${preferences.preferred_exercise_types.join(', ')}
-  Equipamento disponível: ${preferences.available_equipment.join(', ')}
+  Dias por semana: ${preferences.days_per_week || getDaysPerWeekFromActivityLevel(preferences.activity_level)}
+  Tipos de exercício preferidos: ${preferences.preferred_exercise_types?.join(', ') || 'Não especificado'}
+  Equipamento disponível: ${preferences.available_equipment?.join(', ') || 'Não especificado'}
   `;
 
   // Add health conditions if available
@@ -337,6 +356,16 @@ function constructUserPrompt(preferences, exercises) {
 
   // Return the complete prompt
   return prompt;
+}
+
+function getDaysPerWeekFromActivityLevel(activityLevel) {
+  switch (activityLevel) {
+    case 'sedentary': return 2; // Low activity
+    case 'light': return 3; // Light activity
+    case 'moderate': return 5; // Moderate activity
+    case 'intense': return 6; // High activity
+    default: return 3; // Default to 3 days
+  }
 }
 
 function getDefaultPrompt() {
