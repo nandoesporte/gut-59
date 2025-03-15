@@ -9,7 +9,6 @@ export interface WorkoutPreferences {
   preferred_exercise_types: ExerciseType[];
   available_equipment: string[];
   health_conditions?: string[];
-  days_per_week?: number; // Added this property
 }
 
 export type ActivityLevel = "sedentary" | "light" | "moderate" | "intense";
