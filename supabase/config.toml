@@ -19,12 +19,6 @@ verify_jwt = false
 [functions.generate-rehab-plan]
 verify_jwt = false
 
-[functions.generate-workout-plan-llama]
-verify_jwt = false
-
-[functions.nutri-plus-agent]
-verify_jwt = false
-
 [functions.analyze-assessment-results]
 verify_jwt = false
 
@@ -34,39 +28,45 @@ verify_jwt = false
 [functions.generate-daily-challenges]
 verify_jwt = false
 
-[functions.analyze-meal-plan]
-verify_jwt = false
-
-[functions.generate-workout-plan]
-verify_jwt = false
-
 [functions.check-asaas-payment]
-verify_jwt = false
-
-[functions.check-mercadopago-payment]
 verify_jwt = false
 
 [functions.create-asaas-payment]
 verify_jwt = false
 
-[functions.create-mercadopago-preference]
-verify_jwt = false
-
-[functions.handle-mercadopago-webhook]
-verify_jwt = false
-
-[functions.llama-completion]
+[functions.process-exercise-gifs]
 verify_jwt = false
 
 [functions.nutritionix-search]
 verify_jwt = false
 
-[functions.process-exercise-gifs]
-verify_jwt = false
-
-[functions.grant-plan-access]
-verify_jwt = false
-
 # Temporarily disabled functions to stay within limits
 # [functions.generate-meal-plan-llama]
+# verify_jwt = false
+
+# [functions.generate-workout-plan-llama]
+# verify_jwt = false
+
+# [functions.nutri-plus-agent]
+# verify_jwt = false
+
+# [functions.analyze-meal-plan]
+# verify_jwt = false
+
+# [functions.check-mercadopago-payment]
+# verify_jwt = false
+
+# [functions.create-mercadopago-preference]
+# verify_jwt = false
+
+# [functions.handle-mercadopago-webhook]
+# verify_jwt = false
+
+# [functions.grant-plan-access]
+# verify_jwt = false
+
+# [functions.llama-completion]
+# verify_jwt = false
+
+# [functions.generate-workout-plan]
 # verify_jwt = false
