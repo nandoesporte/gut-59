@@ -1,6 +1,7 @@
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 const apiKey = Deno.env.get('SUPABASE_ANON_KEY');
 const supabaseUrl = Deno.env.get('SUPABASE_URL');
