@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { WorkoutPreferences } from './types';
 import { WorkoutPlan } from './types/workout-plan';
@@ -63,7 +62,7 @@ export const WorkoutPlanDisplay = ({ preferences, onReset, onPlanGenerated }: Wo
       // Ensure preferences has all required fields, including days_per_week
       const enhancedPreferences = {
         ...preferences,
-        days_per_week: preferences.days_per_week || 3 // Default to 3 days if not specified
+        days_per_week: preferences.days_per_week || getDaysPerWeekFromActivityLevel(preferences.activity_level)
       };
 
       // Add console log to debug the preferences being sent
@@ -109,6 +108,16 @@ export const WorkoutPlanDisplay = ({ preferences, onReset, onPlanGenerated }: Wo
   useEffect(() => {
     generateWorkoutPlan();
   }, [generateWorkoutPlan]);
+
+  const getDaysPerWeekFromActivityLevel = (activityLevel: string): number => {
+    switch (activityLevel) {
+      case 'sedentary': return 2; // Tuesday and Thursday
+      case 'light': return 3; // Monday, Wednesday, Friday
+      case 'moderate': return 5; // Monday through Friday
+      case 'intense': return 6; // Monday through Saturday
+      default: return 3; // Default to 3 days
+    }
+  };
 
   const renderExerciseItem = (exercise: any) => {
     if (!exercise || !exercise.exercise) {
