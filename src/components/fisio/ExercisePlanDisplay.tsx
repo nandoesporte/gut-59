@@ -323,9 +323,11 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
         {rehabPlan.overview && (
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-2">Visão Geral</h3>
-            <p className="text-gray-600">{typeof rehabPlan.overview === 'string' ? 
-                rehabPlan.overview : 
-                rehabPlan.overview.title || 'Plano de reabilitação personalizado'}</p>
+            <p className="text-gray-600">
+              {typeof rehabPlan.overview === 'string' 
+                ? rehabPlan.overview 
+                : rehabPlan.overview.title || 'Plano de reabilitação personalizado'}
+            </p>
           </div>
         )}
 

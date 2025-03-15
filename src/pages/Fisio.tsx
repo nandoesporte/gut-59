@@ -50,32 +50,41 @@ const Fisio = () => {
       }
 
       // Transform the data to match RehabPlan type
-      const transformedPlans: RehabPlan[] = (plansData || []).map(plan => ({
-        id: plan.id,
-        user_id: plan.user_id,
-        goal: plan.goal,
-        start_date: plan.start_date,
-        end_date: plan.end_date,
-        rehab_sessions: (plan.rehab_sessions || []).map((session: any) => ({
-          day_number: session.day_number,
-          warmup_description: session.warmup_description,
-          cooldown_description: session.cooldown_description,
-          exercises: (session.rehab_session_exercises || []).map((se: any) => ({
-            name: se.exercise.name,
-            sets: se.sets,
-            reps: se.reps,
-            rest_time_seconds: se.rest_time_seconds,
-            gifUrl: se.exercise.gif_url,
-            notes: se.exercise.description
+      const transformedPlans: RehabPlan[] = (plansData || []).map(plan => {
+        // Create basic plan structure
+        const transformedPlan: RehabPlan = {
+          id: plan.id,
+          user_id: plan.user_id,
+          goal: plan.goal,
+          start_date: plan.start_date,
+          end_date: plan.end_date,
+          rehab_sessions: (plan.rehab_sessions || []).map((session: any) => ({
+            day_number: session.day_number,
+            warmup_description: session.warmup_description,
+            cooldown_description: session.cooldown_description,
+            exercises: (session.rehab_session_exercises || []).map((se: any) => ({
+              name: se.exercise.name,
+              sets: se.sets,
+              reps: se.reps,
+              rest_time_seconds: se.rest_time_seconds,
+              gifUrl: se.exercise.gif_url,
+              notes: se.exercise.description
+            }))
           }))
-        })),
-        // Add plan_data if available for backward compatibility
-        ...((plan.plan_data && typeof plan.plan_data === 'object') ? { 
-          days: plan.plan_data.days,
-          overview: plan.plan_data.overview,
-          recommendations: plan.plan_data.recommendations
-        } : {})
-      }));
+        };
+        
+        // Add plan_data if available
+        if (plan.plan_data && typeof plan.plan_data === 'object') {
+          transformedPlan.plan_data = plan.plan_data;
+          
+          // For backward compatibility, also set these properties directly
+          transformedPlan.days = plan.plan_data.days;
+          transformedPlan.overview = plan.plan_data.overview;
+          transformedPlan.recommendations = plan.plan_data.overview?.recommendations || [];
+        }
+        
+        return transformedPlan;
+      });
 
       setHistoryPlans(transformedPlans);
     } catch (error) {

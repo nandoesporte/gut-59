@@ -26,8 +26,21 @@ export interface RehabPlan {
   end_date: string;
   rehab_sessions: RehabSession[];
   
-  // Adding the missing properties that are being used in ExercisePlanDisplay.tsx
+  // Adding plan_data property to fix the type errors
+  plan_data?: {
+    days: Record<string, any>;
+    overview: {
+      title?: string;
+      goals?: string[];
+      recommendations?: string[];
+      general_recommendations?: string[];
+      pain_management?: string[];
+      warning_signs?: string[];
+    };
+  };
+  
+  // These properties are derived from plan_data, but kept for backward compatibility
   days?: Record<string, any>;
-  overview?: string;
+  overview?: any;
   recommendations?: string[] | string;
 }
