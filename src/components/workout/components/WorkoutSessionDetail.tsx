@@ -1,4 +1,3 @@
-
 import { AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { WorkoutSession } from "../types/workout-plan";
@@ -8,9 +7,14 @@ import { TrainingLoadInfo } from "./TrainingLoadInfo";
 interface WorkoutSessionDetailProps {
   session: WorkoutSession;
   getDayName: (dayNumber: number) => string;
+  showAccordion?: boolean;
 }
 
-export const WorkoutSessionDetail = ({ session, getDayName }: WorkoutSessionDetailProps) => {
+export const WorkoutSessionDetail = ({ 
+  session, 
+  getDayName, 
+  showAccordion = true 
+}: WorkoutSessionDetailProps) => {
   // Improved function for filtering unique exercises
   const getUniqueExercises = () => {
     if (!session.session_exercises) return [];
@@ -54,6 +58,47 @@ export const WorkoutSessionDetail = ({ session, getDayName }: WorkoutSessionDeta
   // Get all muscle groups present in the workout
   const muscleGroups = Object.keys(exercisesByMuscleGroup).sort();
 
+  // If showAccordion is false, render only the content part
+  if (!showAccordion) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h4 className="font-medium text-lg mb-3">
+            Exercícios <span className="text-gray-500 text-sm">({uniqueExercises.length})</span>
+          </h4>
+          
+          {/* Display exercises grouped by muscle group */}
+          <div className="space-y-6">
+            {muscleGroups.map((muscleGroup) => (
+              <div key={`mg-${session.day_number}-${muscleGroup}`} className="space-y-4">
+                <h5 className="font-medium text-gray-700 uppercase border-b pb-1">
+                  {muscleGroup.charAt(0).toUpperCase() + muscleGroup.slice(1)}
+                </h5>
+                <div className="space-y-5">
+                  {exercisesByMuscleGroup[muscleGroup].map((exerciseSession, index) => {
+                    // Create a truly unique key using multiple identifiers
+                    const uniqueKey = `ex-${session.day_number}-${muscleGroup}-${index}-${exerciseSession.id || 'unknown'}-${exerciseSession.exercise.id || 'no-id'}`;
+                    
+                    return (
+                      <WorkoutExerciseDetail 
+                        key={uniqueKey}
+                        exerciseSession={exerciseSession}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        {/* Training Load */}
+        {session.training_load && <TrainingLoadInfo session={session} />}
+      </div>
+    );
+  }
+
+  // Otherwise, render with Accordion (for WorkoutHistory)
   return (
     <AccordionItem key={session.day_number} value={`day-${session.day_number}`}>
       <AccordionTrigger className="bg-white rounded-t-lg shadow px-4 hover:no-underline hover:bg-gray-50">
