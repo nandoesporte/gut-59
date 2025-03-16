@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { supabaseClient } from "../_shared/supabase-client.ts";
 import { corsHeaders } from "../_shared/cors.ts";
@@ -281,7 +280,7 @@ serve(async (req) => {
       // Transform plan data to a consistent format
       console.log("Converting plan data to display format");
       
-      // Add plan_data property for database storage - define planData variable here to avoid reference error
+      // Define planData explicitly to avoid the reference error
       const planData = JSON.parse(JSON.stringify(rehabPlan));
       
       // Set condition property using preferences
@@ -367,6 +366,9 @@ serve(async (req) => {
     // Save rehabilitation plan to database if user is authenticated
     if (userData?.id) {
       try {
+        // Ensure planData is defined before trying to use it
+        const planData = JSON.parse(JSON.stringify(rehabPlan));
+        
         // Save rehabilitation plan
         const { error: insertError } = await supabase
           .from('rehab_plans')
@@ -377,7 +379,7 @@ serve(async (req) => {
             joint_area: preferences.joint_area,
             start_date: new Date().toISOString(),
             end_date: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString(), // 28 days later
-            plan_data: planData  // Now correctly using the planData variable defined above
+            plan_data: planData  // Using the planData that was just defined
           });
 
         if (insertError) {

@@ -1,6 +1,7 @@
 
 project_id = "sxjafhzikftdenqnkcri"
 
+# Core functionality - keeping these enabled
 [functions.mental-health-chat]
 verify_jwt = false
 
@@ -16,5 +17,23 @@ verify_jwt = false
 [functions.create-mercadopago-preference]
 verify_jwt = false
 
-# Remove unused edge functions or merge functionality to stay within limits
-# Current error: Max number of functions reached for project
+# The following functions are disabled to stay within limits
+# Uncomment only when needed for specific tasks
+
+# [functions.analyze-meal-plan]
+# verify_jwt = false
+
+# [functions.generate-meal-suggestions]
+# verify_jwt = false
+
+# [functions.process-exercise-gifs]
+# verify_jwt = false
+
+# [functions.analyze-assessment-results]
+# verify_jwt = false
+
+# NOTE: Max number of functions reached for project
+# Options to resolve:
+# 1. Upgrade your Supabase plan
+# 2. Disable spend cap in billing settings
+# 3. Keep unnecessary functions commented out in this file
