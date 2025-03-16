@@ -57,11 +57,11 @@ serve(async (req) => {
           messages: [
             {
               role: "system",
-              content: "You are a professional physiotherapist who creates detailed rehabilitation plans. Your task is to generate a valid and complete JSON rehabilitation plan. DO NOT include placeholders or '...and so on' text in your response. Generate a complete, valid JSON object for all days specified."
+              content: "You are a professional physiotherapist who creates detailed rehabilitation plans. Your task is to generate a valid and complete JSON rehabilitation plan for the 5 specific days mentioned (days 1, 7, 14, 21, and 28). Generate only these 5 days, and ensure each day is fully detailed. NO PLACEHOLDERS OR ELLIPSIS allowed. The JSON must be complete and parseable."
             },
             { role: "user", content: prompt }
           ],
-          temperature: 0.5,
+          temperature: 0.3,
           max_tokens: 4000,
           response_format: { type: "json_object" }
         })
@@ -76,7 +76,7 @@ serve(async (req) => {
       }
 
       const result = await response.json();
-      console.log("Groq API response received");
+      console.log("Groq API response received successfully");
 
       if (!result.choices || result.choices.length === 0) {
         console.error("Groq API returned empty choices array:", JSON.stringify(result));
@@ -87,8 +87,42 @@ serve(async (req) => {
       let rehabPlan;
       try {
         const content = result.choices[0].message.content;
-        console.log("Raw content from Groq API:", content);
-        rehabPlan = typeof content === 'string' ? JSON.parse(content) : content;
+        console.log("Content type:", typeof content);
+        
+        // Handle JSON parsing with extra safety
+        if (typeof content === 'string') {
+          try {
+            // First attempt: direct parsing
+            rehabPlan = JSON.parse(content);
+          } catch (parseError) {
+            console.error("Initial parsing failed, trying to clean the content:", parseError);
+            
+            // Second attempt: clean up any potential issues with the JSON string
+            let cleanedContent = content
+              .replace(/\\n/g, " ")
+              .replace(/\s+/g, " ")
+              .replace(/^```json/i, "")
+              .replace(/```$/i, "")
+              .trim();
+              
+            if (cleanedContent.startsWith('"') && cleanedContent.endsWith('"')) {
+              cleanedContent = cleanedContent.slice(1, -1);
+            }
+            
+            try {
+              rehabPlan = JSON.parse(cleanedContent);
+            } catch (secondError) {
+              console.error("Second parsing attempt failed:", secondError);
+              throw new Error("Could not parse the rehabilitation plan JSON");
+            }
+          }
+        } else if (typeof content === 'object') {
+          // If it's already an object, use it directly
+          rehabPlan = content;
+        } else {
+          throw new Error(`Unexpected content type: ${typeof content}`);
+        }
+        
         console.log("Rehab plan processed successfully");
       } catch (parseError) {
         console.error("Error parsing Groq API response:", parseError);
@@ -225,8 +259,9 @@ INSTRUCTIONS:
 2. Each day should include warm-up activities, specific rehabilitation exercises, and cool-down routines.
 3. Include detailed information about exercise repetitions, sets, and rest periods.
 4. Provide general health recommendations and dietary advice to support recovery.
-5. Important: Due to message size limitations, only create a plan for days 1, 7, 14, 21, and 28 as representative days for each week.
-6. Format your response as a valid JSON object with the following structure:
+5. IMPORTANT: Due to message size limitations, ONLY create a plan for days 1, 7, 14, 21, and 28 as representative days for each week.
+6. Do NOT use any placeholder text, ellipsis (...), or "and so on" text in your response.
+7. Format your response as a valid JSON object with the following structure:
 
 {
   "overview": "A brief overview of the condition and the rehabilitation approach",
@@ -263,24 +298,24 @@ INSTRUCTIONS:
           "calories": 500,
           "macros": {"protein": 20, "carbs": 60, "fats": 15, "fiber": 5}
         },
-        "morningSnack": {...},
-        "lunch": {...},
-        "afternoonSnack": {...},
-        "dinner": {...}
+        "morningSnack": {"foods": [...], "calories": 200, "macros": {...}},
+        "lunch": {"foods": [...], "calories": 600, "macros": {...}},
+        "afternoonSnack": {"foods": [...], "calories": 200, "macros": {...}},
+        "dinner": {"foods": [...], "calories": 500, "macros": {...}}
       }
     },
-    "day7": {...},
-    "day14": {...},
-    "day21": {...},
-    "day28": {...}
+    "day7": { ... identical structure to day1 ... },
+    "day14": { ... identical structure to day1 ... },
+    "day21": { ... identical structure to day1 ... },
+    "day28": { ... identical structure to day1 ... }
   }
 }
 
-IMPORTANT REQUIREMENTS:
-1. Only generate the days specified (days 1, 7, 14, 21, and 28). Do not include placeholder text or "...and so on" in your JSON.
-2. Make sure your response is a complete, valid JSON object with no placeholders or ellipsis.
-3. Each day should have unique and progressive exercises suitable for the recovery stage.
-4. All nutrition sections should include complete details for all meals.
+CRITICAL REQUIREMENTS:
+1. ONLY generate day1, day7, day14, day21, and day28 in your response. Do not include other days.
+2. ALL food lists and exercise lists must be FULLY DETAILED - not using placeholder text or ellipsis.
+3. Your response MUST be a valid, parseable JSON object that adheres precisely to the schema above.
+4. Portuguese is preferred for all content if possible.
 
 Por favor, crie um plano de reabilitação personalizado em português do Brasil (Brazilian Portuguese).
 `;
