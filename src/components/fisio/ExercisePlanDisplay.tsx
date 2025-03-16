@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { FisioPreferences } from "./types";
@@ -142,7 +141,15 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
     // Ensure the plan has days
     if (!plan.days) {
       console.warn("Plan doesn't have days structure:", plan);
-      plan.days = {};
+      plan.days = {
+        day1: {
+          notes: "Dia 1 do tratamento",
+          exercises: [{
+            title: "Exercícios de Reabilitação",
+            exercises: []
+          }]
+        }
+      };
     }
     
     // Assign default GIFs based on exercise names if missing

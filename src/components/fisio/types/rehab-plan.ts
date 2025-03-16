@@ -18,16 +18,21 @@ export interface RehabSession {
 }
 
 export interface RehabPlan {
-  id: string;
-  user_id: string;
-  goal: RehabGoal;
+  id?: string;
+  user_id?: string;
+  goal?: RehabGoal;
   condition?: string;
-  start_date: string;
-  end_date: string;
-  rehab_sessions: RehabSession[];
+  joint_area?: string;
+  start_date?: string;
+  end_date?: string;
+  rehab_sessions?: RehabSession[];
   
-  // Adding the missing properties that are being used in ExercisePlanDisplay.tsx
+  // Adding properties used in the display component
   days?: Record<string, any>;
   overview?: string;
   recommendations?: string[] | string;
+  description?: string;
+  general_recommendations?: string[] | string;
+  exercises?: Exercise[];
+  plan_data?: any;
 }
