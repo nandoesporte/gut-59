@@ -1,295 +1,221 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { supabaseClient } from "../_shared/supabase-client.ts";
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { corsHeaders } from "../_shared/cors.ts";
 
-const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY');
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
+const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 
 serve(async (req) => {
   // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { userData, preferences } = await req.json();
+    console.log("Generate Rehab Plan Groq Function - Request received");
     
-    console.log("Gerando plano de reabilitação com llama3-8b-8192 via Groq");
-    console.log("Dados do usuário:", JSON.stringify(userData));
-    console.log("Preferências:", JSON.stringify(preferences));
+    // Parse request data
+    const { preferences, userId } = await req.json();
+    console.log("User ID:", userId);
+    console.log("Preferences received:", JSON.stringify(preferences));
     
-    if (!userData || !preferences) {
-      throw new Error("Dados insuficientes para gerar o plano de reabilitação");
+    // Validate required fields
+    if (!preferences || !userId) {
+      console.error("Missing required fields: preferences or userId");
+      return new Response(
+        JSON.stringify({ error: "Missing required fields" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    // Format the user preferences and injury data for the prompt
-    const painLevel = preferences.painLevel ? `Nível de dor: ${preferences.painLevel}/10` : 'Nível de dor não informado';
-    const injuryDescription = preferences.injuryDescription ? 
-      `Descrição da lesão: ${preferences.injuryDescription}` : 
-      'Descrição da lesão não informada';
+    if (!GROQ_API_KEY) {
+      console.error("GROQ_API_KEY is not configured");
+      return new Response(
+        JSON.stringify({ error: "API configuration error" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Create rehabilitation plan JSON structure
+    console.log("Creating rehabilitation plan");
     
-    const painLocation = preferences.painLocation ?
-      `Localização da dor: ${preferences.painLocation}` :
-      'Localização da dor não informada';
-      
-    const injuryDuration = preferences.injuryDuration ?
-      `Duração da lesão: ${preferences.injuryDuration}` :
-      'Duração da lesão não informada';
-      
-    const previousTreatments = preferences.previousTreatments ?
-      `Tratamentos anteriores: ${preferences.previousTreatments}` :
-      'Sem tratamentos anteriores informados';
-      
-    const exerciseExperience = preferences.exerciseExperience ?
-      `Experiência com exercícios: ${preferences.exerciseExperience}` :
-      'Experiência com exercícios não informada';
-      
-    const equipmentAvailable = preferences.equipmentAvailable && preferences.equipmentAvailable.length > 0 ?
-      `Equipamentos disponíveis: ${preferences.equipmentAvailable.join(', ')}` :
-      'Sem equipamentos disponíveis';
+    // Format the prompt for the Groq API
+    const prompt = createRehabPlanPrompt(preferences);
     
-    // Define a detailed system prompt for the Fisio+ AI agent
-    const systemPrompt = `Você é Fisio+, um fisioterapeuta especializado criado para gerar planos de reabilitação personalizados. 
-Use seu amplo conhecimento em fisioterapia para criar um plano de 4 semanas baseado nas informações do paciente.
-Você deve fornecer exercícios específicos, com detalhes de séries, repetições e técnica correta.
-Inclua aquecimento, exercícios principais e resfriamento para cada sessão.
-Ofereça orientações de progressão ao longo das semanas e recomendações para gerenciamento da dor.
-Você sempre responde apenas com JSON válido estruturado de acordo com o formato solicitado, sem nenhum texto adicional.`;
-    
-    // Prepare the full prompt for the LLM
-    const prompt = `
-# Instrução
-Crie um plano de reabilitação física personalizado de 4 semanas baseado nos seguintes dados:
-
-## Informações do Usuário
-- Peso: ${userData.weight || 'Não informado'}kg
-- Altura: ${userData.height || 'Não informada'}cm
-- Idade: ${userData.age || 'Não informada'} anos
-- Gênero: ${userData.gender === 'male' ? 'Masculino' : userData.gender === 'female' ? 'Feminino' : 'Não informado'}
-
-## Informações da Lesão
-- ${painLocation}
-- ${painLevel}
-- ${injuryDescription}
-- ${injuryDuration}
-- ${previousTreatments}
-
-## Experiência e Recursos
-- ${exerciseExperience}
-- ${equipmentAvailable}
-
-## Estrutura do Plano de Reabilitação
-Crie um plano de reabilitação física para 4 semanas, com:
-1. Exercícios diários para cada semana
-2. Progressão adequada de dificuldade
-3. Tempo de descanso recomendado
-4. Número de séries e repetições para cada exercício
-5. Descrições detalhadas de como realizar os exercícios com segurança
-
-## Recomendações Adicionais
-Inclua:
-1. Recomendações gerais para recuperação
-2. Cuidados a serem tomados durante exercícios
-3. Sinais de alerta para interromper os exercícios
-4. Técnicas de gerenciamento de dor
-
-## Formato de Resposta
-Responda APENAS com um objeto JSON válido com a seguinte estrutura:
-{
-  "overview": {
-    "title": string,
-    "goals": [string],
-    "general_recommendations": [string],
-    "pain_management": [string],
-    "warning_signs": [string]
-  },
-  "plan": {
-    "week1": {
-      "title": string,
-      "description": string,
-      "days": {
-        "day1": {
-          "exercises": [
-            {
-              "name": string,
-              "description": string,
-              "sets": número,
-              "reps": string,
-              "rest": string,
-              "equipment": string,
-              "tips": [string]
-            }
-          ],
-          "notes": string
-        },
-        "day2": {},
-        "day3": {},
-        "day4": {},
-        "day5": {},
-        "day6": {},
-        "day7": {}
-      },
-      "weekNotes": string
-    },
-    "week2": {},
-    "week3": {},
-    "week4": {}
-  }
-}
-
-Certifique-se de que os números são números (e não strings). O JSON deve ser válido e todos os campos listados devem estar preenchidos.
-`;
-
-    console.log("Enviando prompt para o modelo llama3-8b-8192");
-
-    // Call Groq API to generate the rehabilitation plan
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    // Make request to Groq API
+    const response = await fetch(GROQ_API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${GROQ_API_KEY}`,
+        "Authorization": `Bearer ${GROQ_API_KEY}`
       },
       body: JSON.stringify({
-        model: "llama3-8b-8192",
+        model: "llama3-70b-8192",
         messages: [
-          { 
-            role: "system", 
-            content: systemPrompt
+          {
+            role: "system",
+            content: "You are a professional physiotherapist who creates detailed rehabilitation plans."
           },
           { role: "user", content: prompt }
         ],
-        max_tokens: 4096,
-        temperature: 0.2,
+        temperature: 0.7,
+        max_tokens: 4000,
         response_format: { type: "json_object" }
-      }),
+      })
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`Erro na chamada da API do Groq (${response.status}):`, errorText);
-      throw new Error(`Erro na API: ${response.status} ${errorText}`);
+      console.error(`Groq API Error (${response.status}):`, errorText);
+      throw new Error(`Groq API request failed with status ${response.status}: ${errorText}`);
     }
 
-    const groqResponse = await response.json();
-    console.log("Resposta recebida da API do Groq");
+    const result = await response.json();
+    console.log("Groq API response received");
 
-    if (!groqResponse.choices || !groqResponse.choices[0] || !groqResponse.choices[0].message) {
-      console.error("Formato de resposta inesperado:", groqResponse);
-      throw new Error("Formato de resposta inesperado");
+    if (!result.choices || result.choices.length === 0) {
+      console.error("Groq API returned empty choices array:", result);
+      throw new Error("No content generated by Groq API");
     }
 
-    let rehabPlanJson = groqResponse.choices[0].message.content;
-    console.log("Conteúdo da resposta:", rehabPlanJson);
-
-    // Try to parse the JSON response
+    // Process the response
     let rehabPlan;
     try {
-      // First, check if the response is already a string or if it's an object
-      if (typeof rehabPlanJson === 'string') {
-        // Clean up the response if it contains markdown code blocks
-        if (rehabPlanJson.includes('```json')) {
-          rehabPlanJson = rehabPlanJson.replace(/```json\n|\n```/g, '');
-        }
-        
-        rehabPlan = JSON.parse(rehabPlanJson);
-      } else if (typeof rehabPlanJson === 'object') {
-        rehabPlan = rehabPlanJson;
-      } else {
-        throw new Error("Formato de resposta inválido");
-      }
+      const content = result.choices[0].message.content;
+      rehabPlan = typeof content === 'string' ? JSON.parse(content) : content;
+      console.log("Rehab plan processed successfully");
     } catch (parseError) {
-      console.error("Erro ao analisar JSON:", parseError);
-      console.error("Conteúdo JSON problemático:", rehabPlanJson);
-      throw new Error("Erro ao processar resposta: " + parseError.message);
+      console.error("Error parsing Groq API response:", parseError);
+      throw new Error("Failed to parse rehabilitation plan from Groq API response");
     }
 
-    // Save the rehabilitation plan to the database if user is authenticated
-    if (userData.id) {
-      const supabase = supabaseClient();
+    // Now, store the plan in the database
+    const { supabaseClient } = await import("../_shared/supabase-client.ts");
+    
+    // Calculate start and end dates (4 weeks plan)
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + 28); // 4 weeks from now
+    
+    const planData = {
+      user_id: userId,
+      goal: preferences.goal || "Rehabilitation",
+      condition: preferences.condition,
+      start_date: startDate.toISOString(),
+      end_date: endDate.toISOString(),
+      plan_data: rehabPlan
+    };
+    
+    // Insert the rehab plan into the database
+    const { data: insertedPlan, error: insertError } = await supabaseClient
+      .from('rehab_plans')
+      .insert(planData)
+      .select()
+      .single();
       
-      // Save the rehab plan
-      const { error: insertError } = await supabase
-        .from('rehab_plans')
-        .insert({
-          user_id: userData.id,
-          plan_data: rehabPlan,
-          injury_info: {
-            pain_location: preferences.painLocation,
-            pain_level: preferences.painLevel,
-            injury_description: preferences.injuryDescription,
-            injury_duration: preferences.injuryDuration,
-            previous_treatments: preferences.previousTreatments
-          }
-        });
-
-      if (insertError) {
-        console.error("Erro ao salvar plano de reabilitação:", insertError);
-      } else {
-        console.log("Plano de reabilitação salvo com sucesso!");
-      
-        // Update the plan generation count
-        const now = new Date().toISOString();
-        const { data: planCount, error: countError } = await supabase
-          .from('plan_generation_counts')
-          .select('count, last_reset_date')
-          .eq('user_id', userData.id)
-          .eq('plan_type', 'rehab_plan')
-          .maybeSingle();
-          
-        if (countError) {
-          console.error("Erro ao verificar contagem de planos:", countError);
-        }
-        
-        if (planCount) {
-          await supabase
-            .from('plan_generation_counts')
-            .update({
-              count: planCount.count + 1,
-              last_generated_date: now
-            })
-            .eq('user_id', userData.id)
-            .eq('plan_type', 'rehab_plan');
-        } else {
-          await supabase
-            .from('plan_generation_counts')
-            .insert({
-              user_id: userData.id,
-              plan_type: 'rehab_plan',
-              count: 1,
-              last_generated_date: now,
-              last_reset_date: now
-            });
-        }
-      }
+    if (insertError) {
+      console.error("Error saving rehab plan to database:", insertError);
+      throw new Error(`Failed to save rehab plan: ${insertError.message}`);
     }
-
+    
+    console.log("Rehab plan saved to database successfully");
+    
+    // Return the generated plan
     return new Response(
       JSON.stringify(rehabPlan),
-      {
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-      }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("Erro completo:", error);
-    
+    console.error("Error in generate-rehab-plan-groq:", error);
     return new Response(
       JSON.stringify({
-        error: error.message || "Ocorreu um erro ao gerar o plano de reabilitação"
+        error: error.message || "An error occurred while generating the rehab plan",
+        success: false,
       }),
       {
         status: 500,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
       }
     );
   }
 });
+
+function createRehabPlanPrompt(preferences) {
+  return `
+Create a detailed 4-week rehabilitation plan for a patient with the following information:
+
+PATIENT INFORMATION:
+- Age: ${preferences.age} years
+- Weight: ${preferences.weight} kg
+- Height: ${preferences.height} cm
+- Gender: ${preferences.gender}
+- Joint Area Affected: ${preferences.joint_area}
+- Condition: ${preferences.condition}
+- Pain Level (0-10): ${preferences.pain_level}
+- Mobility Level: ${preferences.mobility_level}
+- Previous Treatment: ${preferences.previous_treatment ? "Yes" : "No"}
+- Activity Level: ${preferences.activity_level}
+- Pain Location: ${preferences.painLocation || "Not specified"}
+
+INJURY DETAILS:
+- Injury Description: ${preferences.injuryDescription}
+- Injury Duration: ${preferences.injuryDuration}
+- Previous Treatments: ${preferences.previousTreatments}
+- Exercise Experience: ${preferences.exerciseExperience}
+
+INSTRUCTIONS:
+1. Create a comprehensive rehabilitation plan covering 4 weeks (28 days) with progressive exercises.
+2. Each day should include warm-up activities, specific rehabilitation exercises, and cool-down routines.
+3. Include detailed information about exercise repetitions, sets, and rest periods.
+4. Provide general health recommendations and dietary advice to support recovery.
+5. Format your response as a valid JSON object with the following structure:
+
+{
+  "overview": "A brief overview of the condition and the rehabilitation approach",
+  "recommendations": ["array", "of", "general", "recommendations"],
+  "days": {
+    "day1": {
+      "notes": "Day-specific instructions or focus",
+      "exercises": [
+        {
+          "title": "Warm-up",
+          "exercises": [
+            {"name": "Exercise name", "sets": 3, "reps": 10, "restTime": "30 seconds", "description": "Exercise description"}
+          ],
+          "notes": "Any additional notes for this section"
+        },
+        {
+          "title": "Main Session",
+          "exercises": [
+            {"name": "Exercise name", "sets": 3, "reps": 10, "restTime": "60 seconds", "description": "Exercise description"}
+          ],
+          "notes": "Any additional notes for this section"
+        },
+        {
+          "title": "Cool-down",
+          "exercises": [
+            {"name": "Exercise name", "sets": 1, "reps": 3, "restTime": "30 seconds", "description": "Exercise description"}
+          ],
+          "notes": "Any additional notes for this section"
+        }
+      ],
+      "nutrition": {
+        "breakfast": {
+          "foods": [{"name": "food name", "portion": 100, "unit": "g", "details": "optional description"}],
+          "calories": 500,
+          "macros": {"protein": 20, "carbs": 60, "fats": 15, "fiber": 5}
+        },
+        "morningSnack": {...},
+        "lunch": {...},
+        "afternoonSnack": {...},
+        "dinner": {...}
+      }
+    },
+    "day2": {...},
+    ...and so on for days 1-28
+  }
+}
+
+Por favor, crie um plano de reabilitação personalizado em português do Brasil (Brazilian Portuguese).
+`;
+}
