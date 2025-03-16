@@ -8,11 +8,13 @@ import { Stethoscope } from 'lucide-react';
 import { FisioHistoryView } from '@/components/fisio/components/FisioHistory';
 import { supabase } from '@/integrations/supabase/client';
 import type { RehabPlan } from '@/components/fisio/types/rehab-plan';
+import { useToast } from '@/hooks/use-toast';
 
 const Fisio = () => {
   const [preferences, setPreferences] = useState<FisioPreferences | null>(null);
   const [historyPlans, setHistoryPlans] = useState<RehabPlan[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const { toast } = useToast();
 
   const fetchFisioHistory = async () => {
     try {
@@ -36,7 +38,15 @@ const Fisio = () => {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching rehab history:', error);
+        toast({
+          title: 'Error',
+          description: 'Could not load your rehabilitation history',
+          variant: 'destructive'
+        });
+        return;
+      }
 
       // Transform the data to match RehabPlan type
       const transformedPlans: RehabPlan[] = (plansData || []).map(plan => ({
@@ -63,6 +73,11 @@ const Fisio = () => {
       setHistoryPlans(transformedPlans);
     } catch (error) {
       console.error('Error fetching rehab history:', error);
+      toast({
+        title: 'Error',
+        description: 'Could not load your rehabilitation history',
+        variant: 'destructive'
+      });
     } finally {
       setIsLoadingHistory(false);
     }
@@ -90,12 +105,20 @@ const Fisio = () => {
         <div className="max-w-4xl mx-auto space-y-8">
           {!preferences ? (
             <div className="transform transition-all duration-500 hover:scale-[1.01]">
-              <FisioPreferencesForm onSubmit={setPreferences} />
+              <FisioPreferencesForm onSubmit={(prefs) => {
+                setPreferences(prefs);
+                // Scroll to top when generating a new plan
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }} />
             </div>
           ) : (
             <ExercisePlanDisplay 
               preferences={preferences} 
-              onReset={() => setPreferences(null)} 
+              onReset={() => {
+                setPreferences(null);
+                // Refresh history when resetting to generate a new plan
+                fetchFisioHistory();
+              }} 
             />
           )}
 

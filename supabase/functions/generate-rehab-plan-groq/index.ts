@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { supabaseClient } from "../_shared/supabase-client.ts";
 import { corsHeaders } from "../_shared/cors.ts";
@@ -45,13 +46,13 @@ serve(async (req) => {
     console.log("Prompt found:", promptData.name);
 
     // Fetch relevant exercises from the database based on joint area
-    // Limit to just 5 exercises to significantly reduce context size
+    // Further limit to just 5 exercises to significantly reduce context size
     const { data: exercises, error: exercisesError } = await supabase
       .from('physio_exercises')
       .select('id,name,joint_area,difficulty,exercise_type')
       .eq('joint_area', preferences.joint_area)
       .order('name')
-      .limit(5); // Further reduced from 10 to 5
+      .limit(5); // Reduced from 10 to 5
 
     if (exercisesError) {
       console.error("Error fetching exercises:", exercisesError);
@@ -67,7 +68,7 @@ serve(async (req) => {
       const { data: generalExercises, error: generalError } = await supabase
         .from('physio_exercises')
         .select('id,name,joint_area,difficulty,exercise_type')
-        .limit(3); // Further reduced from 5 to 3
+        .limit(3); // Reduced from 5 to 3
       
       if (!generalError && generalExercises) {
         relevantExercises = generalExercises;
@@ -88,7 +89,7 @@ serve(async (req) => {
 
     // Get base prompt from Fisio+ agent - Significantly truncate to reduce size
     let promptTemplate = promptData.prompt;
-    if (promptTemplate.length > 1000) { // Further reduced from 2000 to 1000
+    if (promptTemplate.length > 1000) { // Reduced from 2000 to 1000
       promptTemplate = promptTemplate.substring(0, 1000) + "...";
       console.log("Prompt was significantly truncated to reduce context size");
     }

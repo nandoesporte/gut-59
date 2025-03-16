@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -20,49 +19,37 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
   const [isLoading, setIsLoading] = useState(true);
   const [activeDay, setActiveDay] = useState('overview');
   const [loadingText, setLoadingText] = useState('Generating your rehabilitation plan...');
+  const [error, setError] = useState<string | null>(null);
   const { hasPaid, isProcessingPayment, handlePaymentAndContinue, showConfirmation, setShowConfirmation } = 
     usePaymentHandling('rehabilitation');
 
-  const generatePlan = async () => {
+  const generateRehabPlan = async () => {
+    setIsLoading(true);
+    setError(null);
+    
     try {
-      setIsLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
       
-      setLoadingText('Gathering exercise data for your condition...');
-      setTimeout(() => {
-        setLoadingText('Analyzing your preferences and history...');
-      }, 3000);
-      setTimeout(() => {
-        setLoadingText('Creating personalized exercise protocol...');
-      }, 6000);
-      setTimeout(() => {
-        setLoadingText('Finalizing your plan...');
-      }, 9000);
-
-      const { data: userData } = await supabase.auth.getUser();
-
-      const response = await fetch('/api/functions/v1/generate-rehab-plan-groq', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          preferences,
-          userData: userData.user,
-        }),
+      const userData = user ? {
+        id: user.id,
+        email: user.email,
+        // Add any other user data needed
+      } : null;
+      
+      const response = await supabase.functions.invoke('generate-rehab-plan-groq', {
+        body: { preferences, userData },
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate rehabilitation plan');
-      }
-
-      const rehabPlan = await response.json();
-      console.log('Generated rehabilitation plan:', rehabPlan);
       
-      setPlan(rehabPlan);
+      if (response.error) {
+        throw new Error(response.error.message || 'Error generating rehabilitation plan');
+      }
+      
+      console.log('Response from generate-rehab-plan-groq:', response.data);
+      setPlan(response.data);
+      
     } catch (error) {
       console.error('Error generating rehabilitation plan:', error);
-      toast.error('Failed to generate rehabilitation plan. Please try again.');
+      setError(error instanceof Error ? error.message : 'An unknown error occurred');
     } finally {
       setIsLoading(false);
     }
@@ -70,23 +57,20 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
 
   useEffect(() => {
     if (hasPaid && !plan) {
-      generatePlan();
+      generateRehabPlan();
     }
   }, [hasPaid]);
 
-  // Start the process right away if no payment is needed
   useEffect(() => {
     const checkPaymentAndGeneratePlan = async () => {
       setIsLoading(true);
       try {
-        // Check plan access
         const { data: { user } } = await supabase.auth.getUser();
         
         if (!user) {
           throw new Error('User not authenticated');
         }
 
-        // Check plan generation counts
         const { data: counts, error: countError } = await supabase
           .from('plan_generation_counts')
           .select('rehabilitation_count')
@@ -97,12 +81,9 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
           console.error('Error checking plan counts:', countError);
         }
 
-        // If user hasn't generated plans yet or has generated less than 3
         if (!counts || (counts.rehabilitation_count < 3)) {
-          // Don't need payment, generate plan
-          await generatePlan();
+          await generateRehabPlan();
         } else {
-          // Check if there's special access
           const { data: access, error: accessError } = await supabase
             .from('plan_access')
             .select('*')
@@ -118,10 +99,8 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
           }
 
           if (access && !access.payment_required) {
-            // User has special access
-            await generatePlan();
+            await generateRehabPlan();
           } else {
-            // Need payment
             setIsLoading(false);
           }
         }
