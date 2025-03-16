@@ -1,39 +1,37 @@
 
-import React from "react";
-import { CardHeader } from "@/components/ui/card";
-import { format, parseISO } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { Target, CalendarRange } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { FileDown, RotateCcw, Bot } from "lucide-react";
+import { WorkoutPlan } from "../types/workout-plan";
 
 interface WorkoutPlanHeaderProps {
-  goal: string;
-  startDate: string;
-  endDate: string;
+  workoutPlan: WorkoutPlan;
+  onExportPDF: () => void;
+  onRetry: () => void;
 }
 
-export const WorkoutPlanHeader = ({ goal, startDate, endDate }: WorkoutPlanHeaderProps) => {
-  const formatDateDisplay = (dateString: string) => {
-    try {
-      return format(parseISO(dateString), "dd 'de' MMMM", { locale: ptBR });
-    } catch (e) {
-      return "Data indisponível";
-    }
-  };
-
+export const WorkoutPlanHeader = ({ workoutPlan, onExportPDF, onRetry }: WorkoutPlanHeaderProps) => {
   return (
-    <CardHeader className="p-4 pb-3">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-        <div className="flex items-center gap-2">
-          <div className="bg-primary/10 p-1.5 rounded-full">
-            <Target className="h-5 w-5 text-primary" />
-          </div>
-          <h2 className="text-lg font-semibold">Plano de {goal}</h2>
-        </div>
-        <div className="flex items-center text-sm text-muted-foreground">
-          <CalendarRange className="h-4 w-4 mr-1.5" />
-          <span>{formatDateDisplay(startDate)} - {formatDateDisplay(endDate)}</span>
+    <div className="flex justify-between items-center flex-wrap gap-4">
+      <div>
+        <h2 className="text-2xl font-semibold">Seu Plano de Treino</h2>
+        <div className="flex items-center mt-2 gap-2">
+          <Badge variant="outline" className="flex items-center gap-1 bg-primary/5">
+            <Bot className="w-3 h-3" />
+            Gerado por Trenner2025 (Llama 3 8B via Groq)
+          </Badge>
         </div>
       </div>
-    </CardHeader>
+      <div className="flex gap-2">
+        <Button onClick={onRetry} variant="outline" size="sm">
+          <RotateCcw className="w-4 h-4 mr-2" />
+          Gerar Novo
+        </Button>
+        <Button onClick={onExportPDF} variant="outline">
+          <FileDown className="w-4 h-4 mr-2" />
+          Exportar PDF
+        </Button>
+      </div>
+    </div>
   );
 };

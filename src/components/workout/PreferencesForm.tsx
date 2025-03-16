@@ -26,8 +26,7 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
     setIsPaymentDialogOpen,
     currentPrice,
     handleSubmit,
-    handlePaymentProcess,
-    isPaymentEnabled
+    handlePaymentProcess
   } = useWorkoutForm(onSubmit);
 
   const isValid = form.formState.isValid;
@@ -72,15 +71,13 @@ export const PreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
         </form>
       </Form>
 
-      {isPaymentEnabled && (
-        <PaymentDialog
-          open={isPaymentDialogOpen}
-          onOpenChange={setIsPaymentDialogOpen}
-          onPayment={handlePaymentProcess}
-          isProcessing={isProcessingPayment}
-          currentPrice={currentPrice}
-        />
-      )}
+      <PaymentDialog
+        open={isPaymentDialogOpen}
+        onOpenChange={setIsPaymentDialogOpen}
+        onPayment={handlePaymentProcess}
+        isProcessing={isProcessingPayment}
+        currentPrice={currentPrice}
+      />
     </>
   );
 };

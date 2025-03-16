@@ -71,29 +71,6 @@ export const WorkoutPlanDisplay = ({
     }
   };
 
-  const formatGoalName = (goal: string) => {
-    switch(goal) {
-      case "gain_mass":
-        return "Ganho de Massa";
-      case "lose_weight":
-        return "Perda de Peso";
-      case "maintain":
-        return "Manter Peso";
-      case "strength":
-        return "Força";
-      case "hypertrophy":
-        return "Hipertrofia";
-      case "endurance":
-        return "Resistência";
-      case "flexibility":
-        return "Flexibilidade";
-      default:
-        return goal.split('_')
-          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(' ');
-    }
-  };
-
   if (loading) {
     return (
       <WorkoutLoadingState
@@ -140,14 +117,9 @@ export const WorkoutPlanDisplay = ({
     );
   }
 
-  const displayPlan = workoutPlan ? {
-    ...workoutPlan,
-    displayGoal: formatGoalName(workoutPlan.goal)
-  } : null;
-
   return (
     <div className="space-y-4 sm:space-y-6 animate-fadeIn">
-      <CurrentWorkoutPlan plan={displayPlan} formatGoal={formatGoalName} />
+      <CurrentWorkoutPlan plan={workoutPlan} />
       
       <div className={`flex ${isMobile ? 'flex-col' : 'justify-center'} gap-2 sm:gap-3 mt-4 sm:mt-6`}>
         <Button 

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,7 @@ const WorkoutHistory = ({ plans, isLoading, onRefresh, selectedPlanId }: Workout
   const [deletingPlan, setDeletingPlan] = useState(false);
   const isMobile = useIsMobile();
 
+  // Set initial active tab based on selectedPlanId
   useEffect(() => {
     if (selectedPlanId && plans.length > 0) {
       const plan = plans.find(p => p.id === selectedPlanId);
@@ -58,7 +60,7 @@ const WorkoutHistory = ({ plans, isLoading, onRefresh, selectedPlanId }: Workout
   };
 
   const openDeleteDialog = (planId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+    e.stopPropagation(); // Prevent triggering the view plan action
     setPlanToDelete(planId);
     setDeleteDialogOpen(true);
   };
@@ -69,6 +71,7 @@ const WorkoutHistory = ({ plans, isLoading, onRefresh, selectedPlanId }: Workout
     try {
       setDeletingPlan(true);
       
+      // Delete the plan from the database
       const { error } = await supabase
         .from('workout_plans')
         .delete()
@@ -82,11 +85,13 @@ const WorkoutHistory = ({ plans, isLoading, onRefresh, selectedPlanId }: Workout
 
       toast.success('Plano de treino excluído com sucesso');
       
+      // Check if the deleted plan is the currently selected one
       if (selectedPlan && selectedPlan.id === planToDelete) {
         setSelectedPlan(null);
         setActiveTab("plans-list");
       }
       
+      // Refresh the list
       onRefresh();
     } catch (error) {
       console.error('Error in deletion process:', error);
@@ -95,29 +100,6 @@ const WorkoutHistory = ({ plans, isLoading, onRefresh, selectedPlanId }: Workout
       setDeletingPlan(false);
       setDeleteDialogOpen(false);
       setPlanToDelete(null);
-    }
-  };
-
-  const formatGoalName = (goal: string) => {
-    switch(goal) {
-      case "gain_mass":
-        return "Ganho de Massa";
-      case "lose_weight":
-        return "Perda de Peso";
-      case "maintain":
-        return "Manter Peso";
-      case "strength":
-        return "Força";
-      case "hypertrophy":
-        return "Hipertrofia";
-      case "endurance":
-        return "Resistência";
-      case "flexibility":
-        return "Flexibilidade";
-      default:
-        return goal.split('_')
-          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(' ');
     }
   };
 
@@ -178,7 +160,7 @@ const WorkoutHistory = ({ plans, isLoading, onRefresh, selectedPlanId }: Workout
                   >
                     <div className="flex justify-between items-center">
                       <div>
-                        <h3 className="font-medium">Plano de {formatGoalName(plan.goal)}</h3>
+                        <h3 className="font-medium">Plano de {plan.goal}</h3>
                         <p className="text-sm text-muted-foreground">
                           {formatDate(plan.created_at)}
                         </p>
