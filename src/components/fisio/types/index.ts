@@ -49,4 +49,12 @@ export interface FisioPreferences {
   mobility_level: "limited" | "moderate" | "good";
   previous_treatment: boolean;
   activity_level: "sedentary" | "light" | "moderate" | "active";
+  
+  // Additional fields for enhanced data collection
+  injuryDescription?: string;
+  painLocation?: string;
+  injuryDuration?: string;
+  previousTreatments?: string;
+  exerciseExperience?: string;
+  equipmentAvailable?: string[];
 }

@@ -24,9 +24,11 @@ export interface RehabPlan {
   condition?: string;
   start_date: string;
   end_date: string;
+  created_at?: string;
   rehab_sessions: RehabSession[];
+  plan_data?: any; // Store the raw plan data from the API
   
-  // Adding the missing properties that are being used in ExercisePlanDisplay.tsx
+  // Adding the properties that are being used in ExercisePlanDisplay.tsx
   days?: Record<string, any>;
   overview?: string;
   recommendations?: string[] | string;

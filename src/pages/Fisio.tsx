@@ -4,10 +4,11 @@ import { useState } from 'react';
 import { FisioPreferences } from '@/components/fisio/types';
 import { FisioPreferencesForm } from '@/components/fisio/PreferencesForm';
 import { ExercisePlanDisplay } from '@/components/fisio/ExercisePlanDisplay';
-import { Stethoscope } from 'lucide-react';
+import { Stethoscope, Bot } from 'lucide-react';
 import { FisioHistoryView } from '@/components/fisio/components/FisioHistory';
 import { supabase } from '@/integrations/supabase/client';
 import type { RehabPlan } from '@/components/fisio/types/rehab-plan';
+import { Badge } from '@/components/ui/badge';
 
 const Fisio = () => {
   const [preferences, setPreferences] = useState<FisioPreferences | null>(null);
@@ -45,6 +46,8 @@ const Fisio = () => {
         goal: plan.goal,
         start_date: plan.start_date,
         end_date: plan.end_date,
+        created_at: plan.created_at,
+        plan_data: plan.plan_data,
         rehab_sessions: (plan.rehab_sessions || []).map((session: any) => ({
           day_number: session.day_number,
           warmup_description: session.warmup_description,
@@ -72,6 +75,10 @@ const Fisio = () => {
     fetchFisioHistory();
   }, []);
 
+  const handleSubmitPreferences = (data: FisioPreferences) => {
+    setPreferences(data);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       <div className="container mx-auto px-4 py-8 space-y-8">
@@ -85,12 +92,16 @@ const Fisio = () => {
           <p className="text-muted-foreground max-w-2xl mx-auto">
             Crie um plano de reabilitação personalizado baseado em suas necessidades específicas
           </p>
+          <Badge variant="outline" className="inline-flex items-center gap-1 bg-primary/5">
+            <Bot className="w-3 h-3" />
+            Powered by Fisio+ (Llama 3 8B)
+          </Badge>
         </div>
 
         <div className="max-w-4xl mx-auto space-y-8">
           {!preferences ? (
             <div className="transform transition-all duration-500 hover:scale-[1.01]">
-              <FisioPreferencesForm onSubmit={setPreferences} />
+              <FisioPreferencesForm onSubmit={handleSubmitPreferences} />
             </div>
           ) : (
             <ExercisePlanDisplay 

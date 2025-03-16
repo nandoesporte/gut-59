@@ -16,7 +16,7 @@ serve(async (req) => {
   }
 
   try {
-    const { userData, preferences, exerciseOptions } = await req.json();
+    const { userData, preferences } = await req.json();
     
     console.log("Gerando plano de reabilitação com llama3-8b-8192 via Groq");
     console.log("Dados do usuário:", JSON.stringify(userData));
@@ -51,6 +51,14 @@ serve(async (req) => {
     const equipmentAvailable = preferences.equipmentAvailable && preferences.equipmentAvailable.length > 0 ?
       `Equipamentos disponíveis: ${preferences.equipmentAvailable.join(', ')}` :
       'Sem equipamentos disponíveis';
+    
+    // Define a detailed system prompt for the Fisio+ AI agent
+    const systemPrompt = `Você é Fisio+, um fisioterapeuta especializado criado para gerar planos de reabilitação personalizados. 
+Use seu amplo conhecimento em fisioterapia para criar um plano de 4 semanas baseado nas informações do paciente.
+Você deve fornecer exercícios específicos, com detalhes de séries, repetições e técnica correta.
+Inclua aquecimento, exercícios principais e resfriamento para cada sessão.
+Ofereça orientações de progressão ao longo das semanas e recomendações para gerenciamento da dor.
+Você sempre responde apenas com JSON válido estruturado de acordo com o formato solicitado, sem nenhum texto adicional.`;
     
     // Prepare the full prompt for the LLM
     const prompt = `
@@ -150,7 +158,7 @@ Certifique-se de que os números são números (e não strings). O JSON deve ser
         messages: [
           { 
             role: "system", 
-            content: "Você é um fisioterapeuta especializado em criar planos de reabilitação personalizados. Você sempre responde apenas com JSON válido, sem explicações ou texto adicional."
+            content: systemPrompt
           },
           { role: "user", content: prompt }
         ],
