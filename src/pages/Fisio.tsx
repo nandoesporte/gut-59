@@ -31,16 +31,16 @@ const Fisio = () => {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching rehab history:', error);
+        console.error('Erro ao buscar histórico de reabilitação:', error);
         toast({
-          title: 'Error',
-          description: 'Could not load your rehabilitation history',
+          title: 'Erro',
+          description: 'Não foi possível carregar seu histórico de reabilitação',
           variant: 'destructive'
         });
         return;
       }
 
-      console.log('Retrieved rehab plans:', plansData);
+      console.log('Planos de reabilitação recuperados:', plansData);
 
       // Transform the data to match RehabPlan type using plan_data
       const transformedPlans: RehabPlan[] = (plansData || []).map(plan => {
@@ -52,7 +52,7 @@ const Fisio = () => {
             try {
               parsedData = JSON.parse(plan.plan_data);
             } catch (e) {
-              console.error('Error parsing plan_data:', e);
+              console.error('Erro ao analisar plan_data:', e);
               // If parsing fails, use an empty object
               parsedData = {};
             }
@@ -70,7 +70,7 @@ const Fisio = () => {
           joint_area: plan.joint_area,
           start_date: plan.start_date,
           end_date: plan.end_date,
-          overview: parsedData.overview || "Rehabilitation plan",
+          overview: parsedData.overview || "Plano de reabilitação",
           recommendations: parsedData.recommendations || [],
           days: parsedData.days || {},
           rehab_sessions: parsedData.rehab_sessions || []
@@ -79,10 +79,10 @@ const Fisio = () => {
 
       setHistoryPlans(transformedPlans);
     } catch (error) {
-      console.error('Error fetching rehab history:', error);
+      console.error('Erro ao buscar histórico de reabilitação:', error);
       toast({
-        title: 'Error',
-        description: 'Could not load your rehabilitation history',
+        title: 'Erro',
+        description: 'Não foi possível carregar seu histórico de reabilitação',
         variant: 'destructive'
       });
     } finally {
