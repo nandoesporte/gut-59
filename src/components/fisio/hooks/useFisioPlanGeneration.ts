@@ -142,23 +142,23 @@ export const useFisioPlanGeneration = (
       try {
         const { data: countData, error: countError } = await supabase
           .from('plan_generation_counts')
-          .select('rehab_count')
+          .select('rehabilitation_count')
           .eq('user_id', user.id)
           .maybeSingle();
           
         if (countError) {
           console.error("Error getting count:", countError);
         } else if (countData) {
-          const newCount = (countData.rehab_count || 0) + 1;
+          const newCount = (countData.rehabilitation_count || 0) + 1;
           await supabase
             .from('plan_generation_counts')
-            .update({ rehab_count: newCount })
+            .update({ rehabilitation_count: newCount })
             .eq('user_id', user.id);
           setPlanGenerationCount(newCount);
         } else {
           await supabase
             .from('plan_generation_counts')
-            .insert({ user_id: user.id, rehab_count: 1 });
+            .insert({ user_id: user.id, rehabilitation_count: 1 });
           setPlanGenerationCount(1);
         }
       } catch (countError) {
@@ -200,12 +200,12 @@ export const useFisioPlanGeneration = (
         if (user) {
           const { data } = await supabase
             .from('plan_generation_counts')
-            .select('rehab_count')
+            .select('rehabilitation_count')
             .eq('user_id', user.id)
             .maybeSingle();
             
           if (data) {
-            setPlanGenerationCount(data.rehab_count || 0);
+            setPlanGenerationCount(data.rehabilitation_count || 0);
           }
         }
       } catch (err) {
