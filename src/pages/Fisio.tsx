@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { useState } from 'react';
 import { FisioPreferences } from '@/components/fisio/types';
@@ -23,7 +22,6 @@ const Fisio = () => {
       
       if (!user) return;
 
-      // Changed query to not use relationship that isn't set up correctly
       const { data: plansData, error } = await supabase
         .from('rehab_plans')
         .select('*')
@@ -42,9 +40,7 @@ const Fisio = () => {
 
       console.log('Planos de reabilitação recuperados:', plansData);
 
-      // Transform the data to match RehabPlan type using plan_data
       const transformedPlans: RehabPlan[] = (plansData || []).map(plan => {
-        // Parse the plan_data if it's a string, otherwise use it as is
         let parsedData: Record<string, any> = {};
         
         try {
@@ -52,20 +48,20 @@ const Fisio = () => {
             if (typeof plan.plan_data === 'string') {
               parsedData = JSON.parse(plan.plan_data);
             } else if (typeof plan.plan_data === 'object') {
-              // If it's already an object, use it directly
               parsedData = plan.plan_data as Record<string, any>;
             }
           }
         } catch (e) {
           console.error('Erro ao analisar plan_data:', e, plan.plan_data);
-          // If parsing fails, use an empty object
           parsedData = {};
         }
+        
+        const goalValue = plan.goal && plan.goal !== "" ? plan.goal : "pain_relief";
         
         return {
           id: plan.id,
           user_id: plan.user_id,
-          goal: plan.goal || '',
+          goal: goalValue,
           condition: plan.condition || parsedData.condition || '',
           joint_area: plan.joint_area || '',
           start_date: plan.start_date || new Date().toISOString(),
@@ -114,7 +110,6 @@ const Fisio = () => {
             <div className="transform transition-all duration-500 hover:scale-[1.01]">
               <FisioPreferencesForm onSubmit={(prefs) => {
                 setPreferences(prefs);
-                // Scroll to top when generating a new plan
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }} />
             </div>
@@ -123,7 +118,6 @@ const Fisio = () => {
               preferences={preferences} 
               onReset={() => {
                 setPreferences(null);
-                // Refresh history when resetting to generate a new plan
                 fetchFisioHistory();
               }} 
             />

@@ -26,7 +26,7 @@ export interface RehabSession {
 export interface RehabPlan {
   id: string;
   user_id?: string;
-  goal?: RehabGoal;
+  goal?: RehabGoal | string; // Changed to accept string to handle empty strings
   condition?: string;
   joint_area?: string;
   start_date: string;
