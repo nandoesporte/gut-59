@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { supabaseClient } from "../_shared/supabase-client.ts";
 import { corsHeaders } from "../_shared/cors.ts";
@@ -280,7 +281,7 @@ serve(async (req) => {
       // Transform plan data to a consistent format
       console.log("Converting plan data to display format");
       
-      // Add plan_data property for database storage
+      // Add plan_data property for database storage - explicitly clone the object here
       const planData = structuredClone(rehabPlan);
       
       // Set condition property using preferences
