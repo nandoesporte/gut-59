@@ -56,7 +56,9 @@ const Fisio = () => {
           parsedData = {};
         }
         
-        const goalValue = plan.goal && plan.goal !== "" ? plan.goal : "pain_relief";
+        const goalValue = plan.goal ? 
+          (typeof plan.goal === 'string' && plan.goal.length === 0 ? "pain_relief" : plan.goal) 
+          : "pain_relief";
         
         return {
           id: plan.id,
