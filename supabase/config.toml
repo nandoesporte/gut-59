@@ -15,3 +15,9 @@ verify_jwt = false
 
 [functions.create-mercadopago-preference]
 verify_jwt = false
+
+[functions.check-asaas-payment]
+verify_jwt = false
+
+[functions.create-asaas-payment]
+verify_jwt = false
