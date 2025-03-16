@@ -146,7 +146,13 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
           console.error('Error checking payment settings:', settingsError);
         }
         
-        const paymentGloballyEnabled = globalSettings?.value === 'true';
+        // Check if payments are globally enabled (default to true if not found)
+        let paymentGloballyEnabled = true;
+        if (globalSettings) {
+          // Use is_active instead of value
+          paymentGloballyEnabled = globalSettings.is_active;
+        }
+        
         console.log('Payment globally enabled:', paymentGloballyEnabled);
         
         if (!paymentGloballyEnabled || !counts || (counts.rehabilitation_count < 3)) {
@@ -533,3 +539,4 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
     </div>
   );
 };
+
