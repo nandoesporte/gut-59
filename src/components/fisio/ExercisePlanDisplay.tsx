@@ -3,14 +3,17 @@ import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { FisioPreferences } from "./types";
 import { RehabPlan } from "./types/rehab-plan";
-import { Card, CardContent } from "@/components/ui/card";
-import { RotateCcw, FileDown } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RotateCcw, FileDown, Dumbbell } from "lucide-react";
 import { WorkoutLoadingState } from "../workout/components/WorkoutLoadingState";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { REWARDS } from '@/constants/rewards';
 import { useWallet } from "@/hooks/useWallet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface ExercisePlanDisplayProps {
   preferences: FisioPreferences;
@@ -23,6 +26,7 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
   const [rehabPlan, setRehabPlan] = useState<RehabPlan | null>(null);
   const [selectedDay, setSelectedDay] = useState<string>("day1");
   const [loadingTime, setLoadingTime] = useState(0);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     let interval: number | null = null;
@@ -124,105 +128,187 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
     );
   }
 
-  const renderMealItem = (mealName: string, mealDetails: any) => {
-    if (!mealDetails || !mealDetails.foods || mealDetails.foods.length === 0) return null;
+  const generateDayTabs = () => {
+    if (!rehabPlan || !rehabPlan.days) return [];
     
-    return (
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold flex items-center mb-3">
-          <span className="text-primary mr-2">🍽️</span> {mealName}
-        </h3>
-        <div className="space-y-2 pl-5">
-          {mealDetails.foods.map((food: any, idx: number) => (
-            <div key={idx} className="flex items-baseline">
-              <span className="mr-1">{food.portion}</span>
-              {food.unit && <span className="mr-1">{food.unit} de</span>}
-              <span className="font-medium">{food.name}</span>
-              {food.details && (
-                <span className="text-sm text-gray-500 ml-2">({food.details})</span>
-              )}
-            </div>
-          ))}
-        </div>
-        <div className="mt-3 pt-2 border-t text-sm">
-          <p>
-            Total: {mealDetails.calories} kcal | Carboidratos: {mealDetails.macros.carbs}g | 
-            Proteínas: {mealDetails.macros.protein}g | Gorduras: {mealDetails.macros.fats}g
-            {mealDetails.macros.fiber > 0 && ` | Fibras: ${mealDetails.macros.fiber}g`}
-          </p>
-        </div>
-      </div>
-    );
+    return Object.keys(rehabPlan.days).map(day => {
+      const dayNumber = day.replace('day', '');
+      return {
+        id: day,
+        label: `Dia ${dayNumber}`
+      };
+    });
   };
 
-  const renderExerciseItem = (exerciseName: string, exerciseDetails: any) => {
-    if (!exerciseDetails || !exerciseDetails.exercises || exerciseDetails.exercises.length === 0) return null;
+  const dayTabs = generateDayTabs();
+
+  const renderExerciseItem = (exercise: any) => {
+    if (!exercise) return null;
     
     return (
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold flex items-center mb-3">
-          <span className="text-primary mr-2">💪</span> {exerciseName}
-        </h3>
-        <div className="space-y-2 pl-5">
-          {exerciseDetails.exercises.map((exercise: any, idx: number) => (
-            <div key={idx} className="flex flex-col mb-3">
-              <div className="flex items-baseline font-medium">
-                <span className="mr-1">{exercise.name}</span>
-                {exercise.sets && exercise.reps && (
-                  <span className="text-sm text-gray-700 ml-2">
-                    {exercise.sets} séries x {exercise.reps} repetições
-                  </span>
-                )}
-              </div>
-              {exercise.description && (
-                <span className="text-sm text-gray-500 ml-2 mt-1">{exercise.description}</span>
+      <div className="border border-gray-200 rounded-lg p-4 mb-4 hover:bg-gray-50 transition-colors">
+        <div className="flex justify-between items-start">
+          <div>
+            <h4 className="font-medium text-primary">{exercise.name}</h4>
+            <div className="flex flex-wrap gap-2 mt-1">
+              {exercise.sets && exercise.reps && (
+                <Badge variant="outline" className="bg-primary/5">
+                  {exercise.sets} séries x {exercise.reps} repetições
+                </Badge>
               )}
-              {exercise.restTime && (
-                <span className="text-sm text-blue-600 ml-2 mt-1">Descanso: {exercise.restTime}</span>
+              {exercise.intensity && (
+                <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                  {exercise.intensity}
+                </Badge>
               )}
             </div>
-          ))}
+          </div>
         </div>
-        {exerciseDetails.notes && (
-          <div className="mt-3 pt-2 border-t text-sm">
-            <p className="font-medium text-gray-700">Observações:</p>
-            <p className="text-gray-600">{exerciseDetails.notes}</p>
+        
+        {exercise.description && (
+          <div className="mt-3 text-sm text-gray-600">
+            <p>{exercise.description}</p>
+          </div>
+        )}
+        
+        {exercise.restTime && (
+          <div className="mt-2 text-xs text-gray-500 flex items-center">
+            <span className="text-blue-600">Descanso: {exercise.restTime}</span>
           </div>
         )}
       </div>
     );
   };
 
+  const renderDailyExercises = (exercises: any[]) => {
+    if (!exercises || exercises.length === 0) return <p className="text-gray-500 text-center py-4">Nenhum exercício para este dia</p>;
+    
+    return (
+      <div className="space-y-4">
+        {exercises.map((exercise, idx) => (
+          <div key={idx}>
+            {renderExerciseItem(exercise)}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   const renderDailyPlan = (day: string) => {
-    if (rehabPlan.days && rehabPlan.days[day]) {
+    if (rehabPlan?.days && rehabPlan.days[day]) {
       const dayPlan = rehabPlan.days[day];
+      
       return (
         <div className="space-y-6">
+          {/* Informações do dia */}
           <div className="bg-blue-50 p-4 rounded-lg">
             <h3 className="font-semibold text-blue-800">Observações do Dia</h3>
             <p className="text-gray-700 mt-2">{dayPlan.notes || "Sem observações específicas para este dia."}</p>
           </div>
           
-          {dayPlan.exercises?.map((section: any, idx: number) => (
-            <Card key={idx} className="overflow-hidden">
-              <CardContent className="p-6">
-                {renderExerciseItem(section.title, section)}
-              </CardContent>
-            </Card>
-          ))}
-
+          {/* Exercícios */}
+          <Card className="overflow-hidden">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Dumbbell className="h-5 w-5 text-primary" />
+                Exercícios
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {dayPlan.exercises ? (
+                renderDailyExercises(dayPlan.exercises.flatMap(section => section.exercises || []))
+              ) : (
+                <p className="text-gray-500 text-center py-4">Nenhum exercício para este dia</p>
+              )}
+            </CardContent>
+          </Card>
+          
+          {/* Plano Nutricional */}
           {dayPlan.nutrition && (
             <Card className="overflow-hidden">
-              <CardContent className="p-6">
-                <h3 className="text-xl font-semibold mb-4 flex items-center">
-                  <span className="text-green-600 mr-2">🥗</span> Plano Alimentar
-                </h3>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <span className="text-green-600">🥗</span>
+                  Plano Alimentar
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
                 <div className="space-y-4">
-                  {dayPlan.nutrition.breakfast && renderMealItem("Café da Manhã", dayPlan.nutrition.breakfast)}
-                  {dayPlan.nutrition.morningSnack && renderMealItem("Lanche da Manhã", dayPlan.nutrition.morningSnack)}
-                  {dayPlan.nutrition.lunch && renderMealItem("Almoço", dayPlan.nutrition.lunch)}
-                  {dayPlan.nutrition.afternoonSnack && renderMealItem("Lanche da Tarde", dayPlan.nutrition.afternoonSnack)}
-                  {dayPlan.nutrition.dinner && renderMealItem("Jantar", dayPlan.nutrition.dinner)}
+                  {dayPlan.nutrition.breakfast && (
+                    <div className="border-l-4 border-green-400 pl-4 py-2">
+                      <h4 className="font-medium text-green-800">Café da Manhã</h4>
+                      <ul className="list-disc pl-5 mt-1 space-y-1 text-gray-700">
+                        {dayPlan.nutrition.breakfast.foods.map((food: any, idx: number) => (
+                          <li key={idx} className="text-sm">
+                            {food.portion} {food.unit} {food.name} {food.details && `(${food.details})`}
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="mt-2 text-xs text-gray-600">
+                        <p>
+                          {dayPlan.nutrition.breakfast.calories} kcal | Carbs: {dayPlan.nutrition.breakfast.macros.carbs}g | 
+                          Proteínas: {dayPlan.nutrition.breakfast.macros.protein}g | Gorduras: {dayPlan.nutrition.breakfast.macros.fats}g
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {dayPlan.nutrition.lunch && (
+                    <div className="border-l-4 border-amber-400 pl-4 py-2">
+                      <h4 className="font-medium text-amber-800">Almoço</h4>
+                      <ul className="list-disc pl-5 mt-1 space-y-1 text-gray-700">
+                        {dayPlan.nutrition.lunch.foods.map((food: any, idx: number) => (
+                          <li key={idx} className="text-sm">
+                            {food.portion} {food.unit} {food.name} {food.details && `(${food.details})`}
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="mt-2 text-xs text-gray-600">
+                        <p>
+                          {dayPlan.nutrition.lunch.calories} kcal | Carbs: {dayPlan.nutrition.lunch.macros.carbs}g | 
+                          Proteínas: {dayPlan.nutrition.lunch.macros.protein}g | Gorduras: {dayPlan.nutrition.lunch.macros.fats}g
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {dayPlan.nutrition.dinner && (
+                    <div className="border-l-4 border-purple-400 pl-4 py-2">
+                      <h4 className="font-medium text-purple-800">Jantar</h4>
+                      <ul className="list-disc pl-5 mt-1 space-y-1 text-gray-700">
+                        {dayPlan.nutrition.dinner.foods.map((food: any, idx: number) => (
+                          <li key={idx} className="text-sm">
+                            {food.portion} {food.unit} {food.name} {food.details && `(${food.details})`}
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="mt-2 text-xs text-gray-600">
+                        <p>
+                          {dayPlan.nutrition.dinner.calories} kcal | Carbs: {dayPlan.nutrition.dinner.macros.carbs}g | 
+                          Proteínas: {dayPlan.nutrition.dinner.macros.protein}g | Gorduras: {dayPlan.nutrition.dinner.macros.fats}g
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {dayPlan.nutrition.snacks && dayPlan.nutrition.snacks.map((snack: any, idx: number) => (
+                    <div key={idx} className="border-l-4 border-blue-400 pl-4 py-2">
+                      <h4 className="font-medium text-blue-800">Lanche {idx + 1}</h4>
+                      <ul className="list-disc pl-5 mt-1 space-y-1 text-gray-700">
+                        {snack.foods.map((food: any, foodIdx: number) => (
+                          <li key={foodIdx} className="text-sm">
+                            {food.portion} {food.unit} {food.name} {food.details && `(${food.details})`}
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="mt-2 text-xs text-gray-600">
+                        <p>
+                          {snack.calories} kcal | Carbs: {snack.macros.carbs}g | 
+                          Proteínas: {snack.macros.protein}g | Gorduras: {snack.macros.fats}g
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
@@ -238,73 +324,74 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
     );
   };
 
-  const generateDayTabs = () => {
-    if (!rehabPlan || !rehabPlan.days) return [];
-    
-    return Object.keys(rehabPlan.days).map(day => {
-      const dayNumber = day.replace('day', '');
-      return {
-        id: day,
-        label: `Dia ${dayNumber}`
-      };
-    });
-  };
-
-  const dayTabs = generateDayTabs();
-
   return (
-    <div className="space-y-8">
-      <Card className="p-6">
-        <h2 className="text-2xl font-semibold mb-4">
-          Seu Plano de Reabilitação
-        </h2>
-        
-        {rehabPlan?.overview && (
-          <div className="mb-6">
-            <h3 className="text-lg font-medium mb-2">Visão Geral</h3>
-            <p className="text-gray-600">{rehabPlan.overview}</p>
-          </div>
-        )}
+    <div className="space-y-8 animate-fadeIn">
+      <Card className="overflow-hidden border-primary/20">
+        <CardHeader className={`${isMobile ? 'px-4 py-4' : ''}`}>
+          <CardTitle className="flex justify-between items-center text-lg sm:text-xl">
+            <span>Seu Plano de Reabilitação</span>
+            {!isMobile && rehabPlan?.days && (
+              <Badge variant="outline" className="text-xs ml-2">
+                {Object.keys(rehabPlan.days).length} dias
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className={`space-y-4 ${isMobile ? 'p-4' : ''}`}>
+          {/* Visão Geral */}
+          {rehabPlan?.overview && (
+            <div className="mb-4">
+              <h3 className="text-lg font-medium mb-2">Visão Geral</h3>
+              <p className="text-gray-600">{rehabPlan.overview}</p>
+            </div>
+          )}
 
-        {rehabPlan?.recommendations && (
-          <div className="bg-green-50 p-4 rounded-lg mb-6">
-            <h3 className="font-semibold text-green-800">Recomendações Gerais</h3>
-            <ul className="list-disc pl-5 mt-2 space-y-1 text-gray-700">
-              {typeof rehabPlan.recommendations === 'string' ? (
-                <li>{rehabPlan.recommendations}</li>
-              ) : (
-                Array.isArray(rehabPlan.recommendations) && 
-                rehabPlan.recommendations.map((rec, idx) => (
-                  <li key={idx}>{rec}</li>
-                ))
-              )}
-            </ul>
-          </div>
-        )}
-      </Card>
-      
-      {dayTabs.length > 0 && (
-        <Card className="p-6">
-          <Tabs value={selectedDay} onValueChange={setSelectedDay}>
-            <TabsList className="mb-6 w-full flex flex-nowrap overflow-x-auto pb-2 justify-start sm:justify-center gap-1 sm:gap-2">
+          {/* Recomendações Gerais */}
+          {rehabPlan?.recommendations && (
+            <div className="bg-green-50 p-4 rounded-lg mb-4">
+              <h3 className="font-semibold text-green-800">Recomendações Gerais</h3>
+              <ul className="list-disc pl-5 mt-2 space-y-1 text-gray-700">
+                {typeof rehabPlan.recommendations === 'string' ? (
+                  <li>{rehabPlan.recommendations}</li>
+                ) : (
+                  Array.isArray(rehabPlan.recommendations) && 
+                  rehabPlan.recommendations.map((rec, idx) => (
+                    <li key={idx}>{rec}</li>
+                  ))
+                )}
+              </ul>
+            </div>
+          )}
+          
+          {/* Dias de Tratamento */}
+          {dayTabs.length > 0 && (
+            <Tabs value={selectedDay} onValueChange={setSelectedDay}>
+              <ScrollArea className="w-full">
+                <TabsList className={`mb-4 w-full justify-start sm:justify-center gap-1 sm:gap-2 ${isMobile ? 'h-9' : ''}`}>
+                  {dayTabs.map(tab => (
+                    <TabsTrigger 
+                      key={tab.id} 
+                      value={tab.id} 
+                      className={`${isMobile ? 'px-2 py-1 text-xs' : 'min-w-[80px] px-3'}`}
+                    >
+                      {tab.label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </ScrollArea>
+              
               {dayTabs.map(tab => (
-                <TabsTrigger key={tab.id} value={tab.id} className="whitespace-nowrap">
-                  {tab.label}
-                </TabsTrigger>
+                <TabsContent key={tab.id} value={tab.id} className="space-y-4 animate-fadeIn">
+                  <div className="p-3 bg-primary/5 rounded-lg">
+                    <h2 className="text-lg font-bold text-primary">📅 {tab.label} – Plano de Reabilitação</h2>
+                  </div>
+                  {renderDailyPlan(tab.id)}
+                </TabsContent>
               ))}
-            </TabsList>
-            
-            {dayTabs.map(tab => (
-              <TabsContent key={tab.id} value={tab.id}>
-                <div className="p-4 bg-muted rounded-md mb-6">
-                  <h2 className="text-xl font-bold">📅 {tab.label} – Plano de Reabilitação</h2>
-                </div>
-                {renderDailyPlan(tab.id)}
-              </TabsContent>
-            ))}
-          </Tabs>
-        </Card>
-      )}
+            </Tabs>
+          )}
+        </CardContent>
+      </Card>
       
       <div className="flex justify-center gap-4">
         <Button 
