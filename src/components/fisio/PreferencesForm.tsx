@@ -1,3 +1,4 @@
+
 import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -10,11 +11,10 @@ import { SelectCard } from "@/components/workout/components/SelectCard";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { FisioPreferences, JointArea } from "./types";
-import { Stethoscope, ArrowRight, CreditCard, Bot } from "lucide-react";
-import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form";
+import { Stethoscope, ArrowRight, CreditCard } from "lucide-react";
+import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { usePaymentHandling } from "@/components/menu/hooks/usePaymentHandling";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 
 const formSchema = z.object({
   age: z.number().min(16, "Idade mínima é 16 anos").max(100, "Idade máxima é 100 anos"),
@@ -27,9 +27,8 @@ const formSchema = z.object({
   pain_level: z.number().min(0).max(10),
   mobility_level: z.enum(["limited", "moderate", "good"]),
   previous_treatment: z.boolean(),
-  activity_level: z.enum(["sedentary", "light", "moderate", "active"]),
-  painLocation: z.string().optional(),
-});
+  activity_level: z.enum(["sedentary", "light", "moderate", "active"])
+}).required();
 
 type FormData = z.infer<typeof formSchema>;
 
@@ -45,10 +44,9 @@ const jointAreaOptions: Record<JointArea, string> = {
 
 interface PreferencesFormProps {
   onSubmit: (data: FisioPreferences) => void;
-  isPaymentRequired?: boolean;
 }
 
-export const FisioPreferencesForm = ({ onSubmit, isPaymentRequired = false }: PreferencesFormProps) => {
+export const FisioPreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = React.useState(false);
   const [formData, setFormData] = React.useState<FormData | null>(null);
   const {
@@ -56,7 +54,7 @@ export const FisioPreferencesForm = ({ onSubmit, isPaymentRequired = false }: Pr
     hasPaid,
     currentPrice,
     handlePaymentAndContinue
-  } = usePaymentHandling('rehabilitation');
+  } = usePaymentHandling();
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -69,13 +67,12 @@ export const FisioPreferencesForm = ({ onSubmit, isPaymentRequired = false }: Pr
       pain_level: 5,
       mobility_level: "moderate",
       previous_treatment: false,
-      activity_level: "moderate",
-      painLocation: "",
+      activity_level: "moderate"
     }
   });
 
   const handleSubmit = async (data: FormData) => {
-    if (isPaymentRequired && !hasPaid) {
+    if (!hasPaid) {
       setFormData(data);
       setIsPaymentDialogOpen(true);
       return;
@@ -93,18 +90,10 @@ export const FisioPreferencesForm = ({ onSubmit, isPaymentRequired = false }: Pr
         pain_level: data.pain_level,
         mobility_level: data.mobility_level,
         previous_treatment: data.previous_treatment,
-        activity_level: data.activity_level,
-        // Add the remaining required fields with empty values
-        // These will be filled with defaults in the Fisio component
-        injuryDescription: "",
-        painLocation: data.painLocation,
-        injuryDuration: "",
-        previousTreatments: "",
-        exerciseExperience: "",
-        equipmentAvailable: []
+        activity_level: data.activity_level
       };
       
-      toast.info("Gerando seu plano de reabilitação personalizado com IA...");
+      toast.info("Gerando seu plano de reabilitação personalizado...");
       onSubmit(preferences);
     } catch (error: any) {
       console.error("Erro ao processar formulário:", error);
@@ -149,16 +138,12 @@ export const FisioPreferencesForm = ({ onSubmit, isPaymentRequired = false }: Pr
                 <div className="p-2 bg-primary/10 rounded-lg">
                   <Stethoscope className="w-5 h-5 text-primary" />
                 </div>
-                <div className="flex-1">
+                <div>
                   <h3 className="text-xl font-semibold">Informações para seu Plano</h3>
                   <p className="text-sm text-muted-foreground mt-1">
                     Preencha os dados abaixo para gerar seu plano personalizado
                   </p>
                 </div>
-                <Badge variant="outline" className="flex items-center gap-1 bg-primary/5">
-                  <Bot className="w-3 h-3" />
-                  Fisio+ (Llama 3 8B)
-                </Badge>
               </div>
             </CardHeader>
             
@@ -207,43 +192,6 @@ export const FisioPreferencesForm = ({ onSubmit, isPaymentRequired = false }: Pr
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  control={form.control}
-                  name="weight"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Peso (kg)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          {...field}
-                          onChange={(e) => field.onChange(Number(e.target.value))}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="height"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Altura (cm)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          {...field}
-                          onChange={(e) => field.onChange(Number(e.target.value))}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
               <FormField
                 control={form.control}
                 name="joint_area"
@@ -261,26 +209,6 @@ export const FisioPreferencesForm = ({ onSubmit, isPaymentRequired = false }: Pr
                         </SelectCard>
                       ))}
                     </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="painLocation"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Localização da Dor</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="Ex: Lado interno do joelho direito"
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Descreva onde a dor está localizada com mais detalhes
-                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -308,32 +236,6 @@ export const FisioPreferencesForm = ({ onSubmit, isPaymentRequired = false }: Pr
                         </div>
                       </div>
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="mobility_level"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nível de Mobilidade</FormLabel>
-                    <div className="grid grid-cols-3 gap-4">
-                      {[
-                        { value: "limited", label: "Limitado" },
-                        { value: "moderate", label: "Moderado" },
-                        { value: "good", label: "Bom" }
-                      ].map(({ value, label }) => (
-                        <SelectCard
-                          key={value}
-                          selected={field.value === value}
-                          onClick={() => field.onChange(value)}
-                        >
-                          <span className="text-lg">{label}</span>
-                        </SelectCard>
-                      ))}
-                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
