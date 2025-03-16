@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FisioPreferences } from '@/components/fisio/types';
-import { Loader2, ArrowLeft, Download, BookOpen, Dumbbell } from 'lucide-react';
+import { Loader2, ArrowLeft, Download, BookOpen, Dumbbell, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { usePaymentHandling } from '@/components/menu/hooks/usePaymentHandling';
@@ -20,6 +21,7 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
   const [activeDay, setActiveDay] = useState('overview');
   const [loadingText, setLoadingText] = useState('Generating your rehabilitation plan...');
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const { hasPaid, isProcessingPayment, handlePaymentAndContinue, showConfirmation, setShowConfirmation } = 
     usePaymentHandling('rehabilitation');
 
@@ -33,11 +35,27 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
       const userData = user ? {
         id: user.id,
         email: user.email,
-        // Add any other user data needed
       } : null;
       
+      // Set more specific loading messages to improve UX during longer processing times
+      setLoadingText('Analyzing your preferences...');
+      setTimeout(() => {
+        if (isLoading) setLoadingText('Selecting appropriate exercises...');
+      }, 5000);
+      setTimeout(() => {
+        if (isLoading) setLoadingText('Creating your personalized plan...');
+      }, 10000);
+      
+      // Simplify the preferences data to reduce context size
+      const simplifiedPreferences = {
+        joint_area: preferences.joint_area,
+        condition: preferences.condition || 'general',
+        pain_level: preferences.pain_level || 0,
+        mobility_level: preferences.mobility_level || 'moderate',
+      };
+      
       const response = await supabase.functions.invoke('generate-rehab-plan-groq', {
-        body: { preferences, userData },
+        body: { preferences: simplifiedPreferences, userData },
       });
       
       if (response.error) {
@@ -49,10 +67,29 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
       
     } catch (error) {
       console.error('Error generating rehabilitation plan:', error);
-      setError(error instanceof Error ? error.message : 'An unknown error occurred');
+      
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+      
+      // Handle specific errors
+      if (errorMessage.includes('context_length_exceeded')) {
+        setError('The plan generation failed due to complexity. Please try with simpler preferences or try again later.');
+      } else if (errorMessage.includes('Max number of functions reached')) {
+        setError('The service is currently at capacity. Please try again later.');
+      } else {
+        setError(errorMessage);
+      }
+      
+      toast.error('Failed to generate plan', {
+        description: 'Please try again later or contact support if the issue persists.'
+      });
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleRetry = () => {
+    setRetryCount(prev => prev + 1);
+    generateRehabPlan();
   };
 
   useEffect(() => {
@@ -107,6 +144,7 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
       } catch (error) {
         console.error('Error checking payment status:', error);
         setIsLoading(false);
+        setError('Failed to check payment status. Please try again later.');
       }
     };
 
@@ -174,6 +212,34 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
           This may take up to a minute as we create a custom plan for you.
         </p>
       </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle className="text-2xl flex items-center">
+            <AlertTriangle className="h-6 w-6 text-amber-500 mr-2" />
+            Error generating plan
+          </CardTitle>
+          <CardDescription>
+            {error}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-4">This might be due to temporary service overload or technical issues.</p>
+        </CardContent>
+        <CardFooter className="flex flex-col sm:flex-row gap-4">
+          <Button variant="outline" onClick={onReset} className="w-full sm:w-auto">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Change preferences
+          </Button>
+          <Button onClick={handleRetry} className="w-full sm:w-auto">
+            Try again
+          </Button>
+        </CardFooter>
+      </Card>
     );
   }
 

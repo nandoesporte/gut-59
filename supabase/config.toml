@@ -15,18 +15,3 @@ verify_jwt = false
 
 [functions.create-mercadopago-preference]
 verify_jwt = false
-
-[functions.check-asaas-payment]
-verify_jwt = false
-
-[functions.create-asaas-payment]
-verify_jwt = false
-
-[functions.generate-meal-plan-groq]
-verify_jwt = false
-
-[functions.llama-completion]
-verify_jwt = false
-
-[functions.analyze-assessment-results]
-verify_jwt = false
