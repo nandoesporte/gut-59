@@ -57,11 +57,11 @@ serve(async (req) => {
           messages: [
             {
               role: "system",
-              content: "You are a professional physiotherapist who creates detailed rehabilitation plans."
+              content: "You are a professional physiotherapist who creates detailed rehabilitation plans. Your task is to generate a valid and complete JSON rehabilitation plan. DO NOT include placeholders or '...and so on' text in your response. Generate a complete, valid JSON object for all days specified."
             },
             { role: "user", content: prompt }
           ],
-          temperature: 0.7,
+          temperature: 0.5,
           max_tokens: 4000,
           response_format: { type: "json_object" }
         })
@@ -225,7 +225,8 @@ INSTRUCTIONS:
 2. Each day should include warm-up activities, specific rehabilitation exercises, and cool-down routines.
 3. Include detailed information about exercise repetitions, sets, and rest periods.
 4. Provide general health recommendations and dietary advice to support recovery.
-5. Format your response as a valid JSON object with the following structure:
+5. Important: Due to message size limitations, only create a plan for days 1, 7, 14, 21, and 28 as representative days for each week.
+6. Format your response as a valid JSON object with the following structure:
 
 {
   "overview": "A brief overview of the condition and the rehabilitation approach",
@@ -268,10 +269,18 @@ INSTRUCTIONS:
         "dinner": {...}
       }
     },
-    "day2": {...},
-    ...and so on for days 1-28
+    "day7": {...},
+    "day14": {...},
+    "day21": {...},
+    "day28": {...}
   }
 }
+
+IMPORTANT REQUIREMENTS:
+1. Only generate the days specified (days 1, 7, 14, 21, and 28). Do not include placeholder text or "...and so on" in your JSON.
+2. Make sure your response is a complete, valid JSON object with no placeholders or ellipsis.
+3. Each day should have unique and progressive exercises suitable for the recovery stage.
+4. All nutrition sections should include complete details for all meals.
 
 Por favor, crie um plano de reabilitação personalizado em português do Brasil (Brazilian Portuguese).
 `;
