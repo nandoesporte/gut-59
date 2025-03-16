@@ -15,18 +15,18 @@ serve(async (req) => {
   try {
     const { preferences, userData } = await req.json();
     
-    console.log("Gerando plano de reabilitação com agente Fisio+");
-    console.log("Dados do usuário:", JSON.stringify(userData));
-    console.log("Preferências:", JSON.stringify(preferences));
+    console.log("Generating rehabilitation plan with Fisio+ agent");
+    console.log("User data:", JSON.stringify(userData));
+    console.log("Preferences:", JSON.stringify(preferences));
     
     if (!preferences) {
-      throw new Error("Dados insuficientes para gerar o plano de reabilitação");
+      throw new Error("Insufficient data to generate rehabilitation plan");
     }
 
-    // Criar o cliente Supabase
+    // Create Supabase client
     const supabase = supabaseClient();
 
-    // Buscar o prompt ativo do agente Fisio+
+    // Fetch active prompt for Fisio+ agent
     const { data: promptData, error: promptError } = await supabase
       .from('ai_agent_prompts')
       .select('*')
@@ -35,18 +35,18 @@ serve(async (req) => {
       .single();
 
     if (promptError) {
-      console.error("Erro ao buscar prompt do agente Fisio+:", promptError);
-      throw new Error("Não foi possível encontrar o prompt do agente Fisio+");
+      console.error("Error fetching Fisio+ agent prompt:", promptError);
+      throw new Error("Could not find Fisio+ agent prompt");
     }
 
     if (!promptData) {
-      throw new Error("Nenhum prompt de fisioterapia ativo encontrado");
+      throw new Error("No active physiotherapy prompt found");
     }
 
-    console.log("Prompt encontrado:", promptData.name);
+    console.log("Prompt found:", promptData.name);
 
-    // Preparar os dados do usuário para o prompt
-    const painLevel = preferences.pain_level ? `Nível de dor: ${preferences.pain_level}/10` : 'Nível de dor não informado';
+    // Prepare user data for prompt
+    const painLevel = preferences.pain_level ? `Pain level: ${preferences.pain_level}/10` : 'Pain level not informed';
     const userWeight = userData?.weight || preferences.weight || 70;
     const userHeight = userData?.height || preferences.height || 170;
     const userAge = userData?.age || preferences.age || 30;
@@ -55,10 +55,10 @@ serve(async (req) => {
     const mobilityLevel = preferences.mobility_level || 'moderate';
     const activityLevel = preferences.activity_level || 'moderate';
 
-    // Obter o prompt base do agente Fisio+
+    // Get base prompt from Fisio+ agent
     let promptTemplate = promptData.prompt;
     
-    // Substituir variáveis no template
+    // Replace variables in template
     const contextData = {
       user_weight: userWeight,
       user_height: userHeight,
@@ -70,23 +70,23 @@ serve(async (req) => {
       activity_level: activityLevel
     };
 
-    // Substituir variáveis no template
+    // Replace variables in template
     Object.entries(contextData).forEach(([key, value]) => {
       promptTemplate = promptTemplate.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
     });
 
-    console.log("Enviando prompt para o modelo llama3-8b-8192");
+    console.log("Sending prompt to llama3-8b-8192 model");
 
     if (!GROQ_API_KEY) {
-      throw new Error("GROQ_API_KEY não configurada no ambiente");
+      throw new Error("GROQ_API_KEY not configured in environment");
     }
 
     // Create a timeout promise
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("Timeout ao gerar plano de reabilitação")), TIMEOUT_MS);
+      setTimeout(() => reject(new Error("Timeout generating rehabilitation plan")), TIMEOUT_MS);
     });
 
-    // Call Groq API to generate the rehabilitation plan with timeout
+    // Call Groq API to generate rehabilitation plan with timeout
     const groqPromise = fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -98,7 +98,7 @@ serve(async (req) => {
         messages: [
           { 
             role: "system", 
-            content: "Você é um fisioterapeuta especializado em criar planos de reabilitação personalizados. Você sempre responde com JSON válido, utilizando um objeto com estrutura correta e completa, sem truncar ou usar placeholder como '...e assim por diante'. O JSON deve estar em um formato que possa ser diretamente utilizado por uma aplicação, sem nenhum texto ou formatação adicional."
+            content: "You are a physiotherapist specialized in creating personalized rehabilitation plans. Always respond with valid JSON, using a properly structured and complete object without truncating or using placeholders like '...and so on'. The JSON should be in a format that can be directly used by an application, without any additional text or formatting."
           },
           { role: "user", content: promptTemplate }
         ],
@@ -108,72 +108,100 @@ serve(async (req) => {
       }),
     });
 
-    // Race between the API call and the timeout
+    // Race between API call and timeout
     const response = await Promise.race([groqPromise, timeoutPromise]);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`Erro na chamada da API do Groq (${response.status}):`, errorText);
-      throw new Error(`Erro na API: ${response.status} ${errorText}`);
+      console.error(`Error in Groq API call (${response.status}):`, errorText);
+      throw new Error(`API Error: ${response.status} ${errorText}`);
     }
 
     const groqResponse = await response.json();
-    console.log("Resposta recebida da API do Groq");
+    console.log("Response received from Groq API");
 
     if (!groqResponse.choices || !groqResponse.choices[0] || !groqResponse.choices[0].message) {
-      console.error("Formato de resposta inesperado:", groqResponse);
-      throw new Error("Formato de resposta inesperado");
+      console.error("Unexpected response format:", groqResponse);
+      throw new Error("Unexpected response format");
     }
 
     let rehabPlanJson = groqResponse.choices[0].message.content;
-    console.log("Conteúdo JSON bruto recebido:", rehabPlanJson);
+    console.log("Raw JSON content received:", rehabPlanJson);
 
-    // Processar a resposta JSON
+    // Process JSON response
     let rehabPlan;
     try {
-      // Verificar se a resposta já é uma string ou se é um objeto
+      // Check if response is already a string or an object
       if (typeof rehabPlanJson === 'string') {
-        // Limpar a resposta se contiver blocos de código markdown
+        // Clean response if it contains markdown code blocks
         if (rehabPlanJson.includes('```json')) {
-          console.log("Removendo marcadores de markdown do JSON");
+          console.log("Removing markdown markers from JSON");
           rehabPlanJson = rehabPlanJson.replace(/```json\n|\n```/g, '');
         }
         
-        // Tentar fazer parse do JSON
+        // Try to parse JSON
         try {
           rehabPlan = JSON.parse(rehabPlanJson);
         } catch (jsonError) {
-          console.error("Erro no parse do JSON:", jsonError);
+          console.error("Error parsing JSON:", jsonError);
           
-          // Tentar recuperar apenas a parte JSON válida
+          // Try to extract only valid JSON part
           const jsonMatch = rehabPlanJson.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
-            console.log("Tentando extrair apenas a parte JSON válida");
+            console.log("Attempting to extract only valid JSON part");
             try {
               rehabPlan = JSON.parse(jsonMatch[0]);
             } catch (fallbackError) {
-              console.error("Falha na extração do JSON mesmo com regexp:", fallbackError);
-              throw new Error("JSON inválido mesmo após tentativa de extração");
+              console.error("Failed to extract JSON even with regexp:", fallbackError);
+              throw new Error("Invalid JSON even after extraction attempt");
             }
           } else {
-            throw new Error("Não foi possível extrair JSON válido da resposta");
+            throw new Error("Could not extract valid JSON from response");
           }
         }
       } else if (typeof rehabPlanJson === 'object') {
         rehabPlan = rehabPlanJson;
       } else {
-        throw new Error("Formato de resposta inválido");
+        throw new Error("Invalid response format");
       }
+
+      // Add required fields for compatibility with ExercisePlanDisplay component
+      if (!rehabPlan.days && rehabPlan.rehab_sessions) {
+        console.log("Converting rehab_sessions to days format for display");
+        rehabPlan.days = {};
+        
+        rehabPlan.rehab_sessions.forEach((session, index) => {
+          const dayKey = `day${index + 1}`;
+          
+          // Create exercise structure for display component
+          rehabPlan.days[dayKey] = {
+            notes: session.notes || `Day ${index + 1} of treatment`,
+            exercises: [{
+              title: "Rehabilitation Exercises",
+              exercises: session.exercises.map(ex => ({
+                name: ex.name,
+                sets: ex.sets,
+                reps: ex.reps,
+                restTime: `${Math.floor(ex.rest_time_seconds / 60)} minutes ${ex.rest_time_seconds % 60} seconds`,
+                description: ex.notes || "Perform exercise carefully with attention to technique.",
+                gifUrl: ex.gifUrl || null
+              }))
+            }]
+          };
+        });
+      }
+      
+      console.log("Final rehabilitation plan structure:", JSON.stringify(rehabPlan, null, 2));
     } catch (parseError) {
-      console.error("Erro ao analisar JSON:", parseError);
-      console.error("Conteúdo JSON problemático:", rehabPlanJson);
-      throw new Error("Erro ao processar resposta: " + parseError.message);
+      console.error("Error analyzing JSON:", parseError);
+      console.error("Problematic JSON content:", rehabPlanJson);
+      throw new Error("Error processing response: " + parseError.message);
     }
 
-    // Salvar o plano de reabilitação no banco de dados se o usuário estiver autenticado
+    // Save rehabilitation plan to database if user is authenticated
     if (userData?.id) {
       try {
-        // Salvar o plano de reabilitação
+        // Save rehabilitation plan
         const { error: insertError } = await supabase
           .from('rehab_plans')
           .insert({
@@ -181,16 +209,16 @@ serve(async (req) => {
             goal: preferences.goal || 'pain_relief',
             condition: preferences.condition,
             start_date: new Date().toISOString(),
-            end_date: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString(), // 28 dias depois
+            end_date: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString(), // 28 days later
             plan_data: rehabPlan
           });
 
         if (insertError) {
-          console.error("Erro ao salvar plano de reabilitação:", insertError);
+          console.error("Error saving rehabilitation plan:", insertError);
         } else {
-          console.log("Plano de reabilitação salvo com sucesso!");
+          console.log("Rehabilitation plan saved successfully!");
         
-          // Atualizar contagem de geração de planos
+          // Update plan generation count
           const now = new Date().toISOString();
           const { data: planCount, error: countError } = await supabase
             .from('plan_generation_counts')
@@ -200,7 +228,7 @@ serve(async (req) => {
             .maybeSingle();
             
           if (countError) {
-            console.error("Erro ao verificar contagem de planos:", countError);
+            console.error("Error checking plan count:", countError);
           }
           
           if (planCount) {
@@ -225,7 +253,7 @@ serve(async (req) => {
           }
         }
       } catch (dbError) {
-        console.error("Erro ao interagir com o banco de dados:", dbError);
+        console.error("Error interacting with database:", dbError);
       }
     }
 
@@ -239,11 +267,11 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error("Erro completo:", error);
+    console.error("Complete error:", error);
     
     return new Response(
       JSON.stringify({
-        error: error.message || "Ocorreu um erro ao gerar o plano de reabilitação"
+        error: error.message || "An error occurred generating the rehabilitation plan"
       }),
       {
         status: 500,

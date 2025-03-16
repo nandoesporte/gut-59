@@ -52,9 +52,11 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
         return;
       }
 
-      // Direct API call to the Supabase function using fetch instead of invoke
+      // Direct API call to the Supabase function using fetch
       const functionUrl = `${process.env.SUPABASE_URL || 'https://sxjafhzikftdenqnkcri.supabase.co'}/functions/v1/generate-rehab-plan-groq`;
       const { data: authData } = await supabase.auth.getSession();
+      
+      console.log("Starting fetch request to:", functionUrl);
       
       const response = await fetch(functionUrl, {
         method: 'POST',
@@ -74,8 +76,11 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
         })
       });
 
+      console.log("Response status:", response.status);
+      
       if (!response.ok) {
         const errorText = await response.text();
+        console.error("Error response:", errorText);
         throw new Error(`Error: ${response.status} - ${errorText}`);
       }
 
@@ -163,6 +168,8 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
   
   // Function to get a GIF URL based on exercise name
   const getExerciseGifByName = (name: string): string | null => {
+    if (!name) return "/placeholder.svg";
+    
     // Map common exercise names to GIF URLs
     const exerciseGifMap: Record<string, string> = {
       // Knee exercises
@@ -190,20 +197,27 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
       "Equilíbrio": "balance.gif"
     };
     
+    console.log("Looking for GIF for exercise:", name);
+    
     // Try to find an exact match
     if (exerciseGifMap[name]) {
-      return `${process.env.SUPABASE_URL || 'https://sxjafhzikftdenqnkcri.supabase.co'}/storage/v1/object/public/exercise-gifs/${exerciseGifMap[name]}`;
+      const gifUrl = `${process.env.SUPABASE_URL || 'https://sxjafhzikftdenqnkcri.supabase.co'}/storage/v1/object/public/exercise-gifs/${exerciseGifMap[name]}`;
+      console.log("Found exact match GIF:", gifUrl);
+      return gifUrl;
     }
     
     // Try to find a partial match
     const lowerName = name.toLowerCase();
     for (const [key, url] of Object.entries(exerciseGifMap)) {
       if (lowerName.includes(key.toLowerCase())) {
-        return `${process.env.SUPABASE_URL || 'https://sxjafhzikftdenqnkcri.supabase.co'}/storage/v1/object/public/exercise-gifs/${url}`;
+        const gifUrl = `${process.env.SUPABASE_URL || 'https://sxjafhzikftdenqnkcri.supabase.co'}/storage/v1/object/public/exercise-gifs/${url}`;
+        console.log("Found partial match GIF:", gifUrl);
+        return gifUrl;
       }
     }
     
     // Default placeholder
+    console.log("No GIF found, using placeholder");
     return `/placeholder.svg`;
   };
 
@@ -295,6 +309,7 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
                   // Fallback to placeholder on error
                   const target = e.target as HTMLImageElement;
                   target.src = '/placeholder.svg';
+                  console.log("Image failed to load:", exercise.gifUrl);
                 }}
               />
             </div>
@@ -324,13 +339,13 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
       
       return (
         <div className="space-y-6">
-          {/* Informações do dia */}
+          {/* Day information */}
           <div className="bg-blue-50 p-4 rounded-lg">
             <h3 className="font-semibold text-blue-800">Observações do Dia</h3>
             <p className="text-gray-700 mt-2">{dayPlan.notes || "Sem observações específicas para este dia."}</p>
           </div>
           
-          {/* Exercícios */}
+          {/* Exercises */}
           <Card className="overflow-hidden">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -356,7 +371,7 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
             </CardContent>
           </Card>
           
-          {/* Plano Nutricional */}
+          {/* Nutritional Plan */}
           {dayPlan.nutrition && (
             <Card className="overflow-hidden">
               <CardHeader className="pb-2">
@@ -479,7 +494,7 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
           </CardTitle>
         </CardHeader>
         <CardContent className={`space-y-4 ${isMobile ? 'p-4' : ''}`}>
-          {/* Visão Geral */}
+          {/* Overview */}
           {rehabPlan?.overview && (
             <div className="mb-4">
               <h3 className="text-lg font-medium mb-2">Visão Geral</h3>
@@ -487,7 +502,7 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
             </div>
           )}
 
-          {/* Recomendações Gerais */}
+          {/* General Recommendations */}
           {rehabPlan?.recommendations && (
             <div className="bg-green-50 p-4 rounded-lg mb-4">
               <h3 className="font-semibold text-green-800">Recomendações Gerais</h3>
@@ -504,7 +519,7 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
             </div>
           )}
           
-          {/* Dias de Tratamento */}
+          {/* Treatment Days */}
           {dayTabs.length > 0 && (
             <Tabs value={selectedDay} onValueChange={setSelectedDay}>
               <ScrollArea className="w-full">
