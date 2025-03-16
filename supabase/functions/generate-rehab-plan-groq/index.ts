@@ -4,6 +4,7 @@ import { supabaseClient } from "../_shared/supabase-client.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
 const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY');
+const TIMEOUT_MS = 60000; // 60 seconds timeout
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -80,8 +81,13 @@ serve(async (req) => {
       throw new Error("GROQ_API_KEY não configurada no ambiente");
     }
 
-    // Call Groq API to generate the rehabilitation plan
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    // Create a timeout promise
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Timeout ao gerar plano de reabilitação")), TIMEOUT_MS);
+    });
+
+    // Call Groq API to generate the rehabilitation plan with timeout
+    const groqPromise = fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -101,6 +107,9 @@ serve(async (req) => {
         response_format: { type: "json_object" }
       }),
     });
+
+    // Race between the API call and the timeout
+    const response = await Promise.race([groqPromise, timeoutPromise]);
 
     if (!response.ok) {
       const errorText = await response.text();
