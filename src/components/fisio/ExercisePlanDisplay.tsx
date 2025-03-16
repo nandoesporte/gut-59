@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -109,6 +108,78 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
       generateRehabPlan();
     }
   }, [hasPaid]);
+
+  const checkPaymentAndGeneratePlan = async () => {
+    setIsLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      const { data: counts, error: countError } = await supabase
+        .from('plan_generation_counts')
+        .select('rehabilitation_count')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (countError) {
+        console.error('Error checking plan counts:', countError);
+      }
+
+      // Simplify payment settings query completely to avoid type issues
+      let paymentGloballyEnabled = true; // Default value
+      
+      try {
+        // Use raw query with string literals to avoid type inference issues
+        const response = await supabase.rpc('get_payment_setting', { 
+          setting_name_param: 'payment_enabled' 
+        });
+        
+        if (response.error) {
+          console.error('Error in RPC call:', response.error);
+        } else if (response.data !== null) {
+          paymentGloballyEnabled = Boolean(response.data);
+        }
+      } catch (e) {
+        console.error('Error in payment settings query:', e);
+      }
+      
+      console.log('Payment globally enabled:', paymentGloballyEnabled);
+      
+      if (!paymentGloballyEnabled || !counts || (counts.rehabilitation_count < 3)) {
+        console.log('Generating rehab plan without payment check');
+        await generateRehabPlan();
+      } else {
+        const { data: access, error: accessError } = await supabase
+          .from('plan_access')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('plan_type', 'rehabilitation')
+          .eq('is_active', true)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (accessError && accessError.code !== 'PGRST116') {
+          console.error('Error checking plan access:', accessError);
+        }
+
+        if (access && !access.payment_required) {
+          console.log('User has access to rehab plan generation');
+          await generateRehabPlan();
+        } else {
+          console.log('User needs to pay for rehab plan generation');
+          setIsLoading(false);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking payment status:', error);
+      setIsLoading(false);
+      setError('Failed to check payment status. Please try again later.');
+    }
+  };
 
   useEffect(() => {
     const checkPaymentAndGeneratePlan = async () => {
