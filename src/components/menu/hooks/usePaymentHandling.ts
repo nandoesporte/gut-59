@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { initMercadoPago } from "@mercadopago/sdk-react";
 import { toast } from "sonner";
@@ -21,6 +20,7 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
   const [currentPrice, setCurrentPrice] = useState<number>(19.90);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [checkInterval, setCheckInterval] = useState<number | null>(null);
+  const [isPaymentEnabled, setIsPaymentEnabled] = useState(false);
 
   useEffect(() => {
     const loadPrice = async () => {
@@ -28,9 +28,82 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
       setCurrentPrice(price);
     };
     loadPrice();
+    checkPaymentEnabled();
   }, [planType]);
 
-  // Effect to check payment status and notification channel
+  const checkPaymentEnabled = async () => {
+    try {
+      const { data: userData, error: authError } = await supabase.auth.getUser();
+      if (authError || !userData.user) {
+        console.warn('User not authenticated when checking payment settings');
+        return;
+      }
+
+      const { data: settings, error: settingsError } = await supabase
+        .from('payment_settings')
+        .select('is_active')
+        .eq('plan_type', planType)
+        .maybeSingle();
+
+      if (settingsError) {
+        console.error('Error checking payment settings:', settingsError);
+        return;
+      }
+
+      if (!settings?.is_active) {
+        setIsPaymentEnabled(false);
+        setHasPaid(true);
+        return;
+      }
+
+      const { data: planAccess, error: accessError } = await supabase
+        .from('plan_access')
+        .select('payment_required')
+        .eq('user_id', userData.user.id)
+        .eq('plan_type', planType)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (accessError && accessError.code !== 'PGRST116') {
+        console.error('Error checking user access:', accessError);
+        setIsPaymentEnabled(true);
+        return;
+      }
+
+      if (planAccess && !planAccess.payment_required) {
+        setIsPaymentEnabled(false);
+        setHasPaid(true);
+        return;
+      }
+
+      const { data: counts, error: countError } = await supabase
+        .from('plan_generation_counts')
+        .select(`${planType}_count`)
+        .eq('user_id', userData.user.id)
+        .maybeSingle();
+
+      if (countError) {
+        console.error('Error checking plan generation counts:', countError);
+        return;
+      }
+
+      const currentCount = counts ? counts[`${planType}_count`] || 0 : 0;
+      
+      if (currentCount < 3) {
+        setIsPaymentEnabled(false);
+        setHasPaid(true);
+      } else {
+        setIsPaymentEnabled(true);
+        setHasPaid(false);
+      }
+    } catch (error) {
+      console.error('Error checking payment settings:', error);
+      setIsPaymentEnabled(true);
+    }
+  };
+
   useEffect(() => {
     const startPaymentCheck = async () => {
       if (!preferenceId || hasPaid) return;
@@ -62,14 +135,11 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
         }
       };
 
-      // Inicia verificação imediata
       checkPayment();
 
-      // Configura intervalo de 5 segundos
       const intervalId = window.setInterval(checkPayment, 5000);
       setCheckInterval(intervalId);
 
-      // Limpa intervalo após 10 minutos
       const timeoutId = window.setTimeout(() => {
         window.clearInterval(intervalId);
         setCheckInterval(null);
@@ -83,7 +153,6 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
 
     startPaymentCheck();
 
-    // Subscribe to payment notifications channel
     const channel = supabase
       .channel('payment_notifications')
       .on('postgres_changes', {
@@ -100,7 +169,6 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
             setHasPaid(true);
             setShowConfirmation(true);
             
-            // Reproduzir som de notificação
             const audio = new Audio('/notification.mp3');
             audio.play().catch(() => {});
             
@@ -125,13 +193,11 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
     try {
       setIsProcessingPayment(true);
 
-      // Get user data
       const { data: userData, error: authError } = await supabase.auth.getUser();
       if (authError || !userData.user) {
         throw new Error('Usuário não autenticado');
       }
 
-      // Verificar primeiro se o pagamento está habilitado
       const { data: paymentSettings, error: settingsError } = await supabase
         .from('payment_settings')
         .select('is_active')
@@ -143,7 +209,6 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
         throw new Error('Erro ao verificar configuração de pagamento');
       }
 
-      // Se o pagamento não estiver ativo globalmente, permitir continuar sem pagamento
       if (!paymentSettings?.is_active) {
         console.log('Pagamento não está ativo globalmente, permitindo acesso');
         setHasPaid(true);
@@ -151,7 +216,6 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
         return;
       }
 
-      // Verificar acesso específico do usuário - pegando apenas o registro mais recente
       const { data: planAccess, error: accessError } = await supabase
         .from('plan_access')
         .select('payment_required, created_at')
@@ -167,7 +231,6 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
         throw new Error('Erro ao verificar acesso do usuário');
       }
 
-      // Se o usuário tiver acesso especial sem necessidade de pagamento
       if (planAccess && !planAccess.payment_required) {
         console.log('Usuário tem acesso especial, permitindo acesso sem pagamento');
         setHasPaid(true);
@@ -175,7 +238,6 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
         return;
       }
 
-      // Verificar contagem de gerações
       const { data: counts, error: countError } = await supabase
         .from('plan_generation_counts')
         .select('*')
@@ -190,7 +252,6 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
       const countField = `${planType}_count`;
       const currentCount = counts ? counts[countField] || 0 : 0;
 
-      // Se ainda tiver gerações gratuitas disponíveis
       if (currentCount < 3) {
         console.log('Usuário ainda tem gerações gratuitas disponíveis');
         setHasPaid(true);
@@ -198,20 +259,16 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
         return;
       }
 
-      // Se chegou aqui, precisa criar preferência de pagamento
       const { preferenceId: newPreferenceId, initPoint } = await createPaymentPreference(planType, currentPrice);
       setPreferenceId(newPreferenceId);
       
-      // Add success URL with message
       const successUrl = new URL(window.location.href);
       successUrl.searchParams.set('status', 'success');
       successUrl.searchParams.set('message', getSuccessMessage(planType));
       
-      // Add the success URL to the payment window URL
       const paymentUrl = new URL(initPoint);
       paymentUrl.searchParams.set('back_urls_success', successUrl.toString());
       
-      // Open payment window
       window.open(paymentUrl.toString(), '_blank');
 
     } catch (error: any) {
@@ -230,6 +287,7 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
     handlePaymentAndContinue,
     showConfirmation,
     setShowConfirmation,
-    confirmationMessage: getSuccessMessage(planType)
+    confirmationMessage: getSuccessMessage(planType),
+    isPaymentEnabled
   };
 };

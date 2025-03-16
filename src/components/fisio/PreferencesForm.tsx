@@ -53,8 +53,9 @@ export const FisioPreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
     isProcessingPayment,
     hasPaid,
     currentPrice,
-    handlePaymentAndContinue
-  } = usePaymentHandling();
+    handlePaymentAndContinue,
+    isPaymentEnabled
+  } = usePaymentHandling('rehabilitation');
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -72,7 +73,8 @@ export const FisioPreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
   });
 
   const handleSubmit = async (data: FormData) => {
-    if (!hasPaid) {
+    // Check if payment is required
+    if (isPaymentEnabled && !hasPaid) {
       setFormData(data);
       setIsPaymentDialogOpen(true);
       return;
