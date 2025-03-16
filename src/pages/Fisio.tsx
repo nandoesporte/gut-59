@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { useState } from 'react';
 import { FisioPreferences } from '@/components/fisio/types';
@@ -44,6 +43,7 @@ const Fisio = () => {
         id: plan.id,
         user_id: plan.user_id,
         goal: plan.goal,
+        condition: plan.condition,
         start_date: plan.start_date,
         end_date: plan.end_date,
         created_at: plan.created_at,
