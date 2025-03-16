@@ -130,22 +130,22 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
           console.error('Error checking plan counts:', countError);
         }
 
-        // Get the payment settings with a completely simplified approach that avoids type issues
+        // Completely simplify the payment settings query to avoid type inference issues
         let paymentGloballyEnabled = true; // Default value
         
         try {
-          // Use a simple approach with explicit any type to avoid TypeScript inference issues
-          const result = await supabase
+          // Execute a simple query with explicit steps to avoid TypeScript inference problems
+          const { data, error } = await supabase
             .from('payment_settings')
             .select('is_active')
             .eq('setting_name', 'payment_enabled')
             .limit(1);
-            
-          if (result.error) {
-            console.error('Error fetching payment settings:', result.error);
-          } else if (result.data && result.data.length > 0) {
-            // Access the value directly without complex type checking
-            paymentGloballyEnabled = result.data[0].is_active === true;
+          
+          if (error) {
+            console.error('Error fetching payment settings:', error);
+          } else if (data && data.length > 0) {
+            // Use a simple boolean check with strict equality
+            paymentGloballyEnabled = data[0].is_active === true;
           }
         } catch (e) {
           console.error('Error in payment settings query:', e);
