@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { supabaseClient } from "../_shared/supabase-client.ts";
 import { corsHeaders } from "../_shared/cors.ts";
@@ -46,12 +45,13 @@ serve(async (req) => {
     console.log("Prompt found:", promptData.name);
 
     // Fetch relevant exercises from the database based on joint area
+    // Limit to just 5 exercises to significantly reduce context size
     const { data: exercises, error: exercisesError } = await supabase
       .from('physio_exercises')
-      .select('*')
+      .select('id,name,joint_area,difficulty,exercise_type')
       .eq('joint_area', preferences.joint_area)
       .order('name')
-      .limit(10); // Limit to 10 exercises to reduce context size
+      .limit(5); // Further reduced from 10 to 5
 
     if (exercisesError) {
       console.error("Error fetching exercises:", exercisesError);
@@ -66,8 +66,8 @@ serve(async (req) => {
       console.log("Insufficient joint-specific exercises, fetching general exercises");
       const { data: generalExercises, error: generalError } = await supabase
         .from('physio_exercises')
-        .select('*')
-        .limit(5); // Limit to 5 general exercises
+        .select('id,name,joint_area,difficulty,exercise_type')
+        .limit(3); // Further reduced from 5 to 3
       
       if (!generalError && generalExercises) {
         relevantExercises = generalExercises;
@@ -76,7 +76,7 @@ serve(async (req) => {
     }
 
     // Prepare user data for prompt
-    const painLevel = preferences.pain_level ? `Pain level: ${preferences.pain_level}/10` : 'Pain level not informed';
+    const painLevel = preferences.pain_level ? `${preferences.pain_level}/10` : '5/10';
     const userWeight = userData?.weight || preferences.weight || 70;
     const userHeight = userData?.height || preferences.height || 170;
     const userAge = userData?.age || preferences.age || 30;
@@ -84,48 +84,45 @@ serve(async (req) => {
     const jointArea = preferences.joint_area || 'knee';
     const mobilityLevel = preferences.mobility_level || 'moderate';
     const activityLevel = preferences.activity_level || 'moderate';
-    const rehabGoal = 'pain_relief'; // Default goal for rehab
+    const rehabGoal = preferences.goal || 'pain_relief'; // Default goal for rehab
 
-    // Get base prompt from Fisio+ agent - Truncate to reduce size
+    // Get base prompt from Fisio+ agent - Significantly truncate to reduce size
     let promptTemplate = promptData.prompt;
-    if (promptTemplate.length > 2000) {
-      promptTemplate = promptTemplate.substring(0, 2000) + "...";
-      console.log("Prompt was truncated to reduce context size");
+    if (promptTemplate.length > 1000) { // Further reduced from 2000 to 1000
+      promptTemplate = promptTemplate.substring(0, 1000) + "...";
+      console.log("Prompt was significantly truncated to reduce context size");
     }
     
-    // Replace variables in template
+    // Use a much more compact context data structure
     const contextData = {
       user_weight: userWeight,
       user_height: userHeight,
       user_age: userAge,
-      user_gender: userGender === 'male' ? 'Masculino' : 'Feminino',
+      user_gender: userGender === 'male' ? 'M' : 'F',
       joint_area: jointArea,
-      pain_level: preferences.pain_level || 5,
-      mobility_level: mobilityLevel,
-      activity_level: activityLevel
+      pain_level: painLevel,
+      mobility: mobilityLevel,
+      activity: activityLevel
     };
 
-    // Replace variables in template
-    Object.entries(contextData).forEach(([key, value]) => {
-      promptTemplate = promptTemplate.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
-    });
+    // Create a minimal prompt with essential information only
+    const minimalPrompt = `Create a rehabilitation plan for ${contextData.joint_area} with pain level ${contextData.pain_level}. Patient: ${contextData.user_age}yo, ${contextData.user_gender}, ${contextData.user_weight}kg, ${contextData.user_height}cm. Mobility: ${contextData.mobility}, Activity: ${contextData.activity}.`;
 
-    // Add exercise information to the prompt but with reduced data
+    // Add exercise information to the prompt with minimal data
     const exerciseInfo = relevantExercises.map(ex => ({
       id: ex.id,
       name: ex.name,
-      joint_area: ex.joint_area,
-      difficulty: ex.difficulty,
-      // Reduce description size
-      description: ex.description?.substring(0, 100) || "",
-      exercise_type: ex.exercise_type
-      // Remove gif_url to reduce context size
+      area: ex.joint_area,
+      type: ex.exercise_type
     }));
 
-    // Append exercise data to prompt - more concise instructions
-    promptTemplate += `\n\nUse these exercises in your plan (add their IDs):\n${JSON.stringify(exerciseInfo)}`;
+    // Ultra-compact prompt for exercises
+    const exercisePrompt = `Use these exercises (IDs only):\n${JSON.stringify(exerciseInfo)}`;
     
-    console.log(`Prompt length: ${promptTemplate.length} characters`);
+    // Combine into a compact final prompt
+    const finalPrompt = `${minimalPrompt}\n\n${exercisePrompt}`;
+    
+    console.log(`Prompt length: ${finalPrompt.length} characters`);
     console.log("Sending prompt to llama3-8b-8192 model");
 
     if (!GROQ_API_KEY) {
@@ -151,9 +148,9 @@ serve(async (req) => {
             role: "system", 
             content: "You are a physiotherapist specialized in creating personalized rehabilitation plans. Always respond with valid JSON, using a properly structured and complete object without truncating or using placeholders like '...and so on'. The JSON should be in a format that can be directly used by an application, without any additional text or formatting."
           },
-          { role: "user", content: promptTemplate }
+          { role: "user", content: finalPrompt }
         ],
-        max_tokens: 4096,
+        max_tokens: 2048, // Reduced from 4096 to 2048
         temperature: 0.3,
         response_format: { type: "json_object" }
       }),
@@ -228,10 +225,51 @@ serve(async (req) => {
                 if (dbExercise) {
                   // Enhance the exercise with database data
                   exercise.name = dbExercise.name;
-                  exercise.description = dbExercise.description;
-                  exercise.gifUrl = dbExercise.gif_url;
                   exercise.exerciseType = dbExercise.exercise_type;
                   exercise.difficulty = dbExercise.difficulty;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Get additional exercise details after the plan is generated to keep initial context small
+      const exerciseIds = [];
+      
+      // Extract all exercise IDs from the plan
+      if (rehabPlan.rehab_sessions && Array.isArray(rehabPlan.rehab_sessions)) {
+        for (const session of rehabPlan.rehab_sessions) {
+          if (session.exercises && Array.isArray(session.exercises)) {
+            for (const exercise of session.exercises) {
+              if (exercise.exercise_id && !exerciseIds.includes(exercise.exercise_id)) {
+                exerciseIds.push(exercise.exercise_id);
+              }
+            }
+          }
+        }
+      }
+      
+      // Fetch full exercise details if we have exercise IDs
+      if (exerciseIds.length > 0) {
+        const { data: exerciseDetails, error: detailsError } = await supabase
+          .from('physio_exercises')
+          .select('*')
+          .in('id', exerciseIds);
+          
+        if (!detailsError && exerciseDetails) {
+          // Enhance exercises with full details
+          if (rehabPlan.rehab_sessions) {
+            for (const session of rehabPlan.rehab_sessions) {
+              if (session.exercises) {
+                for (const exercise of session.exercises) {
+                  if (exercise.exercise_id) {
+                    const fullDetails = exerciseDetails.find(d => d.id === exercise.exercise_id);
+                    if (fullDetails) {
+                      exercise.description = fullDetails.description;
+                      exercise.gifUrl = fullDetails.gif_url;
+                    }
+                  }
                 }
               }
             }
