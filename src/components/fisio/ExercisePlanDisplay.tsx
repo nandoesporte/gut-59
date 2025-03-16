@@ -130,23 +130,25 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
           console.error('Error checking plan counts:', countError);
         }
 
-        // Get the payment settings but handle it in a way that avoids complex type inference
+        // Get the payment settings with a completely simplified approach
         let paymentGloballyEnabled = true; // Default value
         
         try {
-          // Use a simpler query approach to avoid TypeScript complexity
-          const response = await supabase
+          // Use raw query to completely avoid TypeScript complexity
+          const { data, error } = await supabase
             .from('payment_settings')
-            .select('*')
+            .select('is_active')
             .eq('setting_name', 'payment_enabled')
             .limit(1);
-            
-          // Simple and safe access to the data
-          if (response.data && response.data.length > 0) {
-            paymentGloballyEnabled = Boolean(response.data[0].is_active);
+          
+          if (error) {
+            console.error('Error fetching payment settings:', error);
+          } else if (data && data.length > 0) {
+            // Explicitly cast to boolean to avoid any inference issues
+            paymentGloballyEnabled = data[0].is_active === true;
           }
         } catch (e) {
-          console.error('Error fetching payment settings:', e);
+          console.error('Error in payment settings query:', e);
         }
         
         console.log('Payment globally enabled:', paymentGloballyEnabled);
