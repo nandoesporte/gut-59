@@ -47,24 +47,43 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
         return;
       }
 
-      const { data: response, error } = await supabase.functions.invoke('generate-rehab-plan-groq', {
-        body: { 
+      // Direct API call to the Supabase function using fetch instead of invoke
+      const functionUrl = `${process.env.SUPABASE_URL || 'https://sxjafhzikftdenqnkcri.supabase.co'}/functions/v1/generate-rehab-plan-groq`;
+      const { data: authData } = await supabase.auth.getSession();
+      
+      const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authData.session?.access_token}`
+        },
+        body: JSON.stringify({ 
           preferences, 
-          userId: user.id
-        }
+          userData: { 
+            id: user.id,
+            weight: user.user_metadata?.weight,
+            height: user.user_metadata?.height,
+            age: user.user_metadata?.age,
+            gender: user.user_metadata?.gender
+          }
+        })
       });
 
-      if (error) throw error;
-      if (!response) throw new Error("Nenhum plano foi gerado");
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Error: ${response.status} - ${errorText}`);
+      }
 
-      if (response) {
+      const responseData = await response.json();
+
+      if (responseData) {
         await addTransaction({
           amount: REWARDS.REHAB_PLAN,
           type: 'physio_plan',
           description: 'Geração de plano de reabilitação com Groq'
         });
         
-        setRehabPlan(response);
+        setRehabPlan(responseData);
         toast.success(`Plano de reabilitação gerado com sucesso! +${REWARDS.REHAB_PLAN} FITs`);
       }
     } catch (error: any) {
@@ -240,14 +259,14 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
           Seu Plano de Reabilitação
         </h2>
         
-        {rehabPlan.overview && (
+        {rehabPlan?.overview && (
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-2">Visão Geral</h3>
             <p className="text-gray-600">{rehabPlan.overview}</p>
           </div>
         )}
 
-        {rehabPlan.recommendations && (
+        {rehabPlan?.recommendations && (
           <div className="bg-green-50 p-4 rounded-lg mb-6">
             <h3 className="font-semibold text-green-800">Recomendações Gerais</h3>
             <ul className="list-disc pl-5 mt-2 space-y-1 text-gray-700">
