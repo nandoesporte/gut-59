@@ -1,3 +1,4 @@
+
 import * as React from 'react';
 import { useState } from 'react';
 import { FisioPreferences } from '@/components/fisio/types';
@@ -29,7 +30,7 @@ const Fisio = () => {
             *,
             rehab_session_exercises (
               *,
-              exercise:physio_exercises (*)
+              exercise:exercises (*)
             )
           )
         `)
