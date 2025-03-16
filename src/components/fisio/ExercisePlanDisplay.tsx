@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { formatImageUrl } from "@/utils/imageUtils";
 
 interface ExercisePlanDisplayProps {
   preferences: FisioPreferences;
@@ -79,6 +80,7 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
       }
 
       const responseData = await response.json();
+      console.log("Rehab plan data received:", responseData);
 
       if (responseData) {
         await addTransaction({
@@ -87,7 +89,9 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
           description: 'Geração de plano de reabilitação com Groq'
         });
         
-        setRehabPlan(responseData);
+        // Process the plan to ensure proper exercise display
+        const processedPlan = processRehabPlan(responseData);
+        setRehabPlan(processedPlan);
         toast.success(`Plano de reabilitação gerado com sucesso! +${REWARDS.REHAB_PLAN} FITs`);
       }
     } catch (error: any) {
@@ -97,6 +101,110 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
     } finally {
       setLoading(false);
     }
+  };
+
+  // Process the rehab plan to ensure proper structure and add gif URLs
+  const processRehabPlan = (plan: any): RehabPlan => {
+    console.log("Processing rehab plan:", plan);
+    
+    // If the plan doesn't have the expected format, try to normalize it
+    if (!plan.days && plan.rehab_sessions) {
+      // Convert from database format to display format
+      const days: Record<string, any> = {};
+      
+      plan.rehab_sessions.forEach((session: any, index: number) => {
+        const dayKey = `day${index + 1}`;
+        
+        days[dayKey] = {
+          notes: session.notes || `Dia ${index + 1} do tratamento`,
+          exercises: [{
+            title: "Exercícios de Reabilitação",
+            exercises: session.exercises.map((ex: any) => ({
+              name: ex.name,
+              sets: ex.sets,
+              reps: ex.reps,
+              restTime: `${Math.floor(ex.rest_time_seconds / 60)} minutos ${ex.rest_time_seconds % 60} segundos`,
+              description: ex.notes || "Realize o exercício com cuidado e atenção à técnica.",
+              gifUrl: ex.gifUrl || null
+            }))
+          }]
+        };
+      });
+      
+      plan.days = days;
+    }
+    
+    // Ensure the plan has days
+    if (!plan.days) {
+      console.warn("Plan doesn't have days structure:", plan);
+      plan.days = {};
+    }
+    
+    // Assign default GIFs based on exercise names if missing
+    Object.keys(plan.days).forEach(dayKey => {
+      const day = plan.days[dayKey];
+      
+      if (day.exercises) {
+        day.exercises.forEach((exerciseGroup: any) => {
+          if (exerciseGroup.exercises) {
+            exerciseGroup.exercises.forEach((exercise: any) => {
+              if (!exercise.gifUrl) {
+                // Try to assign a default GIF based on the exercise name
+                exercise.gifUrl = getExerciseGifByName(exercise.name);
+              }
+            });
+          }
+        });
+      }
+    });
+    
+    return plan as RehabPlan;
+  };
+  
+  // Function to get a GIF URL based on exercise name
+  const getExerciseGifByName = (name: string): string | null => {
+    // Map common exercise names to GIF URLs
+    const exerciseGifMap: Record<string, string> = {
+      // Knee exercises
+      "Flexão de Joelho": "knee_flexion.gif",
+      "Extensão de Joelho": "knee_extension.gif",
+      "Fortalecimento de Quadríceps": "quad_strengthening.gif",
+      "Elevação de Perna Reta": "straight_leg_raise.gif",
+      "Agachamento Parcial": "partial_squat.gif",
+      
+      // Ankle exercises
+      "Flexão Plantar": "plantar_flexion.gif",
+      "Dorsiflexão": "dorsiflexion.gif",
+      "Inversão do Tornozelo": "ankle_inversion.gif",
+      "Eversão do Tornozelo": "ankle_eversion.gif",
+      
+      // Shoulder exercises
+      "Rotação Externa": "external_rotation.gif",
+      "Rotação Interna": "internal_rotation.gif",
+      "Elevação de Ombro": "shoulder_elevation.gif",
+      
+      // Generic exercises
+      "Alongamento": "stretching.gif",
+      "Fortalecimento": "strengthening.gif",
+      "Caminhada": "walking.gif",
+      "Equilíbrio": "balance.gif"
+    };
+    
+    // Try to find an exact match
+    if (exerciseGifMap[name]) {
+      return `${process.env.SUPABASE_URL || 'https://sxjafhzikftdenqnkcri.supabase.co'}/storage/v1/object/public/exercise-gifs/${exerciseGifMap[name]}`;
+    }
+    
+    // Try to find a partial match
+    const lowerName = name.toLowerCase();
+    for (const [key, url] of Object.entries(exerciseGifMap)) {
+      if (lowerName.includes(key.toLowerCase())) {
+        return `${process.env.SUPABASE_URL || 'https://sxjafhzikftdenqnkcri.supabase.co'}/storage/v1/object/public/exercise-gifs/${url}`;
+      }
+    }
+    
+    // Default placeholder
+    return `/placeholder.svg`;
   };
 
   useEffect(() => {
@@ -147,8 +255,8 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
     
     return (
       <div className="border border-gray-200 rounded-lg p-4 mb-4 hover:bg-gray-50 transition-colors">
-        <div className="flex justify-between items-start">
-          <div>
+        <div className="flex flex-col md:flex-row justify-between items-start gap-4">
+          <div className="flex-1">
             <h4 className="font-medium text-primary">{exercise.name}</h4>
             <div className="flex flex-wrap gap-2 mt-1">
               {exercise.sets && exercise.reps && (
@@ -162,20 +270,36 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
                 </Badge>
               )}
             </div>
+            
+            {exercise.description && (
+              <div className="mt-3 text-sm text-gray-600">
+                <p>{exercise.description}</p>
+              </div>
+            )}
+            
+            {exercise.restTime && (
+              <div className="mt-2 text-xs text-gray-500 flex items-center">
+                <span className="text-blue-600">Descanso: {exercise.restTime}</span>
+              </div>
+            )}
           </div>
+          
+          {/* Exercise GIF */}
+          {exercise.gifUrl && (
+            <div className="w-full md:w-32 h-32 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 border">
+              <img 
+                src={formatImageUrl(exercise.gifUrl)} 
+                alt={`Demonstração: ${exercise.name}`}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  // Fallback to placeholder on error
+                  const target = e.target as HTMLImageElement;
+                  target.src = '/placeholder.svg';
+                }}
+              />
+            </div>
+          )}
         </div>
-        
-        {exercise.description && (
-          <div className="mt-3 text-sm text-gray-600">
-            <p>{exercise.description}</p>
-          </div>
-        )}
-        
-        {exercise.restTime && (
-          <div className="mt-2 text-xs text-gray-500 flex items-center">
-            <span className="text-blue-600">Descanso: {exercise.restTime}</span>
-          </div>
-        )}
       </div>
     );
   };
@@ -216,7 +340,16 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
             </CardHeader>
             <CardContent>
               {dayPlan.exercises ? (
-                renderDailyExercises(dayPlan.exercises.flatMap(section => section.exercises || []))
+                <>
+                  {dayPlan.exercises.map((section: any, idx: number) => (
+                    <div key={idx} className="mb-6 last:mb-0">
+                      {section.title && (
+                        <h3 className="font-medium text-sm uppercase text-gray-500 mb-3">{section.title}</h3>
+                      )}
+                      {renderDailyExercises(section.exercises || [])}
+                    </div>
+                  ))}
+                </>
               ) : (
                 <p className="text-gray-500 text-center py-4">Nenhum exercício para este dia</p>
               )}
@@ -238,18 +371,20 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
                     <div className="border-l-4 border-green-400 pl-4 py-2">
                       <h4 className="font-medium text-green-800">Café da Manhã</h4>
                       <ul className="list-disc pl-5 mt-1 space-y-1 text-gray-700">
-                        {dayPlan.nutrition.breakfast.foods.map((food: any, idx: number) => (
+                        {dayPlan.nutrition.breakfast.foods && dayPlan.nutrition.breakfast.foods.map((food: any, idx: number) => (
                           <li key={idx} className="text-sm">
                             {food.portion} {food.unit} {food.name} {food.details && `(${food.details})`}
                           </li>
                         ))}
                       </ul>
-                      <div className="mt-2 text-xs text-gray-600">
-                        <p>
-                          {dayPlan.nutrition.breakfast.calories} kcal | Carbs: {dayPlan.nutrition.breakfast.macros.carbs}g | 
-                          Proteínas: {dayPlan.nutrition.breakfast.macros.protein}g | Gorduras: {dayPlan.nutrition.breakfast.macros.fats}g
-                        </p>
-                      </div>
+                      {dayPlan.nutrition.breakfast.macros && (
+                        <div className="mt-2 text-xs text-gray-600">
+                          <p>
+                            {dayPlan.nutrition.breakfast.calories} kcal | Carbs: {dayPlan.nutrition.breakfast.macros.carbs}g | 
+                            Proteínas: {dayPlan.nutrition.breakfast.macros.protein}g | Gorduras: {dayPlan.nutrition.breakfast.macros.fats}g
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                   
@@ -257,18 +392,20 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
                     <div className="border-l-4 border-amber-400 pl-4 py-2">
                       <h4 className="font-medium text-amber-800">Almoço</h4>
                       <ul className="list-disc pl-5 mt-1 space-y-1 text-gray-700">
-                        {dayPlan.nutrition.lunch.foods.map((food: any, idx: number) => (
+                        {dayPlan.nutrition.lunch.foods && dayPlan.nutrition.lunch.foods.map((food: any, idx: number) => (
                           <li key={idx} className="text-sm">
                             {food.portion} {food.unit} {food.name} {food.details && `(${food.details})`}
                           </li>
                         ))}
                       </ul>
-                      <div className="mt-2 text-xs text-gray-600">
-                        <p>
-                          {dayPlan.nutrition.lunch.calories} kcal | Carbs: {dayPlan.nutrition.lunch.macros.carbs}g | 
-                          Proteínas: {dayPlan.nutrition.lunch.macros.protein}g | Gorduras: {dayPlan.nutrition.lunch.macros.fats}g
-                        </p>
-                      </div>
+                      {dayPlan.nutrition.lunch.macros && (
+                        <div className="mt-2 text-xs text-gray-600">
+                          <p>
+                            {dayPlan.nutrition.lunch.calories} kcal | Carbs: {dayPlan.nutrition.lunch.macros.carbs}g | 
+                            Proteínas: {dayPlan.nutrition.lunch.macros.protein}g | Gorduras: {dayPlan.nutrition.lunch.macros.fats}g
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                   
@@ -276,18 +413,20 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
                     <div className="border-l-4 border-purple-400 pl-4 py-2">
                       <h4 className="font-medium text-purple-800">Jantar</h4>
                       <ul className="list-disc pl-5 mt-1 space-y-1 text-gray-700">
-                        {dayPlan.nutrition.dinner.foods.map((food: any, idx: number) => (
+                        {dayPlan.nutrition.dinner.foods && dayPlan.nutrition.dinner.foods.map((food: any, idx: number) => (
                           <li key={idx} className="text-sm">
                             {food.portion} {food.unit} {food.name} {food.details && `(${food.details})`}
                           </li>
                         ))}
                       </ul>
-                      <div className="mt-2 text-xs text-gray-600">
-                        <p>
-                          {dayPlan.nutrition.dinner.calories} kcal | Carbs: {dayPlan.nutrition.dinner.macros.carbs}g | 
-                          Proteínas: {dayPlan.nutrition.dinner.macros.protein}g | Gorduras: {dayPlan.nutrition.dinner.macros.fats}g
-                        </p>
-                      </div>
+                      {dayPlan.nutrition.dinner.macros && (
+                        <div className="mt-2 text-xs text-gray-600">
+                          <p>
+                            {dayPlan.nutrition.dinner.calories} kcal | Carbs: {dayPlan.nutrition.dinner.macros.carbs}g | 
+                            Proteínas: {dayPlan.nutrition.dinner.macros.protein}g | Gorduras: {dayPlan.nutrition.dinner.macros.fats}g
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                   
@@ -295,18 +434,20 @@ export const ExercisePlanDisplay = ({ preferences, onReset }: ExercisePlanDispla
                     <div key={idx} className="border-l-4 border-blue-400 pl-4 py-2">
                       <h4 className="font-medium text-blue-800">Lanche {idx + 1}</h4>
                       <ul className="list-disc pl-5 mt-1 space-y-1 text-gray-700">
-                        {snack.foods.map((food: any, foodIdx: number) => (
+                        {snack.foods && snack.foods.map((food: any, foodIdx: number) => (
                           <li key={foodIdx} className="text-sm">
                             {food.portion} {food.unit} {food.name} {food.details && `(${food.details})`}
                           </li>
                         ))}
                       </ul>
-                      <div className="mt-2 text-xs text-gray-600">
-                        <p>
-                          {snack.calories} kcal | Carbs: {snack.macros.carbs}g | 
-                          Proteínas: {snack.macros.protein}g | Gorduras: {snack.macros.fats}g
-                        </p>
-                      </div>
+                      {snack.macros && (
+                        <div className="mt-2 text-xs text-gray-600">
+                          <p>
+                            {snack.calories} kcal | Carbs: {snack.macros.carbs}g | 
+                            Proteínas: {snack.macros.protein}g | Gorduras: {snack.macros.fats}g
+                          </p>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
