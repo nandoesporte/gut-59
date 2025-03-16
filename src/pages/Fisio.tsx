@@ -45,22 +45,35 @@ const Fisio = () => {
       // Transform the data to match RehabPlan type using plan_data
       const transformedPlans: RehabPlan[] = (plansData || []).map(plan => {
         // Parse the plan_data if it's a string, otherwise use it as is
-        const planData = typeof plan.plan_data === 'string' 
-          ? JSON.parse(plan.plan_data) 
-          : (plan.plan_data as Record<string, any> || {});
+        let parsedData: Record<string, any> = {};
+        
+        if (plan.plan_data) {
+          if (typeof plan.plan_data === 'string') {
+            try {
+              parsedData = JSON.parse(plan.plan_data);
+            } catch (e) {
+              console.error('Error parsing plan_data:', e);
+              // If parsing fails, use an empty object
+              parsedData = {};
+            }
+          } else if (typeof plan.plan_data === 'object') {
+            // If it's already an object, use it directly
+            parsedData = plan.plan_data as Record<string, any>;
+          }
+        }
         
         return {
           id: plan.id,
           user_id: plan.user_id,
           goal: plan.goal,
-          condition: plan.condition || (planData && planData.condition),
+          condition: plan.condition || (parsedData.condition || null),
           joint_area: plan.joint_area,
           start_date: plan.start_date,
           end_date: plan.end_date,
-          overview: planData && planData.overview || "Rehabilitation plan",
-          recommendations: planData && planData.recommendations || [],
-          days: planData && planData.days || {},
-          rehab_sessions: planData && planData.rehab_sessions || []
+          overview: parsedData.overview || "Rehabilitation plan",
+          recommendations: parsedData.recommendations || [],
+          days: parsedData.days || {},
+          rehab_sessions: parsedData.rehab_sessions || []
         };
       });
 
