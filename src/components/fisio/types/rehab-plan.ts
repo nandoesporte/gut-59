@@ -8,6 +8,7 @@ export interface Exercise {
   rest_time_seconds: number;
   gifUrl?: string | null;
   notes?: string | null;
+  description?: string | null;
 }
 
 export interface RehabSession {
@@ -15,6 +16,7 @@ export interface RehabSession {
   warmup_description: string;
   cooldown_description: string;
   exercises: Exercise[];
+  notes?: string | null;
 }
 
 export interface RehabPlan {

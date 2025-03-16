@@ -208,7 +208,7 @@ serve(async (req) => {
                   name: ex.name,
                   sets: ex.sets,
                   reps: ex.reps,
-                  restTime: `${Math.floor(ex.rest_time_seconds / 60)} minutes ${ex.rest_time_seconds % 60} seconds`,
+                  restTime: `${Math.floor((ex.rest_time_seconds || 60) / 60)} minutes ${(ex.rest_time_seconds || 60) % 60} seconds`,
                   description: ex.description || ex.notes || "Perform exercise carefully with attention to technique.",
                   gifUrl: ex.gifUrl || null
                 }))
