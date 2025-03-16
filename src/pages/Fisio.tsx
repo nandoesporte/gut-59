@@ -78,9 +78,9 @@ const Fisio = () => {
 
   const handleSubmitPreferences = (data: FisioPreferences) => {
     // Set default values for fields we removed from the form
-    data.injuryDescription = "Lesão comum relacionada à área afetada";
+    data.injuryDescription = "Lesão relacionada à área afetada";
     data.injuryDuration = "Recente";
-    data.previousTreatments = "Nenhum tratamento anterior";
+    data.previousTreatments = "Nenhum tratamento anterior específico";
     data.exerciseExperience = "moderate";
     data.equipmentAvailable = ["elastic bands", "foam roller", "chair"];
     data.painLocation = data.joint_area === "shoulder" ? "Ombro" 
@@ -93,7 +93,7 @@ const Fisio = () => {
                      : "Área afetada";
     
     setPreferences(data);
-    toast.info("Gerando plano de reabilitação personalizado...");
+    toast.info("Gerando plano de reabilitação personalizado. Isso pode levar alguns instantes...");
   };
 
   return (

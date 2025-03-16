@@ -42,7 +42,7 @@ serve(async (req) => {
     
     // Format the prompt for the Groq API
     const prompt = createRehabPlanPrompt(preferences);
-    console.log("Sending request to Groq API");
+    console.log("Sending request to Groq API with model: llama3-70b-8192");
     
     try {
       // Make request to Groq API
@@ -53,7 +53,7 @@ serve(async (req) => {
           "Authorization": `Bearer ${GROQ_API_KEY}`
         },
         body: JSON.stringify({
-          model: "llama3-70b-8192",
+          model: "llama3-70b-8192",  // Corrected model name
           messages: [
             {
               role: "system",
