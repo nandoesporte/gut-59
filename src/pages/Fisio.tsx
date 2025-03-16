@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { useState } from 'react';
 import { FisioPreferences } from '@/components/fisio/types';
@@ -47,7 +46,7 @@ const Fisio = () => {
         start_date: plan.start_date,
         end_date: plan.end_date,
         created_at: plan.created_at,
-        plan_data: plan.plan_data,
+        plan_data: plan.plan_data || null,
         rehab_sessions: (plan.rehab_sessions || []).map((session: any) => ({
           day_number: session.day_number,
           warmup_description: session.warmup_description,
