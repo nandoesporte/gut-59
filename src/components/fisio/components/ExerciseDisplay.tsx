@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Dumbbell, Clock, Stretch, Move } from 'lucide-react';
+import { Dumbbell, Clock, Activity, Move } from 'lucide-react';
 
 interface ExerciseDisplayProps {
   name: string;
@@ -28,7 +28,7 @@ export const ExerciseDisplay = ({
   const getExerciseIcon = () => {
     switch (exerciseType?.toLowerCase()) {
       case 'stretching':
-        return <Stretch className="w-4 h-4 text-yellow-500" />;
+        return <Activity className="w-4 h-4 text-yellow-500" />;
       case 'mobility':
         return <Move className="w-4 h-4 text-blue-500" />;
       case 'strength':
