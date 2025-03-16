@@ -377,7 +377,7 @@ serve(async (req) => {
             joint_area: preferences.joint_area,
             start_date: new Date().toISOString(),
             end_date: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString(), // 28 days later
-            plan_data: planData  // Now using the plan_data column we just added
+            plan_data: planData  // Now correctly using the planData that was defined above
           });
 
         if (insertError) {
