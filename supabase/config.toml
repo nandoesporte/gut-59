@@ -16,4 +16,5 @@ verify_jwt = false
 [functions.create-mercadopago-preference]
 verify_jwt = false
 
-# Adding a priority comment to keep this part of config.toml the same as in the original file
+# Remove unused edge functions or merge functionality to stay within limits
+# Current error: Max number of functions reached for project
