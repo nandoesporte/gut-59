@@ -1,323 +1,344 @@
 
-import * as React from 'react';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import * as z from 'zod';
-import { Button } from '@/components/ui/button';
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Slider } from '@/components/ui/slider';
-import { FisioPreferences, JointArea, RehabGoal } from './types';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
+import * as React from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+import { Form } from "@/components/ui/form";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { SelectCard } from "@/components/workout/components/SelectCard";
+import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
+import { FisioPreferences, JointArea } from "./types";
+import { Stethoscope, ArrowRight, CreditCard } from "lucide-react";
+import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { usePaymentHandling } from "@/components/menu/hooks/usePaymentHandling";
+import { toast } from "sonner";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 const formSchema = z.object({
-  joint_area: z.string().min(2, { message: 'Por favor, selecione uma área articular' }),
-  condition: z.string().optional(),
-  pain_level: z.coerce.number().min(0).max(10).optional(),
-  mobility_level: z.string().optional(),
-  goal: z.string().optional(),
-});
+  age: z.number().min(16, "Idade mínima é 16 anos").max(100, "Idade máxima é 100 anos"),
+  weight: z.number().min(30, "Peso mínimo é 30kg").max(200, "Peso máximo é 200kg"),
+  height: z.number().min(100, "Altura mínima é 100cm").max(250, "Altura máxima é 250cm"),
+  gender: z.enum(["male", "female"]),
+  joint_area: z.enum([
+    "ankle_foot", "leg", "knee", "hip", "spine", "shoulder", "elbow_hand"
+  ] as const),
+  pain_level: z.number().min(0).max(10),
+  mobility_level: z.enum(["limited", "moderate", "good"]),
+  previous_treatment: z.boolean(),
+  activity_level: z.enum(["sedentary", "light", "moderate", "active"])
+}).required();
 
-interface FisioPreferencesFormProps {
+type FormData = z.infer<typeof formSchema>;
+
+const jointAreaOptions: Record<JointArea, string> = {
+  ankle_foot: "Tornozelo e Pé",
+  leg: "Perna",
+  knee: "Joelho",
+  hip: "Quadril",
+  spine: "Coluna",
+  shoulder: "Ombro",
+  elbow_hand: "Cotovelo e Mão"
+};
+
+interface PreferencesFormProps {
   onSubmit: (data: FisioPreferences) => void;
 }
 
-const jointAreas = [
-  { value: 'knee', label: 'Joelho' },
-  { value: 'shoulder', label: 'Ombro' },
-  { value: 'ankle_foot', label: 'Tornozelo/Pé' },
-  { value: 'back', label: 'Coluna' },
-  { value: 'hip', label: 'Quadril' },
-  { value: 'elbow', label: 'Cotovelo' },
-  { value: 'wrist', label: 'Pulso' },
-  { value: 'neck', label: 'Pescoço' },
-];
-
-const kneeConditions = [
-  { value: 'acl_tear', label: 'Lesão do Ligamento Cruzado Anterior (LCA)' },
-  { value: 'meniscus_tear', label: 'Lesão de Menisco' },
-  { value: 'patellofemoral', label: 'Síndrome Patelofemoral' },
-  { value: 'osteoarthritis', label: 'Osteoartrite' },
-  { value: 'tendinitis', label: 'Tendinite Patelar' },
-  { value: 'post_surgery', label: 'Pós-Cirurgia' },
-  { value: 'general', label: 'Recuperação Geral' },
-];
-
-const shoulderConditions = [
-  { value: 'rotator_cuff', label: 'Lesão do Manguito Rotador' },
-  { value: 'impingement', label: 'Síndrome do Impacto' },
-  { value: 'frozen_shoulder', label: 'Capsulite Adesiva (Ombro Congelado)' },
-  { value: 'dislocation', label: 'Instabilidade/Luxação' },
-  { value: 'general', label: 'Recuperação Geral' },
-];
-
-const ankleFootConditions = [
-  { value: 'sprain', label: 'Entorse de Tornozelo' },
-  { value: 'plantar_fasciitis', label: 'Fascite Plantar' },
-  { value: 'achilles_tendinitis', label: 'Tendinite de Aquiles' },
-  { value: 'general', label: 'Recuperação Geral' },
-];
-
-const backConditions = [
-  { value: 'lumbar_strain', label: 'Lombalgia' },
-  { value: 'disc_herniation', label: 'Hérnia de Disco' },
-  { value: 'sciatica', label: 'Ciática' },
-  { value: 'scoliosis', label: 'Escoliose' },
-  { value: 'general', label: 'Recuperação Geral' },
-];
-
-const hipConditions = [
-  { value: 'osteoarthritis', label: 'Osteoartrite' },
-  { value: 'impingement', label: 'Síndrome do Impacto Femoroacetabular' },
-  { value: 'bursitis', label: 'Bursite' },
-  { value: 'labral_tear', label: 'Lesão Labral' },
-  { value: 'general', label: 'Recuperação Geral' },
-];
-
-const elbowConditions = [
-  { value: 'tennis_elbow', label: 'Epicondilite Lateral (Cotovelo de Tenista)' },
-  { value: 'golfers_elbow', label: 'Epicondilite Medial (Cotovelo de Golfista)' },
-  { value: 'ucl_injury', label: 'Lesão do Ligamento Colateral Ulnar' },
-  { value: 'general', label: 'Recuperação Geral' },
-];
-
-const wristConditions = [
-  { value: 'carpal_tunnel', label: 'Síndrome do Túnel do Carpo' },
-  { value: 'tendinitis', label: 'Tendinite de De Quervain' },
-  { value: 'sprain', label: 'Entorse de Pulso' },
-  { value: 'general', label: 'Recuperação Geral' },
-];
-
-const neckConditions = [
-  { value: 'strain', label: 'Tensão Cervical' },
-  { value: 'herniated_disc', label: 'Hérnia de Disco Cervical' },
-  { value: 'whiplash', label: 'Lesão em Chicote' },
-  { value: 'general', label: 'Recuperação Geral' },
-];
-
-const goals = [
-  { value: 'pain_relief', label: 'Alívio da Dor' },
-  { value: 'mobility', label: 'Melhorar Mobilidade' },
-  { value: 'strength', label: 'Aumentar Força' },
-  { value: 'function', label: 'Restaurar Função' },
-  { value: 'return_to_sport', label: 'Retorno aos Esportes' },
-  { value: 'prevent_injury', label: 'Prevenir Lesões' },
-];
-
-const mobilityLevels = [
-  { value: 'minimal', label: 'Mínima - Movimentos muito limitados' },
-  { value: 'limited', label: 'Limitada - Alguns movimentos possíveis com dor' },
-  { value: 'moderate', label: 'Moderada - Movimentos razoáveis com alguma dor' },
-  { value: 'good', label: 'Boa - Movimento quase normal com pouca dor' },
-  { value: 'full', label: 'Completa - Movimento normal sem dor' },
-];
-
-export function FisioPreferencesForm({ onSubmit }: FisioPreferencesFormProps) {
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      joint_area: '',
-      condition: undefined,
-      pain_level: 5,
-      mobility_level: 'moderate',
-      goal: 'pain_relief',
-    },
-  });
-
-  const watchJointArea = form.watch('joint_area');
+export const FisioPreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = React.useState(false);
+  const [formData, setFormData] = React.useState<FormData | null>(null);
+  const [isPaymentEnabled, setIsPaymentEnabled] = useState(false);
   
-  // Função para obter as condições específicas para a área articular selecionada
-  const getConditionsForJointArea = (jointArea: string | undefined) => {
-    switch (jointArea) {
-      case 'knee':
-        return kneeConditions;
-      case 'shoulder':
-        return shoulderConditions;
-      case 'ankle_foot':
-        return ankleFootConditions;
-      case 'back':
-        return backConditions;
-      case 'hip':
-        return hipConditions;
-      case 'elbow':
-        return elbowConditions;
-      case 'wrist':
-        return wristConditions;
-      case 'neck':
-        return neckConditions;
-      default:
-        return [];
+  const {
+    isProcessingPayment,
+    hasPaid,
+    currentPrice,
+    handlePaymentAndContinue
+  } = usePaymentHandling('rehabilitation');
+
+  useEffect(() => {
+    checkPaymentSettings();
+  }, []);
+
+  const checkPaymentSettings = async () => {
+    try {
+      const { data: settings, error } = await supabase
+        .from('payment_settings')
+        .select('is_active')
+        .eq('plan_type', 'rehabilitation')
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error checking payment settings:', error);
+        return;
+      }
+
+      // Set payment enabled based on the retrieved setting
+      setIsPaymentEnabled(settings?.is_active ?? false);
+      console.log('Rehabilitation payment setting:', settings?.is_active);
+    } catch (error) {
+      console.error('Error checking payment settings:', error);
     }
   };
 
-  function handleSubmit(values: z.infer<typeof formSchema>) {
-    onSubmit(values as FisioPreferences);
-  }
+  const form = useForm<FormData>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      age: 30,
+      weight: 70,
+      height: 170,
+      gender: "male",
+      joint_area: "knee",
+      pain_level: 5,
+      mobility_level: "moderate",
+      previous_treatment: false,
+      activity_level: "moderate"
+    }
+  });
+
+  const handleSubmit = async (data: FormData) => {
+    // Skip payment dialog if payment is not enabled
+    if (!isPaymentEnabled || hasPaid) {
+      try {
+        const preferences: FisioPreferences = {
+          age: data.age,
+          weight: data.weight,
+          height: data.height,
+          gender: data.gender,
+          joint_area: data.joint_area,
+          // Set a default condition based on the joint area
+          condition: getDefaultCondition(data.joint_area),
+          pain_level: data.pain_level,
+          mobility_level: data.mobility_level,
+          previous_treatment: data.previous_treatment,
+          activity_level: data.activity_level
+        };
+        
+        toast.info("Gerando seu plano de reabilitação personalizado...");
+        onSubmit(preferences);
+      } catch (error: any) {
+        console.error("Erro ao processar formulário:", error);
+        toast.error(error.message || "Erro ao processar suas preferências. Por favor, tente novamente.");
+      }
+      return;
+    }
+
+    // Only proceed to payment if payment is enabled
+    setFormData(data);
+    setIsPaymentDialogOpen(true);
+  };
+
+  // Function to get a default condition based on the joint area
+  const getDefaultCondition = (jointArea: JointArea) => {
+    switch (jointArea) {
+      case "ankle_foot": return "ankle_sprain";
+      case "leg": return "shin_splints";
+      case "knee": return "patellofemoral";
+      case "hip": return "trochanteric_bursitis";
+      case "spine": return "disc_protrusion";
+      case "shoulder": return "rotator_cuff";
+      case "elbow_hand": return "lateral_epicondylitis";
+      default: return "patellofemoral";
+    }
+  };
+
+  const handlePaymentProcess = async () => {
+    try {
+      await handlePaymentAndContinue();
+      if (formData) {
+        await handleSubmit(formData);
+      }
+      setIsPaymentDialogOpen(false);
+    } catch (error) {
+      console.error("Erro no processo de pagamento:", error);
+      toast.error("Erro ao processar pagamento. Por favor, tente novamente.");
+    }
+  };
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="text-2xl">Preferências de Reabilitação</CardTitle>
-        <CardDescription>
-          Personalize seu plano de reabilitação respondendo as perguntas abaixo
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="joint_area"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Área Articular</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione a área articular" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {jointAreas.map((area) => (
-                        <SelectItem key={area.value} value={area.value}>
-                          {area.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    A área principal que precisa de reabilitação
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+    <>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+          <Card className="overflow-hidden border-none shadow-lg">
+            <CardHeader className="border-b bg-primary/5 p-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Stethoscope className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold">Informações para seu Plano</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Preencha os dados abaixo para gerar seu plano personalizado
+                  </p>
+                </div>
+              </div>
+            </CardHeader>
+            
+            <CardContent className="p-6 space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormField
+                  control={form.control}
+                  name="age"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Idade</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          {...field}
+                          onChange={(e) => field.onChange(Number(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="gender"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Gênero</FormLabel>
+                      <div className="grid grid-cols-2 gap-4">
+                        <SelectCard
+                          selected={field.value === "male"}
+                          onClick={() => field.onChange("male")}
+                        >
+                          <span className="text-lg">Masculino</span>
+                        </SelectCard>
+                        <SelectCard
+                          selected={field.value === "female"}
+                          onClick={() => field.onChange("female")}
+                        >
+                          <span className="text-lg">Feminino</span>
+                        </SelectCard>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-            {watchJointArea && (
               <FormField
                 control={form.control}
-                name="condition"
+                name="joint_area"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Condição Específica</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione a condição específica" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {getConditionsForJointArea(watchJointArea).map((condition) => (
-                          <SelectItem key={condition.value} value={condition.value}>
-                            {condition.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>
-                      Sua condição específica para este plano de reabilitação
-                    </FormDescription>
+                    <FormLabel>Área Afetada</FormLabel>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                      {Object.entries(jointAreaOptions).map(([value, label]) => (
+                        <SelectCard
+                          key={value}
+                          selected={field.value === value}
+                          onClick={() => field.onChange(value)}
+                        >
+                          <span className="text-lg">{label}</span>
+                        </SelectCard>
+                      ))}
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            )}
 
-            <FormField
-              control={form.control}
-              name="pain_level"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nível de Dor (0-10)</FormLabel>
-                  <FormControl>
-                    <div className="space-y-2">
-                      <Slider
-                        min={0}
-                        max={10}
-                        step={1}
-                        defaultValue={[field.value || 5]}
-                        onValueChange={(vals) => field.onChange(vals[0])}
-                      />
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Sem Dor (0)</span>
-                        <span>Dor Moderada (5)</span>
-                        <span>Dor Severa (10)</span>
+              <FormField
+                control={form.control}
+                name="pain_level"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nível de Dor (0-10)</FormLabel>
+                    <FormControl>
+                      <div className="space-y-3">
+                        <Slider
+                          min={0}
+                          max={10}
+                          step={1}
+                          value={[field.value]}
+                          onValueChange={(value) => field.onChange(value[0])}
+                          className="w-full"
+                        />
+                        <div className="flex justify-between text-xs text-gray-500">
+                          <span>Sem dor</span>
+                          <span>Dor máxima</span>
+                        </div>
                       </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="activity_level"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nível de Atividade</FormLabel>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {[
+                        { value: "sedentary", label: "Sedentário" },
+                        { value: "light", label: "Leve" },
+                        { value: "moderate", label: "Moderado" },
+                        { value: "active", label: "Ativo" }
+                      ].map(({ value, label }) => (
+                        <SelectCard
+                          key={value}
+                          selected={field.value === value}
+                          onClick={() => field.onChange(value)}
+                        >
+                          <span className="text-lg">{label}</span>
+                        </SelectCard>
+                      ))}
                     </div>
-                  </FormControl>
-                  <FormDescription>
-                    Avalie seu nível de dor atual na escala de 0 a 10
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="mobility_level"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nível de Mobilidade</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione seu nível de mobilidade" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {mobilityLevels.map((level) => (
-                        <SelectItem key={level.value} value={level.value}>
-                          {level.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    Seu nível atual de mobilidade na área afetada
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <Button 
+                type="submit" 
+                className="w-full"
+                size="lg"
+                disabled={isProcessingPayment}
+              >
+                Gerar Plano de Reabilitação
+                {!isProcessingPayment && <ArrowRight className="w-5 h-5 ml-2" />}
+                {isProcessingPayment && (
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white ml-2" />
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        </form>
+      </Form>
 
-            <FormField
-              control={form.control}
-              name="goal"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Objetivo Principal</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione seu objetivo principal" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {goals.map((goal) => (
-                        <SelectItem key={goal.value} value={goal.value}>
-                          {goal.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    O principal objetivo que você deseja alcançar com este plano
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <Button type="submit" className="w-full">Gerar Plano de Reabilitação</Button>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+      <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Pagamento do Plano de Reabilitação</DialogTitle>
+            <DialogDescription>
+              Para gerar seu plano de reabilitação personalizado, é necessário realizar o pagamento.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Valor: R$ {currentPrice.toFixed(2)}
+            </p>
+            <Button 
+              onClick={handlePaymentProcess} 
+              className="w-full"
+              disabled={isProcessingPayment}
+            >
+              <CreditCard className="w-4 h-4 mr-2" />
+              {isProcessingPayment ? "Processando..." : "Realizar Pagamento"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
-}
+};

@@ -7,7 +7,6 @@ import type { RehabPlan } from "../types/rehab-plan";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState } from "react";
-import { formatImageUrl } from "@/utils/imageUtils";
 
 interface FisioHistoryViewProps {
   isLoading: boolean;
@@ -33,7 +32,7 @@ export const FisioHistoryView = ({ isLoading, historyPlans = [], onRefresh }: Fi
         await onRefresh();
       }
     } catch (error) {
-      console.error('Erro ao excluir plano:', error);
+      console.error('Error deleting plan:', error);
       toast.error("Erro ao excluir plano");
     } finally {
       setDeletingIds(prev => {
@@ -145,7 +144,7 @@ export const FisioHistoryView = ({ isLoading, historyPlans = [], onRefresh }: Fi
                                     {exercise.gifUrl && (
                                       <div className="w-full md:w-40 h-40 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                                         <img 
-                                          src={formatImageUrl(exercise.gifUrl)} 
+                                          src={exercise.gifUrl} 
                                           alt={exercise.name}
                                           className="w-full h-full object-cover"
                                           loading="lazy"
@@ -194,7 +193,7 @@ export const FisioHistoryView = ({ isLoading, historyPlans = [], onRefresh }: Fi
                                   {exercise.gifUrl && (
                                     <div className="w-full md:w-40 h-40 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                                       <img 
-                                        src={formatImageUrl(exercise.gifUrl)} 
+                                        src={exercise.gifUrl} 
                                         alt={exercise.name}
                                         className="w-full h-full object-cover"
                                         loading="lazy"
