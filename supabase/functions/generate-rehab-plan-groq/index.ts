@@ -83,6 +83,7 @@ serve(async (req) => {
     const jointArea = preferences.joint_area || 'knee';
     const mobilityLevel = preferences.mobility_level || 'moderate';
     const activityLevel = preferences.activity_level || 'moderate';
+    const rehabGoal = 'pain_relief'; // Default goal for rehab
 
     // Get base prompt from Fisio+ agent
     let promptTemplate = promptData.prompt;
@@ -238,6 +239,9 @@ serve(async (req) => {
       // Add plan_data property for database storage
       const plan_data = structuredClone(rehabPlan);
       
+      // Set condition property using preferences
+      rehabPlan.condition = preferences.condition || "General rehabilitation";
+      
       // Ensure days structure exists for display component
       if (!rehabPlan.days) {
         console.log("Creating days structure from rehab sessions");
@@ -323,7 +327,7 @@ serve(async (req) => {
           .from('rehab_plans')
           .insert({
             user_id: userData.id,
-            goal: preferences.goal || 'pain_relief',
+            goal: rehabGoal,
             condition: preferences.condition,
             joint_area: preferences.joint_area,
             start_date: new Date().toISOString(),
