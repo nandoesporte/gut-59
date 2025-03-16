@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -129,13 +130,15 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
           console.error('Error checking plan counts:', countError);
         }
 
-        const { data: paymentSettings } = await supabase
+        // Simplify the query to avoid excessive type nesting
+        const { data } = await supabase
           .from('payment_settings')
           .select('is_active')
           .eq('setting_name', 'payment_enabled')
           .single();
           
-        const paymentGloballyEnabled = paymentSettings?.is_active ?? true;
+        // Use a simple boolean assignment instead of conditional expressions
+        const paymentGloballyEnabled = data ? data.is_active : true;
         
         console.log('Payment globally enabled:', paymentGloballyEnabled);
         
