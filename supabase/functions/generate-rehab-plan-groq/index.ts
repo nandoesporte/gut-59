@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { supabaseClient } from "../_shared/supabase-client.ts";
 import { corsHeaders } from "../_shared/cors.ts";
@@ -282,7 +281,7 @@ serve(async (req) => {
       console.log("Converting plan data to display format");
       
       // Add plan_data property for database storage
-      const plan_data = structuredClone(rehabPlan);
+      const planData = structuredClone(rehabPlan);
       
       // Set condition property using preferences
       rehabPlan.condition = preferences.condition || "General rehabilitation";
@@ -377,7 +376,7 @@ serve(async (req) => {
             joint_area: preferences.joint_area,
             start_date: new Date().toISOString(),
             end_date: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString(), // 28 days later
-            plan_data: rehabPlan
+            plan_data: rehabPlan  // Now using the plan_data column we just added
           });
 
         if (insertError) {

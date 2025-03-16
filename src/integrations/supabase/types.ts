@@ -1566,6 +1566,7 @@ export type Database = {
           goal: Database["public"]["Enums"]["rehab_goal"]
           id: string
           joint_area: Database["public"]["Enums"]["joint_area"]
+          plan_data: Json | null
           start_date: string
           updated_at: string
           user_id: string
@@ -1577,6 +1578,7 @@ export type Database = {
           goal: Database["public"]["Enums"]["rehab_goal"]
           id?: string
           joint_area: Database["public"]["Enums"]["joint_area"]
+          plan_data?: Json | null
           start_date?: string
           updated_at?: string
           user_id: string
@@ -1588,6 +1590,7 @@ export type Database = {
           goal?: Database["public"]["Enums"]["rehab_goal"]
           id?: string
           joint_area?: Database["public"]["Enums"]["joint_area"]
+          plan_data?: Json | null
           start_date?: string
           updated_at?: string
           user_id?: string
