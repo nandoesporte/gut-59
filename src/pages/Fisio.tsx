@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { useState } from 'react';
 import { FisioPreferences } from '@/components/fisio/types';
@@ -40,7 +39,7 @@ const Fisio = () => {
       if (error) throw error;
 
       // Transform the data to match RehabPlan type
-      const transformedPlans: RehabPlan[] = (plansData || []).map(plan => ({
+      const transformedPlans: RehabPlan[] = (plansData || []).map((plan: any) => ({
         id: plan.id,
         user_id: plan.user_id,
         goal: plan.goal,
@@ -48,8 +47,8 @@ const Fisio = () => {
         start_date: plan.start_date,
         end_date: plan.end_date,
         created_at: plan.created_at,
-        // Explicitly include plan_data with a fallback to null if it doesn't exist
-        plan_data: plan.plan_data || {},
+        // Create an empty object for plan_data if it doesn't exist in the original data
+        plan_data: typeof plan.plan_data === 'undefined' ? {} : plan.plan_data,
         rehab_sessions: (plan.rehab_sessions || []).map((session: any) => ({
           day_number: session.day_number,
           warmup_description: session.warmup_description,
