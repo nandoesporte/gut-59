@@ -9,6 +9,9 @@ export interface Exercise {
   gifUrl?: string | null;
   notes?: string | null;
   description?: string | null;
+  exercise_id?: string | null;
+  difficulty?: string | null;
+  exerciseType?: string | null;
 }
 
 export interface RehabSession {

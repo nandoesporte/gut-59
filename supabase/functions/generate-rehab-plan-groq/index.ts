@@ -45,6 +45,35 @@ serve(async (req) => {
 
     console.log("Prompt found:", promptData.name);
 
+    // Fetch relevant exercises from the database based on joint area
+    const { data: exercises, error: exercisesError } = await supabase
+      .from('physio_exercises')
+      .select('*')
+      .eq('joint_area', preferences.joint_area)
+      .order('name');
+
+    if (exercisesError) {
+      console.error("Error fetching exercises:", exercisesError);
+      throw new Error("Failed to fetch exercises from database");
+    }
+
+    console.log(`Found ${exercises?.length || 0} exercises for joint area: ${preferences.joint_area}`);
+
+    // If no specific exercises found for the joint area, get some general exercises
+    let relevantExercises = exercises;
+    if (!relevantExercises || relevantExercises.length < 3) {
+      console.log("Insufficient joint-specific exercises, fetching general exercises");
+      const { data: generalExercises, error: generalError } = await supabase
+        .from('physio_exercises')
+        .select('*')
+        .limit(10);
+      
+      if (!generalError && generalExercises) {
+        relevantExercises = generalExercises;
+        console.log(`Using ${generalExercises.length} general exercises`);
+      }
+    }
+
     // Prepare user data for prompt
     const painLevel = preferences.pain_level ? `Pain level: ${preferences.pain_level}/10` : 'Pain level not informed';
     const userWeight = userData?.weight || preferences.weight || 70;
@@ -74,6 +103,21 @@ serve(async (req) => {
     Object.entries(contextData).forEach(([key, value]) => {
       promptTemplate = promptTemplate.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
     });
+
+    // Add exercise information to the prompt
+    const exerciseInfo = relevantExercises.map(ex => ({
+      id: ex.id,
+      name: ex.name,
+      joint_area: ex.joint_area,
+      difficulty: ex.difficulty,
+      description: ex.description,
+      exercise_type: ex.exercise_type,
+      gif_url: ex.gif_url
+    }));
+
+    // Append exercise data to prompt
+    promptTemplate += `\n\nPlease use ONLY the following exercises from our database in your rehabilitation plan. Include their IDs to ensure proper tracking:\n${JSON.stringify(exerciseInfo, null, 2)}`;
+    promptTemplate += `\n\nEnsure your response includes these specific exercises with their exact IDs, sets, reps, and rest times.`;
 
     console.log("Sending prompt to llama3-8b-8192 model");
 
@@ -165,6 +209,29 @@ serve(async (req) => {
         throw new Error("Invalid response format");
       }
 
+      // Enhance the plan with actual exercise data from our database
+      if (rehabPlan.rehab_sessions && Array.isArray(rehabPlan.rehab_sessions)) {
+        for (const session of rehabPlan.rehab_sessions) {
+          if (session.exercises && Array.isArray(session.exercises)) {
+            for (const exercise of session.exercises) {
+              // Check if exercise has an ID reference
+              if (exercise.exercise_id) {
+                // Find the matching exercise in our database
+                const dbExercise = relevantExercises.find(e => e.id === exercise.exercise_id);
+                if (dbExercise) {
+                  // Enhance the exercise with database data
+                  exercise.name = dbExercise.name;
+                  exercise.description = dbExercise.description;
+                  exercise.gifUrl = dbExercise.gif_url;
+                  exercise.exerciseType = dbExercise.exercise_type;
+                  exercise.difficulty = dbExercise.difficulty;
+                }
+              }
+            }
+          }
+        }
+      }
+
       // Transform plan data to a consistent format
       console.log("Converting plan data to display format");
       
@@ -191,7 +258,7 @@ serve(async (req) => {
                   sets: ex.sets,
                   reps: ex.reps,
                   restTime: `${Math.floor(ex.rest_time_seconds / 60)} minutes ${ex.rest_time_seconds % 60} seconds`,
-                  description: ex.notes || "Perform exercise carefully with attention to technique.",
+                  description: ex.description || "Perform exercise carefully with attention to technique.",
                   gifUrl: ex.gifUrl || null
                 }))
               }]
