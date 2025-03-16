@@ -130,15 +130,15 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
           console.error('Error checking plan counts:', countError);
         }
 
-        // Simplify the query to avoid excessive type nesting
-        const { data } = await supabase
+        // Fixed approach: Explicitly define the return type and use maybeSingle
+        const { data, error: settingsError } = await supabase
           .from('payment_settings')
           .select('is_active')
           .eq('setting_name', 'payment_enabled')
-          .single();
+          .maybeSingle();
           
-        // Use a simple boolean assignment instead of conditional expressions
-        const paymentGloballyEnabled = data ? data.is_active : true;
+        // Set a default value directly without complex conditional
+        const paymentGloballyEnabled = data?.is_active ?? true;
         
         console.log('Payment globally enabled:', paymentGloballyEnabled);
         
