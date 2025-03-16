@@ -75,7 +75,9 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
         throw new Error('Nenhum dado retornado pelo gerador de plano de reabilitação');
       }
       
-      setPlan(response.data);
+      // Make sure we have the exercises data properly formatted 
+      const processedPlan = processRehabPlan(response.data);
+      setPlan(processedPlan);
       
     } catch (error) {
       console.error('Erro ao gerar plano de reabilitação:', error);
@@ -98,6 +100,120 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Process the rehab plan to ensure we have all required data properly formatted
+  const processRehabPlan = (data: any): RehabPlan => {
+    console.log('Processando dados do plano de reabilitação:', data);
+    
+    // Create a properly formatted plan
+    const processedPlan: RehabPlan = {
+      id: data.id || crypto.randomUUID(),
+      user_id: data.user_id || '',
+      goal: data.goal || 'pain_relief',
+      condition: data.condition || '',
+      joint_area: data.joint_area || preferences.joint_area,
+      start_date: data.start_date || new Date().toISOString(),
+      end_date: data.end_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      overview: data.overview || 'Plano de reabilitação personalizado para sua condição',
+      recommendations: data.recommendations || [],
+      days: {},
+      rehab_sessions: data.rehab_sessions || []
+    };
+    
+    // Handle days structure from API
+    if (data.days && Object.keys(data.days).length > 0) {
+      processedPlan.days = data.days;
+    } else {
+      console.log('Construindo estrutura de dias a partir dos dados disponíveis');
+      
+      // Build days from rehab_sessions if available
+      if (data.rehab_sessions && data.rehab_sessions.length > 0) {
+        processedPlan.days = {};
+        
+        data.rehab_sessions.forEach((session: any, index: number) => {
+          const dayKey = `day${index + 1}`;
+          processedPlan.days[dayKey] = {
+            notes: `Dia ${index + 1} - Exercícios de reabilitação`,
+            exercises: [{
+              title: "Exercícios de Reabilitação",
+              exercises: (session.exercises || []).map((ex: any) => ({
+                name: ex.name,
+                sets: ex.sets || 3,
+                reps: ex.reps || 10,
+                rest_time_seconds: ex.rest_time_seconds || 60,
+                restTime: ex.restTime || `${Math.floor((ex.rest_time_seconds || 60) / 60)}:${(ex.rest_time_seconds || 60) % 60 < 10 ? '0' : ''}${(ex.rest_time_seconds || 60) % 60}`,
+                gifUrl: ex.gifUrl || null,
+                description: ex.description || null,
+                notes: ex.notes || null,
+                difficulty: ex.difficulty || null
+              }))
+            }]
+          };
+        });
+      } 
+      // Build days from exercises if available but no rehab_sessions
+      else if (data.exercises && data.exercises.length > 0) {
+        processedPlan.days = {
+          day1: {
+            notes: "Exercícios de reabilitação",
+            exercises: [{
+              title: "Exercícios Recomendados",
+              exercises: data.exercises.map((ex: any) => ({
+                name: ex.name || "Exercício",
+                sets: ex.sets || 3,
+                reps: ex.reps || 10,
+                rest_time_seconds: ex.rest_time_seconds || 60,
+                restTime: ex.restTime || `${Math.floor((ex.rest_time_seconds || 60) / 60)}:${(ex.rest_time_seconds || 60) % 60 < 10 ? '0' : ''}${(ex.rest_time_seconds || 60) % 60}`,
+                gifUrl: ex.gifUrl || null,
+                description: ex.description || null,
+                notes: ex.notes || null,
+                difficulty: ex.difficulty || null
+              }))
+            }]
+          }
+        };
+      } 
+      // If we have exercises inside patient object 
+      else if (data.rehabilitationPlan && data.rehabilitationPlan.exercises && data.rehabilitationPlan.exercises.length > 0) {
+        processedPlan.days = {
+          day1: {
+            notes: "Exercícios de reabilitação",
+            exercises: [{
+              title: "Exercícios Recomendados",
+              exercises: data.rehabilitationPlan.exercises.map((ex: any) => ({
+                name: ex.name || "Exercício " + (ex.id || ""),
+                sets: ex.sets || 3,
+                reps: ex.repetitions || ex.reps || 10,
+                rest_time_seconds: ex.rest_time_seconds || 60,
+                restTime: ex.restTime || `${Math.floor((ex.rest_time_seconds || 60) / 60)}:${(ex.rest_time_seconds || 60) % 60 < 10 ? '0' : ''}${(ex.rest_time_seconds || 60) % 60}`,
+                gifUrl: ex.gifUrl || null,
+                description: ex.description || null,
+                notes: ex.notes || null,
+                difficulty: ex.difficulty || null,
+                exercise_id: ex.id || null
+              }))
+            }]
+          }
+        };
+      }
+      // Default empty structure
+      else {
+        processedPlan.days = {
+          day1: {
+            notes: "Plano de reabilitação padrão",
+            exercises: [{
+              title: "Exercícios Recomendados",
+              exercises: []
+            }]
+          }
+        };
+      }
+    }
+    
+    console.log('Plano processado:', processedPlan);
+    
+    return processedPlan;
   };
 
   const handleRetry = () => {
@@ -130,17 +246,21 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
         console.error('Erro ao verificar contagens de plano:', countError);
       }
 
-      const { data: paymentSettingData, error: paymentSettingError } = await supabase
-        .rpc('get_payment_setting', { setting_name_param: 'payment_enabled' });
-      
-      if (paymentSettingError) {
-        console.error('Erro ao buscar configurações de pagamento:', paymentSettingError);
-        console.log('Configuração de pagamento de reabilitação: false');
-      } else {
-        console.log('Configuração de pagamento de reabilitação:', paymentSettingData);
+      // Try to get payment setting, if it fails, log the error but continue
+      let paymentGloballyEnabled = true;
+      try {
+        const { data: paymentSettingData, error: paymentSettingError } = await supabase
+          .rpc('get_payment_setting', { setting_name_param: 'payment_enabled' });
+        
+        if (paymentSettingError) {
+          console.error('Erro ao buscar configurações de pagamento:', paymentSettingError);
+        } else {
+          console.log('Configuração de pagamento de reabilitação:', paymentSettingData);
+          paymentGloballyEnabled = paymentSettingData === null ? true : paymentSettingData;
+        }
+      } catch (error) {
+        console.error('Erro ao buscar configurações de pagamento:', error);
       }
-      
-      const paymentGloballyEnabled = paymentSettingData === null ? true : paymentSettingData;
       
       console.log('Pagamento globalmente ativado:', paymentGloballyEnabled);
       
@@ -202,6 +322,7 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
                     alt={exercise.name || 'Exercício'} 
                     className="h-48 object-contain"
                     onError={(e) => {
+                      console.log('Erro ao carregar imagem:', exercise.gifUrl);
                       (e.target as HTMLImageElement).src = '/placeholder.svg';
                     }}
                   />
@@ -364,43 +485,21 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
     );
   }
 
-  const days = plan.days || {};
-  const dayKeys = Object.keys(days).sort((a, b) => {
-    const aNum = parseInt(a.replace('day', ''));
-    const bNum = parseInt(b.replace('day', ''));
-    return aNum - bNum;
-  });
-
-  if (dayKeys.length === 0 && plan.rehab_sessions && plan.rehab_sessions.length > 0) {
-    console.log('Criando estrutura de dias a partir de sessões de reabilitação');
-    plan.days = {};
-    
-    plan.rehab_sessions.forEach((session, index) => {
-      const dayKey = `day${index + 1}`;
-      plan.days[dayKey] = {
-        notes: `Exercícios do Dia ${index + 1}`,
-        exercises: [{
-          title: "Sessão de Reabilitação",
-          exercises: session.exercises || []
-        }]
-      };
-    });
-  }
-
+  // Ensure we have days structure
   if (!plan.days || Object.keys(plan.days).length === 0) {
-    console.log('Criando estrutura de plano alternativa');
+    console.log('Plano não tem estrutura de dias válida:', plan);
     plan.days = {
       day1: {
         notes: "Exercícios de reabilitação padrão",
         exercises: [{
-          title: "Exercícios",
-          exercises: plan.exercises || []
+          title: "Exercícios Recomendados",
+          exercises: []
         }]
       }
     };
   }
-  
-  const updatedDayKeys = Object.keys(plan.days || {}).sort((a, b) => {
+
+  const dayKeys = Object.keys(plan.days).sort((a, b) => {
     const aNum = parseInt(a.replace('day', ''));
     const bNum = parseInt(b.replace('day', ''));
     return aNum - bNum;
@@ -428,7 +527,7 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
             <BookOpen className="h-4 w-4 mr-2" />
             Visão Geral
           </TabsTrigger>
-          {updatedDayKeys.map((day) => (
+          {dayKeys.map((day) => (
             <TabsTrigger 
               key={day} 
               value={day}
@@ -490,7 +589,7 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
           )}
         </TabsContent>
 
-        {updatedDayKeys.map((day) => {
+        {dayKeys.map((day) => {
           const dayData = plan.days?.[day];
           if (!dayData) return null;
           

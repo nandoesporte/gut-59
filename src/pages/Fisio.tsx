@@ -47,29 +47,29 @@ const Fisio = () => {
         // Parse the plan_data if it's a string, otherwise use it as is
         let parsedData: Record<string, any> = {};
         
-        if (plan.plan_data) {
-          if (typeof plan.plan_data === 'string') {
-            try {
+        try {
+          if (plan.plan_data) {
+            if (typeof plan.plan_data === 'string') {
               parsedData = JSON.parse(plan.plan_data);
-            } catch (e) {
-              console.error('Erro ao analisar plan_data:', e);
-              // If parsing fails, use an empty object
-              parsedData = {};
+            } else if (typeof plan.plan_data === 'object') {
+              // If it's already an object, use it directly
+              parsedData = plan.plan_data as Record<string, any>;
             }
-          } else if (typeof plan.plan_data === 'object') {
-            // If it's already an object, use it directly
-            parsedData = plan.plan_data as Record<string, any>;
           }
+        } catch (e) {
+          console.error('Erro ao analisar plan_data:', e, plan.plan_data);
+          // If parsing fails, use an empty object
+          parsedData = {};
         }
         
         return {
           id: plan.id,
           user_id: plan.user_id,
-          goal: plan.goal,
-          condition: plan.condition || (parsedData.condition || null),
-          joint_area: plan.joint_area,
-          start_date: plan.start_date,
-          end_date: plan.end_date,
+          goal: plan.goal || '',
+          condition: plan.condition || parsedData.condition || '',
+          joint_area: plan.joint_area || '',
+          start_date: plan.start_date || new Date().toISOString(),
+          end_date: plan.end_date || new Date().toISOString(),
           overview: parsedData.overview || "Plano de reabilitação",
           recommendations: parsedData.recommendations || [],
           days: parsedData.days || {},

@@ -16,5 +16,3 @@ verify_jwt = false
 
 [functions.create-mercadopago-preference]
 verify_jwt = false
-
-# Todas as outras funções estão desabilitadas para permanecer dentro dos limites de funções do Supabase
