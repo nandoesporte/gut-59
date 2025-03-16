@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -132,13 +133,14 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
         let paymentGloballyEnabled = true; // Default value
         
         try {
-          const { data } = await supabase
+          const { data, error } = await supabase
             .from('payment_settings')
             .select('is_active')
             .eq('setting_name', 'payment_enabled')
-            .single();
+            .limit(1);
             
-          paymentGloballyEnabled = data?.is_active ?? true;
+          // Safely access the data with proper null checking
+          paymentGloballyEnabled = data && data.length > 0 ? !!data[0].is_active : true;
         } catch (e) {
           console.error('Error fetching payment settings:', e);
         }
