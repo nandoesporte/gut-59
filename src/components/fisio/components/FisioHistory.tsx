@@ -23,7 +23,9 @@ export const FisioHistoryView = ({
 }: FisioHistoryViewProps) => {
   const isMobile = useIsMobile();
 
-  const renderGoal = (goal: string) => {
+  const renderGoal = (goal: string | undefined) => {
+    if (!goal) return 'Alívio de Dor';
+    
     switch (goal) {
       case 'pain_relief': return 'Alívio de Dor';
       case 'mobility': return 'Mobilidade';
@@ -33,7 +35,9 @@ export const FisioHistoryView = ({
     }
   };
 
-  const renderCondition = (condition: string) => {
+  const renderCondition = (condition: string | undefined) => {
+    if (!condition) return 'Condição não especificada';
+    
     switch (condition) {
       case 'patellofemoral': return 'Síndrome Patelofemoral';
       case 'ankle_sprain': return 'Entorse de Tornozelo';
@@ -44,6 +48,16 @@ export const FisioHistoryView = ({
       case 'shin_splints': return 'Canelite';
       default: return condition;
     }
+  };
+
+  const getOverviewText = (overview: any): string => {
+    if (!overview) return "Plano de reabilitação personalizado";
+    if (typeof overview === 'string') return overview;
+    // Se for um objeto, tenta extrair informações úteis ou retorna um valor padrão
+    if (typeof overview === 'object') {
+      return "Plano de reabilitação personalizado";
+    }
+    return "Plano de reabilitação personalizado";
   };
 
   if (isLoading) {
@@ -116,9 +130,9 @@ export const FisioHistoryView = ({
                 <div className="flex flex-col">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h3 className="font-medium">{renderCondition(plan.condition || '')}</h3>
+                      <h3 className="font-medium">{renderCondition(plan.condition)}</h3>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Objetivo: {renderGoal(plan.goal?.toString() || 'pain_relief')}
+                        Objetivo: {renderGoal(plan.goal?.toString())}
                       </p>
                     </div>
                     <div className="flex items-center text-xs text-muted-foreground gap-1">
@@ -128,7 +142,7 @@ export const FisioHistoryView = ({
                   </div>
                   <div className="mt-2">
                     <p className="text-xs text-muted-foreground">
-                      {plan.overview || "Plano de reabilitação personalizado"}
+                      {getOverviewText(plan.overview)}
                     </p>
                   </div>
                 </div>
