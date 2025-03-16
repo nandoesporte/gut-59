@@ -35,9 +35,9 @@ export const RehabPlanDisplay = ({ plan }: RehabPlanDisplayProps) => {
       case 'trochanteric_bursitis': return 'Bursite Trocantérica';
       case 'lateral_epicondylitis': return 'Epicondilite Lateral (Cotovelo de Tenista)';
       case 'shin_splints': return 'Canelite (Síndrome do Estresse Tibial Medial)';
-      default: return condition.split('_').map(word => 
-        word.charAt(0).toUpperCase() + word.slice(1)
-      ).join(' ');
+      default: return typeof condition === 'string' 
+        ? condition.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+        : 'Condição não especificada';
     }
   };
 
@@ -46,7 +46,7 @@ export const RehabPlanDisplay = ({ plan }: RehabPlanDisplayProps) => {
     if (plan.days && Object.keys(plan.days).length > 0) {
       return Object.keys(plan.days).map(day => ({
         id: day,
-        name: `Dia ${day}`,
+        name: `Dia ${day.replace('day', '')}`,
         exercises: plan.days[day]?.exercises || []
       }));
     }
@@ -54,8 +54,8 @@ export const RehabPlanDisplay = ({ plan }: RehabPlanDisplayProps) => {
     // If we don't have days structure, try to create it from rehab sessions
     if (plan.rehab_sessions && plan.rehab_sessions.length > 0) {
       return plan.rehab_sessions.map(session => ({
-        id: session.day_number.toString(),
-        name: `Dia ${session.day_number}`,
+        id: String(session.day_number || '1'),
+        name: `Dia ${session.day_number || ''}`,
         exercises: session.exercises || []
       }));
     }
@@ -79,24 +79,64 @@ export const RehabPlanDisplay = ({ plan }: RehabPlanDisplayProps) => {
   };
   
   const recommendations = getRecommendations();
+  
+  // Safely get the overview text
+  const getOverview = () => {
+    if (typeof plan.overview === 'string') {
+      return plan.overview;
+    }
+    if (plan.overview && typeof plan.overview === 'object') {
+      // If it's an object, try to extract useful information
+      const overviewObj = plan.overview as Record<string, any>;
+      if (overviewObj.approach && typeof overviewObj.approach === 'string') {
+        return overviewObj.approach;
+      }
+      if (overviewObj.condition && typeof overviewObj.condition === 'string') {
+        return `Plano para ${overviewObj.condition}`;
+      }
+      // Convert to string if possible
+      try {
+        return JSON.stringify(plan.overview);
+      } catch (e) {
+        return "Plano de reabilitação personalizado para sua condição.";
+      }
+    }
+    return "Plano de reabilitação personalizado para sua condição.";
+  };
+
+  const overview = getOverview();
+
+  // Safe goal value for display
+  const goalDisplay = typeof plan.goal === 'object' 
+    ? 'Alívio de Dor' 
+    : renderGoal(String(plan.goal || ''));
+
+  // Safe joint area value for display
+  const jointAreaDisplay = typeof plan.joint_area === 'object'
+    ? 'Área não especificada'
+    : plan.joint_area?.split('_').map(word => 
+        typeof word === 'string' ? word.charAt(0).toUpperCase() + word.slice(1) : ''
+      ).join(' ') || 'Não especificada';
 
   return (
     <Card className="border-none shadow-md overflow-hidden">
       <CardHeader className="bg-primary/5 border-b">
         <CardTitle className="flex flex-col gap-1">
-          <span className="text-xl sm:text-2xl font-bold">{formatCondition(plan.condition)}</span>
+          <span className="text-xl sm:text-2xl font-bold">{formatCondition(plan.condition as string)}</span>
           <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mt-1">
             <div className="flex items-center gap-1">
               <Target className="w-4 h-4" />
-              <span>{renderGoal(plan.goal?.toString())}</span>
+              <span>{goalDisplay}</span>
             </div>
             <div className="flex items-center gap-1">
               <Calendar className="w-4 h-4" />
-              <span>Duração: {new Date(plan.end_date).getDate() - new Date(plan.start_date).getDate() || 14} dias</span>
+              <span>Duração: {
+                (new Date(plan.end_date).getDate() - new Date(plan.start_date).getDate()) || 14
+              } dias</span>
             </div>
             <div className="flex items-center gap-1">
               <Bone className="w-4 h-4" />
-              <span>Área: {plan.joint_area?.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') || 'Não especificada'}</span>
+              <span>Área: {jointAreaDisplay}</span>
             </div>
           </div>
         </CardTitle>
@@ -107,14 +147,14 @@ export const RehabPlanDisplay = ({ plan }: RehabPlanDisplayProps) => {
             <TrendingUp className="w-4 h-4" />
             Visão Geral
           </h3>
-          <p className="text-sm text-muted-foreground">{plan.overview || "Plano de reabilitação personalizado para sua condição."}</p>
+          <p className="text-sm text-muted-foreground">{overview}</p>
         </div>
         
         <div className="p-4 border-t">
           <h3 className="text-sm font-medium mb-2">Recomendações</h3>
           <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
             {recommendations.map((rec, index) => (
-              <li key={index}>{rec}</li>
+              <li key={index}>{typeof rec === 'string' ? rec : 'Recomendação não disponível'}</li>
             ))}
           </ul>
         </div>
@@ -147,13 +187,32 @@ export const RehabPlanDisplay = ({ plan }: RehabPlanDisplayProps) => {
                       day.exercises.map((exercise, index) => (
                         <ExerciseDisplay
                           key={index}
-                          name={exercise.name}
+                          name={typeof exercise.name === 'string' ? exercise.name : 'Exercício sem nome'}
                           sets={exercise.sets}
                           reps={exercise.reps}
-                          restTime={exercise.restTime || `${exercise.rest_time_seconds || 30}s`}
-                          gifUrl={formatImageUrl(exercise.gifUrl)}
-                          description={exercise.description || ''}
-                          notes={exercise.notes || ''}
+                          restTime={
+                            typeof exercise.restTime === 'string' 
+                              ? exercise.restTime 
+                              : `${exercise.rest_time_seconds || 30}s`
+                          }
+                          gifUrl={formatImageUrl(
+                            typeof exercise.gifUrl === 'string' ? exercise.gifUrl : undefined
+                          )}
+                          description={
+                            typeof exercise.description === 'string' 
+                              ? exercise.description 
+                              : ''
+                          }
+                          notes={
+                            typeof exercise.notes === 'string' 
+                              ? exercise.notes 
+                              : ''
+                          }
+                          exerciseType={
+                            typeof exercise.exerciseType === 'string'
+                              ? exercise.exerciseType
+                              : 'strength'
+                          }
                         />
                       ))
                     )}
