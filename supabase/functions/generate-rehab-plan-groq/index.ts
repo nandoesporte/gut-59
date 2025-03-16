@@ -379,7 +379,7 @@ serve(async (req) => {
             joint_area: preferences.joint_area,
             start_date: new Date().toISOString(),
             end_date: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString(), // 28 days later
-            plan_data: planData  // Using the planData that was just defined
+            plan_data: planData
           });
 
         if (insertError) {
@@ -391,7 +391,7 @@ serve(async (req) => {
           const now = new Date().toISOString();
           const { data: planCount, error: countError } = await supabase
             .from('plan_generation_counts')
-            .select('rehabilitation_count, last_reset_date')
+            .select('rehabilitation_count')
             .eq('user_id', userData.id)
             .maybeSingle();
             
@@ -449,3 +449,4 @@ serve(async (req) => {
     );
   }
 });
+

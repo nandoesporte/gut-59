@@ -23,18 +23,10 @@ const Fisio = () => {
       
       if (!user) return;
 
+      // Changed query to not use relationship that isn't set up correctly
       const { data: plansData, error } = await supabase
         .from('rehab_plans')
-        .select(`
-          *,
-          rehab_sessions:rehab_sessions (
-            *,
-            rehab_session_exercises (
-              *,
-              exercise:physio_exercises (*)
-            )
-          )
-        `)
+        .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
@@ -48,27 +40,27 @@ const Fisio = () => {
         return;
       }
 
-      // Transform the data to match RehabPlan type
-      const transformedPlans: RehabPlan[] = (plansData || []).map(plan => ({
-        id: plan.id,
-        user_id: plan.user_id,
-        goal: plan.goal,
-        start_date: plan.start_date,
-        end_date: plan.end_date,
-        rehab_sessions: (plan.rehab_sessions || []).map((session: any) => ({
-          day_number: session.day_number,
-          warmup_description: session.warmup_description,
-          cooldown_description: session.cooldown_description,
-          exercises: (session.rehab_session_exercises || []).map((se: any) => ({
-            name: se.exercise.name,
-            sets: se.sets,
-            reps: se.reps,
-            rest_time_seconds: se.rest_time_seconds,
-            gifUrl: se.exercise.gif_url,
-            notes: se.exercise.description
-          }))
-        }))
-      }));
+      console.log('Retrieved rehab plans:', plansData);
+
+      // Transform the data to match RehabPlan type using plan_data
+      const transformedPlans: RehabPlan[] = (plansData || []).map(plan => {
+        // Use the plan_data that contains all the information about the plan
+        const planData = plan.plan_data || {};
+        
+        return {
+          id: plan.id,
+          user_id: plan.user_id,
+          goal: plan.goal,
+          condition: plan.condition || planData.condition,
+          joint_area: plan.joint_area,
+          start_date: plan.start_date,
+          end_date: plan.end_date,
+          overview: planData.overview || "Rehabilitation plan",
+          recommendations: planData.recommendations || [],
+          days: planData.days || {},
+          rehab_sessions: planData.rehab_sessions || []
+        };
+      });
 
       setHistoryPlans(transformedPlans);
     } catch (error) {

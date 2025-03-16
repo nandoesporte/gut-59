@@ -128,15 +128,16 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
         console.error('Error checking plan counts:', countError);
       }
 
-      // Use our new SQL function to check if payment is enabled
       const { data: paymentSettingData, error: paymentSettingError } = await supabase
         .rpc('get_payment_setting', { setting_name_param: 'payment_enabled' });
       
       if (paymentSettingError) {
         console.error('Error fetching payment settings:', paymentSettingError);
+        console.log('Rehabilitation payment setting: false');
+      } else {
+        console.log('Rehabilitation payment setting:', paymentSettingData);
       }
       
-      // Default to true if there's an error or null result
       const paymentGloballyEnabled = paymentSettingData === null ? true : paymentSettingData;
       
       console.log('Payment globally enabled:', paymentGloballyEnabled);

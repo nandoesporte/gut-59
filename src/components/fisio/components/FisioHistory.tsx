@@ -79,14 +79,19 @@ export const FisioHistoryView = ({ isLoading, historyPlans = [], onRefresh }: Fi
                 <div className="flex items-start gap-4">
                   <div>
                     <h3 className="font-medium text-left">
-                      Plano de Reabilitação - {new Date(plan.start_date).toLocaleDateString()}
+                      Plano de Reabilitação - {plan.joint_area ? plan.joint_area.charAt(0).toUpperCase() + plan.joint_area.slice(1) : 'Área não especificada'}
                     </h3>
                     <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
                       <Calendar className="w-4 h-4" />
                       <span>
-                        Até: {new Date(plan.end_date).toLocaleDateString()}
+                        {new Date(plan.start_date).toLocaleDateString()} até {new Date(plan.end_date).toLocaleDateString()}
                       </span>
                     </div>
+                    {plan.condition && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        Condição: {plan.condition}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -112,47 +117,134 @@ export const FisioHistoryView = ({ isLoading, historyPlans = [], onRefresh }: Fi
             
             <CollapsibleContent>
               <CardContent className="p-4 pt-0">
-                {plan.rehab_sessions.map((session) => (
-                  <div key={session.day_number} className="border-t pt-4 mt-4 first:border-t-0 first:pt-0 first:mt-0">
-                    <div className="flex items-center gap-2 mb-3">
-                      <h4 className="font-medium">Dia {session.day_number}</h4>
+                {plan.overview && (
+                  <div className="mb-4 p-3 bg-muted/30 rounded-md">
+                    <h4 className="font-medium mb-1">Visão Geral</h4>
+                    <p className="text-sm">{plan.overview}</p>
+                  </div>
+                )}
+                
+                {/* Display days if available */}
+                {plan.days && Object.keys(plan.days).length > 0 ? (
+                  Object.entries(plan.days).map(([dayKey, dayData]) => (
+                    <div key={dayKey} className="border-t pt-4 mt-4 first:border-t-0 first:pt-0 first:mt-0">
+                      <div className="flex items-center gap-2 mb-3">
+                        <h4 className="font-medium">Dia {dayKey.replace('day', '')}</h4>
+                      </div>
+                      <div className="ml-2 md:ml-4">
+                        {dayData.notes && <p className="text-sm text-gray-600 mb-3">{dayData.notes}</p>}
+                        
+                        {dayData.exercises && dayData.exercises.map((group, groupIdx) => (
+                          <div key={groupIdx} className="mb-4">
+                            <h5 className="text-sm font-medium mb-2">{group.title || 'Exercícios'}</h5>
+                            <ul className="list-none space-y-4">
+                              {group.exercises && group.exercises.map((exercise, exIdx) => (
+                                <li key={exIdx} className="text-sm bg-muted/20 p-3 rounded-md">
+                                  <div className="flex flex-col md:flex-row gap-4 items-start">
+                                    {exercise.gifUrl && (
+                                      <div className="w-full md:w-40 h-40 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                                        <img 
+                                          src={exercise.gifUrl} 
+                                          alt={exercise.name}
+                                          className="w-full h-full object-cover"
+                                          loading="lazy"
+                                          onError={(e) => {
+                                            (e.target as HTMLImageElement).src = '/placeholder.svg';
+                                          }}
+                                        />
+                                      </div>
+                                    )}
+                                    <div className="flex-grow">
+                                      <span className="font-medium text-base">{exercise.name}</span>
+                                      <div className="text-gray-600 mt-1">
+                                        {exercise.sets} séries x {exercise.reps} repetições
+                                        <span className="text-gray-500 block mt-1">
+                                          Descanso: {exercise.restTime || '60 segundos'}
+                                        </span>
+                                      </div>
+                                      {exercise.description && (
+                                        <p className="text-sm text-gray-500 mt-2">{exercise.description}</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="ml-2 md:ml-4">
-                      <p className="text-sm text-gray-600">{session.warmup_description}</p>
-                      <ul className="list-none space-y-6 my-4">
-                        {session.exercises.map((exercise, idx) => (
-                          <li key={`${session.day_number}-${idx}`} className="text-sm">
-                            <div className="flex flex-col md:flex-row gap-4 items-start">
-                              {exercise.gifUrl && (
-                                <div className="w-full md:w-48 h-48 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                                  <img 
-                                    src={exercise.gifUrl} 
-                                    alt={exercise.name}
-                                    className="w-full h-full object-cover"
-                                    loading="lazy"
-                                  />
+                  ))
+                ) : (
+                  // Display rehab_sessions if no days structure but we have rehab_sessions
+                  plan.rehab_sessions && plan.rehab_sessions.length > 0 ? (
+                    plan.rehab_sessions.map((session, index) => (
+                      <div key={index} className="border-t pt-4 mt-4 first:border-t-0 first:pt-0 first:mt-0">
+                        <div className="flex items-center gap-2 mb-3">
+                          <h4 className="font-medium">Dia {session.day_number || index + 1}</h4>
+                        </div>
+                        <div className="ml-2 md:ml-4">
+                          {session.warmup_description && <p className="text-sm text-gray-600 mb-3">{session.warmup_description}</p>}
+                          
+                          <ul className="list-none space-y-4">
+                            {session.exercises && session.exercises.map((exercise, exIdx) => (
+                              <li key={exIdx} className="text-sm bg-muted/20 p-3 rounded-md">
+                                <div className="flex flex-col md:flex-row gap-4 items-start">
+                                  {exercise.gifUrl && (
+                                    <div className="w-full md:w-40 h-40 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                                      <img 
+                                        src={exercise.gifUrl} 
+                                        alt={exercise.name}
+                                        className="w-full h-full object-cover"
+                                        loading="lazy"
+                                        onError={(e) => {
+                                          (e.target as HTMLImageElement).src = '/placeholder.svg';
+                                        }}
+                                      />
+                                    </div>
+                                  )}
+                                  <div className="flex-grow">
+                                    <span className="font-medium text-base">{exercise.name}</span>
+                                    <div className="text-gray-600 mt-1">
+                                      {exercise.sets} séries x {exercise.reps} repetições
+                                      <span className="text-gray-500 block mt-1">
+                                        Descanso: {exercise.rest_time_seconds ? `${exercise.rest_time_seconds} segundos` : '60 segundos'}
+                                      </span>
+                                    </div>
+                                    {exercise.description && (
+                                      <p className="text-sm text-gray-500 mt-2">{exercise.description}</p>
+                                    )}
+                                  </div>
                                 </div>
-                              )}
-                              <div className="flex-grow">
-                                <span className="font-medium text-base">{exercise.name}</span>
-                                <div className="text-gray-600 mt-1">
-                                  {exercise.sets} séries x {exercise.reps} repetições
-                                  <span className="text-gray-500 block mt-1">
-                                    Descanso: {exercise.rest_time_seconds} segundos
-                                  </span>
-                                </div>
-                                {exercise.notes && (
-                                  <p className="text-sm text-gray-500 mt-2">{exercise.notes}</p>
-                                )}
-                              </div>
-                            </div>
-                          </li>
+                              </li>
+                            ))}
+                          </ul>
+                          
+                          {session.cooldown_description && <p className="text-sm text-gray-600 mt-3">{session.cooldown_description}</p>}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-4 text-center bg-gray-50 dark:bg-gray-800 rounded-md">
+                      <p className="text-muted-foreground">Detalhes do plano não disponíveis.</p>
+                    </div>
+                  )
+                )}
+                
+                {plan.recommendations && plan.recommendations.length > 0 && (
+                  <div className="mt-4 p-3 bg-muted/30 rounded-md">
+                    <h4 className="font-medium mb-1">Recomendações</h4>
+                    {Array.isArray(plan.recommendations) ? (
+                      <ul className="list-disc pl-5 space-y-1">
+                        {plan.recommendations.map((rec, i) => (
+                          <li key={i} className="text-sm">{rec}</li>
                         ))}
                       </ul>
-                      <p className="text-sm text-gray-600 mt-2">{session.cooldown_description}</p>
-                    </div>
+                    ) : (
+                      <p className="text-sm">{plan.recommendations}</p>
+                    )}
                   </div>
-                ))}
+                )}
               </CardContent>
             </CollapsibleContent>
           </Card>
