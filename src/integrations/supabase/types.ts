@@ -2303,6 +2303,12 @@ export type Database = {
         }
         Returns: number
       }
+      get_payment_setting: {
+        Args: {
+          setting_name_param: string
+        }
+        Returns: boolean
+      }
       grant_plan_access: {
         Args: {
           p_user_id: string

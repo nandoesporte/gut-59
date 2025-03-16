@@ -128,25 +128,16 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
         console.error('Error checking plan counts:', countError);
       }
 
-      // Use a direct query approach to avoid TypeScript issues
-      let paymentGloballyEnabled = true; // Default value
+      // Use our new SQL function to check if payment is enabled
+      const { data: paymentSettingData, error: paymentSettingError } = await supabase
+        .rpc('get_payment_setting', { setting_name_param: 'payment_enabled' });
       
-      try {
-        // Direct query to payment_settings table
-        const { data, error } = await supabase
-          .from('payment_settings')
-          .select('is_active')
-          .eq('setting_name', 'payment_enabled')
-          .single();
-        
-        if (error) {
-          console.error('Error fetching payment settings:', error);
-        } else if (data) {
-          paymentGloballyEnabled = data.is_active === true;
-        }
-      } catch (e) {
-        console.error('Error in payment settings query:', e);
+      if (paymentSettingError) {
+        console.error('Error fetching payment settings:', paymentSettingError);
       }
+      
+      // Default to true if there's an error or null result
+      const paymentGloballyEnabled = paymentSettingData === null ? true : paymentSettingData;
       
       console.log('Payment globally enabled:', paymentGloballyEnabled);
       
