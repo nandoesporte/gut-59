@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -130,17 +129,13 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
           console.error('Error checking plan counts:', countError);
         }
 
-        // Fix: Simplify the query structure and avoid nested type instantiation
-        const { data: paymentSettingsData } = await supabase
+        const { data, error } = await supabase
           .from('payment_settings')
           .select('is_active')
           .eq('setting_name', 'payment_enabled')
           .limit(1);
           
-        // Set default value with simple assignment to avoid complex type inference
-        const paymentGloballyEnabled = paymentSettingsData && paymentSettingsData.length > 0 
-          ? paymentSettingsData[0].is_active 
-          : true;
+        const paymentGloballyEnabled = data && data.length > 0 ? Boolean(data[0].is_active) : true;
         
         console.log('Payment globally enabled:', paymentGloballyEnabled);
         
