@@ -5,7 +5,8 @@ export interface Exercise {
   name: string;
   sets: number;
   reps: number;
-  rest_time_seconds: number;
+  rest_time_seconds?: number;
+  restTime?: string;
   gifUrl?: string | null;
   notes?: string | null;
   description?: string | null;
@@ -16,23 +17,23 @@ export interface Exercise {
 
 export interface RehabSession {
   day_number: number;
-  warmup_description: string;
-  cooldown_description: string;
+  warmup_description?: string;
+  cooldown_description?: string;
   exercises: Exercise[];
   notes?: string | null;
 }
 
 export interface RehabPlan {
-  id?: string;
+  id: string;
   user_id?: string;
   goal?: RehabGoal;
   condition?: string;
   joint_area?: string;
-  start_date?: string;
-  end_date?: string;
+  start_date: string;
+  end_date: string;
   rehab_sessions?: RehabSession[];
   
-  // Adding properties used in the display component
+  // Propriedades usadas no componente de exibição
   days?: Record<string, any>;
   overview?: string;
   recommendations?: string[] | string;

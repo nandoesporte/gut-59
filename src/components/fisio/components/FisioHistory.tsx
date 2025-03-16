@@ -7,6 +7,7 @@ import type { RehabPlan } from "../types/rehab-plan";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState } from "react";
+import { formatImageUrl } from "@/utils/imageUtils";
 
 interface FisioHistoryViewProps {
   isLoading: boolean;
@@ -32,7 +33,7 @@ export const FisioHistoryView = ({ isLoading, historyPlans = [], onRefresh }: Fi
         await onRefresh();
       }
     } catch (error) {
-      console.error('Error deleting plan:', error);
+      console.error('Erro ao excluir plano:', error);
       toast.error("Erro ao excluir plano");
     } finally {
       setDeletingIds(prev => {
@@ -124,7 +125,7 @@ export const FisioHistoryView = ({ isLoading, historyPlans = [], onRefresh }: Fi
                   </div>
                 )}
                 
-                {/* Display days if available */}
+                {/* Exibir dias se disponível */}
                 {plan.days && Object.keys(plan.days).length > 0 ? (
                   Object.entries(plan.days).map(([dayKey, dayData]) => (
                     <div key={dayKey} className="border-t pt-4 mt-4 first:border-t-0 first:pt-0 first:mt-0">
@@ -144,8 +145,8 @@ export const FisioHistoryView = ({ isLoading, historyPlans = [], onRefresh }: Fi
                                     {exercise.gifUrl && (
                                       <div className="w-full md:w-40 h-40 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                                         <img 
-                                          src={exercise.gifUrl} 
-                                          alt={exercise.name}
+                                          src={formatImageUrl(exercise.gifUrl)} 
+                                          alt={exercise.name || 'Exercício'}
                                           className="w-full h-full object-cover"
                                           loading="lazy"
                                           onError={(e) => {
@@ -159,7 +160,7 @@ export const FisioHistoryView = ({ isLoading, historyPlans = [], onRefresh }: Fi
                                       <div className="text-gray-600 mt-1">
                                         {exercise.sets} séries x {exercise.reps} repetições
                                         <span className="text-gray-500 block mt-1">
-                                          Descanso: {exercise.restTime || '60 segundos'}
+                                          Descanso: {exercise.restTime || exercise.rest_time_seconds ? `${exercise.rest_time_seconds || 60} segundos` : '60 segundos'}
                                         </span>
                                       </div>
                                       {exercise.description && (
@@ -176,7 +177,7 @@ export const FisioHistoryView = ({ isLoading, historyPlans = [], onRefresh }: Fi
                     </div>
                   ))
                 ) : (
-                  // Display rehab_sessions if no days structure but we have rehab_sessions
+                  // Exibir rehab_sessions se nenhuma estrutura de dias, mas temos rehab_sessions
                   plan.rehab_sessions && plan.rehab_sessions.length > 0 ? (
                     plan.rehab_sessions.map((session, index) => (
                       <div key={index} className="border-t pt-4 mt-4 first:border-t-0 first:pt-0 first:mt-0">
@@ -193,8 +194,8 @@ export const FisioHistoryView = ({ isLoading, historyPlans = [], onRefresh }: Fi
                                   {exercise.gifUrl && (
                                     <div className="w-full md:w-40 h-40 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                                       <img 
-                                        src={exercise.gifUrl} 
-                                        alt={exercise.name}
+                                        src={formatImageUrl(exercise.gifUrl)} 
+                                        alt={exercise.name || 'Exercício'}
                                         className="w-full h-full object-cover"
                                         loading="lazy"
                                         onError={(e) => {

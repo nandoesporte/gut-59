@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -8,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { usePaymentHandling } from '@/components/menu/hooks/usePaymentHandling';
 import type { RehabPlan } from './types/rehab-plan';
+import { formatImageUrl } from '@/utils/imageUtils';
 
 interface ExercisePlanDisplayProps {
   preferences: FisioPreferences;
@@ -18,7 +20,7 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
   const [plan, setPlan] = useState<RehabPlan | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeDay, setActiveDay] = useState('overview');
-  const [loadingText, setLoadingText] = useState('Generating your rehabilitation plan...');
+  const [loadingText, setLoadingText] = useState('Gerando seu plano de reabilitação...');
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const { hasPaid, isProcessingPayment, handlePaymentAndContinue, showConfirmation, setShowConfirmation } = 
@@ -36,14 +38,14 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
         email: user.email,
       } : null;
       
-      setLoadingText('Analyzing your preferences...');
+      setLoadingText('Analisando suas preferências...');
       
       const timeout1 = setTimeout(() => {
-        if (isLoading) setLoadingText('Selecting appropriate exercises...');
+        if (isLoading) setLoadingText('Selecionando exercícios apropriados...');
       }, 5000);
       
       const timeout2 = setTimeout(() => {
-        if (isLoading) setLoadingText('Creating your personalized plan...');
+        if (isLoading) setLoadingText('Criando seu plano personalizado...');
       }, 10000);
       
       const simplifiedPreferences = {
@@ -53,7 +55,7 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
         mobility_level: preferences.mobility_level || 'moderate',
       };
       
-      console.log('Sending rehabilitation plan request with preferences:', simplifiedPreferences);
+      console.log('Enviando requisição de plano de reabilitação com preferências:', simplifiedPreferences);
       
       const response = await supabase.functions.invoke('generate-rehab-plan-groq', {
         body: { preferences: simplifiedPreferences, userData },
@@ -63,35 +65,35 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
       clearTimeout(timeout2);
       
       if (response.error) {
-        console.error('Error response from generate-rehab-plan-groq:', response.error);
-        throw new Error(response.error.message || 'Error generating rehabilitation plan');
+        console.error('Erro na resposta de generate-rehab-plan-groq:', response.error);
+        throw new Error(response.error.message || 'Erro ao gerar plano de reabilitação');
       }
       
-      console.log('Response from generate-rehab-plan-groq:', response.data);
+      console.log('Resposta de generate-rehab-plan-groq:', response.data);
       
       if (!response.data) {
-        throw new Error('No data returned from the rehabilitation plan generator');
+        throw new Error('Nenhum dado retornado pelo gerador de plano de reabilitação');
       }
       
       setPlan(response.data);
       
     } catch (error) {
-      console.error('Error generating rehabilitation plan:', error);
+      console.error('Erro ao gerar plano de reabilitação:', error);
       
-      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+      const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido';
       
       if (errorMessage.includes('context_length_exceeded')) {
-        setError('The plan generation failed due to complexity. Please try with simpler preferences or try again later.');
+        setError('A geração do plano falhou devido à complexidade. Por favor, tente com preferências mais simples ou tente novamente mais tarde.');
       } else if (errorMessage.includes('Max number of functions reached')) {
-        setError('The service is currently at capacity. Your plan will be generated using an alternative method. Please try again in a few moments.');
+        setError('O serviço está atualmente em capacidade máxima. Seu plano será gerado usando um método alternativo. Por favor, tente novamente em alguns momentos.');
       } else if (errorMessage.includes('no data returned') || errorMessage.includes('No data returned')) {
-        setError('Failed to generate rehabilitation data. Please try again with different preferences.');
+        setError('Falha ao gerar dados de reabilitação. Por favor, tente novamente com preferências diferentes.');
       } else {
         setError(errorMessage);
       }
       
-      toast.error('Failed to generate plan', {
-        description: 'Please try again later or contact support if the issue persists.'
+      toast.error('Falha ao gerar plano', {
+        description: 'Por favor, tente novamente mais tarde ou entre em contato com o suporte se o problema persistir.'
       });
     } finally {
       setIsLoading(false);
@@ -115,7 +117,7 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        throw new Error('User not authenticated');
+        throw new Error('Usuário não autenticado');
       }
 
       const { data: counts, error: countError } = await supabase
@@ -125,25 +127,25 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
         .maybeSingle();
 
       if (countError) {
-        console.error('Error checking plan counts:', countError);
+        console.error('Erro ao verificar contagens de plano:', countError);
       }
 
       const { data: paymentSettingData, error: paymentSettingError } = await supabase
         .rpc('get_payment_setting', { setting_name_param: 'payment_enabled' });
       
       if (paymentSettingError) {
-        console.error('Error fetching payment settings:', paymentSettingError);
-        console.log('Rehabilitation payment setting: false');
+        console.error('Erro ao buscar configurações de pagamento:', paymentSettingError);
+        console.log('Configuração de pagamento de reabilitação: false');
       } else {
-        console.log('Rehabilitation payment setting:', paymentSettingData);
+        console.log('Configuração de pagamento de reabilitação:', paymentSettingData);
       }
       
       const paymentGloballyEnabled = paymentSettingData === null ? true : paymentSettingData;
       
-      console.log('Payment globally enabled:', paymentGloballyEnabled);
+      console.log('Pagamento globalmente ativado:', paymentGloballyEnabled);
       
       if (!paymentGloballyEnabled || !counts || (counts.rehabilitation_count < 3)) {
-        console.log('Generating rehab plan without payment check');
+        console.log('Gerando plano de reabilitação sem verificação de pagamento');
         await generateRehabPlan();
       } else {
         const { data: access, error: accessError } = await supabase
@@ -157,21 +159,21 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
           .maybeSingle();
 
         if (accessError && accessError.code !== 'PGRST116') {
-          console.error('Error checking plan access:', accessError);
+          console.error('Erro ao verificar acesso ao plano:', accessError);
         }
 
         if (access && !access.payment_required) {
-          console.log('User has access to rehab plan generation');
+          console.log('Usuário tem acesso à geração de plano de reabilitação');
           await generateRehabPlan();
         } else {
-          console.log('User needs to pay for rehab plan generation');
+          console.log('Usuário precisa pagar pela geração de plano de reabilitação');
           setIsLoading(false);
         }
       }
     } catch (error) {
-      console.error('Error checking payment status:', error);
+      console.error('Erro ao verificar status de pagamento:', error);
       setIsLoading(false);
-      setError('Failed to check payment status. Please try again later.');
+      setError('Falha ao verificar status de pagamento. Por favor, tente novamente mais tarde.');
     }
   };
 
@@ -183,7 +185,7 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
     if (!exercises || exercises.length === 0) {
       return (
         <div className="p-4 text-center bg-gray-50 dark:bg-gray-800 rounded-md">
-          <p className="text-muted-foreground">No exercises found for this section.</p>
+          <p className="text-muted-foreground">Nenhum exercício encontrado para esta seção.</p>
         </div>
       );
     }
@@ -196,8 +198,8 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
               {exercise.gifUrl && (
                 <div className="md:w-1/3 flex justify-center items-center bg-gray-100 dark:bg-gray-700 p-4">
                   <img 
-                    src={exercise.gifUrl} 
-                    alt={exercise.name} 
+                    src={formatImageUrl(exercise.gifUrl)} 
+                    alt={exercise.name || 'Exercício'} 
                     className="h-48 object-contain"
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = '/placeholder.svg';
@@ -208,24 +210,24 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
               <div className={`md:${exercise.gifUrl ? 'w-2/3' : 'w-full'} p-4`}>
                 <h4 className="text-lg font-semibold flex items-center">
                   <Dumbbell className="w-5 h-5 mr-2 text-primary" />
-                  {exercise.name || 'Exercise Name Missing'}
+                  {exercise.name || 'Nome do Exercício Ausente'}
                 </h4>
                 {exercise.difficulty && (
                   <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                    Difficulty: {exercise.difficulty}
+                    Dificuldade: {exercise.difficulty}
                   </div>
                 )}
                 <div className="grid grid-cols-3 gap-2 my-3">
                   <div className="bg-primary/10 rounded-md p-2 text-center">
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Sets</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">Séries</div>
                     <div className="font-bold">{exercise.sets || '3'}</div>
                   </div>
                   <div className="bg-primary/10 rounded-md p-2 text-center">
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Reps</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">Repetições</div>
                     <div className="font-bold">{exercise.reps || '10'}</div>
                   </div>
                   <div className="bg-primary/10 rounded-md p-2 text-center">
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Rest</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">Descanso</div>
                     <div className="font-bold">
                       {exercise.rest_time_seconds ? 
                         `${Math.floor(exercise.rest_time_seconds / 60)}:${(exercise.rest_time_seconds % 60).toString().padStart(2, '0')}` : 
@@ -235,7 +237,7 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
                 </div>
                 {(exercise.description || exercise.notes) && (
                   <div className="mt-3 text-sm">
-                    <p>{exercise.description || exercise.notes || 'No description available.'}</p>
+                    <p>{exercise.description || exercise.notes || 'Nenhuma descrição disponível.'}</p>
                   </div>
                 )}
               </div>
@@ -252,7 +254,7 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
         <h3 className="text-xl font-medium text-center">{loadingText}</h3>
         <p className="text-muted-foreground text-center mt-2">
-          This may take up to a minute as we create a custom plan for you.
+          Isso pode levar até um minuto enquanto criamos um plano personalizado para você.
         </p>
       </div>
     );
@@ -264,23 +266,23 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
         <CardHeader>
           <CardTitle className="text-2xl flex items-center">
             <AlertTriangle className="h-6 w-6 text-amber-500 mr-2" />
-            Error generating plan
+            Erro ao gerar plano
           </CardTitle>
           <CardDescription>
             {error}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="mb-4">This might be due to temporary service overload or technical issues.</p>
+          <p className="mb-4">Isso pode ser devido a sobrecarga temporária do serviço ou problemas técnicos.</p>
         </CardContent>
         <CardFooter className="flex flex-col sm:flex-row gap-4">
           <Button variant="outline" onClick={onReset} className="w-full sm:w-auto">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Change preferences
+            Alterar preferências
           </Button>
           <Button onClick={handleRetry} className="w-full sm:w-auto">
             <RefreshCw className="mr-2 h-4 w-4" />
-            Try again
+            Tentar novamente
           </Button>
         </CardFooter>
       </Card>
@@ -291,31 +293,31 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
     return (
       <Card className="w-full">
         <CardHeader>
-          <CardTitle className="text-2xl">Ready to create your rehabilitation plan</CardTitle>
+          <CardTitle className="text-2xl">Pronto para criar seu plano de reabilitação</CardTitle>
           <CardDescription>
-            Get a personalized rehabilitation plan for your {preferences.joint_area} with exercises tailored to your needs.
+            Obtenha um plano de reabilitação personalizado para {preferences.joint_area} com exercícios adaptados às suas necessidades.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-primary/5 rounded-lg p-4">
-                <h3 className="font-medium text-lg mb-2">Your preferences</h3>
+                <h3 className="font-medium text-lg mb-2">Suas preferências</h3>
                 <ul className="space-y-2">
-                  <li><span className="font-medium">Joint Area:</span> {preferences.joint_area}</li>
-                  <li><span className="font-medium">Rehabilitation Focus:</span> {preferences.condition || 'General recovery'}</li>
+                  <li><span className="font-medium">Área articular:</span> {preferences.joint_area}</li>
+                  <li><span className="font-medium">Foco da reabilitação:</span> {preferences.condition || 'Recuperação geral'}</li>
                   {preferences.pain_level && (
-                    <li><span className="font-medium">Pain Level:</span> {preferences.pain_level}/10</li>
+                    <li><span className="font-medium">Nível de dor:</span> {preferences.pain_level}/10</li>
                   )}
                 </ul>
               </div>
               <div className="bg-primary/5 rounded-lg p-4">
-                <h3 className="font-medium text-lg mb-2">What you'll get</h3>
+                <h3 className="font-medium text-lg mb-2">O que você receberá</h3>
                 <ul className="space-y-2">
-                  <li>⭐ Custom rehabilitation exercises</li>
-                  <li>⭐ Progress tracking framework</li>
-                  <li>⭐ Detailed instructions with visuals</li>
-                  <li>⭐ Specific recommendations for your condition</li>
+                  <li>⭐ Exercícios de reabilitação personalizados</li>
+                  <li>⭐ Estrutura de acompanhamento de progresso</li>
+                  <li>⭐ Instruções detalhadas com visuais</li>
+                  <li>⭐ Recomendações específicas para sua condição</li>
                 </ul>
               </div>
             </div>
@@ -324,7 +326,7 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
         <CardFooter className="flex flex-col sm:flex-row gap-4">
           <Button variant="outline" onClick={onReset} className="w-full sm:w-auto">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Change preferences
+            Alterar preferências
           </Button>
           <Button 
             onClick={handlePaymentAndContinue} 
@@ -332,7 +334,7 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
             className="w-full sm:w-auto"
           >
             {isProcessingPayment && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isProcessingPayment ? 'Processing...' : 'Continue'}
+            {isProcessingPayment ? 'Processando...' : 'Continuar'}
           </Button>
         </CardFooter>
       </Card>
@@ -343,18 +345,18 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
     return (
       <div className="flex flex-col items-center justify-center p-8">
         <div className="text-center space-y-2">
-          <h3 className="text-xl font-medium">Something went wrong</h3>
+          <h3 className="text-xl font-medium">Algo deu errado</h3>
           <p className="text-muted-foreground">
-            We couldn't generate your rehabilitation plan. Please try again.
+            Não foi possível gerar seu plano de reabilitação. Por favor, tente novamente.
           </p>
           <div className="mt-4 flex flex-col sm:flex-row gap-4">
             <Button onClick={onReset}>
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Start over
+              Recomeçar
             </Button>
             <Button onClick={handleRetry} variant="outline">
               <RefreshCw className="mr-2 h-4 w-4" />
-              Try again
+              Tentar novamente
             </Button>
           </div>
         </div>
@@ -370,15 +372,15 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
   });
 
   if (dayKeys.length === 0 && plan.rehab_sessions && plan.rehab_sessions.length > 0) {
-    console.log('Creating day structure from rehab sessions');
+    console.log('Criando estrutura de dias a partir de sessões de reabilitação');
     plan.days = {};
     
     plan.rehab_sessions.forEach((session, index) => {
       const dayKey = `day${index + 1}`;
       plan.days[dayKey] = {
-        notes: `Day ${index + 1} exercises`,
+        notes: `Exercícios do Dia ${index + 1}`,
         exercises: [{
-          title: "Rehabilitation Session",
+          title: "Sessão de Reabilitação",
           exercises: session.exercises || []
         }]
       };
@@ -386,12 +388,12 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
   }
 
   if (!plan.days || Object.keys(plan.days).length === 0) {
-    console.log('Creating fallback plan structure');
+    console.log('Criando estrutura de plano alternativa');
     plan.days = {
       day1: {
-        notes: "Default rehabilitation exercises",
+        notes: "Exercícios de reabilitação padrão",
         exercises: [{
-          title: "Exercises",
+          title: "Exercícios",
           exercises: plan.exercises || []
         }]
       }
@@ -407,15 +409,15 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Your Rehabilitation Plan</h2>
+        <h2 className="text-2xl font-bold">Seu Plano de Reabilitação</h2>
         <div className="flex space-x-2">
           <Button variant="outline" onClick={onReset} size="sm">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
+            Voltar
           </Button>
           <Button variant="outline" size="sm">
             <Download className="mr-2 h-4 w-4" />
-            Save PDF
+            Salvar PDF
           </Button>
         </div>
       </div>
@@ -424,7 +426,7 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
         <TabsList className="mb-4 flex flex-wrap">
           <TabsTrigger value="overview" className="data-[state=active]:bg-primary data-[state=active]:text-white">
             <BookOpen className="h-4 w-4 mr-2" />
-            Overview
+            Visão Geral
           </TabsTrigger>
           {updatedDayKeys.map((day) => (
             <TabsTrigger 
@@ -432,7 +434,7 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
               value={day}
               className="data-[state=active]:bg-primary data-[state=active]:text-white"
             >
-              Day {day.replace('day', '')}
+              Dia {day.replace('day', '')}
             </TabsTrigger>
           ))}
         </TabsList>
@@ -440,9 +442,9 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
         <TabsContent value="overview" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Rehabilitation Plan Overview</CardTitle>
+              <CardTitle>Visão Geral do Plano de Reabilitação</CardTitle>
               <CardDescription>
-                For {preferences.joint_area} - {preferences.condition || 'Recovery'}
+                Para {preferences.joint_area} - {preferences.condition || 'Recuperação'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -450,12 +452,12 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
                 {plan.overview ? (
                   <p>{plan.overview}</p>
                 ) : (
-                  <p>This rehabilitation plan is designed to help improve your {preferences.joint_area} condition and achieve recovery for {preferences.condition || 'your condition'}.</p>
+                  <p>Este plano de reabilitação foi desenvolvido para ajudar a melhorar sua condição de {preferences.joint_area} e alcançar recuperação para {preferences.condition || 'sua condição'}.</p>
                 )}
                 
                 {plan.recommendations && (
                   <div className="mt-4">
-                    <h3 className="text-lg font-medium mb-2">Recommendations</h3>
+                    <h3 className="text-lg font-medium mb-2">Recomendações</h3>
                     {Array.isArray(plan.recommendations) ? (
                       <ul className="list-disc pl-5 space-y-1">
                         {plan.recommendations.map((rec, i) => (
@@ -474,9 +476,9 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
           {plan.rehab_sessions && plan.rehab_sessions.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle>Exercise Overview</CardTitle>
+                <CardTitle>Visão Geral dos Exercícios</CardTitle>
                 <CardDescription>
-                  All exercises in your rehabilitation program
+                  Todos os exercícios em seu programa de reabilitação
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -496,22 +498,22 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
             <TabsContent key={day} value={day} className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Day {day.replace('day', '')} - Exercise Program</CardTitle>
+                  <CardTitle>Dia {day.replace('day', '')} - Programa de Exercícios</CardTitle>
                   <CardDescription>
-                    {dayData.notes || `Exercises for day ${day.replace('day', '')}`}
+                    {dayData.notes || `Exercícios para o dia ${day.replace('day', '')}`}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {dayData.exercises && dayData.exercises.map((group, i) => (
                     <div key={i} className="space-y-4">
-                      <h3 className="text-lg font-medium">{group.title || 'Exercise Group'}</h3>
+                      <h3 className="text-lg font-medium">{group.title || 'Grupo de Exercícios'}</h3>
                       {renderExerciseList(group.exercises || [])}
                     </div>
                   ))}
                   
                   {!dayData.exercises && (
                     <div className="p-4 text-center bg-gray-50 dark:bg-gray-800 rounded-md">
-                      <p className="text-muted-foreground">No exercises found for this day.</p>
+                      <p className="text-muted-foreground">Nenhum exercício encontrado para este dia.</p>
                     </div>
                   )}
                 </CardContent>

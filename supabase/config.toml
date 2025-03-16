@@ -1,7 +1,7 @@
 
 project_id = "sxjafhzikftdenqnkcri"
 
-# Core functionality - keeping only these enabled and disabling the rest
+# Funções principais - mantendo apenas estas habilitadas e desabilitando o resto
 [functions.mental-health-chat]
 verify_jwt = false
 
@@ -17,4 +17,4 @@ verify_jwt = false
 [functions.create-mercadopago-preference]
 verify_jwt = false
 
-# All other functions are disabled to stay within the Supabase function limits
+# Todas as outras funções estão desabilitadas para permanecer dentro dos limites de funções do Supabase
