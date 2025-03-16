@@ -44,21 +44,23 @@ const Fisio = () => {
 
       // Transform the data to match RehabPlan type using plan_data
       const transformedPlans: RehabPlan[] = (plansData || []).map(plan => {
-        // Use the plan_data that contains all the information about the plan
-        const planData = plan.plan_data || {};
+        // Parse the plan_data if it's a string, otherwise use it as is
+        const planData = typeof plan.plan_data === 'string' 
+          ? JSON.parse(plan.plan_data) 
+          : (plan.plan_data as Record<string, any> || {});
         
         return {
           id: plan.id,
           user_id: plan.user_id,
           goal: plan.goal,
-          condition: plan.condition || planData.condition,
+          condition: plan.condition || (planData && planData.condition),
           joint_area: plan.joint_area,
           start_date: plan.start_date,
           end_date: plan.end_date,
-          overview: planData.overview || "Rehabilitation plan",
-          recommendations: planData.recommendations || [],
-          days: planData.days || {},
-          rehab_sessions: planData.rehab_sessions || []
+          overview: planData && planData.overview || "Rehabilitation plan",
+          recommendations: planData && planData.recommendations || [],
+          days: planData && planData.days || {},
+          rehab_sessions: planData && planData.rehab_sessions || []
         };
       });
 
