@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { useState } from 'react';
 import { FisioPreferences } from '@/components/fisio/types';
@@ -40,7 +39,6 @@ const Fisio = () => {
 
       if (error) throw error;
 
-      // Transform the data to match RehabPlan type
       const transformedPlans: RehabPlan[] = (plansData || []).map((plan: any) => ({
         id: plan.id,
         user_id: plan.user_id,
@@ -49,7 +47,6 @@ const Fisio = () => {
         start_date: plan.start_date,
         end_date: plan.end_date,
         created_at: plan.created_at,
-        // Create an empty object for plan_data if it doesn't exist in the original data
         plan_data: typeof plan.plan_data === 'undefined' ? {} : plan.plan_data,
         rehab_sessions: (plan.rehab_sessions || []).map((session: any) => ({
           day_number: session.day_number,
@@ -79,32 +76,11 @@ const Fisio = () => {
   }, []);
 
   const handleSubmitPreferences = (data: FisioPreferences) => {
-    // Validate required fields for the API
-    if (!data.injuryDescription) {
-      toast.error("Por favor, descreva sua lesão para melhor precisão do plano.");
-      return;
-    }
-    
-    if (!data.painLocation) {
-      toast.error("Por favor, indique a localização da dor para um plano mais adequado.");
-      return;
-    }
-    
-    if (!data.injuryDuration) {
-      toast.error("Por favor, informe há quanto tempo tem a lesão.");
-      return;
-    }
-    
-    if (!data.equipmentAvailable || data.equipmentAvailable.length === 0) {
-      // Set default equipment to empty array but with some standard equipment
-      data.equipmentAvailable = ["elastic bands", "foam roller", "chair"];
-      toast.info("Utilizaremos equipamentos básicos para seu plano de reabilitação.");
-    }
-    
-    if (!data.exerciseExperience) {
-      data.exerciseExperience = "moderate";
-      toast.info("Considerando que você tem experiência moderada com exercícios.");
-    }
+    data.injuryDescription = "Lesão comum relacionada à área afetada";
+    data.injuryDuration = "Recente";
+    data.previousTreatments = "Nenhum tratamento anterior";
+    data.exerciseExperience = "moderate";
+    data.equipmentAvailable = ["elastic bands", "foam roller", "chair"];
     
     setPreferences(data);
   };

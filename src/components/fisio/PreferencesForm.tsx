@@ -10,7 +10,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { SelectCard } from "@/components/workout/components/SelectCard";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
-import { Textarea } from "@/components/ui/textarea";
 import { FisioPreferences, JointArea } from "./types";
 import { Stethoscope, ArrowRight, CreditCard, Bot } from "lucide-react";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form";
@@ -30,12 +29,7 @@ const formSchema = z.object({
   mobility_level: z.enum(["limited", "moderate", "good"]),
   previous_treatment: z.boolean(),
   activity_level: z.enum(["sedentary", "light", "moderate", "active"]),
-  injuryDescription: z.string().optional(),
   painLocation: z.string().optional(),
-  injuryDuration: z.string().optional(),
-  previousTreatments: z.string().optional(),
-  exerciseExperience: z.string().optional(),
-  equipmentAvailable: z.array(z.string()).default([]),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -49,16 +43,6 @@ const jointAreaOptions: Record<JointArea, string> = {
   shoulder: "Ombro",
   elbow_hand: "Cotovelo e Mão"
 };
-
-const equipmentOptions = [
-  { value: "elastic_band", label: "Faixa Elástica" },
-  { value: "weights", label: "Pesos" },
-  { value: "swiss_ball", label: "Bola Suíça" },
-  { value: "foam_roller", label: "Rolo de Espuma" },
-  { value: "yoga_mat", label: "Tapete de Yoga" },
-  { value: "chair", label: "Cadeira" },
-  { value: "none", label: "Nenhum" }
-];
 
 interface PreferencesFormProps {
   onSubmit: (data: FisioPreferences) => void;
@@ -86,12 +70,7 @@ export const FisioPreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
       mobility_level: "moderate",
       previous_treatment: false,
       activity_level: "moderate",
-      injuryDescription: "",
       painLocation: "",
-      injuryDuration: "",
-      previousTreatments: "",
-      exerciseExperience: "",
-      equipmentAvailable: []
     }
   });
 
@@ -115,13 +94,14 @@ export const FisioPreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
         mobility_level: data.mobility_level,
         previous_treatment: data.previous_treatment,
         activity_level: data.activity_level,
-        // Add the new fields from our enhanced form
-        injuryDescription: data.injuryDescription,
+        // Add the remaining required fields with empty values
+        // These will be filled with defaults in the Fisio component
+        injuryDescription: "",
         painLocation: data.painLocation,
-        injuryDuration: data.injuryDuration,
-        previousTreatments: data.previousTreatments,
-        exerciseExperience: data.exerciseExperience,
-        equipmentAvailable: data.equipmentAvailable.filter(item => item !== 'none')
+        injuryDuration: "",
+        previousTreatments: "",
+        exerciseExperience: "",
+        equipmentAvailable: []
       };
       
       toast.info("Gerando seu plano de reabilitação personalizado com IA...");
@@ -335,85 +315,6 @@ export const FisioPreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
 
               <FormField
                 control={form.control}
-                name="injuryDescription"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Descrição da Lesão</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        {...field}
-                        placeholder="Descreva sua lesão ou condição em detalhes"
-                        className="min-h-[100px]"
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Descreva como ocorreu a lesão, seus sintomas e qualquer diagnóstico médico
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="injuryDuration"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Duração da Lesão</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="Ex: 3 semanas, 2 meses, 1 ano"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="previousTreatments"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tratamentos Anteriores</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        {...field}
-                        placeholder="Ex: Fisioterapia por 1 mês, medicamentos anti-inflamatórios"
-                        className="min-h-[80px]"
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Liste tratamentos que você já tentou para esta lesão
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="exerciseExperience"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Experiência com Exercícios</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="Ex: Pratico exercícios regularmente há 5 anos"
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Descreva sua experiência com exercícios físicos
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
                 name="mobility_level"
                 render={({ field }) => (
                   <FormItem>
@@ -460,42 +361,6 @@ export const FisioPreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
                         </SelectCard>
                       ))}
                     </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="equipmentAvailable"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Equipamentos Disponíveis</FormLabel>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      {equipmentOptions.map((option) => (
-                        <SelectCard
-                          key={option.value}
-                          selected={field.value.includes(option.value)}
-                          onClick={() => {
-                            if (option.value === 'none') {
-                              // If 'none' is selected, clear all other selections
-                              field.onChange(['none']);
-                            } else {
-                              // If any other option is selected, remove 'none' from the selections
-                              const newValue = field.value.includes(option.value)
-                                ? field.value.filter(val => val !== option.value)
-                                : [...field.value.filter(val => val !== 'none'), option.value];
-                              field.onChange(newValue);
-                            }
-                          }}
-                        >
-                          <span className="text-sm">{option.label}</span>
-                        </SelectCard>
-                      ))}
-                    </div>
-                    <FormDescription>
-                      Selecione todos os equipamentos que você tem disponíveis para exercícios
-                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
