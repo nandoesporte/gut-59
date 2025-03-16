@@ -5,7 +5,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RehabPlan } from '../types/rehab-plan';
 import { ExerciseDisplay } from './ExerciseDisplay';
 import { formatImageUrl } from '@/utils/imageUtils';
-import { formatDate } from '@/lib/utils';
 import { Bone, Calendar, Target, TrendingUp } from 'lucide-react';
 
 interface RehabPlanDisplayProps {
@@ -110,16 +109,18 @@ export const RehabPlanDisplay = ({ plan }: RehabPlanDisplayProps) => {
   const overview = getOverview();
 
   // Safe goal value for display
-  const goalDisplay = typeof plan.goal === 'object' 
-    ? 'Alívio de Dor' 
-    : renderGoal(typeof plan.goal === 'string' ? plan.goal : undefined);
+  const goalDisplay = 
+    typeof plan.goal === 'object' || !plan.goal
+      ? 'Alívio de Dor' 
+      : renderGoal(typeof plan.goal === 'string' ? plan.goal : undefined);
 
   // Safe joint area value for display
-  const jointAreaDisplay = typeof plan.joint_area === 'object' || !plan.joint_area
-    ? 'Área não especificada'
-    : String(plan.joint_area).split('_').map(word => 
-        typeof word === 'string' ? word.charAt(0).toUpperCase() + word.slice(1) : ''
-      ).join(' ');
+  const jointAreaDisplay = 
+    typeof plan.joint_area === 'object' || !plan.joint_area
+      ? 'Área não especificada'
+      : String(plan.joint_area).split('_').map(word => 
+          typeof word === 'string' ? word.charAt(0).toUpperCase() + word.slice(1) : ''
+        ).join(' ');
 
   // Calculate duration safely
   const calculateDuration = () => {
