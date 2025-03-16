@@ -1,13 +1,9 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { supabaseClient } from "../_shared/supabase-client.ts";
+import { corsHeaders } from "../_shared/cors.ts";
 
 const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY');
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -16,125 +12,67 @@ serve(async (req) => {
   }
 
   try {
-    const { userData, preferences, exerciseOptions } = await req.json();
+    const { preferences, userData } = await req.json();
     
-    console.log("Gerando plano de reabilitação com llama3-8b-8192 via Groq");
+    console.log("Gerando plano de reabilitação com agente Fisio+");
     console.log("Dados do usuário:", JSON.stringify(userData));
     console.log("Preferências:", JSON.stringify(preferences));
     
-    if (!userData || !preferences) {
+    if (!preferences) {
       throw new Error("Dados insuficientes para gerar o plano de reabilitação");
     }
 
-    // Format the user preferences and injury data for the prompt
-    const painLevel = preferences.painLevel ? `Nível de dor: ${preferences.painLevel}/10` : 'Nível de dor não informado';
-    const injuryDescription = preferences.injuryDescription ? 
-      `Descrição da lesão: ${preferences.injuryDescription}` : 
-      'Descrição da lesão não informada';
+    // Criar o cliente Supabase
+    const supabase = supabaseClient();
+
+    // Buscar o prompt ativo do agente Fisio+
+    const { data: promptData, error: promptError } = await supabase
+      .from('ai_agent_prompts')
+      .select('*')
+      .eq('agent_type', 'physiotherapy')
+      .eq('is_active', true)
+      .single();
+
+    if (promptError) {
+      console.error("Erro ao buscar prompt do agente Fisio+:", promptError);
+      throw new Error("Não foi possível encontrar o prompt do agente Fisio+");
+    }
+
+    if (!promptData) {
+      throw new Error("Nenhum prompt de fisioterapia ativo encontrado");
+    }
+
+    console.log("Prompt encontrado:", promptData.name);
+
+    // Preparar os dados do usuário para o prompt
+    const painLevel = preferences.pain_level ? `Nível de dor: ${preferences.pain_level}/10` : 'Nível de dor não informado';
+    const userWeight = userData?.weight || preferences.weight || 70;
+    const userHeight = userData?.height || preferences.height || 170;
+    const userAge = userData?.age || preferences.age || 30;
+    const userGender = userData?.gender || preferences.gender || 'male';
+    const jointArea = preferences.joint_area || 'knee';
+    const mobilityLevel = preferences.mobility_level || 'moderate';
+    const activityLevel = preferences.activity_level || 'moderate';
+
+    // Obter o prompt base do agente Fisio+
+    let promptTemplate = promptData.prompt;
     
-    const painLocation = preferences.painLocation ?
-      `Localização da dor: ${preferences.painLocation}` :
-      'Localização da dor não informada';
-      
-    const injuryDuration = preferences.injuryDuration ?
-      `Duração da lesão: ${preferences.injuryDuration}` :
-      'Duração da lesão não informada';
-      
-    const previousTreatments = preferences.previousTreatments ?
-      `Tratamentos anteriores: ${preferences.previousTreatments}` :
-      'Sem tratamentos anteriores informados';
-      
-    const exerciseExperience = preferences.exerciseExperience ?
-      `Experiência com exercícios: ${preferences.exerciseExperience}` :
-      'Experiência com exercícios não informada';
-      
-    const equipmentAvailable = preferences.equipmentAvailable && preferences.equipmentAvailable.length > 0 ?
-      `Equipamentos disponíveis: ${preferences.equipmentAvailable.join(', ')}` :
-      'Sem equipamentos disponíveis';
-    
-    // Prepare the full prompt for the LLM
-    const prompt = `
-# Instrução
-Crie um plano de reabilitação física personalizado de 4 semanas baseado nos seguintes dados:
+    // Substituir variáveis no template
+    const contextData = {
+      user_weight: userWeight,
+      user_height: userHeight,
+      user_age: userAge,
+      user_gender: userGender === 'male' ? 'Masculino' : 'Feminino',
+      joint_area: jointArea,
+      pain_level: preferences.pain_level || 5,
+      mobility_level: mobilityLevel,
+      activity_level: activityLevel
+    };
 
-## Informações do Usuário
-- Peso: ${userData.weight || 'Não informado'}kg
-- Altura: ${userData.height || 'Não informada'}cm
-- Idade: ${userData.age || 'Não informada'} anos
-- Gênero: ${userData.gender === 'male' ? 'Masculino' : userData.gender === 'female' ? 'Feminino' : 'Não informado'}
-
-## Informações da Lesão
-- ${painLocation}
-- ${painLevel}
-- ${injuryDescription}
-- ${injuryDuration}
-- ${previousTreatments}
-
-## Experiência e Recursos
-- ${exerciseExperience}
-- ${equipmentAvailable}
-
-## Estrutura do Plano de Reabilitação
-Crie um plano de reabilitação física para 4 semanas, com:
-1. Exercícios diários para cada semana
-2. Progressão adequada de dificuldade
-3. Tempo de descanso recomendado
-4. Número de séries e repetições para cada exercício
-5. Descrições detalhadas de como realizar os exercícios com segurança
-
-## Recomendações Adicionais
-Inclua:
-1. Recomendações gerais para recuperação
-2. Cuidados a serem tomados durante exercícios
-3. Sinais de alerta para interromper os exercícios
-4. Técnicas de gerenciamento de dor
-
-## Formato de Resposta
-Responda APENAS com um objeto JSON válido com a seguinte estrutura:
-{
-  "overview": {
-    "title": string,
-    "goals": [string],
-    "general_recommendations": [string],
-    "pain_management": [string],
-    "warning_signs": [string]
-  },
-  "plan": {
-    "week1": {
-      "title": string,
-      "description": string,
-      "days": {
-        "day1": {
-          "exercises": [
-            {
-              "name": string,
-              "description": string,
-              "sets": número,
-              "reps": string,
-              "rest": string,
-              "equipment": string,
-              "tips": [string]
-            }
-          ],
-          "notes": string
-        },
-        "day2": {},
-        "day3": {},
-        "day4": {},
-        "day5": {},
-        "day6": {},
-        "day7": {}
-      },
-      "weekNotes": string
-    },
-    "week2": {},
-    "week3": {},
-    "week4": {}
-  }
-}
-
-Certifique-se de que os números são números (e não strings). O JSON deve ser válido e todos os campos listados devem estar preenchidos.
-`;
+    // Substituir variáveis no template
+    Object.entries(contextData).forEach(([key, value]) => {
+      promptTemplate = promptTemplate.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
+    });
 
     console.log("Enviando prompt para o modelo llama3-8b-8192");
 
@@ -150,12 +88,12 @@ Certifique-se de que os números são números (e não strings). O JSON deve ser
         messages: [
           { 
             role: "system", 
-            content: "Você é um fisioterapeuta especializado em criar planos de reabilitação personalizados. Você sempre responde apenas com JSON válido, sem explicações ou texto adicional."
+            content: "Você é um fisioterapeuta especializado em criar planos de reabilitação personalizados. Você sempre responde com JSON válido, utilizando um objeto com estrutura correta e completa, sem truncar ou usar placeholder como '...e assim por diante'."
           },
-          { role: "user", content: prompt }
+          { role: "user", content: promptTemplate }
         ],
         max_tokens: 4096,
-        temperature: 0.2,
+        temperature: 0.4,
         response_format: { type: "json_object" }
       }),
     });
@@ -175,14 +113,13 @@ Certifique-se de que os números são números (e não strings). O JSON deve ser
     }
 
     let rehabPlanJson = groqResponse.choices[0].message.content;
-    console.log("Conteúdo da resposta:", rehabPlanJson);
 
-    // Try to parse the JSON response
+    // Processar a resposta JSON
     let rehabPlan;
     try {
-      // First, check if the response is already a string or if it's an object
+      // Verificar se a resposta já é uma string ou se é um objeto
       if (typeof rehabPlanJson === 'string') {
-        // Clean up the response if it contains markdown code blocks
+        // Limpar a resposta se contiver blocos de código markdown
         if (rehabPlanJson.includes('```json')) {
           rehabPlanJson = rehabPlanJson.replace(/```json\n|\n```/g, '');
         }
@@ -199,63 +136,62 @@ Certifique-se de que os números são números (e não strings). O JSON deve ser
       throw new Error("Erro ao processar resposta: " + parseError.message);
     }
 
-    // Save the rehabilitation plan to the database if user is authenticated
-    if (userData.id) {
-      const supabase = supabaseClient();
-      
-      // Save the rehab plan
-      const { error: insertError } = await supabase
-        .from('rehab_plans')
-        .insert({
-          user_id: userData.id,
-          plan_data: rehabPlan,
-          injury_info: {
-            pain_location: preferences.painLocation,
-            pain_level: preferences.painLevel,
-            injury_description: preferences.injuryDescription,
-            injury_duration: preferences.injuryDuration,
-            previous_treatments: preferences.previousTreatments
-          }
-        });
+    // Salvar o plano de reabilitação no banco de dados se o usuário estiver autenticado
+    if (userData?.id) {
+      try {
+        // Salvar o plano de reabilitação
+        const { error: insertError } = await supabase
+          .from('rehab_plans')
+          .insert({
+            user_id: userData.id,
+            goal: preferences.goal || 'pain_relief',
+            condition: preferences.condition,
+            start_date: new Date().toISOString(),
+            end_date: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString(), // 28 dias depois
+            plan_data: rehabPlan
+          });
 
-      if (insertError) {
-        console.error("Erro ao salvar plano de reabilitação:", insertError);
-      } else {
-        console.log("Plano de reabilitação salvo com sucesso!");
-      
-        // Update the plan generation count
-        const now = new Date().toISOString();
-        const { data: planCount, error: countError } = await supabase
-          .from('plan_generation_counts')
-          .select('count, last_reset_date')
-          .eq('user_id', userData.id)
-          .eq('plan_type', 'rehab_plan')
-          .maybeSingle();
-          
-        if (countError) {
-          console.error("Erro ao verificar contagem de planos:", countError);
-        }
-        
-        if (planCount) {
-          await supabase
-            .from('plan_generation_counts')
-            .update({
-              count: planCount.count + 1,
-              last_generated_date: now
-            })
-            .eq('user_id', userData.id)
-            .eq('plan_type', 'rehab_plan');
+        if (insertError) {
+          console.error("Erro ao salvar plano de reabilitação:", insertError);
         } else {
-          await supabase
+          console.log("Plano de reabilitação salvo com sucesso!");
+        
+          // Atualizar contagem de geração de planos
+          const now = new Date().toISOString();
+          const { data: planCount, error: countError } = await supabase
             .from('plan_generation_counts')
-            .insert({
+            .select('count, last_reset_date')
+            .eq('user_id', userData.id)
+            .eq('plan_type', 'rehab_plan')
+            .maybeSingle();
+            
+          if (countError) {
+            console.error("Erro ao verificar contagem de planos:", countError);
+          }
+          
+          if (planCount) {
+            await supabase
+              .from('plan_generation_counts')
+              .update({
+                count: planCount.count + 1,
+                last_generated_date: now
+              })
+              .eq('user_id', userData.id)
+              .eq('plan_type', 'rehab_plan');
+          } else {
+            await supabase
+              .from('plan_generation_counts')
+              .insert({
               user_id: userData.id,
               plan_type: 'rehab_plan',
               count: 1,
               last_generated_date: now,
               last_reset_date: now
             });
+          }
         }
+      } catch (dbError) {
+        console.error("Erro ao interagir com o banco de dados:", dbError);
       }
     }
 
