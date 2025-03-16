@@ -1,626 +1,186 @@
 
-import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FisioPreferences } from '@/components/fisio/types';
-import { Loader2, ArrowLeft, Download, BookOpen, Dumbbell, AlertTriangle, RefreshCw } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { usePaymentHandling } from '@/components/menu/hooks/usePaymentHandling';
-import type { RehabPlan } from './types/rehab-plan';
-import { formatImageUrl } from '@/utils/imageUtils';
+import React, { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Stethoscope, RotateCcw, RefreshCw, Trash2 } from "lucide-react";
+import { FisioPreferences } from "./types";
+import { WorkoutLoadingState } from "@/components/workout/components/WorkoutLoadingState";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useFisioPlanGeneration } from "./hooks/useFisioPlanGeneration";
+import { RehabPlanDisplay } from "./components/RehabPlanDisplay";
+import { DeletePlanDialog } from "./components/DeletePlanDialog";
 
 interface ExercisePlanDisplayProps {
   preferences: FisioPreferences;
   onReset: () => void;
+  onPlanGenerated?: () => void;
 }
 
-export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ preferences, onReset }) => {
-  const [plan, setPlan] = useState<RehabPlan | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [activeDay, setActiveDay] = useState('overview');
-  const [loadingText, setLoadingText] = useState('Gerando seu plano de reabilitação...');
-  const [error, setError] = useState<string | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
-  const { hasPaid, isProcessingPayment, handlePaymentAndContinue, showConfirmation, setShowConfirmation } = 
-    usePaymentHandling('rehabilitation');
+export const ExercisePlanDisplay = ({
+  preferences,
+  onReset,
+  onPlanGenerated,
+}: ExercisePlanDisplayProps) => {
+  const {
+    loading,
+    rehabPlan,
+    error,
+    generatePlan,
+    loadingTime,
+    loadingPhase,
+    loadingMessage,
+    planGenerationCount,
+  } = useFisioPlanGeneration(preferences, onPlanGenerated);
+  
+  const isMobile = useIsMobile();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isDeletingPlan, setIsDeletingPlan] = useState(false);
 
-  const generateRehabPlan = async () => {
-    setIsLoading(true);
-    setError(null);
+  const handleGenerateNewPlan = () => {
+    generatePlan();
+  };
+
+  const handleDeletePlan = async () => {
+    if (!rehabPlan?.id) return;
     
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      setIsDeletingPlan(true);
       
-      const userData = user ? {
-        id: user.id,
-        email: user.email,
-      } : null;
-      
-      setLoadingText('Analisando suas preferências...');
-      
-      const timeout1 = setTimeout(() => {
-        if (isLoading) setLoadingText('Selecionando exercícios apropriados...');
-      }, 5000);
-      
-      const timeout2 = setTimeout(() => {
-        if (isLoading) setLoadingText('Criando seu plano personalizado...');
-      }, 10000);
-      
-      const simplifiedPreferences = {
-        joint_area: preferences.joint_area,
-        condition: preferences.condition || 'general',
-        pain_level: preferences.pain_level || 0,
-        mobility_level: preferences.mobility_level || 'moderate',
-      };
-      
-      console.log('Enviando requisição de plano de reabilitação com preferências:', simplifiedPreferences);
-      
-      const response = await supabase.functions.invoke('generate-rehab-plan-groq', {
-        body: { preferences: simplifiedPreferences, userData },
-      });
-      
-      clearTimeout(timeout1);
-      clearTimeout(timeout2);
-      
-      if (response.error) {
-        console.error('Erro na resposta de generate-rehab-plan-groq:', response.error);
-        throw new Error(response.error.message || 'Erro ao gerar plano de reabilitação');
+      const { error } = await supabase
+        .from('rehab_plans')
+        .delete()
+        .eq('id', rehabPlan.id);
+
+      if (error) {
+        console.error('Error deleting rehab plan:', error);
+        toast.error('Erro ao excluir plano de reabilitação');
+        return;
       }
-      
-      console.log('Resposta de generate-rehab-plan-groq:', response.data);
-      
-      if (!response.data) {
-        throw new Error('Nenhum dado retornado pelo gerador de plano de reabilitação');
-      }
-      
-      // Make sure we have the exercises data properly formatted 
-      const processedPlan = processRehabPlan(response.data);
-      setPlan(processedPlan);
-      
+
+      toast.success('Plano de reabilitação excluído com sucesso');
+      onReset();
+      if (onPlanGenerated) onPlanGenerated();
     } catch (error) {
-      console.error('Erro ao gerar plano de reabilitação:', error);
-      
-      const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido';
-      
-      if (errorMessage.includes('context_length_exceeded')) {
-        setError('A geração do plano falhou devido à complexidade. Por favor, tente com preferências mais simples ou tente novamente mais tarde.');
-      } else if (errorMessage.includes('Max number of functions reached')) {
-        setError('O serviço está atualmente em capacidade máxima. Seu plano será gerado usando um método alternativo. Por favor, tente novamente em alguns momentos.');
-      } else if (errorMessage.includes('no data returned') || errorMessage.includes('No data returned')) {
-        setError('Falha ao gerar dados de reabilitação. Por favor, tente novamente com preferências diferentes.');
-      } else {
-        setError(errorMessage);
-      }
-      
-      toast.error('Falha ao gerar plano', {
-        description: 'Por favor, tente novamente mais tarde ou entre em contato com o suporte se o problema persistir.'
-      });
+      console.error('Error in deletion process:', error);
+      toast.error('Erro ao excluir plano de reabilitação');
     } finally {
-      setIsLoading(false);
+      setIsDeletingPlan(false);
+      setDeleteDialogOpen(false);
     }
   };
 
-  // Process the rehab plan to ensure we have all required data properly formatted
-  const processRehabPlan = (data: any): RehabPlan => {
-    console.log('Processando dados do plano de reabilitação:', data);
-    
-    // Create a properly formatted plan
-    const processedPlan: RehabPlan = {
-      id: data.id || crypto.randomUUID(),
-      user_id: data.user_id || '',
-      goal: data.goal || 'pain_relief',
-      condition: data.condition || '',
-      joint_area: data.joint_area || preferences.joint_area,
-      start_date: data.start_date || new Date().toISOString(),
-      end_date: data.end_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      overview: data.overview || 'Plano de reabilitação personalizado para sua condição',
-      recommendations: data.recommendations || [],
-      days: {},
-      rehab_sessions: data.rehab_sessions || []
-    };
-    
-    // Handle days structure from API
-    if (data.days && Object.keys(data.days).length > 0) {
-      processedPlan.days = data.days;
-    } else {
-      console.log('Construindo estrutura de dias a partir dos dados disponíveis');
-      
-      // Build days from rehab_sessions if available
-      if (data.rehab_sessions && data.rehab_sessions.length > 0) {
-        processedPlan.days = {};
-        
-        data.rehab_sessions.forEach((session: any, index: number) => {
-          const dayKey = `day${index + 1}`;
-          processedPlan.days[dayKey] = {
-            notes: `Dia ${index + 1} - Exercícios de reabilitação`,
-            exercises: [{
-              title: "Exercícios de Reabilitação",
-              exercises: (session.exercises || []).map((ex: any) => ({
-                name: ex.name,
-                sets: ex.sets || 3,
-                reps: ex.reps || 10,
-                rest_time_seconds: ex.rest_time_seconds || 60,
-                restTime: ex.restTime || `${Math.floor((ex.rest_time_seconds || 60) / 60)}:${(ex.rest_time_seconds || 60) % 60 < 10 ? '0' : ''}${(ex.rest_time_seconds || 60) % 60}`,
-                gifUrl: ex.gifUrl || null,
-                description: ex.description || null,
-                notes: ex.notes || null,
-                difficulty: ex.difficulty || null
-              }))
-            }]
-          };
-        });
-      } 
-      // Build days from exercises if available but no rehab_sessions
-      else if (data.exercises && data.exercises.length > 0) {
-        processedPlan.days = {
-          day1: {
-            notes: "Exercícios de reabilitação",
-            exercises: [{
-              title: "Exercícios Recomendados",
-              exercises: data.exercises.map((ex: any) => ({
-                name: ex.name || "Exercício",
-                sets: ex.sets || 3,
-                reps: ex.reps || 10,
-                rest_time_seconds: ex.rest_time_seconds || 60,
-                restTime: ex.restTime || `${Math.floor((ex.rest_time_seconds || 60) / 60)}:${(ex.rest_time_seconds || 60) % 60 < 10 ? '0' : ''}${(ex.rest_time_seconds || 60) % 60}`,
-                gifUrl: ex.gifUrl || null,
-                description: ex.description || null,
-                notes: ex.notes || null,
-                difficulty: ex.difficulty || null
-              }))
-            }]
-          }
-        };
-      } 
-      // If we have exercises inside patient object 
-      else if (data.rehabilitationPlan && data.rehabilitationPlan.exercises && data.rehabilitationPlan.exercises.length > 0) {
-        processedPlan.days = {
-          day1: {
-            notes: "Exercícios de reabilitação",
-            exercises: [{
-              title: "Exercícios Recomendados",
-              exercises: data.rehabilitationPlan.exercises.map((ex: any) => ({
-                name: ex.name || "Exercício " + (ex.id || ""),
-                sets: ex.sets || 3,
-                reps: ex.repetitions || ex.reps || 10,
-                rest_time_seconds: ex.rest_time_seconds || 60,
-                restTime: ex.restTime || `${Math.floor((ex.rest_time_seconds || 60) / 60)}:${(ex.rest_time_seconds || 60) % 60 < 10 ? '0' : ''}${(ex.rest_time_seconds || 60) % 60}`,
-                gifUrl: ex.gifUrl || null,
-                description: ex.description || null,
-                notes: ex.notes || null,
-                difficulty: ex.difficulty || null,
-                exercise_id: ex.id || null
-              }))
-            }]
-          }
-        };
-      }
-      // Default empty structure
-      else {
-        processedPlan.days = {
-          day1: {
-            notes: "Plano de reabilitação padrão",
-            exercises: [{
-              title: "Exercícios Recomendados",
-              exercises: []
-            }]
-          }
-        };
-      }
-    }
-    
-    console.log('Plano processado:', processedPlan);
-    
-    return processedPlan;
-  };
-
-  const handleRetry = () => {
-    setRetryCount(prev => prev + 1);
-    generateRehabPlan();
-  };
-
-  useEffect(() => {
-    if (hasPaid && !plan) {
-      generateRehabPlan();
-    }
-  }, [hasPaid]);
-
-  const checkPaymentAndGeneratePlan = async () => {
-    setIsLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        throw new Error('Usuário não autenticado');
-      }
-
-      const { data: counts, error: countError } = await supabase
-        .from('plan_generation_counts')
-        .select('rehabilitation_count')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (countError) {
-        console.error('Erro ao verificar contagens de plano:', countError);
-      }
-
-      // Try to get payment setting, if it fails, log the error but continue
-      let paymentGloballyEnabled = true;
-      try {
-        const { data: paymentSettingData, error: paymentSettingError } = await supabase
-          .rpc('get_payment_setting', { setting_name_param: 'payment_enabled' });
-        
-        if (paymentSettingError) {
-          console.error('Erro ao buscar configurações de pagamento:', paymentSettingError);
-        } else {
-          console.log('Configuração de pagamento de reabilitação:', paymentSettingData);
-          paymentGloballyEnabled = paymentSettingData === null ? true : paymentSettingData;
-        }
-      } catch (error) {
-        console.error('Erro ao buscar configurações de pagamento:', error);
-      }
-      
-      console.log('Pagamento globalmente ativado:', paymentGloballyEnabled);
-      
-      if (!paymentGloballyEnabled || !counts || (counts.rehabilitation_count < 3)) {
-        console.log('Gerando plano de reabilitação sem verificação de pagamento');
-        await generateRehabPlan();
-      } else {
-        const { data: access, error: accessError } = await supabase
-          .from('plan_access')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('plan_type', 'rehabilitation')
-          .eq('is_active', true)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (accessError && accessError.code !== 'PGRST116') {
-          console.error('Erro ao verificar acesso ao plano:', accessError);
-        }
-
-        if (access && !access.payment_required) {
-          console.log('Usuário tem acesso à geração de plano de reabilitação');
-          await generateRehabPlan();
-        } else {
-          console.log('Usuário precisa pagar pela geração de plano de reabilitação');
-          setIsLoading(false);
-        }
-      }
-    } catch (error) {
-      console.error('Erro ao verificar status de pagamento:', error);
-      setIsLoading(false);
-      setError('Falha ao verificar status de pagamento. Por favor, tente novamente mais tarde.');
-    }
-  };
-
-  useEffect(() => {
-    checkPaymentAndGeneratePlan();
-  }, []);
-
-  const renderExerciseList = (exercises) => {
-    if (!exercises || exercises.length === 0) {
-      return (
-        <div className="p-4 text-center bg-gray-50 dark:bg-gray-800 rounded-md">
-          <p className="text-muted-foreground">Nenhum exercício encontrado para esta seção.</p>
-        </div>
-      );
-    }
-    
+  if (loading) {
     return (
-      <div className="space-y-6">
-        {exercises.map((exercise, i) => (
-          <Card key={i} className="overflow-hidden bg-white dark:bg-gray-800">
-            <div className="flex flex-col md:flex-row">
-              {exercise.gifUrl && (
-                <div className="md:w-1/3 flex justify-center items-center bg-gray-100 dark:bg-gray-700 p-4">
-                  <img 
-                    src={formatImageUrl(exercise.gifUrl)} 
-                    alt={exercise.name || 'Exercício'} 
-                    className="h-48 object-contain"
-                    onError={(e) => {
-                      console.log('Erro ao carregar imagem:', exercise.gifUrl);
-                      (e.target as HTMLImageElement).src = '/placeholder.svg';
-                    }}
-                  />
-                </div>
-              )}
-              <div className={`md:${exercise.gifUrl ? 'w-2/3' : 'w-full'} p-4`}>
-                <h4 className="text-lg font-semibold flex items-center">
-                  <Dumbbell className="w-5 h-5 mr-2 text-primary" />
-                  {exercise.name || 'Nome do Exercício Ausente'}
-                </h4>
-                {exercise.difficulty && (
-                  <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                    Dificuldade: {exercise.difficulty}
-                  </div>
-                )}
-                <div className="grid grid-cols-3 gap-2 my-3">
-                  <div className="bg-primary/10 rounded-md p-2 text-center">
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Séries</div>
-                    <div className="font-bold">{exercise.sets || '3'}</div>
-                  </div>
-                  <div className="bg-primary/10 rounded-md p-2 text-center">
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Repetições</div>
-                    <div className="font-bold">{exercise.reps || '10'}</div>
-                  </div>
-                  <div className="bg-primary/10 rounded-md p-2 text-center">
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Descanso</div>
-                    <div className="font-bold">
-                      {exercise.rest_time_seconds ? 
-                        `${Math.floor(exercise.rest_time_seconds / 60)}:${(exercise.rest_time_seconds % 60).toString().padStart(2, '0')}` : 
-                        '1:00'}
-                    </div>
-                  </div>
-                </div>
-                {(exercise.description || exercise.notes) && (
-                  <div className="mt-3 text-sm">
-                    <p>{exercise.description || exercise.notes || 'Nenhuma descrição disponível.'}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
-    );
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] p-8">
-        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <h3 className="text-xl font-medium text-center">{loadingText}</h3>
-        <p className="text-muted-foreground text-center mt-2">
-          Isso pode levar até um minuto enquanto criamos um plano personalizado para você.
-        </p>
-      </div>
+      <WorkoutLoadingState
+        loadingTime={loadingTime}
+        loadingPhase={loadingPhase}
+        loadingMessage={loadingMessage}
+        onRetry={generatePlan}
+        timePassed={loadingTime > 30}
+      />
     );
   }
 
   if (error) {
     return (
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle className="text-2xl flex items-center">
-            <AlertTriangle className="h-6 w-6 text-amber-500 mr-2" />
-            Erro ao gerar plano
-          </CardTitle>
-          <CardDescription>
-            {error}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="mb-4">Isso pode ser devido a sobrecarga temporária do serviço ou problemas técnicos.</p>
-        </CardContent>
-        <CardFooter className="flex flex-col sm:flex-row gap-4">
-          <Button variant="outline" onClick={onReset} className="w-full sm:w-auto">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Alterar preferências
+      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6 text-center">
+        <div className="inline-flex items-center justify-center p-2 bg-red-100 dark:bg-red-900/30 rounded-full mb-4">
+          <Stethoscope className="w-6 h-6 text-red-500" />
+        </div>
+        <h3 className="text-xl font-semibold text-red-700 dark:text-red-400 mb-2">
+          Erro ao gerar plano
+        </h3>
+        <p className="text-sm text-red-600 dark:text-red-300 max-w-md mx-auto mb-4">
+          {error || "Ocorreu um erro ao gerar seu plano de reabilitação. Por favor, tente novamente."}
+        </p>
+        <div className="flex flex-col sm:flex-row justify-center gap-2">
+          <Button onClick={generatePlan} variant="default">
+            Tentar Novamente
           </Button>
-          <Button onClick={handleRetry} className="w-full sm:w-auto">
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Tentar novamente
+          <Button onClick={onReset} variant="outline">
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Alterar Preferências
           </Button>
-        </CardFooter>
-      </Card>
-    );
-  }
-
-  if (!hasPaid && !plan) {
-    return (
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle className="text-2xl">Pronto para criar seu plano de reabilitação</CardTitle>
-          <CardDescription>
-            Obtenha um plano de reabilitação personalizado para {preferences.joint_area} com exercícios adaptados às suas necessidades.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-primary/5 rounded-lg p-4">
-                <h3 className="font-medium text-lg mb-2">Suas preferências</h3>
-                <ul className="space-y-2">
-                  <li><span className="font-medium">Área articular:</span> {preferences.joint_area}</li>
-                  <li><span className="font-medium">Foco da reabilitação:</span> {preferences.condition || 'Recuperação geral'}</li>
-                  {preferences.pain_level && (
-                    <li><span className="font-medium">Nível de dor:</span> {preferences.pain_level}/10</li>
-                  )}
-                </ul>
-              </div>
-              <div className="bg-primary/5 rounded-lg p-4">
-                <h3 className="font-medium text-lg mb-2">O que você receberá</h3>
-                <ul className="space-y-2">
-                  <li>⭐ Exercícios de reabilitação personalizados</li>
-                  <li>⭐ Estrutura de acompanhamento de progresso</li>
-                  <li>⭐ Instruções detalhadas com visuais</li>
-                  <li>⭐ Recomendações específicas para sua condição</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-        <CardFooter className="flex flex-col sm:flex-row gap-4">
-          <Button variant="outline" onClick={onReset} className="w-full sm:w-auto">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Alterar preferências
-          </Button>
-          <Button 
-            onClick={handlePaymentAndContinue} 
-            disabled={isProcessingPayment}
-            className="w-full sm:w-auto"
-          >
-            {isProcessingPayment && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isProcessingPayment ? 'Processando...' : 'Continuar'}
-          </Button>
-        </CardFooter>
-      </Card>
-    );
-  }
-
-  if (!plan) {
-    return (
-      <div className="flex flex-col items-center justify-center p-8">
-        <div className="text-center space-y-2">
-          <h3 className="text-xl font-medium">Algo deu errado</h3>
-          <p className="text-muted-foreground">
-            Não foi possível gerar seu plano de reabilitação. Por favor, tente novamente.
-          </p>
-          <div className="mt-4 flex flex-col sm:flex-row gap-4">
-            <Button onClick={onReset}>
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Recomeçar
-            </Button>
-            <Button onClick={handleRetry} variant="outline">
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Tentar novamente
-            </Button>
-          </div>
         </div>
       </div>
     );
   }
 
-  // Ensure we have days structure
-  if (!plan.days || Object.keys(plan.days).length === 0) {
-    console.log('Plano não tem estrutura de dias válida:', plan);
-    plan.days = {
-      day1: {
-        notes: "Exercícios de reabilitação padrão",
-        exercises: [{
-          title: "Exercícios Recomendados",
-          exercises: []
-        }]
-      }
-    };
+  if (!rehabPlan) {
+    return (
+      <div className="text-center p-3 sm:p-8">
+        <div className="inline-flex items-center justify-center p-2 bg-amber-100 rounded-full mb-3 sm:mb-4">
+          <Stethoscope className="w-5 h-5 sm:w-6 sm:h-6 text-amber-500" />
+        </div>
+        <h3 className="text-lg sm:text-xl font-semibold text-amber-600">
+          Aguardando plano de reabilitação
+        </h3>
+        <p className="text-sm text-muted-foreground max-w-md mx-auto mt-2">
+          O plano de reabilitação ainda não está pronto. Aguarde enquanto ele é preparado ou tente novamente.
+        </p>
+        <div className="flex flex-col sm:flex-row justify-center gap-2 mt-4 sm:mt-6">
+          <Button onClick={handleGenerateNewPlan} className="w-full sm:w-auto text-sm">
+            Gerar Plano
+          </Button>
+          <Button onClick={onReset} variant="outline" className="w-full sm:w-auto text-sm">
+            <RotateCcw className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+            Alterar Preferências
+          </Button>
+        </div>
+      </div>
+    );
   }
-
-  const dayKeys = Object.keys(plan.days).sort((a, b) => {
-    const aNum = parseInt(a.replace('day', ''));
-    const bNum = parseInt(b.replace('day', ''));
-    return aNum - bNum;
-  });
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Seu Plano de Reabilitação</h2>
-        <div className="flex space-x-2">
-          <Button variant="outline" onClick={onReset} size="sm">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Voltar
-          </Button>
-          <Button variant="outline" size="sm">
-            <Download className="mr-2 h-4 w-4" />
-            Salvar PDF
-          </Button>
-        </div>
+    <div className="space-y-4 sm:space-y-6 animate-fadeIn">
+      <RehabPlanDisplay plan={rehabPlan} />
+      
+      <div className={`flex ${isMobile ? 'flex-col' : 'justify-center'} gap-2 sm:gap-3 mt-4 sm:mt-6`}>
+        <Button 
+          onClick={handleGenerateNewPlan} 
+          variant="default" 
+          className="flex items-center gap-1.5 sm:gap-2 text-sm"
+          size={isMobile ? "default" : "lg"}
+        >
+          <RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          {isMobile ? "Novo Plano" : "Novo Plano com Diferentes Exercícios"}
+        </Button>
+        
+        <Button 
+          onClick={onReset} 
+          variant="outline" 
+          className="flex items-center gap-1.5 sm:gap-2 text-sm"
+          size={isMobile ? "default" : "lg"}
+        >
+          <RotateCcw className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          {isMobile ? "Mudar Preferências" : "Alterar Preferências"}
+        </Button>
+        
+        <Button 
+          onClick={() => setDeleteDialogOpen(true)} 
+          variant="destructive" 
+          className="flex items-center gap-1.5 sm:gap-2 text-sm"
+          size={isMobile ? "default" : "lg"}
+        >
+          <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          {isMobile ? "Excluir" : "Excluir Plano"}
+        </Button>
       </div>
-
-      <Tabs defaultValue="overview" value={activeDay} onValueChange={setActiveDay}>
-        <TabsList className="mb-4 flex flex-wrap">
-          <TabsTrigger value="overview" className="data-[state=active]:bg-primary data-[state=active]:text-white">
-            <BookOpen className="h-4 w-4 mr-2" />
-            Visão Geral
-          </TabsTrigger>
-          {dayKeys.map((day) => (
-            <TabsTrigger 
-              key={day} 
-              value={day}
-              className="data-[state=active]:bg-primary data-[state=active]:text-white"
-            >
-              Dia {day.replace('day', '')}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Visão Geral do Plano de Reabilitação</CardTitle>
-              <CardDescription>
-                Para {preferences.joint_area} - {preferences.condition || 'Recuperação'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="prose dark:prose-invert max-w-none">
-                {plan.overview ? (
-                  <p>{plan.overview}</p>
-                ) : (
-                  <p>Este plano de reabilitação foi desenvolvido para ajudar a melhorar sua condição de {preferences.joint_area} e alcançar recuperação para {preferences.condition || 'sua condição'}.</p>
-                )}
-                
-                {plan.recommendations && (
-                  <div className="mt-4">
-                    <h3 className="text-lg font-medium mb-2">Recomendações</h3>
-                    {Array.isArray(plan.recommendations) ? (
-                      <ul className="list-disc pl-5 space-y-1">
-                        {plan.recommendations.map((rec, i) => (
-                          <li key={i}>{rec}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p>{plan.recommendations}</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {plan.rehab_sessions && plan.rehab_sessions.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Visão Geral dos Exercícios</CardTitle>
-                <CardDescription>
-                  Todos os exercícios em seu programa de reabilitação
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {renderExerciseList(
-                  plan.rehab_sessions.flatMap(session => session.exercises || [])
-                )}
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
-        {dayKeys.map((day) => {
-          const dayData = plan.days?.[day];
-          if (!dayData) return null;
-          
-          return (
-            <TabsContent key={day} value={day} className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Dia {day.replace('day', '')} - Programa de Exercícios</CardTitle>
-                  <CardDescription>
-                    {dayData.notes || `Exercícios para o dia ${day.replace('day', '')}`}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {dayData.exercises && dayData.exercises.map((group, i) => (
-                    <div key={i} className="space-y-4">
-                      <h3 className="text-lg font-medium">{group.title || 'Grupo de Exercícios'}</h3>
-                      {renderExerciseList(group.exercises || [])}
-                    </div>
-                  ))}
-                  
-                  {!dayData.exercises && (
-                    <div className="p-4 text-center bg-gray-50 dark:bg-gray-800 rounded-md">
-                      <p className="text-muted-foreground">Nenhum exercício encontrado para este dia.</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          );
-        })}
-      </Tabs>
+      
+      {planGenerationCount > 1 && (
+        <p className="text-xs text-center text-muted-foreground px-3">
+          Você já gerou {planGenerationCount} {planGenerationCount === 1 ? 'plano' : 'planos'} de reabilitação. 
+          Cada plano contém exercícios diferentes para variar seu programa.
+        </p>
+      )}
+      
+      <DeletePlanDialog 
+        isOpen={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onConfirm={handleDeletePlan}
+        isDeleting={isDeletingPlan}
+      />
     </div>
   );
 };
