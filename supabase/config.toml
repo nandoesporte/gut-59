@@ -7,19 +7,10 @@ verify_jwt = false
 [functions.groq-chat]
 verify_jwt = false
 
-[functions.generate-meal-plan-groq]
-verify_jwt = false
-
 [functions.generate-rehab-plan-groq]
 verify_jwt = false
 
-[functions.generate-rehab-plan]
-verify_jwt = false
-
-[functions.generate-meal-plan]
-verify_jwt = false
-
-[functions.generate-workout-plan]
+[functions.generate-meal-plan-groq]
 verify_jwt = false
 
 [functions.check-mercadopago-payment]
@@ -27,4 +18,3 @@ verify_jwt = false
 
 [functions.create-mercadopago-preference]
 verify_jwt = false
-
