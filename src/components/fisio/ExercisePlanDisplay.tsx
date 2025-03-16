@@ -129,17 +129,13 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
           console.error('Error checking plan counts:', countError);
         }
 
-        const { data: settings, error: settingsError } = await supabase
+        const { data: paymentSettings } = await supabase
           .from('payment_settings')
           .select('is_active')
           .eq('setting_name', 'payment_enabled')
-          .maybeSingle();
+          .single();
           
-        if (settingsError && settingsError.code !== 'PGRST116') {
-          console.error('Error checking payment settings:', settingsError);
-        }
-        
-        const paymentGloballyEnabled = settings ? !!settings.is_active : true;
+        const paymentGloballyEnabled = paymentSettings?.is_active ?? true;
         
         console.log('Payment globally enabled:', paymentGloballyEnabled);
         
