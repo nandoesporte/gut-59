@@ -1,3 +1,4 @@
+
 import * as React from 'react';
 import { useState } from 'react';
 import { FisioPreferences } from '@/components/fisio/types';
@@ -8,6 +9,7 @@ import { FisioHistoryView } from '@/components/fisio/components/FisioHistory';
 import { supabase } from '@/integrations/supabase/client';
 import type { RehabPlan } from '@/components/fisio/types/rehab-plan';
 import { Badge } from '@/components/ui/badge';
+import { toast } from "sonner";
 
 const Fisio = () => {
   const [preferences, setPreferences] = useState<FisioPreferences | null>(null);
@@ -77,6 +79,33 @@ const Fisio = () => {
   }, []);
 
   const handleSubmitPreferences = (data: FisioPreferences) => {
+    // Validate required fields for the API
+    if (!data.injuryDescription) {
+      toast.error("Por favor, descreva sua lesão para melhor precisão do plano.");
+      return;
+    }
+    
+    if (!data.painLocation) {
+      toast.error("Por favor, indique a localização da dor para um plano mais adequado.");
+      return;
+    }
+    
+    if (!data.injuryDuration) {
+      toast.error("Por favor, informe há quanto tempo tem a lesão.");
+      return;
+    }
+    
+    if (!data.equipmentAvailable || data.equipmentAvailable.length === 0) {
+      // Set default equipment to empty array but with some standard equipment
+      data.equipmentAvailable = ["elastic bands", "foam roller", "chair"];
+      toast.info("Utilizaremos equipamentos básicos para seu plano de reabilitação.");
+    }
+    
+    if (!data.exerciseExperience) {
+      data.exerciseExperience = "moderate";
+      toast.info("Considerando que você tem experiência moderada com exercícios.");
+    }
+    
     setPreferences(data);
   };
 
