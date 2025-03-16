@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -37,10 +36,8 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
         email: user.email,
       } : null;
       
-      // Set more specific loading messages to improve UX during longer processing times
       setLoadingText('Analyzing your preferences...');
       
-      // Create timeout variables that we can clear later
       const timeout1 = setTimeout(() => {
         if (isLoading) setLoadingText('Selecting appropriate exercises...');
       }, 5000);
@@ -49,7 +46,6 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
         if (isLoading) setLoadingText('Creating your personalized plan...');
       }, 10000);
       
-      // Simplify the preferences data to reduce context size
       const simplifiedPreferences = {
         joint_area: preferences.joint_area,
         condition: preferences.condition || 'general',
@@ -63,7 +59,6 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
         body: { preferences: simplifiedPreferences, userData },
       });
       
-      // Clear timeouts to prevent state updates after component is unmounted
       clearTimeout(timeout1);
       clearTimeout(timeout2);
       
@@ -85,7 +80,6 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
       
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
       
-      // Handle specific errors
       if (errorMessage.includes('context_length_exceeded')) {
         setError('The plan generation failed due to complexity. Please try with simpler preferences or try again later.');
       } else if (errorMessage.includes('Max number of functions reached')) {
@@ -135,7 +129,6 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
           console.error('Error checking plan counts:', countError);
         }
 
-        // Check global payment settings to see if we should bypass payment
         const { data: globalSettings, error: settingsError } = await supabase
           .from('payment_settings')
           .select('*')
@@ -146,12 +139,7 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
           console.error('Error checking payment settings:', settingsError);
         }
         
-        // Check if payments are globally enabled (default to true if not found)
-        let paymentGloballyEnabled = true;
-        if (globalSettings) {
-          // Use is_active instead of value
-          paymentGloballyEnabled = globalSettings.is_active;
-        }
+        const paymentGloballyEnabled = globalSettings ? !!globalSettings.is_active : true;
         
         console.log('Payment globally enabled:', paymentGloballyEnabled);
         
@@ -212,7 +200,6 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
                     alt={exercise.name} 
                     className="h-48 object-contain"
                     onError={(e) => {
-                      // Replace broken image with placeholder
                       (e.target as HTMLImageElement).src = '/placeholder.svg';
                     }}
                   />
@@ -382,7 +369,6 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
     return aNum - bNum;
   });
 
-  // Create fallback plan data if structure is incomplete
   if (dayKeys.length === 0 && plan.rehab_sessions && plan.rehab_sessions.length > 0) {
     console.log('Creating day structure from rehab sessions');
     plan.days = {};
@@ -399,7 +385,6 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
     });
   }
 
-  // If still no days, create a fallback
   if (!plan.days || Object.keys(plan.days).length === 0) {
     console.log('Creating fallback plan structure');
     plan.days = {
@@ -413,7 +398,6 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
     };
   }
   
-  // Update day keys after potential restructuring
   const updatedDayKeys = Object.keys(plan.days || {}).sort((a, b) => {
     const aNum = parseInt(a.replace('day', ''));
     const bNum = parseInt(b.replace('day', ''));
