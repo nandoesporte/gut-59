@@ -129,13 +129,19 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
           console.error('Error checking plan counts:', countError);
         }
 
-        const { data, error } = await supabase
-          .from('payment_settings')
-          .select('is_active')
-          .eq('setting_name', 'payment_enabled')
-          .limit(1);
-          
-        const paymentGloballyEnabled = data && data.length > 0 ? Boolean(data[0].is_active) : true;
+        let paymentGloballyEnabled = true; // Default value
+        
+        try {
+          const { data } = await supabase
+            .from('payment_settings')
+            .select('is_active')
+            .eq('setting_name', 'payment_enabled')
+            .single();
+            
+          paymentGloballyEnabled = data?.is_active ?? true;
+        } catch (e) {
+          console.error('Error fetching payment settings:', e);
+        }
         
         console.log('Payment globally enabled:', paymentGloballyEnabled);
         
