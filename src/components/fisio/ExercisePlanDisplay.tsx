@@ -214,10 +214,7 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
                 <h3 className="font-medium text-lg mb-2">Your preferences</h3>
                 <ul className="space-y-2">
                   <li><span className="font-medium">Joint Area:</span> {preferences.joint_area}</li>
-                  <li><span className="font-medium">Goal:</span> {preferences.goal}</li>
-                  {preferences.condition && (
-                    <li><span className="font-medium">Condition:</span> {preferences.condition}</li>
-                  )}
+                  <li><span className="font-medium">Rehabilitation Focus:</span> {preferences.condition || 'General recovery'}</li>
                   {preferences.pain_level && (
                     <li><span className="font-medium">Pain Level:</span> {preferences.pain_level}/10</li>
                   )}
@@ -315,7 +312,7 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
             <CardHeader>
               <CardTitle>Rehabilitation Plan Overview</CardTitle>
               <CardDescription>
-                For {preferences.joint_area} - {preferences.goal}
+                For {preferences.joint_area} - {preferences.condition || 'Recovery'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -323,7 +320,7 @@ export const ExercisePlanDisplay: React.FC<ExercisePlanDisplayProps> = ({ prefer
                 {plan.overview ? (
                   <p>{plan.overview}</p>
                 ) : (
-                  <p>This rehabilitation plan is designed to help improve your {preferences.joint_area} condition and achieve your goal of {preferences.goal}.</p>
+                  <p>This rehabilitation plan is designed to help improve your {preferences.joint_area} condition and achieve recovery for {preferences.condition || 'your condition'}.</p>
                 )}
                 
                 {plan.recommendations && (
