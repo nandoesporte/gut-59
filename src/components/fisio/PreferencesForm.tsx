@@ -15,6 +15,8 @@ import { Stethoscope, ArrowRight, CreditCard } from "lucide-react";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { usePaymentHandling } from "@/components/menu/hooks/usePaymentHandling";
 import { toast } from "sonner";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 const formSchema = z.object({
   age: z.number().min(16, "Idade mínima é 16 anos").max(100, "Idade máxima é 100 anos"),
@@ -49,12 +51,39 @@ interface PreferencesFormProps {
 export const FisioPreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = React.useState(false);
   const [formData, setFormData] = React.useState<FormData | null>(null);
+  const [isPaymentEnabled, setIsPaymentEnabled] = useState(false);
+  
   const {
     isProcessingPayment,
     hasPaid,
     currentPrice,
     handlePaymentAndContinue
-  } = usePaymentHandling();
+  } = usePaymentHandling('rehabilitation');
+
+  useEffect(() => {
+    checkPaymentSettings();
+  }, []);
+
+  const checkPaymentSettings = async () => {
+    try {
+      const { data: settings, error } = await supabase
+        .from('payment_settings')
+        .select('is_active')
+        .eq('plan_type', 'rehabilitation')
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error checking payment settings:', error);
+        return;
+      }
+
+      // Set payment enabled based on the retrieved setting
+      setIsPaymentEnabled(settings?.is_active ?? false);
+      console.log('Rehabilitation payment setting:', settings?.is_active);
+    } catch (error) {
+      console.error('Error checking payment settings:', error);
+    }
+  };
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -72,33 +101,35 @@ export const FisioPreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
   });
 
   const handleSubmit = async (data: FormData) => {
-    if (!hasPaid) {
-      setFormData(data);
-      setIsPaymentDialogOpen(true);
+    // Skip payment dialog if payment is not enabled
+    if (!isPaymentEnabled || hasPaid) {
+      try {
+        const preferences: FisioPreferences = {
+          age: data.age,
+          weight: data.weight,
+          height: data.height,
+          gender: data.gender,
+          joint_area: data.joint_area,
+          // Set a default condition based on the joint area
+          condition: getDefaultCondition(data.joint_area),
+          pain_level: data.pain_level,
+          mobility_level: data.mobility_level,
+          previous_treatment: data.previous_treatment,
+          activity_level: data.activity_level
+        };
+        
+        toast.info("Gerando seu plano de reabilitação personalizado...");
+        onSubmit(preferences);
+      } catch (error: any) {
+        console.error("Erro ao processar formulário:", error);
+        toast.error(error.message || "Erro ao processar suas preferências. Por favor, tente novamente.");
+      }
       return;
     }
 
-    try {
-      const preferences: FisioPreferences = {
-        age: data.age,
-        weight: data.weight,
-        height: data.height,
-        gender: data.gender,
-        joint_area: data.joint_area,
-        // Set a default condition based on the joint area
-        condition: getDefaultCondition(data.joint_area),
-        pain_level: data.pain_level,
-        mobility_level: data.mobility_level,
-        previous_treatment: data.previous_treatment,
-        activity_level: data.activity_level
-      };
-      
-      toast.info("Gerando seu plano de reabilitação personalizado...");
-      onSubmit(preferences);
-    } catch (error: any) {
-      console.error("Erro ao processar formulário:", error);
-      toast.error(error.message || "Erro ao processar suas preferências. Por favor, tente novamente.");
-    }
+    // Only proceed to payment if payment is enabled
+    setFormData(data);
+    setIsPaymentDialogOpen(true);
   };
 
   // Function to get a default condition based on the joint area

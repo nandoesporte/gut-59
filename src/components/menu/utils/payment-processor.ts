@@ -23,14 +23,16 @@ export const createPaymentPreference = async (
     .select('is_active')
     .eq('plan_type', planType)
     .eq('is_active', true)
-    .single();
+    .maybeSingle();
 
-  if (settingsError) {
+  if (settingsError && settingsError.code !== 'PGRST116') {
     console.error('Erro ao verificar configuração de pagamento:', settingsError);
     throw new Error('Erro ao verificar configuração de pagamento');
   }
 
+  // If payment is not required globally, throw error
   if (!paymentSettings?.is_active) {
+    console.log(`Payment not required for ${planType} plans`);
     throw new Error('Pagamento não é necessário para este plano');
   }
 

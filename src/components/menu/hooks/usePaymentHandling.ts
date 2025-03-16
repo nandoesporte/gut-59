@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { initMercadoPago } from "@mercadopago/sdk-react";
 import { toast } from "sonner";
@@ -24,13 +23,71 @@ export const usePaymentHandling = (planType: PlanType = 'nutrition') => {
 
   useEffect(() => {
     const loadPrice = async () => {
-      const price = await fetchCurrentPrice(planType);
-      setCurrentPrice(price);
+      try {
+        const price = await fetchCurrentPrice(planType);
+        setCurrentPrice(price);
+      } catch (error) {
+        console.error(`Error loading price for ${planType}:`, error);
+      }
     };
     loadPrice();
+
+    // Also check if the user already has paid access
+    checkUserAccess();
   }, [planType]);
 
-  // Effect to check payment status and notification channel
+  // Add this new function to check if user already has access
+  const checkUserAccess = async () => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user?.id) return;
+
+      // Check if payment is required (globally)
+      const { data: settings } = await supabase
+        .from('payment_settings')
+        .select('is_active')
+        .eq('plan_type', planType)
+        .maybeSingle();
+      
+      // If payment is not active globally, user has default access
+      if (!settings?.is_active) {
+        setHasPaid(true);
+        return;
+      }
+
+      // Check user's specific access
+      const { data: planAccess } = await supabase
+        .from('plan_access')
+        .select('payment_required')
+        .eq('user_id', userData.user.id)
+        .eq('plan_type', planType)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // If user has special access without payment requirement
+      if (planAccess && !planAccess.payment_required) {
+        setHasPaid(true);
+        return;
+      }
+
+      // Check if user still has free generations
+      const { data: counts } = await supabase
+        .from('plan_generation_counts')
+        .select(`${planType}_count`)
+        .eq('user_id', userData.user.id)
+        .maybeSingle();
+
+      const currentCount = counts ? counts[`${planType}_count`] || 0 : 0;
+      if (currentCount < 3) {
+        setHasPaid(true);
+      }
+    } catch (error) {
+      console.error('Error checking user access:', error);
+    }
+  };
+
   useEffect(() => {
     const startPaymentCheck = async () => {
       if (!preferenceId || hasPaid) return;
