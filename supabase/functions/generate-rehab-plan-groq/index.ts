@@ -50,7 +50,8 @@ serve(async (req) => {
       .from('physio_exercises')
       .select('*')
       .eq('joint_area', preferences.joint_area)
-      .order('name');
+      .order('name')
+      .limit(10); // Limit to 10 exercises to reduce context size
 
     if (exercisesError) {
       console.error("Error fetching exercises:", exercisesError);
@@ -66,7 +67,7 @@ serve(async (req) => {
       const { data: generalExercises, error: generalError } = await supabase
         .from('physio_exercises')
         .select('*')
-        .limit(10);
+        .limit(5); // Limit to 5 general exercises
       
       if (!generalError && generalExercises) {
         relevantExercises = generalExercises;
@@ -85,8 +86,12 @@ serve(async (req) => {
     const activityLevel = preferences.activity_level || 'moderate';
     const rehabGoal = 'pain_relief'; // Default goal for rehab
 
-    // Get base prompt from Fisio+ agent
+    // Get base prompt from Fisio+ agent - Truncate to reduce size
     let promptTemplate = promptData.prompt;
+    if (promptTemplate.length > 2000) {
+      promptTemplate = promptTemplate.substring(0, 2000) + "...";
+      console.log("Prompt was truncated to reduce context size");
+    }
     
     // Replace variables in template
     const contextData = {
@@ -105,21 +110,22 @@ serve(async (req) => {
       promptTemplate = promptTemplate.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
     });
 
-    // Add exercise information to the prompt
+    // Add exercise information to the prompt but with reduced data
     const exerciseInfo = relevantExercises.map(ex => ({
       id: ex.id,
       name: ex.name,
       joint_area: ex.joint_area,
       difficulty: ex.difficulty,
-      description: ex.description,
-      exercise_type: ex.exercise_type,
-      gif_url: ex.gif_url
+      // Reduce description size
+      description: ex.description?.substring(0, 100) || "",
+      exercise_type: ex.exercise_type
+      // Remove gif_url to reduce context size
     }));
 
-    // Append exercise data to prompt
-    promptTemplate += `\n\nPlease use ONLY the following exercises from our database in your rehabilitation plan. Include their IDs to ensure proper tracking:\n${JSON.stringify(exerciseInfo, null, 2)}`;
-    promptTemplate += `\n\nEnsure your response includes these specific exercises with their exact IDs, sets, reps, and rest times.`;
-
+    // Append exercise data to prompt - more concise instructions
+    promptTemplate += `\n\nUse these exercises in your plan (add their IDs):\n${JSON.stringify(exerciseInfo)}`;
+    
+    console.log(`Prompt length: ${promptTemplate.length} characters`);
     console.log("Sending prompt to llama3-8b-8192 model");
 
     if (!GROQ_API_KEY) {
