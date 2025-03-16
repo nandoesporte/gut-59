@@ -76,6 +76,10 @@ serve(async (req) => {
 
     console.log("Enviando prompt para o modelo llama3-8b-8192");
 
+    if (!GROQ_API_KEY) {
+      throw new Error("GROQ_API_KEY não configurada no ambiente");
+    }
+
     // Call Groq API to generate the rehabilitation plan
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -88,12 +92,12 @@ serve(async (req) => {
         messages: [
           { 
             role: "system", 
-            content: "Você é um fisioterapeuta especializado em criar planos de reabilitação personalizados. Você sempre responde com JSON válido, utilizando um objeto com estrutura correta e completa, sem truncar ou usar placeholder como '...e assim por diante'."
+            content: "Você é um fisioterapeuta especializado em criar planos de reabilitação personalizados. Você sempre responde com JSON válido, utilizando um objeto com estrutura correta e completa, sem truncar ou usar placeholder como '...e assim por diante'. O JSON deve estar em um formato que possa ser diretamente utilizado por uma aplicação, sem nenhum texto ou formatação adicional."
           },
           { role: "user", content: promptTemplate }
         ],
         max_tokens: 4096,
-        temperature: 0.4,
+        temperature: 0.3,
         response_format: { type: "json_object" }
       }),
     });
@@ -113,6 +117,7 @@ serve(async (req) => {
     }
 
     let rehabPlanJson = groqResponse.choices[0].message.content;
+    console.log("Conteúdo JSON bruto recebido:", rehabPlanJson);
 
     // Processar a resposta JSON
     let rehabPlan;
@@ -121,10 +126,30 @@ serve(async (req) => {
       if (typeof rehabPlanJson === 'string') {
         // Limpar a resposta se contiver blocos de código markdown
         if (rehabPlanJson.includes('```json')) {
+          console.log("Removendo marcadores de markdown do JSON");
           rehabPlanJson = rehabPlanJson.replace(/```json\n|\n```/g, '');
         }
         
-        rehabPlan = JSON.parse(rehabPlanJson);
+        // Tentar fazer parse do JSON
+        try {
+          rehabPlan = JSON.parse(rehabPlanJson);
+        } catch (jsonError) {
+          console.error("Erro no parse do JSON:", jsonError);
+          
+          // Tentar recuperar apenas a parte JSON válida
+          const jsonMatch = rehabPlanJson.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            console.log("Tentando extrair apenas a parte JSON válida");
+            try {
+              rehabPlan = JSON.parse(jsonMatch[0]);
+            } catch (fallbackError) {
+              console.error("Falha na extração do JSON mesmo com regexp:", fallbackError);
+              throw new Error("JSON inválido mesmo após tentativa de extração");
+            }
+          } else {
+            throw new Error("Não foi possível extrair JSON válido da resposta");
+          }
+        }
       } else if (typeof rehabPlanJson === 'object') {
         rehabPlan = rehabPlanJson;
       } else {
