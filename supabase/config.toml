@@ -16,3 +16,4 @@ verify_jwt = false
 [functions.create-mercadopago-preference]
 verify_jwt = false
 
+# Adding a priority comment to keep this part of config.toml the same as in the original file
