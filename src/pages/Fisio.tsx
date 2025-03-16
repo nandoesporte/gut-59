@@ -1,6 +1,6 @@
 
 import * as React from 'react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FisioPreferences } from '@/components/fisio/types';
 import { FisioPreferencesForm } from '@/components/fisio/PreferencesForm';
 import { ExercisePlanDisplay } from '@/components/fisio/ExercisePlanDisplay';
@@ -15,6 +15,80 @@ const Fisio = () => {
   const [preferences, setPreferences] = useState<FisioPreferences | null>(null);
   const [historyPlans, setHistoryPlans] = useState<RehabPlan[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [isPaymentRequired, setIsPaymentRequired] = useState(false);
+
+  // Check if payment is required for rehab plans
+  useEffect(() => {
+    const checkPaymentRequirement = async () => {
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        
+        if (!userData?.user) return;
+        
+        // First check global payment settings
+        const { data: paymentSettings, error: settingsError } = await supabase
+          .from('payment_settings')
+          .select('is_active')
+          .eq('plan_type', 'rehabilitation')
+          .single();
+          
+        if (settingsError && settingsError.code !== 'PGRST116') {
+          console.error('Error checking payment settings:', settingsError);
+          return;
+        }
+        
+        // If payment is not globally active, no payment is required
+        if (!paymentSettings?.is_active) {
+          setIsPaymentRequired(false);
+          return;
+        }
+        
+        // Check if the user has special access
+        const { data: planAccess, error: accessError } = await supabase
+          .from('plan_access')
+          .select('payment_required')
+          .eq('user_id', userData.user.id)
+          .eq('plan_type', 'rehabilitation')
+          .eq('is_active', true)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+          
+        if (accessError && accessError.code !== 'PGRST116') {
+          console.error('Error checking plan access:', accessError);
+          return;
+        }
+        
+        // If user has special access and payment is not required, no payment is required
+        if (planAccess && !planAccess.payment_required) {
+          setIsPaymentRequired(false);
+          return;
+        }
+        
+        // Check generation count
+        const { data: counts, error: countError } = await supabase
+          .from('plan_generation_counts')
+          .select('rehabilitation_count')
+          .eq('user_id', userData.user.id)
+          .maybeSingle();
+          
+        if (countError) {
+          console.error('Error checking generation count:', countError);
+          return;
+        }
+        
+        const currentCount = counts?.rehabilitation_count || 0;
+        
+        // If user has used less than 3 generations, no payment is required
+        setIsPaymentRequired(currentCount >= 3);
+        
+      } catch (error) {
+        console.error('Error checking payment requirement:', error);
+      }
+    };
+    
+    checkPaymentRequirement();
+  }, []);
 
   const fetchFisioHistory = async () => {
     try {
@@ -118,7 +192,10 @@ const Fisio = () => {
         <div className="max-w-4xl mx-auto space-y-8">
           {!preferences ? (
             <div className="transform transition-all duration-500 hover:scale-[1.01]">
-              <FisioPreferencesForm onSubmit={handleSubmitPreferences} />
+              <FisioPreferencesForm 
+                onSubmit={handleSubmitPreferences} 
+                isPaymentRequired={isPaymentRequired}
+              />
             </div>
           ) : (
             <ExercisePlanDisplay 

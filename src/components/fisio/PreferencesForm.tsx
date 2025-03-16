@@ -1,4 +1,3 @@
-
 import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -46,9 +45,10 @@ const jointAreaOptions: Record<JointArea, string> = {
 
 interface PreferencesFormProps {
   onSubmit: (data: FisioPreferences) => void;
+  isPaymentRequired?: boolean;
 }
 
-export const FisioPreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
+export const FisioPreferencesForm = ({ onSubmit, isPaymentRequired = false }: PreferencesFormProps) => {
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = React.useState(false);
   const [formData, setFormData] = React.useState<FormData | null>(null);
   const {
@@ -56,7 +56,7 @@ export const FisioPreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
     hasPaid,
     currentPrice,
     handlePaymentAndContinue
-  } = usePaymentHandling();
+  } = usePaymentHandling('rehabilitation');
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -75,7 +75,7 @@ export const FisioPreferencesForm = ({ onSubmit }: PreferencesFormProps) => {
   });
 
   const handleSubmit = async (data: FormData) => {
-    if (!hasPaid) {
+    if (isPaymentRequired && !hasPaid) {
       setFormData(data);
       setIsPaymentDialogOpen(true);
       return;
