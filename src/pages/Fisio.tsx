@@ -1,3 +1,4 @@
+
 import * as React from 'react';
 import { useState } from 'react';
 import { FisioPreferences } from '@/components/fisio/types';
@@ -76,13 +77,23 @@ const Fisio = () => {
   }, []);
 
   const handleSubmitPreferences = (data: FisioPreferences) => {
+    // Set default values for fields we removed from the form
     data.injuryDescription = "Lesão comum relacionada à área afetada";
     data.injuryDuration = "Recente";
     data.previousTreatments = "Nenhum tratamento anterior";
     data.exerciseExperience = "moderate";
     data.equipmentAvailable = ["elastic bands", "foam roller", "chair"];
+    data.painLocation = data.joint_area === "shoulder" ? "Ombro" 
+                     : data.joint_area === "knee" ? "Joelho"
+                     : data.joint_area === "ankle_foot" ? "Tornozelo/Pé"
+                     : data.joint_area === "spine" ? "Coluna"
+                     : data.joint_area === "hip" ? "Quadril"
+                     : data.joint_area === "elbow_hand" ? "Cotovelo/Mão"
+                     : data.joint_area === "leg" ? "Perna" 
+                     : "Área afetada";
     
     setPreferences(data);
+    toast.info("Gerando plano de reabilitação personalizado...");
   };
 
   return (
@@ -100,7 +111,7 @@ const Fisio = () => {
           </p>
           <Badge variant="outline" className="inline-flex items-center gap-1 bg-primary/5">
             <Bot className="w-3 h-3" />
-            Powered by Fisio+ (Llama 3 8B)
+            Powered by Fisio+ (Llama 3 70B)
           </Badge>
         </div>
 
