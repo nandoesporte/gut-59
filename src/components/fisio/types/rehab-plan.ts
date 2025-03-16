@@ -26,7 +26,7 @@ export interface RehabPlan {
   end_date: string;
   created_at?: string;
   rehab_sessions: RehabSession[];
-  plan_data: any; // Added the missing property
+  plan_data: any;
   
   // Adding the properties that are being used in ExercisePlanDisplay.tsx
   days?: Record<string, any>;
