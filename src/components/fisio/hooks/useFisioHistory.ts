@@ -3,11 +3,13 @@ import { useState, useCallback, useEffect } from 'react';
 import { RehabPlan } from '../types/rehab-plan';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
 export const useFisioHistory = (isAuthenticated: boolean | null) => {
   const [historyPlans, setHistoryPlans] = useState<RehabPlan[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [isDeletingPlan, setIsDeletingPlan] = useState(false);
+  const navigate = useNavigate();
 
   const fetchFisioHistory = useCallback(async () => {
     try {
@@ -83,6 +85,16 @@ export const useFisioHistory = (isAuthenticated: boolean | null) => {
     try {
       setIsDeletingPlan(true);
       
+      // Verificar se o plano está sendo visualizado atualmente
+      const currentUrl = new URL(window.location.href);
+      const currentPlanId = currentUrl.searchParams.get('planId');
+      
+      // Se o plano que está sendo excluído for o que está sendo visualizado,
+      // redirecionamos para a página principal primeiro
+      if (currentPlanId === planId) {
+        navigate('/fisio');
+      }
+      
       const { error } = await supabase
         .from('rehab_plans')
         .delete()
@@ -106,7 +118,7 @@ export const useFisioHistory = (isAuthenticated: boolean | null) => {
     } finally {
       setIsDeletingPlan(false);
     }
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     if (isAuthenticated) {

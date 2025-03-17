@@ -8,13 +8,13 @@ import { RefreshCw, Calendar, Trash2, Eye } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { DeletePlanDialog } from './DeletePlanDialog';
-import { useNavigate } from 'react-router-dom';
 
 interface FisioHistoryViewProps {
   isLoading: boolean;
   historyPlans: RehabPlan[];
   onRefresh: () => void;
   selectedPlanId?: string | null;
+  onViewDetails: (planId: string) => void;
   onDelete: (planId: string) => Promise<boolean>;
   isDeletingPlan: boolean;
 }
@@ -24,11 +24,11 @@ export const FisioHistoryView = ({
   historyPlans, 
   onRefresh,
   selectedPlanId,
+  onViewDetails,
   onDelete,
   isDeletingPlan
 }: FisioHistoryViewProps) => {
   const isMobile = useIsMobile();
-  const navigate = useNavigate();
   const [deletePlanId, setDeletePlanId] = useState<string | null>(null);
 
   const renderGoal = (goal: string | undefined) => {
@@ -63,7 +63,7 @@ export const FisioHistoryView = ({
     if (typeof overview === 'string') return overview;
     // Se for um objeto, tenta extrair informações úteis ou retorna um valor padrão
     if (typeof overview === 'object') {
-      return "Plano de reabilitação personalizado";
+      return overview.approach || overview.description || "Plano de reabilitação personalizado";
     }
     return "Plano de reabilitação personalizado";
   };
@@ -78,7 +78,7 @@ export const FisioHistoryView = ({
   };
 
   const handleViewDetails = (planId: string) => {
-    navigate(`/fisio?planId=${planId}&view=details`);
+    onViewDetails(planId);
   };
 
   if (isLoading) {

@@ -12,7 +12,7 @@ const Fisio = () => {
   const { isAuthenticated } = useAuthCheck();
   
   // Plan selection from URL params
-  const { selectedPlanId } = usePlanSelection();
+  const { selectedPlanId, viewPlanDetails } = usePlanSelection();
   
   // Fetch rehab plan history
   const { historyPlans, isLoadingHistory, fetchFisioHistory, deletePlan, isDeletingPlan } = useFisioHistory(isAuthenticated);
@@ -39,6 +39,7 @@ const Fisio = () => {
           isLoadingHistory={isLoadingHistory}
           fetchFisioHistory={fetchFisioHistory}
           selectedPlanId={selectedPlanId}
+          viewPlanDetails={viewPlanDetails}
           deletePlan={deletePlan}
           isDeletingPlan={isDeletingPlan}
         />

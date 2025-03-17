@@ -1,10 +1,11 @@
 
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 
 export const usePlanSelection = () => {
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   
   useEffect(() => {
     const planId = searchParams.get('planId');
@@ -19,5 +20,10 @@ export const usePlanSelection = () => {
     }
   }, [searchParams]);
 
-  return { selectedPlanId };
+  // Função para navegar para a página de detalhes de um plano
+  const viewPlanDetails = (planId: string) => {
+    navigate(`/fisio?planId=${planId}&view=details`);
+  };
+
+  return { selectedPlanId, viewPlanDetails };
 };

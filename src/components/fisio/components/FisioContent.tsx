@@ -12,6 +12,7 @@ interface FisioContentProps {
   isLoadingHistory: boolean;
   fetchFisioHistory: () => void;
   selectedPlanId: string | null;
+  viewPlanDetails: (planId: string) => void;
   deletePlan: (planId: string) => Promise<boolean>;
   isDeletingPlan: boolean;
 }
@@ -21,6 +22,7 @@ export const FisioContent: React.FC<FisioContentProps> = ({
   isLoadingHistory, 
   fetchFisioHistory,
   selectedPlanId,
+  viewPlanDetails,
   deletePlan,
   isDeletingPlan
 }) => {
@@ -76,6 +78,7 @@ export const FisioContent: React.FC<FisioContentProps> = ({
           historyPlans={historyPlans}
           onRefresh={fetchFisioHistory}
           selectedPlanId={selectedPlanId}
+          onViewDetails={viewPlanDetails}
           onDelete={deletePlan}
           isDeletingPlan={isDeletingPlan}
         />
