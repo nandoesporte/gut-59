@@ -15,7 +15,7 @@ const Fisio = () => {
   const { selectedPlanId } = usePlanSelection();
   
   // Fetch rehab plan history
-  const { historyPlans, isLoadingHistory, fetchFisioHistory } = useFisioHistory(isAuthenticated);
+  const { historyPlans, isLoadingHistory, fetchFisioHistory, deletePlan, isDeletingPlan } = useFisioHistory(isAuthenticated);
 
   // Authentication check component (returns null if authenticated)
   const authCheck = (
@@ -39,6 +39,8 @@ const Fisio = () => {
           isLoadingHistory={isLoadingHistory}
           fetchFisioHistory={fetchFisioHistory}
           selectedPlanId={selectedPlanId}
+          deletePlan={deletePlan}
+          isDeletingPlan={isDeletingPlan}
         />
       </div>
     </div>

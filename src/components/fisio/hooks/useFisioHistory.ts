@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 export const useFisioHistory = (isAuthenticated: boolean | null) => {
   const [historyPlans, setHistoryPlans] = useState<RehabPlan[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [isDeletingPlan, setIsDeletingPlan] = useState(false);
 
   const fetchFisioHistory = useCallback(async () => {
     try {
@@ -63,7 +64,8 @@ export const useFisioHistory = (isAuthenticated: boolean | null) => {
           overview: parsedData.overview || "Plano de reabilitação",
           recommendations: parsedData.recommendations || [],
           days: parsedData.days || {},
-          rehab_sessions: parsedData.rehab_sessions || []
+          rehab_sessions: parsedData.rehab_sessions || [],
+          created_at: plan.created_at || new Date().toISOString()
         };
       });
 
@@ -76,11 +78,47 @@ export const useFisioHistory = (isAuthenticated: boolean | null) => {
     }
   }, []);
 
+  // Função para excluir um plano de reabilitação
+  const deletePlan = useCallback(async (planId: string) => {
+    try {
+      setIsDeletingPlan(true);
+      
+      const { error } = await supabase
+        .from('rehab_plans')
+        .delete()
+        .eq('id', planId);
+
+      if (error) {
+        console.error('Erro ao excluir plano de reabilitação:', error);
+        toast.error('Erro ao excluir plano de reabilitação');
+        return false;
+      }
+
+      toast.success('Plano de reabilitação excluído com sucesso');
+      
+      // Atualiza a lista de planos após a exclusão
+      setHistoryPlans(prevPlans => prevPlans.filter(plan => plan.id !== planId));
+      return true;
+    } catch (error) {
+      console.error('Erro ao excluir plano de reabilitação:', error);
+      toast.error('Erro ao excluir plano de reabilitação');
+      return false;
+    } finally {
+      setIsDeletingPlan(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (isAuthenticated) {
       fetchFisioHistory();
     }
   }, [fetchFisioHistory, isAuthenticated]);
 
-  return { historyPlans, isLoadingHistory, fetchFisioHistory };
+  return { 
+    historyPlans, 
+    isLoadingHistory, 
+    fetchFisioHistory, 
+    deletePlan,
+    isDeletingPlan 
+  };
 };

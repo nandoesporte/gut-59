@@ -32,6 +32,7 @@ export interface RehabPlan {
   start_date: string;
   end_date: string;
   rehab_sessions?: RehabSession[];
+  created_at?: string;
   
   // Propriedades usadas no componente de exibição
   days?: Record<string, any>;

@@ -13,6 +13,9 @@ export const usePlanSelection = () => {
     if (planId && viewMode === 'details') {
       console.log('Abrindo detalhes do plano de reabilitação para:', planId);
       setSelectedPlanId(planId);
+    } else {
+      // Limpa o plano selecionado se não estiver na URL
+      setSelectedPlanId(null);
     }
   }, [searchParams]);
 

@@ -1,27 +1,35 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { RehabPlan } from '@/components/fisio/types/rehab-plan';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { RefreshCw, Calendar } from 'lucide-react';
+import { RefreshCw, Calendar, Trash2, Eye } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { DeletePlanDialog } from './DeletePlanDialog';
+import { useNavigate } from 'react-router-dom';
 
 interface FisioHistoryViewProps {
   isLoading: boolean;
   historyPlans: RehabPlan[];
   onRefresh: () => void;
   selectedPlanId?: string | null;
+  onDelete: (planId: string) => Promise<boolean>;
+  isDeletingPlan: boolean;
 }
 
 export const FisioHistoryView = ({ 
   isLoading, 
   historyPlans, 
   onRefresh,
-  selectedPlanId
+  selectedPlanId,
+  onDelete,
+  isDeletingPlan
 }: FisioHistoryViewProps) => {
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
+  const [deletePlanId, setDeletePlanId] = useState<string | null>(null);
 
   const renderGoal = (goal: string | undefined) => {
     if (!goal) return 'Alívio de Dor';
@@ -58,6 +66,19 @@ export const FisioHistoryView = ({
       return "Plano de reabilitação personalizado";
     }
     return "Plano de reabilitação personalizado";
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (deletePlanId) {
+      const success = await onDelete(deletePlanId);
+      if (success) {
+        setDeletePlanId(null);
+      }
+    }
+  };
+
+  const handleViewDetails = (planId: string) => {
+    navigate(`/fisio?planId=${planId}&view=details`);
   };
 
   if (isLoading) {
@@ -140,10 +161,33 @@ export const FisioHistoryView = ({
                       <span>{formatDate(new Date(plan.start_date))}</span>
                     </div>
                   </div>
+                  
                   <div className="mt-2">
                     <p className="text-xs text-muted-foreground">
                       {getOverviewText(plan.overview)}
                     </p>
+                  </div>
+                  
+                  <div className="flex justify-end mt-3 gap-2">
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="flex items-center gap-1.5 h-8 px-2.5"
+                      onClick={() => handleViewDetails(plan.id)}
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      <span className="text-xs">Detalhes</span>
+                    </Button>
+                    
+                    <Button 
+                      size="sm" 
+                      variant="destructive" 
+                      className="flex items-center gap-1.5 h-8 px-2.5"
+                      onClick={() => setDeletePlanId(plan.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span className="text-xs">Excluir</span>
+                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -151,6 +195,13 @@ export const FisioHistoryView = ({
           ))}
         </div>
       </CardContent>
+      
+      <DeletePlanDialog 
+        isOpen={!!deletePlanId}
+        onClose={() => setDeletePlanId(null)}
+        onConfirm={handleDeleteConfirm}
+        isDeleting={isDeletingPlan}
+      />
     </Card>
   );
 };
