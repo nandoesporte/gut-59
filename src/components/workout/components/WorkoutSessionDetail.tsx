@@ -70,7 +70,7 @@ export const WorkoutSessionDetail = ({ session, getDayName }: WorkoutSessionDeta
       </AccordionTrigger>
       <AccordionContent className="bg-white rounded-b-lg shadow px-6 pb-4 pt-2">
         <div className="space-y-6">
-          {/* Warmup */}
+          {/* Aquecimento (Warmup) */}
           <div className="border-l-4 border-blue-400 pl-4 py-1">
             <h4 className="font-medium text-blue-800 text-base md:text-lg">Aquecimento</h4>
             <p className="mt-1 text-gray-700 text-sm md:text-base">{session.warmup_description}</p>
@@ -110,7 +110,7 @@ export const WorkoutSessionDetail = ({ session, getDayName }: WorkoutSessionDeta
           {/* Training Load */}
           {session.training_load && <TrainingLoadInfo session={session} />}
           
-          {/* Cooldown */}
+          {/* Volta à Calma (Cooldown) */}
           <div className="border-l-4 border-green-400 pl-4 py-1">
             <h4 className="font-medium text-green-800 text-base md:text-lg">Volta à Calma</h4>
             <p className="mt-1 text-gray-700 text-sm md:text-base">{session.cooldown_description}</p>

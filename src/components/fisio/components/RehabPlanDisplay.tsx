@@ -163,6 +163,54 @@ export const RehabPlanDisplay = ({ plan }: RehabPlanDisplayProps) => {
     ? 'Condição não especificada'
     : formatCondition(typeof plan.condition === 'string' ? plan.condition : undefined);
 
+  // Função para traduzir o aquecimento e resfriamento que vêm em inglês
+  const traduzirInstrucoes = (texto: string | undefined): string => {
+    if (!texto) return '';
+    
+    // Traduções comuns para aquecimento
+    if (texto.includes('warmup') || texto.includes('warm up') || texto.includes('warming up')) {
+      return texto
+        .replace(/(\d+)(?:-| to )(\d+) minute(?:s)? warmup/i, '$1-$2 minutos de aquecimento')
+        .replace(/(\d+) minute(?:s)? warmup/i, '$1 minutos de aquecimento')
+        .replace(/warmup/gi, 'aquecimento')
+        .replace(/warm up/gi, 'aquecimento')
+        .replace(/warming up/gi, 'aquecimento')
+        .replace(/with light cardio/gi, 'com cardio leve')
+        .replace(/with light/gi, 'com leve')
+        .replace(/dynamic stretching/gi, 'alongamento dinâmico')
+        .replace(/static stretching/gi, 'alongamento estático')
+        .replace(/for chest/gi, 'para o peito')
+        .replace(/for chest and triceps/gi, 'para peito e tríceps')
+        .replace(/and triceps/gi, 'e tríceps')
+        .replace(/and shoulders/gi, 'e ombros')
+        .replace(/and legs/gi, 'e pernas')
+        .replace(/and arms/gi, 'e braços')
+        .replace(/and back/gi, 'e costas');
+    }
+    
+    // Traduções comuns para resfriamento
+    if (texto.includes('cooldown') || texto.includes('cool down')) {
+      return texto
+        .replace(/(\d+)(?:-| to )(\d+) minute(?:s)? cooldown/i, '$1-$2 minutos de volta à calma')
+        .replace(/(\d+) minute(?:s)? cooldown/i, '$1 minutos de volta à calma')
+        .replace(/cooldown/gi, 'volta à calma')
+        .replace(/cool down/gi, 'volta à calma')
+        .replace(/with light cardio/gi, 'com cardio leve')
+        .replace(/with light/gi, 'com leve')
+        .replace(/dynamic stretching/gi, 'alongamento dinâmico')
+        .replace(/static stretching/gi, 'alongamento estático')
+        .replace(/for chest/gi, 'para o peito')
+        .replace(/for chest and triceps/gi, 'para peito e tríceps')
+        .replace(/and triceps/gi, 'e tríceps')
+        .replace(/and shoulders/gi, 'e ombros')
+        .replace(/and legs/gi, 'e pernas')
+        .replace(/and arms/gi, 'e braços')
+        .replace(/and back/gi, 'e costas');
+    }
+    
+    return texto;
+  };
+
   return (
     <Card className="border-none shadow-md overflow-hidden">
       <CardHeader className="bg-primary/5 border-b">
@@ -268,11 +316,12 @@ export const RehabPlanDisplay = ({ plan }: RehabPlanDisplayProps) => {
                           undefined
                         );
                         
-                        // Safely get description
-                        const description = 
+                        // Safely get description and translate if needed
+                        const description = traduzirInstrucoes(
                           typeof exercise.description === 'string' ? exercise.description : 
                           typeof exercise.instructions === 'string' ? exercise.instructions :
-                          '';
+                          ''
+                        );
                           
                         // Safely get notes
                         const notes = 
