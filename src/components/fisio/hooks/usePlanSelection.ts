@@ -11,7 +11,7 @@ export const usePlanSelection = () => {
     const viewMode = searchParams.get('view');
     
     if (planId && viewMode === 'details') {
-      console.log('Opening rehab plan details for:', planId);
+      console.log('Abrindo detalhes do plano de reabilitação para:', planId);
       setSelectedPlanId(planId);
     }
   }, [searchParams]);

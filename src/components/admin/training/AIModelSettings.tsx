@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -41,7 +40,6 @@ export const AIModelSettings = () => {
       if (data) {
         const useGroq = data.active_model === 'groq' || data.active_model === 'llama3';
         
-        // Check if API key contains validation errors
         let apiKeyHasError = false;
         let keyContent = data.groq_api_key || '';
         let errorMessage = null;
@@ -52,7 +50,7 @@ export const AIModelSettings = () => {
               keyContent.includes("Error:")) {
             apiKeyHasError = true;
             errorMessage = keyContent;
-            keyContent = ''; // Clear the invalid key
+            keyContent = '';
           }
         }
         
@@ -79,14 +77,14 @@ export const AIModelSettings = () => {
   const getDefaultPrompt = () => {
     return `Você é Trenner2025, um agente de IA especializado em educação física e nutrição esportiva. 
 Seu objetivo é criar planos de treino detalhados, personalizados e cientificamente embasados.
-Você deve fornecer um plano completo, com exercícios, séries, repetições e dicas específicas.`;
+Você deve fornecer um plano completo, com exercícios, séries, repetições e dicas específicas em português do Brasil.
+IMPORTANTE: Todo o conteúdo deve estar SEMPRE em português do Brasil, nunca em inglês.`;
   };
 
   const handleSave = async () => {
     try {
       setLoading(true);
       
-      // Validate the Groq API key if the model uses Groq
       const useGroq = aiSettings.activeModel === 'groq' || aiSettings.activeModel === 'llama3';
       const hasGroqKey = aiSettings.groqApiKey && aiSettings.groqApiKey.trim() !== '';
       
@@ -95,16 +93,12 @@ Você deve fornecer um plano completo, com exercícios, séries, repetições e 
         toast.warning('Uma chave da API Groq é necessária para utilizar o modelo Llama 3');
       }
       
-      // Clear any error message when saving
       setKeyError(null);
       
-      // If the provided key is empty or doesn't look like a valid Groq key format
-      // (Groq keys typically start with "gsk_" followed by alphanumeric characters)
       if (hasGroqKey && !aiSettings.groqApiKey.startsWith('gsk_')) {
         toast.warning('A chave da API Groq não parece estar no formato correto (deve começar com "gsk_")');
       }
       
-      // First check if the record exists
       const { data, error: fetchError } = await supabase
         .from('ai_model_settings')
         .select('id')
@@ -116,7 +110,6 @@ Você deve fornecer um plano completo, com exercícios, séries, repetições e 
       let saveError;
       
       if (data) {
-        // If the record exists, update using the id
         const { error } = await supabase
           .from('ai_model_settings')
           .update({
@@ -130,7 +123,6 @@ Você deve fornecer um plano completo, com exercícios, séries, repetições e 
         
         saveError = error;
       } else {
-        // If it doesn't exist, create a new one
         const { error } = await supabase
           .from('ai_model_settings')
           .insert({
@@ -147,11 +139,10 @@ Você deve fornecer um plano completo, com exercícios, séries, repetições e 
 
       if (saveError) throw saveError;
       
-      // Check if we need to show the missing key alert
       setShowMissingKeyAlert(useGroq && !hasGroqKey);
       
       toast.success('Configurações salvas com sucesso');
-      fetchSettings(); // Reload settings to ensure they're up to date
+      fetchSettings();
     } catch (error) {
       console.error('Erro ao salvar configurações:', error);
       toast.error('Erro ao salvar configurações de IA');
@@ -171,7 +162,6 @@ Você deve fornecer um plano completo, com exercícios, séries, repetições e 
     const newSettings = {...aiSettings, activeModel: value};
     setAiSettings(newSettings);
     
-    // Check if we need to show the missing key alert
     const useGroq = value === 'groq' || value === 'llama3';
     const hasGroqKey = aiSettings.groqApiKey && aiSettings.groqApiKey.trim() !== '';
     setShowMissingKeyAlert(useGroq && !hasGroqKey);

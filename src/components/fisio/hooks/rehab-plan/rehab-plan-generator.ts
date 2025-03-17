@@ -41,7 +41,7 @@ export const useRehabPlanGenerator = ({
     onPlanGenerated?: () => void
   ) => {
     if (generationInProgress.current) {
-      console.log("Rehab plan generation already in progress, skipping...");
+      console.log("Geração de plano de reabilitação já em andamento, pulando...");
       return;
     }
     
@@ -53,20 +53,20 @@ export const useRehabPlanGenerator = ({
     setLoadingTime(0);
 
     try {
-      console.log("Checking authentication status...");
+      console.log("Verificando status de autenticação...");
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       
       if (authError) {
-        console.error("Authentication error:", authError);
+        console.error("Erro de autenticação:", authError);
         throw new Error(`Erro de autenticação: ${authError.message}`);
       }
       
       if (!user) {
-        console.error("User not authenticated");
+        console.error("Usuário não autenticado");
         throw new Error("Usuário não autenticado. Por favor, faça login para gerar um plano de reabilitação.");
       }
       
-      console.log("User authenticated:", user.id);
+      console.log("Usuário autenticado:", user.id);
       
       toast.info(getLoadingMessage());
       
@@ -79,19 +79,19 @@ export const useRehabPlanGenerator = ({
       });
       
       if (functionError) {
-        console.error("Edge function error:", functionError);
+        console.error("Erro na função edge:", functionError);
         throw new Error(`Erro ao gerar plano: ${functionError.message}`);
       }
       
       if (!data) {
-        console.error("No data returned from edge function");
+        console.error("Nenhum dado retornado da função edge");
         throw new Error("Não foi possível gerar o plano de reabilitação - resposta vazia");
       }
       
-      console.log("Rehab plan data received:", data);
+      console.log("Dados do plano de reabilitação recebidos:", data);
       
       if (data.error) {
-        console.error("Error in rehab plan generation:", data.error);
+        console.error("Erro na geração do plano de reabilitação:", data.error);
         throw new Error(data.error);
       }
       
@@ -102,7 +102,7 @@ export const useRehabPlanGenerator = ({
       setRehabPlan(data);
       
       toast.success(`Plano de reabilitação gerado com sucesso!`);
-      console.log("Rehab plan generation completed successfully");
+      console.log("Geração do plano de reabilitação concluída com sucesso");
       
       if (onPlanGenerated) {
         onPlanGenerated();

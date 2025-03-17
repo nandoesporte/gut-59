@@ -65,7 +65,7 @@ export const RehabPlanDisplay = ({ plan }: RehabPlanDisplayProps) => {
       
       return [];
     } catch (error) {
-      console.error("Error getting days:", error);
+      console.error("Erro ao obter dias:", error);
       return [];
     }
   };
@@ -85,7 +85,7 @@ export const RehabPlanDisplay = ({ plan }: RehabPlanDisplayProps) => {
               "Realize os exercícios diariamente para melhores resultados.",
               "Se sentir dor intensa, pare imediatamente e consulte um profissional."];
     } catch (error) {
-      console.error("Error getting recommendations:", error);
+      console.error("Erro ao obter recomendações:", error);
       return ["Siga o plano de exercícios conforme indicado."];
     }
   };
@@ -116,7 +116,7 @@ export const RehabPlanDisplay = ({ plan }: RehabPlanDisplayProps) => {
       }
       return "Plano de reabilitação personalizado para sua condição.";
     } catch (error) {
-      console.error("Error getting overview:", error);
+      console.error("Erro ao obter visão geral:", error);
       return "Plano de reabilitação personalizado para sua condição.";
     }
   };
@@ -153,7 +153,7 @@ export const RehabPlanDisplay = ({ plan }: RehabPlanDisplayProps) => {
       
       return diffDays || 14; // Default to 14 if calculation fails
     } catch (error) {
-      console.error("Error calculating duration:", error);
+      console.error("Erro ao calcular duração:", error);
       return 14;
     }
   };
