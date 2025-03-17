@@ -6,6 +6,7 @@ import { usePlanSelection } from '@/components/fisio/hooks/usePlanSelection';
 import { AuthenticationCheck } from '@/components/fisio/components/AuthenticationCheck';
 import { FisioHeader } from '@/components/fisio/components/FisioHeader';
 import { FisioContent } from '@/components/fisio/components/FisioContent';
+import { toast } from 'sonner';
 
 const Fisio = () => {
   // Authentication hook
@@ -15,7 +16,13 @@ const Fisio = () => {
   const { selectedPlanId, viewPlanDetails } = usePlanSelection();
   
   // Fetch rehab plan history
-  const { historyPlans, isLoadingHistory, fetchFisioHistory, deletePlan, isDeletingPlan } = useFisioHistory(isAuthenticated);
+  const { 
+    historyPlans, 
+    isLoadingHistory, 
+    fetchFisioHistory, 
+    deletePlan, 
+    isDeletingPlan 
+  } = useFisioHistory(isAuthenticated);
 
   // Authentication check component (returns null if authenticated)
   const authCheck = (

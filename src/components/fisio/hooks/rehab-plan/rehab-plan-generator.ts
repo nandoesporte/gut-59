@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -49,6 +48,7 @@ export const useRehabPlanGenerator = ({
           "warming up": "aquecimento",
           "cooldown": "volta à calma",
           "cool down": "volta à calma",
+          "cooling down": "volta à calma",
           "stretching": "alongamento",
           "dynamic stretching": "alongamento dinâmico",
           "static stretching": "alongamento estático"
@@ -104,6 +104,7 @@ export const useRehabPlanGenerator = ({
               .replace(/(\d+) minute(?:s)? cooldown/i, '$1 minutos de volta à calma')
               .replace(/cooldown/gi, 'volta à calma')
               .replace(/cool down/gi, 'volta à calma')
+              .replace(/cooling down/gi, 'volta à calma')
               .replace(/with light cardio/gi, 'com cardio leve')
               .replace(/with light/gi, 'com leve')
               .replace(/dynamic stretching/gi, 'alongamento dinâmico')
@@ -166,6 +167,7 @@ export const useRehabPlanGenerator = ({
               .replace(/(\d+) minute(?:s)? cooldown/i, '$1 minutos de volta à calma')
               .replace(/cooldown/gi, 'volta à calma')
               .replace(/cool down/gi, 'volta à calma')
+              .replace(/cooling down/gi, 'volta à calma')
               .replace(/with light cardio/gi, 'com cardio leve')
               .replace(/with light/gi, 'com leve')
               .replace(/dynamic stretching/gi, 'alongamento dinâmico')

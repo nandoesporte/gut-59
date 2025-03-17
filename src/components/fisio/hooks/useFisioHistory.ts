@@ -84,6 +84,7 @@ export const useFisioHistory = (isAuthenticated: boolean | null) => {
   const deletePlan = useCallback(async (planId: string) => {
     try {
       setIsDeletingPlan(true);
+      console.log("Iniciando exclusão do plano:", planId);
       
       // Verificar se o plano está sendo visualizado atualmente
       const currentUrl = new URL(window.location.href);
@@ -92,6 +93,7 @@ export const useFisioHistory = (isAuthenticated: boolean | null) => {
       // Se o plano que está sendo excluído for o que está sendo visualizado,
       // redirecionamos para a página principal primeiro
       if (currentPlanId === planId) {
+        console.log("Excluindo plano ativo, redirecionando para página principal");
         navigate('/fisio');
       }
       
@@ -106,6 +108,7 @@ export const useFisioHistory = (isAuthenticated: boolean | null) => {
         return false;
       }
 
+      console.log("Plano excluído com sucesso:", planId);
       toast.success('Plano de reabilitação excluído com sucesso');
       
       // Atualiza a lista de planos após a exclusão

@@ -4,7 +4,7 @@ import { RehabPlan } from '@/components/fisio/types/rehab-plan';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { RefreshCw, Calendar, Trash2, Eye } from 'lucide-react';
+import { RefreshCw, Calendar, Trash2, Eye, Loader2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { DeletePlanDialog } from './DeletePlanDialog';
@@ -30,6 +30,7 @@ export const FisioHistoryView = ({
 }: FisioHistoryViewProps) => {
   const isMobile = useIsMobile();
   const [deletePlanId, setDeletePlanId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const renderGoal = (goal: string | undefined) => {
     if (!goal) return 'Alívio de Dor';
@@ -70,14 +71,21 @@ export const FisioHistoryView = ({
 
   const handleDeleteConfirm = async () => {
     if (deletePlanId) {
-      const success = await onDelete(deletePlanId);
-      if (success) {
-        setDeletePlanId(null);
+      setIsDeleting(true);
+      try {
+        console.log('Confirmando exclusão do plano:', deletePlanId);
+        const success = await onDelete(deletePlanId);
+        if (success) {
+          setDeletePlanId(null);
+        }
+      } finally {
+        setIsDeleting(false);
       }
     }
   };
 
   const handleViewDetails = (planId: string) => {
+    console.log('Visualizando detalhes do plano:', planId);
     onViewDetails(planId);
   };
 
@@ -134,8 +142,18 @@ export const FisioHistoryView = ({
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>Histórico de Planos</span>
-          <Button variant="outline" size="sm" onClick={onRefresh} className="gap-1">
-            <RefreshCw className="h-4 w-4" />
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={onRefresh} 
+            className="gap-1"
+            disabled={isLoading || isDeletingPlan}
+          >
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
             {!isMobile && <span>Atualizar</span>}
           </Button>
         </CardTitle>
@@ -184,6 +202,7 @@ export const FisioHistoryView = ({
                       variant="destructive" 
                       className="flex items-center gap-1.5 h-8 px-2.5"
                       onClick={() => setDeletePlanId(plan.id)}
+                      disabled={isDeletingPlan}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                       <span className="text-xs">Excluir</span>
@@ -200,7 +219,7 @@ export const FisioHistoryView = ({
         isOpen={!!deletePlanId}
         onClose={() => setDeletePlanId(null)}
         onConfirm={handleDeleteConfirm}
-        isDeleting={isDeletingPlan}
+        isDeleting={isDeleting || isDeletingPlan}
       />
     </Card>
   );
