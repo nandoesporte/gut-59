@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef, useCallback } from "react";
 import { WorkoutPreferences } from "../types";
 import { toast } from "sonner";
@@ -45,6 +46,7 @@ export const useWorkoutPlanGeneration = (
   const MAX_RETRIES = 3;
   const edgeFunctionStarted = useRef(false);
   const loadingTimer = useRef<NodeJS.Timeout | null>(null);
+  const userId = useRef<string | null>(null);
 
   useEffect(() => {
     if (loading) {
@@ -78,6 +80,19 @@ export const useWorkoutPlanGeneration = (
       }
     };
   }, [loading, loadingPhase]);
+
+  // Fetch current user ID on mount
+  useEffect(() => {
+    const fetchUserId = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data && data.user) {
+        userId.current = data.user.id;
+        console.log("Current user ID:", userId.current);
+      }
+    };
+    
+    fetchUserId();
+  }, []);
 
   const getLoadingMessage = () => {
     switch (loadingPhase) {
@@ -124,6 +139,7 @@ export const useWorkoutPlanGeneration = (
       }
       
       console.log("User authenticated:", user.id);
+      userId.current = user.id;
       
       const activityDesc = activityLevelDescriptions[preferences.activity_level as keyof typeof activityLevelDescriptions] || 
                            "Personalizado";
@@ -142,6 +158,7 @@ export const useWorkoutPlanGeneration = (
       
       console.log("Starting generation of workout plan with Trenner2025...");
       console.log(`Activity level: ${preferences.activity_level}`);
+      console.log(`User ID: ${user.id}`);
       
       const timestamp = Date.now();
       const requestId = `${user.id}_${timestamp}`;
@@ -155,9 +172,79 @@ export const useWorkoutPlanGeneration = (
       
       console.log("Calling generateWorkoutPlanWithTrenner2025...");
       console.log(`Using unique timestamp for variation: ${timestamp}`);
+      console.log(`Request ID: ${requestId}`);
       
+      // First try with the Llama function
+      try {
+        console.log("Attempting to use Llama model first...");
+        const { workoutPlan: generatedPlan, error: generationError, rawResponse: rawResponseData } = 
+          await generateWorkoutPlanWithTrenner2025(preferences, user.id, aiSettings || undefined, requestId, true);
+        
+        clearTimeout(edgeFunctionTimeoutId);
+        edgeFunctionStarted.current = true;
+        
+        if (rawResponseData) {
+          console.log("RAW RESPONSE FROM EDGE FUNCTION:", JSON.stringify(rawResponseData, null, 2));
+          setRawResponse(rawResponseData);
+        } else {
+          console.warn("No raw response data received from edge function");
+        }
+        
+        if (generationError) {
+          console.error("Generation error with Llama model:", generationError);
+          // Don't throw, try fallback instead
+          throw new Error(generationError);
+        }
+        
+        if (!generatedPlan) {
+          console.error("No workout plan generated with Llama model");
+          // Don't throw, try fallback instead
+          throw new Error("Não foi possível gerar o plano de treino com o modelo principal - resposta vazia");
+        }
+        
+        console.log("Workout plan successfully generated with Llama model, saving to database...");
+        console.log("COMPLETE GENERATED PLAN:", JSON.stringify(generatedPlan, null, 2));
+        
+        const savedPlan = await saveWorkoutPlan(generatedPlan, user.id);
+        
+        if (!savedPlan) {
+          throw new Error("Erro ao salvar o plano de treino");
+        }
+        
+        setWorkoutPlan(savedPlan);
+        
+        await updatePlanGenerationCount(user.id);
+        setPlanGenerationCount(prev => prev + 1);
+        
+        const { data: countData } = await supabase
+          .from('plan_generation_counts')
+          .select('workout_count')
+          .eq('user_id', user.id)
+          .maybeSingle();
+          
+        if (countData) {
+          setPlanGenerationCount(countData.workout_count);
+        }
+        
+        toast.success(`Plano de treino ${activityDesc} gerado com sucesso!`);
+        console.log("Workout plan generation and saving completed successfully");
+        
+        if (onPlanGenerated) {
+          onPlanGenerated();
+        }
+        
+        retryCount.current = 0;
+        setLoadingTime(0);
+        return;
+      } catch (llamaError) {
+        console.warn("Failed to generate with Llama model, trying fallback method:", llamaError);
+        // Continue to fallback
+      }
+      
+      // Fallback to regular generation
+      console.log("Using fallback workout plan generation method...");
       const { workoutPlan: generatedPlan, error: generationError, rawResponse: rawResponseData } = 
-        await generateWorkoutPlanWithTrenner2025(preferences, user.id, aiSettings || undefined, requestId);
+        await generateWorkoutPlanWithTrenner2025(preferences, user.id, aiSettings || undefined, requestId, false);
       
       clearTimeout(edgeFunctionTimeoutId);
       edgeFunctionStarted.current = true;
@@ -234,7 +321,8 @@ export const useWorkoutPlanGeneration = (
         err.message.includes("AbortError") ||
         err.message.includes("connection closed") ||
         err.message.includes("Connection closed") ||
-        err.message.includes("presa no estágio")
+        err.message.includes("presa no estágio") ||
+        err.message.includes("non-2xx status code")
       );
       
       if (isAuthError) {

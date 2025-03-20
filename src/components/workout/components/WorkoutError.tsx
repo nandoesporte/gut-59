@@ -14,11 +14,18 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
                                errorMessage.includes("booted") || 
                                errorMessage.includes("função de geração") ||
                                errorMessage.includes("autenticado") ||
-                               errorMessage.includes("autenticação");
+                               errorMessage.includes("autenticação") ||
+                               errorMessage.includes("login");
                                
   const isNetworkError = errorMessage.includes("conexão") || 
                          errorMessage.includes("API") || 
-                         errorMessage.includes("timeout");
+                         errorMessage.includes("timeout") ||
+                         errorMessage.includes("non-2xx status code") ||
+                         errorMessage.includes("Edge Function returned");
+
+  const isPermissionError = errorMessage.includes("permissão") ||
+                           errorMessage.includes("acesso negado") ||
+                           errorMessage.includes("não autorizado");
 
   return (
     <Card className="w-full max-w-lg mx-auto border-none overflow-hidden">
@@ -53,8 +60,24 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
               </div>
             ) : isNetworkError ? (
               <div className="space-y-2">
-                <p className="font-medium">Erro de rede ou tempo limite excedido</p>
-                <p>Verifique sua conexão com a internet e tente novamente.</p>
+                <p className="font-medium">Erro de rede ou resposta do servidor</p>
+                <p>O servidor retornou um erro ao processar sua solicitação.</p>
+                <p>Recomendamos:</p>
+                <ul className="text-left list-disc pl-5 space-y-1">
+                  <li>Verificar sua conexão com a internet</li>
+                  <li>Tentar novamente em alguns minutos</li>
+                  <li>Se o problema persistir, entre em contato com o suporte</li>
+                </ul>
+              </div>
+            ) : isPermissionError ? (
+              <div className="space-y-2">
+                <p className="font-medium">Erro de permissão</p>
+                <p>Você não tem permissão para acessar este recurso.</p>
+                <p>Recomendamos:</p>
+                <ul className="text-left list-disc pl-5 space-y-1">
+                  <li>Verificar se você está logado com a conta correta</li>
+                  <li>Contatar o administrador para verificar suas permissões</li>
+                </ul>
               </div>
             ) : (
               <div className="space-y-2">
@@ -63,13 +86,14 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
                   <li>Verifique se você está logado</li>
                   <li>Verifique suas preferências e tente novamente</li>
                   <li>Tente com diferentes tipos de exercícios</li>
+                  <li>Aguarde alguns minutos e tente novamente</li>
                 </ul>
               </div>
             )}
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
-            {isInitializationError && (
+            {isInitializationError || isNetworkError ? (
               <Button 
                 variant="default" 
                 onClick={() => window.location.reload()}
@@ -79,9 +103,9 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
                 <RefreshCw className="w-4 h-4" />
                 Recarregar Página
               </Button>
-            )}
+            ) : null}
             <Button 
-              variant={isInitializationError ? "outline" : "default"} 
+              variant={isInitializationError || isNetworkError ? "outline" : "default"} 
               onClick={onReset}
               className="gap-2"
               size="lg"
