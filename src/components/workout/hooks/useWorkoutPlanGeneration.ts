@@ -328,7 +328,7 @@ export const useWorkoutPlanGeneration = (
           description: "Faça login para gerar um plano de treino"
         });
       } else if (isNetworkError) {
-        const networkErrorMsg = "Erro de conexão com o serviço de geração de plano. Por favor, verifique sua conexão e tente novamente.";
+        const networkErrorMsg = "Erro de conexão com o serviço de geração de plano. Por favor, verifique sua conexão e tente novamente em alguns minutos.";
         setError(networkErrorMsg);
         toast.error("Erro de conexão. Tente novamente mais tarde.");
       } else {
@@ -382,4 +382,3 @@ export const useWorkoutPlanGeneration = (
     planGenerationCount
   };
 };
-

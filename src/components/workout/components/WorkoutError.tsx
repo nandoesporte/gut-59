@@ -21,7 +21,10 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
                          errorMessage.includes("API") || 
                          errorMessage.includes("timeout") ||
                          errorMessage.includes("non-2xx status code") ||
-                         errorMessage.includes("Edge Function returned");
+                         errorMessage.includes("Edge Function returned") ||
+                         errorMessage.includes("Failed to send") ||
+                         errorMessage.includes("Failed to fetch") ||
+                         errorMessage.includes("rede");
 
   const isPermissionError = errorMessage.includes("permissão") ||
                            errorMessage.includes("acesso negado") ||
@@ -67,6 +70,7 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
                   <li>Verificar sua conexão com a internet</li>
                   <li>Tentar novamente em alguns minutos</li>
                   <li>Se o problema persistir, entre em contato com o suporte</li>
+                  <li>Isso pode ser um problema temporário com o servidor</li>
                 </ul>
               </div>
             ) : isPermissionError ? (
