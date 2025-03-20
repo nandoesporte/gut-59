@@ -15,6 +15,7 @@ export const generateWorkoutPlanWithTrenner2025 = async (
                                                           preferences.activity_level === "moderate" ? 5 : 6);
 
   console.log("Using request ID:", requestId || "none");
+  console.log("User ID for plan generation:", userId);
 
   try {
     // First try to use the Llama function
@@ -44,11 +45,16 @@ export const generateWorkoutPlanWithTrenner2025 = async (
       console.warn("Error with Llama function, falling back to standard generator:", llamaError);
       
       // Fall back to the basic workout generator
+      console.log("Falling back to standard workout generator with userId:", userId);
       const { data, error } = await supabase.functions.invoke('generate-workout-plan', {
-        body: { preferences, userId }
+        body: { 
+          preferences, 
+          userId 
+        }
       });
       
       if (error) {
+        console.error("Error with fallback generator:", error);
         throw error;
       }
       
@@ -56,6 +62,7 @@ export const generateWorkoutPlanWithTrenner2025 = async (
         throw new Error("No data returned from workout plan generator");
       }
       
+      console.log("Successfully generated workout plan with fallback function");
       return { workoutPlan: data, error: null, rawResponse: data };
     }
   } catch (error) {
@@ -75,6 +82,7 @@ export const saveWorkoutPlan = async (plan: WorkoutPlan, userId: string) => {
 
 export const updatePlanGenerationCount = async (userId: string) => {
   try {
+    console.log("Updating plan generation count for user:", userId);
     const { data: countData, error: countError } = await supabase
       .from('plan_generation_counts')
       .select('workout_count')
@@ -88,15 +96,18 @@ export const updatePlanGenerationCount = async (userId: string) => {
     
     if (countData) {
       const newCount = (countData.workout_count || 0) + 1;
+      console.log("Updating existing count to:", newCount);
       await supabase
         .from('plan_generation_counts')
         .update({ workout_count: newCount })
         .eq('user_id', userId);
     } else {
+      console.log("Creating new count record for user");
       await supabase
         .from('plan_generation_counts')
         .insert({ user_id: userId, workout_count: 1 });
     }
+    console.log("Plan generation count updated successfully");
   } catch (countError) {
     console.error("Error updating count:", countError);
   }
