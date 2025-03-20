@@ -25,6 +25,27 @@ serve(async (req) => {
       throw new Error('ID do usuário é obrigatório');
     }
 
+    // Verificar existência do usuário, mas não rejeitar se não for admin
+    // Isso corrige o problema para usuários não-admin
+    try {
+      const userResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}`,
+        {
+          headers: {
+            'apikey': SUPABASE_SERVICE_ROLE_KEY,
+            'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+          }
+        }
+      );
+      
+      if (!userResponse.ok) {
+        console.warn(`Aviso: Não foi possível verificar o perfil do usuário: ${userId}`);
+      }
+    } catch (userCheckError) {
+      console.warn(`Erro ao verificar usuário: ${userCheckError.message}`);
+      // Continue com a geração do plano mesmo se a verificação falhar
+    }
+
     // Buscar o prompt ativo para plano de treino
     const promptResponse = await fetch(
       `${SUPABASE_URL}/rest/v1/ai_agent_prompts?agent_type=eq.workout&is_active=eq.true&order=created_at.desc&limit=1`,

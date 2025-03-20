@@ -15,7 +15,8 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
                                errorMessage.includes("função de geração") ||
                                errorMessage.includes("autenticado") ||
                                errorMessage.includes("autenticação") ||
-                               errorMessage.includes("login");
+                               errorMessage.includes("login") ||
+                               errorMessage.includes("permissão necessária");
                                
   const isNetworkError = errorMessage.includes("conexão") || 
                          errorMessage.includes("API") || 
@@ -28,7 +29,9 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
 
   const isPermissionError = errorMessage.includes("permissão") ||
                            errorMessage.includes("acesso negado") ||
-                           errorMessage.includes("não autorizado");
+                           errorMessage.includes("não autorizado") ||
+                           errorMessage.includes("admin") ||
+                           errorMessage.includes("administrador");
 
   return (
     <Card className="w-full max-w-lg mx-auto border-none overflow-hidden">
@@ -76,11 +79,12 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
             ) : isPermissionError ? (
               <div className="space-y-2">
                 <p className="font-medium">Erro de permissão</p>
-                <p>Você não tem permissão para acessar este recurso.</p>
+                <p>Você não tem permissão para acessar este recurso ou o acesso está temporariamente indisponível.</p>
                 <p>Recomendamos:</p>
                 <ul className="text-left list-disc pl-5 space-y-1">
                   <li>Verificar se você está logado com a conta correta</li>
-                  <li>Contatar o administrador para verificar suas permissões</li>
+                  <li>Tentar novamente em alguns minutos</li>
+                  <li>Se o erro persistir, pode ser necessário contatar o administrador</li>
                 </ul>
               </div>
             ) : (
@@ -91,6 +95,7 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
                   <li>Verifique suas preferências e tente novamente</li>
                   <li>Tente com diferentes tipos de exercícios</li>
                   <li>Aguarde alguns minutos e tente novamente</li>
+                  <li>Se o problema persistir, o serviço pode estar temporariamente indisponível</li>
                 </ul>
               </div>
             )}
