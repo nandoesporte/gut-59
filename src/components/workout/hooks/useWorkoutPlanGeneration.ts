@@ -156,62 +156,108 @@ export const useWorkoutPlanGeneration = (
       console.log("Calling generateWorkoutPlanWithTrenner2025...");
       console.log(`Using unique timestamp for variation: ${timestamp}`);
       
-      const { workoutPlan: generatedPlan, error: generationError, rawResponse: rawResponseData } = 
-        await generateWorkoutPlanWithTrenner2025(preferences, user.id, aiSettings || undefined, requestId);
-      
-      clearTimeout(edgeFunctionTimeoutId);
-      edgeFunctionStarted.current = true;
-      
-      if (rawResponseData) {
-        console.log("RAW RESPONSE FROM EDGE FUNCTION:", JSON.stringify(rawResponseData, null, 2));
-        setRawResponse(rawResponseData);
-      } else {
-        console.warn("No raw response data received from edge function");
-      }
-      
-      if (generationError) {
-        console.error("Generation error:", generationError);
-        throw new Error(generationError);
-      }
-      
-      if (!generatedPlan) {
-        console.error("No workout plan generated");
-        throw new Error("Não foi possível gerar o plano de treino - resposta vazia");
-      }
-      
-      console.log("Workout plan successfully generated, saving to database...");
-      console.log("COMPLETE GENERATED PLAN:", JSON.stringify(generatedPlan, null, 2));
-      
-      const savedPlan = await saveWorkoutPlan(generatedPlan, user.id);
-      
-      if (!savedPlan) {
-        throw new Error("Erro ao salvar o plano de treino");
-      }
-      
-      setWorkoutPlan(savedPlan);
-      
-      await updatePlanGenerationCount(user.id);
-      setPlanGenerationCount(prev => prev + 1);
-      
-      const { data: countData } = await supabase
-        .from('plan_generation_counts')
-        .select('workout_count')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      try {
+        console.log("Attempting to use primary Llama edge function for generation");
+        const { data, error } = await supabase.functions.invoke('generate-workout-plan-llama', {
+          body: {
+            preferences,
+            userId: user.id,
+            requestId,
+          }
+        });
         
-      if (countData) {
-        setPlanGenerationCount(countData.workout_count);
+        clearTimeout(edgeFunctionTimeoutId);
+        edgeFunctionStarted.current = true;
+        
+        if (error) {
+          console.error("Error in primary generation function:", error);
+          throw error;
+        }
+        
+        if (!data) {
+          console.error("No data returned from primary generation function");
+          throw new Error("No data returned from workout plan generator");
+        }
+        
+        console.log("Successfully generated workout plan with primary function");
+        console.log("Workout plan successfully generated, setting to state");
+        
+        setWorkoutPlan(data);
+        
+        await updatePlanGenerationCount(user.id);
+        setPlanGenerationCount(prev => prev + 1);
+        
+        const { data: countData } = await supabase
+          .from('plan_generation_counts')
+          .select('workout_count')
+          .eq('user_id', user.id)
+          .maybeSingle();
+          
+        if (countData) {
+          setPlanGenerationCount(countData.workout_count);
+        }
+        
+        toast.success(`Plano de treino ${activityDesc} gerado com sucesso!`);
+        
+        if (onPlanGenerated) {
+          onPlanGenerated();
+        }
+        
+        retryCount.current = 0;
+        setLoadingTime(0);
+        return;
+        
+      } catch (llamaError) {
+        console.warn("Error with primary generation function, falling back to standard generator:", llamaError);
+        
+        console.log("Falling back to standard workout plan generator");
+        const { data, error } = await supabase.functions.invoke('generate-workout-plan', {
+          body: {
+            preferences, 
+            userId: user.id
+          }
+        });
+        
+        clearTimeout(edgeFunctionTimeoutId);
+        edgeFunctionStarted.current = true;
+        
+        if (error) {
+          console.error("Error in fallback generation function:", error);
+          throw error;
+        }
+        
+        if (!data) {
+          console.error("No data returned from fallback generation function");
+          throw new Error("No data returned from workout plan generator");
+        }
+        
+        console.log("Successfully generated workout plan with fallback function");
+        console.log("Workout plan successfully generated, setting to state");
+        
+        setWorkoutPlan(data);
+        
+        await updatePlanGenerationCount(user.id);
+        setPlanGenerationCount(prev => prev + 1);
+        
+        const { data: countData } = await supabase
+          .from('plan_generation_counts')
+          .select('workout_count')
+          .eq('user_id', user.id)
+          .maybeSingle();
+          
+        if (countData) {
+          setPlanGenerationCount(countData.workout_count);
+        }
+        
+        toast.success(`Plano de treino ${activityDesc} gerado com sucesso!`);
+        
+        if (onPlanGenerated) {
+          onPlanGenerated();
+        }
+        
+        retryCount.current = 0;
+        setLoadingTime(0);
       }
-      
-      toast.success(`Plano de treino ${activityDesc} gerado com sucesso!`);
-      console.log("Workout plan generation and saving completed successfully");
-      
-      if (onPlanGenerated) {
-        onPlanGenerated();
-      }
-      
-      retryCount.current = 0;
-      setLoadingTime(0);
     } catch (err: any) {
       console.error("Erro na geração do plano de treino:", err);
       

@@ -1,10 +1,17 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { supabaseClient } from "../_shared/supabase-client.ts";
-import { corsHeaders } from "../_shared/cors.ts";
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY');
-const TIMEOUT_MS = 60000; // 60 seconds timeout
+
+// CORS headers for browser compatibility
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -15,413 +22,190 @@ serve(async (req) => {
   try {
     const { preferences, userId } = await req.json();
     
-    console.log("Generating rehabilitation plan with Fisio+ agent");
-    console.log("User data:", userId ? "Authenticated user" : "User data not provided");
-    console.log("Preferences:", JSON.stringify(preferences));
-    
-    if (!preferences) {
-      throw new Error("Insufficient data to generate rehabilitation plan");
+    if (!userId) {
+      throw new Error('ID do usuário é obrigatório');
     }
 
-    // Create Supabase client
-    const supabase = supabaseClient();
+    console.log('Gerando plano de reabilitação para usuário:', userId);
+    console.log('Preferências recebidas:', JSON.stringify(preferences));
 
-    // Fetch active prompt for Fisio+ agent
-    const { data: promptData, error: promptError } = await supabase
-      .from('ai_agent_prompts')
-      .select('*')
-      .eq('agent_type', 'physiotherapy')
-      .eq('is_active', true)
+    // Create a Supabase client with the Admin key
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Verify the user exists - this check is just to ensure valid inputs but allows any authenticated user
+    const { data: userData, error: userError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
       .single();
 
-    if (promptError) {
-      console.error("Error fetching Fisio+ agent prompt:", promptError);
-      throw new Error("Could not find Fisio+ agent prompt");
-    }
-
-    if (!promptData) {
-      throw new Error("No active physiotherapy prompt found");
-    }
-
-    console.log("Prompt found:", promptData.name);
-
-    // Fetch user information
-    let userData = null;
-    if (userId) {
-      const { data: user, error: userError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-        
-      if (!userError && user) {
-        userData = user;
-        console.log("User profile retrieved");
-      } else {
-        console.log("User profile not found, using preferences only");
+    if (userError) {
+      console.error('Erro ao verificar usuário:', userError);
+      if (userError.code === 'PGRST116') {
+        throw new Error('Usuário não encontrado');
       }
+      throw new Error('Erro ao verificar usuário');
     }
 
-    // Fetch a more diverse set of exercises from the database based on joint area
-    // Get a mix of stretching, mobility, and strengthening exercises
-    const joinArea = preferences.joint_area || 'knee';
-    
-    const fetchExercisesByType = async (exerciseType, limit = 3) => {
-      const { data, error } = await supabase
-        .from('physio_exercises')
-        .select('*')
-        .eq('joint_area', joinArea)
-        .eq('exercise_type', exerciseType)
-        .limit(limit);
-        
-      if (error) {
-        console.error(`Error fetching ${exerciseType} exercises:`, error);
-        return [];
-      }
-      
-      console.log(`Found ${data?.length || 0} ${exerciseType} exercises`);
-      return data || [];
-    };
-    
-    // Fetch exercises of different types
-    const stretchingExercises = await fetchExercisesByType('stretching');
-    const mobilityExercises = await fetchExercisesByType('mobility');
-    const strengthExercises = await fetchExercisesByType('strength');
-    
-    // Combine all exercises
-    let allExercises = [...stretchingExercises, ...mobilityExercises, ...strengthExercises];
-    
-    // If we don't have enough exercises of specific types, fetch additional ones
-    if (allExercises.length < 5) {
-      console.log("Insufficient type-specific exercises, fetching additional ones");
-      const { data: additionalExercises, error } = await supabase
-        .from('physio_exercises')
-        .select('*')
-        .eq('joint_area', joinArea)
-        .limit(5 - allExercises.length);
-        
-      if (!error && additionalExercises) {
-        allExercises = [...allExercises, ...additionalExercises];
-      }
-    }
-    
-    // If still not enough exercises, get general ones regardless of joint area
-    if (allExercises.length < 3) {
-      console.log("Insufficient joint-specific exercises, fetching general exercises");
-      const { data: generalExercises, error } = await supabase
-        .from('physio_exercises')
-        .select('*')
-        .limit(3);
-        
-      if (!error && generalExercises) {
-        allExercises = [...allExercises, ...generalExercises];
-      }
+    // Fetch physio exercises for the specific condition and joint area
+    const { data: exercises, error: exercisesError } = await supabase
+      .from('physio_exercises')
+      .select('*')
+      .eq('condition', preferences.condition)
+      .eq('joint_area', preferences.joint_area);
+
+    if (exercisesError || !exercises || exercises.length === 0) {
+      console.error('Erro ao buscar exercícios:', exercisesError);
+      throw new Error('Não foram encontrados exercícios adequados para essa condição');
     }
 
-    console.log(`Using ${allExercises.length} total exercises with focus on joint area: ${joinArea}`);
-
-    // Prepare user data for prompt
-    const painLevel = preferences.pain_level ? `${preferences.pain_level}/10` : '5/10';
-    const userWeight = userData?.weight || preferences.weight || 70;
-    const userHeight = userData?.height || preferences.height || 170;
-    const userAge = userData?.age || preferences.age || 30;
-    const userGender = userData?.gender || preferences.gender || 'male';
-    const mobilityLevel = preferences.mobility_level || 'moderate';
-    const activityLevel = preferences.activity_level || 'moderate';
-    const rehabGoal = preferences.goal || 'pain_relief'; // Default goal for rehab
-
-    // Create a prompt with essential information
-    const basePrompt = `Create a comprehensive rehabilitation plan for ${joinArea} with pain level ${painLevel}. 
-Patient details: ${userAge} years old, ${userGender}, ${userWeight}kg, ${userHeight}cm.
-Mobility level: ${mobilityLevel}, Activity level: ${activityLevel}, Goal: ${rehabGoal}.
-Plan must include at least 3 types of exercises: stretching, mobility, and strengthening exercises.`;
-
-    // Add exercise information to the prompt
-    const exerciseInfo = allExercises.map(ex => ({
-      id: ex.id,
-      name: ex.name,
-      type: ex.exercise_type,
-      area: ex.joint_area,
-      description: ex.description?.substring(0, 100) || "",
-      gifUrl: ex.gif_url || null
-    }));
-
-    // Final prompt for the model
-    const finalPrompt = `${basePrompt}
-Use these exercises in your plan (include ALL types - stretching, mobility and strengthening):
-${JSON.stringify(exerciseInfo)}
-Format response as valid JSON with following structure:
-- overview: brief explanation of condition and approach
-- recommendations: array of general guidance points
-- rehab_sessions: array of daily sessions with exercises (exercise_id, sets, reps, rest_time_seconds)
-Make sure each exercise contains complete details including description and gifUrl.`;
-
-    console.log(`Sending prompt to LLM model`);
+    console.log(`Encontrados ${exercises.length} exercícios para condição ${preferences.condition} na área ${preferences.joint_area}`);
 
     if (!GROQ_API_KEY) {
-      throw new Error("GROQ_API_KEY not configured in environment");
+      throw new Error('GROQ API key não configurada');
     }
 
-    // Create a timeout promise
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("Timeout generating rehabilitation plan")), TIMEOUT_MS);
-    });
+    // Generate a rehab plan using GROQ
+    const uniqueExercises = [...new Map(exercises.map(item => [item.id, item])).values()];
+    const safeExercises = uniqueExercises.slice(0, 20); // Limit to 20 exercises to avoid token limits
 
-    // Call Groq API to generate rehabilitation plan with timeout
-    const groqPromise = fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
+    const exercisesDescription = safeExercises.map(ex => {
+      return `ID: ${ex.id}, Nome: ${ex.name}, Descrição: ${ex.description || 'Não disponível'}, Tipo: ${ex.exercise_type}, Dificuldade: ${ex.difficulty}, Sets recomendados: ${ex.recommended_sets || 3}, Repetições recomendadas: ${ex.recommended_repetitions || 10}`;
+    }).join('\n\n');
+
+    // Build the system prompt
+    const systemPrompt = `Você é um fisioterapeuta especializado que criará um plano de reabilitação personalizado. 
+    Formate sua resposta em JSON.
+    
+    O plano deve ser adequado para a condição específica do paciente e considerar seu objetivo. 
+    Inclua exercícios organizados em 3-4 dias por semana para 3-4 semanas, com foco progressivo.
+    
+    Para cada sessão, inclua 5-7 exercícios da lista fornecida, com aquecimento e resfriamento apropriados.
+    
+    IMPORTANTE: Use apenas exercícios da lista fornecida. NÃO INVENTE NOVOS EXERCÍCIOS.
+    Escreva todas as descrições em português brasileiro.
+    Certifique-se que todos os termos como "aquecimento", "volta à calma", etc. estejam em português.`;
+
+    // Build the user prompt
+    const userPrompt = `Crie um plano de reabilitação para um paciente com ${preferences.condition} na área ${preferences.joint_area}, 
+    com objetivo principal de ${preferences.goal}.
+    
+    Idade: ${preferences.age || 'Não informada'}
+    Peso: ${preferences.weight || 'Não informado'} kg
+    Altura: ${preferences.height || 'Não informada'} cm
+    
+    O plano deve ter duração de 3-4 semanas, com 3-4 sessões por semana.
+    
+    Aqui estão os exercícios disponíveis para usar (use apenas estes, não invente novos):
+    
+    ${exercisesDescription}
+    
+    Formate sua resposta como um objeto JSON válido com os seguintes campos:
+    
+    {
+      "overview": "Visão geral do plano e recomendações gerais",
+      "recommendations": ["Recomendação 1", "Recomendação 2", ...],
+      "days": {
+        "day1": {
+          "focus": "Foco do dia",
+          "exercises": [
+            {"id": "id do exercício", "sets": 3, "reps": 10, "rest_seconds": 60}
+          ],
+          "warmup_description": "Descrição do aquecimento (EM PORTUGUÊS)",
+          "cooldown_description": "Descrição da volta à calma (EM PORTUGUÊS)"
+        },
+        ...mais dias
+      }
+    }
+    
+    IMPORTANTE: Certifique-se de que o JSON esteja válido e completo.
+    Certifique-se que aquecimento e resfriamento estejam SEMPRE em português.`;
+
+    console.log('Enviando requisição para a Groq API...');
+
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${GROQ_API_KEY}`,
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: "llama3-8b-8192",
+        model: 'llama3-8b-8192',
         messages: [
-          { 
-            role: "system", 
-            content: "You are a physiotherapist specialized in creating personalized rehabilitation plans. Always respond with valid JSON using a properly structured and complete object. The plan must include a variety of exercise types: stretching, mobility, and strengthening exercises to provide a balanced approach to rehabilitation."
-          },
-          { role: "user", content: finalPrompt }
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
         ],
-        max_tokens: 2048,
-        temperature: 0.3,
-        response_format: { type: "json_object" }
-      }),
+        temperature: 0.7,
+        max_tokens: 4000
+      })
     });
-
-    // Race between API call and timeout
-    const response = await Promise.race([groqPromise, timeoutPromise]);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`Error in Groq API call (${response.status}):`, errorText);
-      throw new Error(`API Error: ${response.status} ${errorText}`);
+      console.error('Erro na resposta da Groq API:', errorText);
+      throw new Error(`Erro na API Groq: ${response.status} - ${errorText}`);
     }
 
-    const groqResponse = await response.json();
-    console.log("Response received from Groq API");
+    const groqData = await response.json();
+    console.log('Resposta recebida da Groq API');
 
-    if (!groqResponse.choices || !groqResponse.choices[0] || !groqResponse.choices[0].message) {
-      console.error("Unexpected response format:", groqResponse);
-      throw new Error("Unexpected response format");
-    }
-
-    let rehabPlanJson = groqResponse.choices[0].message.content;
-    console.log("Raw JSON content received");
-
-    // Process JSON response
-    let rehabPlan;
+    let generatedPlan;
     try {
-      // Parse JSON if it's a string
-      if (typeof rehabPlanJson === 'string') {
-        if (rehabPlanJson.includes('```json')) {
-          console.log("Removing markdown markers from JSON");
-          rehabPlanJson = rehabPlanJson.replace(/```json\n|\n```/g, '');
-        }
-        
-        try {
-          rehabPlan = JSON.parse(rehabPlanJson);
-        } catch (jsonError) {
-          console.error("Error parsing JSON:", jsonError);
-          
-          // Try to extract valid JSON part
-          const jsonMatch = rehabPlanJson.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            console.log("Attempting to extract only valid JSON part");
-            try {
-              rehabPlan = JSON.parse(jsonMatch[0]);
-            } catch (fallbackError) {
-              throw new Error("Invalid JSON even after extraction attempt");
-            }
-          } else {
-            throw new Error("Could not extract valid JSON from response");
-          }
-        }
-      } else if (typeof rehabPlanJson === 'object') {
-        rehabPlan = rehabPlanJson;
-      } else {
-        throw new Error("Invalid response format");
-      }
-
-      // Enhance the plan with complete exercise data from database
-      console.log("Enhancing plan with database exercise details");
+      const contentText = groqData.choices[0].message.content;
       
-      if (rehabPlan.rehab_sessions && Array.isArray(rehabPlan.rehab_sessions)) {
-        for (const session of rehabPlan.rehab_sessions) {
-          if (session.exercises && Array.isArray(session.exercises)) {
-            for (const exercise of session.exercises) {
-              // Check if exercise has an ID reference
-              if (exercise.exercise_id) {
-                // Find the matching exercise in our database
-                const dbExercise = allExercises.find(e => e.id === exercise.exercise_id);
-                if (dbExercise) {
-                  // Enhance the exercise with database data
-                  exercise.name = dbExercise.name;
-                  exercise.exerciseType = dbExercise.exercise_type;
-                  exercise.difficulty = dbExercise.difficulty;
-                  exercise.description = dbExercise.description || "Perform this exercise with proper form and controlled movements.";
-                  exercise.gifUrl = dbExercise.gif_url;
-                  
-                  // Ensure we have at least the minimum required fields
-                  if (!exercise.sets) exercise.sets = dbExercise.recommended_sets || 3;
-                  if (!exercise.reps) exercise.reps = dbExercise.recommended_repetitions || 10;
-                  if (!exercise.rest_time_seconds) exercise.rest_time_seconds = dbExercise.rest_time_seconds || 30;
-                }
-              }
-            }
-          }
-        }
-      }
-
-      // Ensure days structure exists for display component
-      if (!rehabPlan.days) {
-        console.log("Creating days structure from rehab sessions");
-        rehabPlan.days = {};
-        
-        // Check if we have rehab_sessions to convert
-        if (rehabPlan.rehab_sessions && Array.isArray(rehabPlan.rehab_sessions)) {
-          rehabPlan.rehab_sessions.forEach((session, index) => {
-            const dayKey = `day${index + 1}`;
-            
-            // Create exercise structure for display component
-            rehabPlan.days[dayKey] = {
-              notes: session.notes || `Day ${index + 1} of treatment`,
-              exercises: (session.exercises || []).map(ex => ({
-                name: ex.name,
-                sets: ex.sets || 3,
-                reps: ex.reps || 10,
-                restTime: `${Math.floor((ex.rest_time_seconds || 30) / 60)} minutes ${(ex.rest_time_seconds || 30) % 60} seconds`,
-                description: ex.description || "Perform exercise carefully with attention to technique.",
-                gifUrl: ex.gifUrl || null,
-                exerciseType: ex.exerciseType || "unspecified"
-              }))
-            };
-          });
-        }
-      }
+      // Extract JSON from the response if needed
+      const jsonMatch = contentText.match(/```json\s*([\s\S]*?)\s*```/) || 
+                        contentText.match(/{[\s\S]*}/);
       
-      // Ensure we have overview and recommendations
-      if (!rehabPlan.overview && rehabPlan.description) {
-        rehabPlan.overview = rehabPlan.description;
-      }
+      const jsonText = jsonMatch ? jsonMatch[1] || jsonMatch[0] : contentText;
+      generatedPlan = JSON.parse(jsonText);
       
-      if (!rehabPlan.recommendations && rehabPlan.general_recommendations) {
-        rehabPlan.recommendations = rehabPlan.general_recommendations;
-      }
-
-      // Add default recommendations if none provided
-      if (!rehabPlan.recommendations || !Array.isArray(rehabPlan.recommendations) || rehabPlan.recommendations.length === 0) {
-        rehabPlan.recommendations = [
-          "Realize os exercícios diariamente para melhores resultados.",
-          "Se sentir dor intensa, pare imediatamente e consulte um profissional.",
-          "Progrida gradualmente na intensidade dos exercícios.",
-          "Mantenha uma boa hidratação durante todo o processo de reabilitação.",
-          "Combine os exercícios com períodos adequados de descanso."
-        ];
-      }
-      
-      // Set condition property using preferences
-      rehabPlan.condition = preferences.condition || "General rehabilitation";
-      rehabPlan.joint_area = preferences.joint_area || "knee";
-      rehabPlan.goal = rehabGoal;
-      rehabPlan.start_date = new Date().toISOString();
-      rehabPlan.end_date = new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString(); // 28 days later
-      
-      console.log("Final rehabilitation plan structure prepared");
+      console.log('Plano de reabilitação gerado com sucesso');
     } catch (parseError) {
-      console.error("Error analyzing JSON:", parseError);
-      throw new Error("Error processing response: " + parseError.message);
+      console.error('Erro ao analisar JSON da resposta:', parseError);
+      console.error('Conteúdo que causou erro:', groqData.choices[0].message.content);
+      throw new Error('Erro ao processar resposta da IA. Por favor, tente novamente.');
     }
 
-    // Save rehabilitation plan to database if user is authenticated
-    if (userId) {
-      try {
-        // Ensure planData is defined before trying to use it
-        const planData = JSON.parse(JSON.stringify(rehabPlan));
-        
-        // Save rehabilitation plan
-        const { data: savedPlan, error: insertError } = await supabase
-          .from('rehab_plans')
-          .insert({
-            user_id: userId,
-            goal: rehabGoal,
-            condition: preferences.condition,
-            joint_area: preferences.joint_area,
-            start_date: new Date().toISOString(),
-            end_date: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString(), // 28 days later
-            plan_data: planData
-          })
-          .select()
-          .single();
+    // Create a new rehab plan in the database
+    const planId = crypto.randomUUID();
+    const today = new Date();
+    const endDate = new Date(today);
+    endDate.setDate(today.getDate() + 28); // 4 weeks
 
-        if (insertError) {
-          console.error("Error saving rehabilitation plan:", insertError);
-        } else {
-          console.log("Rehabilitation plan saved successfully!");
-          
-          // Set the ID from the database record
-          if (savedPlan) {
-            rehabPlan.id = savedPlan.id;
-          }
-        
-          // Update plan generation count
-          const now = new Date().toISOString();
-          const { data: planCount, error: countError } = await supabase
-            .from('plan_generation_counts')
-            .select('rehabilitation_count')
-            .eq('user_id', userId)
-            .maybeSingle();
-            
-          if (countError) {
-            console.error("Error checking plan count:", countError);
-          }
-          
-          if (planCount) {
-            await supabase
-              .from('plan_generation_counts')
-              .update({
-                rehabilitation_count: (planCount.rehabilitation_count || 0) + 1,
-                updated_at: now
-              })
-              .eq('user_id', userId);
-          } else {
-            await supabase
-              .from('plan_generation_counts')
-              .insert({
-                user_id: userId,
-                rehabilitation_count: 1,
-                updated_at: now,
-                created_at: now
-              });
-          }
-        }
-      } catch (dbError) {
-        console.error("Error interacting with database:", dbError);
-      }
+    const { error: insertError } = await supabase
+      .from('rehab_plans')
+      .insert({
+        id: planId,
+        user_id: userId,
+        goal: preferences.goal,
+        condition: preferences.condition,
+        joint_area: preferences.joint_area,
+        start_date: today.toISOString().split('T')[0],
+        end_date: endDate.toISOString().split('T')[0],
+        plan_data: generatedPlan
+      });
+
+    if (insertError) {
+      console.error('Erro ao salvar plano de reabilitação:', insertError);
+      throw new Error(`Erro ao salvar plano: ${insertError.message}`);
     }
 
     return new Response(
-      JSON.stringify(rehabPlan),
-      {
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-      }
+      JSON.stringify(generatedPlan),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
+
   } catch (error) {
-    console.error("Complete error:", error);
+    console.error('Erro durante a geração do plano de reabilitação:', error);
     
     return new Response(
-      JSON.stringify({
-        error: error.message || "An error occurred generating the rehabilitation plan"
+      JSON.stringify({ 
+        error: error instanceof Error ? error.message : 'Erro desconhecido ao gerar plano de reabilitação'
       }),
-      {
-        status: 500,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   }
