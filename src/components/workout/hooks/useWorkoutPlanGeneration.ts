@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from "react";
 import { WorkoutPreferences } from "../types";
 import { toast } from "sonner";
@@ -81,7 +80,6 @@ export const useWorkoutPlanGeneration = (
     };
   }, [loading, loadingPhase]);
 
-  // Fetch current user ID on mount
   useEffect(() => {
     const fetchUserId = async () => {
       const { data } = await supabase.auth.getUser();
@@ -174,11 +172,10 @@ export const useWorkoutPlanGeneration = (
       console.log(`Using unique timestamp for variation: ${timestamp}`);
       console.log(`Request ID: ${requestId}`);
       
-      // First try with the Llama function
       try {
         console.log("Attempting to use Llama model first...");
         const { workoutPlan: generatedPlan, error: generationError, rawResponse: rawResponseData } = 
-          await generateWorkoutPlanWithTrenner2025(preferences, user.id, aiSettings || undefined, requestId, true);
+          await generateWorkoutPlanWithTrenner2025(preferences, user.id, aiSettings || undefined, requestId);
         
         clearTimeout(edgeFunctionTimeoutId);
         edgeFunctionStarted.current = true;
@@ -241,10 +238,9 @@ export const useWorkoutPlanGeneration = (
         // Continue to fallback
       }
       
-      // Fallback to regular generation
       console.log("Using fallback workout plan generation method...");
       const { workoutPlan: generatedPlan, error: generationError, rawResponse: rawResponseData } = 
-        await generateWorkoutPlanWithTrenner2025(preferences, user.id, aiSettings || undefined, requestId, false);
+        await generateWorkoutPlanWithTrenner2025(preferences, user.id, aiSettings || undefined, requestId);
       
       clearTimeout(edgeFunctionTimeoutId);
       edgeFunctionStarted.current = true;
@@ -386,3 +382,4 @@ export const useWorkoutPlanGeneration = (
     planGenerationCount
   };
 };
+
