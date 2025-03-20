@@ -14,10 +14,7 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
                                errorMessage.includes("booted") || 
                                errorMessage.includes("função de geração") ||
                                errorMessage.includes("autenticado") ||
-                               errorMessage.includes("autenticação") ||
-                               errorMessage.includes("Edge Function") ||
-                               errorMessage.includes("não-2xx") ||
-                               errorMessage.includes("non-2xx");
+                               errorMessage.includes("autenticação");
                                
   const isNetworkError = errorMessage.includes("conexão") || 
                          errorMessage.includes("API") || 
@@ -45,14 +42,13 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
           <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 p-4 rounded-md text-sm">
             {isInitializationError ? (
               <div className="space-y-2">
-                <p className="font-medium">Erro de inicialização, autenticação ou servidor</p>
-                <p>Isso geralmente ocorre quando você não está autenticado, o serviço está sobrecarregado ou a função está com problemas.</p>
+                <p className="font-medium">Erro de inicialização ou autenticação</p>
+                <p>Isso geralmente ocorre quando você não está autenticado ou o serviço está sobrecarregado.</p>
                 <p>Recomendamos:</p>
                 <ul className="text-left list-disc pl-5 space-y-1">
                   <li>Verificar se você está logado na plataforma</li>
                   <li>Recarregar a página completa</li>
                   <li>Tentar novamente em alguns minutos</li>
-                  <li>Entrar em contato com o suporte se o problema persistir</li>
                 </ul>
               </div>
             ) : isNetworkError ? (

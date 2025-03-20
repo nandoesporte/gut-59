@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from "react";
 import { WorkoutPreferences } from "../types";
 import { toast } from "sonner";
@@ -131,79 +130,88 @@ export const useWorkoutPlanGeneration = (
       
       toast.info(getLoadingMessage());
       
-      let aiSettings = null;
-      try {
-        const { data: aiSettingsData, error: aiSettingsError } = await supabase
-          .from('ai_model_settings')
-          .select('*')
-          .eq('name', 'trene2025')
-          .maybeSingle();
-          
-        if (aiSettingsError) {
-          console.warn("Erro ao buscar configurações de IA, usando padrões:", aiSettingsError);
-        } else {
-          aiSettings = aiSettingsData;
-        }
-      } catch (settingsError) {
-        console.warn("Erro ao buscar configurações de IA:", settingsError);
+      const { data: aiSettings, error: aiSettingsError } = await supabase
+        .from('ai_model_settings')
+        .select('*')
+        .eq('name', 'trene2025')
+        .maybeSingle();
+        
+      if (aiSettingsError) {
+        console.warn("Erro ao buscar configurações de IA, usando padrões:", aiSettingsError);
       }
       
       console.log("Starting generation of workout plan with Trenner2025...");
       console.log(`Activity level: ${preferences.activity_level}`);
-      console.log(`User ID: ${user.id}`);
       
       const timestamp = Date.now();
       const requestId = `${user.id}_${timestamp}`;
       
+      const edgeFunctionTimeoutId = setTimeout(() => {
+        if (!edgeFunctionStarted.current) {
+          console.error("Edge function init timeout - function may be stuck at booted stage");
+          throw new Error("Timeout ao iniciar função de geração do plano. A função parece estar presa no estágio inicial.");
+        }
+      }, 5000);
+      
       console.log("Calling generateWorkoutPlanWithTrenner2025...");
       console.log(`Using unique timestamp for variation: ${timestamp}`);
       
-      try {
-        const result = await generateWorkoutPlanWithTrenner2025(
-          preferences,
-          user.id,
-          aiSettings,
-          requestId
-        );
-        
-        if (result.error) {
-          console.error("Error in workout plan generation:", result.error);
-          throw new Error(result.error);
-        }
-        
-        if (!result.workoutPlan) {
-          console.error("No workout plan data returned");
-          throw new Error("No data returned from workout plan generator");
-        }
-        
-        console.log("Workout plan successfully generated, setting to state");
-        setWorkoutPlan(result.workoutPlan);
-        
-        await updatePlanGenerationCount(user.id);
-        setPlanGenerationCount(prev => prev + 1);
-        
-        const { data: countData } = await supabase
-          .from('plan_generation_counts')
-          .select('workout_count')
-          .eq('user_id', user.id)
-          .maybeSingle();
-          
-        if (countData) {
-          setPlanGenerationCount(countData.workout_count);
-        }
-        
-        toast.success(`Plano de treino ${activityDesc} gerado com sucesso!`);
-        
-        if (onPlanGenerated) {
-          onPlanGenerated();
-        }
-        
-        retryCount.current = 0;
-        setLoadingTime(0);
-      } catch (planError) {
-        console.error("Error generating workout plan:", planError);
-        throw planError;
+      const { workoutPlan: generatedPlan, error: generationError, rawResponse: rawResponseData } = 
+        await generateWorkoutPlanWithTrenner2025(preferences, user.id, aiSettings || undefined, requestId);
+      
+      clearTimeout(edgeFunctionTimeoutId);
+      edgeFunctionStarted.current = true;
+      
+      if (rawResponseData) {
+        console.log("RAW RESPONSE FROM EDGE FUNCTION:", JSON.stringify(rawResponseData, null, 2));
+        setRawResponse(rawResponseData);
+      } else {
+        console.warn("No raw response data received from edge function");
       }
+      
+      if (generationError) {
+        console.error("Generation error:", generationError);
+        throw new Error(generationError);
+      }
+      
+      if (!generatedPlan) {
+        console.error("No workout plan generated");
+        throw new Error("Não foi possível gerar o plano de treino - resposta vazia");
+      }
+      
+      console.log("Workout plan successfully generated, saving to database...");
+      console.log("COMPLETE GENERATED PLAN:", JSON.stringify(generatedPlan, null, 2));
+      
+      const savedPlan = await saveWorkoutPlan(generatedPlan, user.id);
+      
+      if (!savedPlan) {
+        throw new Error("Erro ao salvar o plano de treino");
+      }
+      
+      setWorkoutPlan(savedPlan);
+      
+      await updatePlanGenerationCount(user.id);
+      setPlanGenerationCount(prev => prev + 1);
+      
+      const { data: countData } = await supabase
+        .from('plan_generation_counts')
+        .select('workout_count')
+        .eq('user_id', user.id)
+        .maybeSingle();
+        
+      if (countData) {
+        setPlanGenerationCount(countData.workout_count);
+      }
+      
+      toast.success(`Plano de treino ${activityDesc} gerado com sucesso!`);
+      console.log("Workout plan generation and saving completed successfully");
+      
+      if (onPlanGenerated) {
+        onPlanGenerated();
+      }
+      
+      retryCount.current = 0;
+      setLoadingTime(0);
     } catch (err: any) {
       console.error("Erro na geração do plano de treino:", err);
       
@@ -226,8 +234,7 @@ export const useWorkoutPlanGeneration = (
         err.message.includes("AbortError") ||
         err.message.includes("connection closed") ||
         err.message.includes("Connection closed") ||
-        err.message.includes("presa no estágio") ||
-        err.message.includes("Edge Function")
+        err.message.includes("presa no estágio")
       );
       
       if (isAuthError) {
@@ -248,7 +255,7 @@ export const useWorkoutPlanGeneration = (
       setLoading(false);
       generationInProgress.current = false;
     }
-  }, [preferences, onPlanGenerated, getLoadingMessage]);
+  }, [preferences, onPlanGenerated]);
 
   useEffect(() => {
     if (!workoutPlan && !loading && !error && !generationInProgress.current && !generationAttempted.current) {
