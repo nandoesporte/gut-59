@@ -17,7 +17,44 @@ export const generateWorkoutPlanWithTrenner2025 = async (
   console.log("Using request ID:", requestId || "none");
   console.log("User ID for plan generation:", userId);
 
+  if (!userId) {
+    console.error("No user ID provided for workout plan generation");
+    return { 
+      workoutPlan: null, 
+      error: "ID do usuário é obrigatório para gerar um plano de treino", 
+      rawResponse: null 
+    };
+  }
+
   try {
+    // Check if user exists and has proper authentication
+    try {
+      console.log("Verifying user authentication for:", userId);
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      
+      if (userError) {
+        console.error("Authentication error:", userError);
+        throw new Error(`Erro de autenticação: ${userError.message}`);
+      }
+      
+      if (!userData?.user) {
+        console.error("No authenticated user found");
+        throw new Error("Usuário não autenticado. Por favor, faça login para gerar um plano de treino.");
+      }
+      
+      console.log("User authenticated successfully with ID:", userData.user.id);
+      
+      // Verify if the authenticated user matches the requested userId
+      if (userData.user.id !== userId) {
+        console.warn(`Mismatch between authenticated user (${userData.user.id}) and requested userId (${userId})`);
+        console.log("Using authenticated user ID instead");
+        userId = userData.user.id;
+      }
+    } catch (authError) {
+      console.error("Error during authentication check:", authError);
+      throw authError;
+    }
+
     // First try to use the Llama function
     try {
       console.log("Attempting to use primary edge function for generation");
@@ -46,6 +83,13 @@ export const generateWorkoutPlanWithTrenner2025 = async (
       
       // Fall back to the basic workout generator
       console.log("Falling back to standard workout generator with userId:", userId);
+      
+      // Add more detailed logging for the fallback
+      console.log("Fallback function payload:", {
+        preferences: JSON.stringify(preferences).substring(0, 200) + "...",
+        userId
+      });
+      
       const { data, error } = await supabase.functions.invoke('generate-workout-plan', {
         body: { 
           preferences, 
@@ -69,7 +113,7 @@ export const generateWorkoutPlanWithTrenner2025 = async (
     console.error("Error generating workout plan:", error);
     return { 
       workoutPlan: null, 
-      error: error instanceof Error ? error.message : "Error generating workout plan", 
+      error: error instanceof Error ? error.message : "Erro ao gerar plano de treino: Edge Function returned a non-2xx status code", 
       rawResponse: null 
     };
   }

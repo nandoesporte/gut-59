@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef, useCallback } from "react";
 import { WorkoutPreferences } from "../types";
 import { toast } from "sonner";
@@ -154,13 +155,6 @@ export const useWorkoutPlanGeneration = (
       const timestamp = Date.now();
       const requestId = `${user.id}_${timestamp}`;
       
-      const edgeFunctionTimeoutId = setTimeout(() => {
-        if (!edgeFunctionStarted.current) {
-          console.error("Edge function init timeout - function may be stuck at booted stage");
-          throw new Error("Timeout ao iniciar função de geração do plano. A função parece estar presa no estágio inicial.");
-        }
-      }, 5000);
-      
       console.log("Calling generateWorkoutPlanWithTrenner2025...");
       console.log(`Using unique timestamp for variation: ${timestamp}`);
       
@@ -171,9 +165,6 @@ export const useWorkoutPlanGeneration = (
           aiSettings,
           requestId
         );
-        
-        clearTimeout(edgeFunctionTimeoutId);
-        edgeFunctionStarted.current = true;
         
         if (result.error) {
           console.error("Error in workout plan generation:", result.error);
@@ -235,7 +226,8 @@ export const useWorkoutPlanGeneration = (
         err.message.includes("AbortError") ||
         err.message.includes("connection closed") ||
         err.message.includes("Connection closed") ||
-        err.message.includes("presa no estágio")
+        err.message.includes("presa no estágio") ||
+        err.message.includes("Edge Function")
       );
       
       if (isAuthError) {
