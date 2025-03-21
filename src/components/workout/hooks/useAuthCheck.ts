@@ -9,28 +9,34 @@ export const useAuthCheck = () => {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setIsAuthenticated(!!user);
-      setUserId(user?.id || null);
-      
-      if (user) {
-        // Verificar se o usuário é admin (opcional)
-        try {
-          const { data } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', user.id)
-            .eq('role', 'admin')
-            .maybeSingle();
-          
-          setIsAdmin(!!data);
-        } catch (error) {
-          console.error('Erro ao verificar papel de admin:', error);
-          setIsAdmin(false);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        setIsAuthenticated(!!user);
+        setUserId(user?.id || null);
+        
+        if (user) {
+          // Verificar se o usuário é admin (opcional)
+          try {
+            const { data } = await supabase
+              .from('user_roles')
+              .select('role')
+              .eq('user_id', user.id)
+              .eq('role', 'admin')
+              .maybeSingle();
+            
+            setIsAdmin(!!data);
+          } catch (error) {
+            console.error('Erro ao verificar papel de admin:', error);
+            setIsAdmin(false);
+          }
         }
+        
+        console.log("Authentication status:", !!user, "User ID:", user?.id);
+      } catch (error) {
+        console.error("Error checking authentication:", error);
+        setIsAuthenticated(false);
+        setUserId(null);
       }
-      
-      console.log("Authentication status:", !!user, "User ID:", user?.id);
     };
     
     checkAuth();

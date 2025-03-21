@@ -1,6 +1,11 @@
+
 project_id = "sxjafhzikftdenqnkcri"
 
-# Critical functions only - keep only essential services
+# Keep only the absolute minimum functions needed
+# All others will be disabled to stay within the plan limits
+[functions]
+verify_jwt = false
+
 [functions.generate-workout-plan]
 verify_jwt = false
 
@@ -9,5 +14,3 @@ verify_jwt = false
 
 [functions.check-mercadopago-payment]
 verify_jwt = false
-
-# All other functions are disabled to stay within the plan limits
