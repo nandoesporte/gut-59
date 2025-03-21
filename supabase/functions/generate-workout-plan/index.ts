@@ -8,6 +8,8 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Max-Age': '86400'
 };
 
 serve(async (req) => {
@@ -26,8 +28,8 @@ serve(async (req) => {
       throw new Error('ID do usuário é obrigatório');
     }
 
-    // Verificar existência do usuário, mas não rejeitar se não for admin
-    // Isso corrige o problema para usuários não-admin
+    // Verificar existência do usuário de forma não bloqueante
+    let userProfile = null;
     try {
       const userResponse = await fetch(
         `${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}`,
@@ -39,12 +41,20 @@ serve(async (req) => {
         }
       );
       
-      if (!userResponse.ok) {
-        console.warn(`Aviso: Não foi possível verificar o perfil do usuário: ${userId}`);
+      if (userResponse.ok) {
+        const profiles = await userResponse.json();
+        if (profiles && profiles.length > 0) {
+          userProfile = profiles[0];
+          console.log('Perfil do usuário encontrado:', userId);
+        } else {
+          console.warn(`Usuário não encontrado, mas continuando para compatibilidade: ${userId}`);
+        }
+      } else {
+        console.warn(`Resposta não-OK ao verificar usuário (${userResponse.status}): ${await userResponse.text()}`);
       }
     } catch (userCheckError) {
-      console.warn(`Erro ao verificar usuário: ${userCheckError.message}`);
-      // Continue com a geração do plano mesmo se a verificação falhar
+      console.warn(`Erro ao verificar usuário, continuando: ${userCheckError.message}`);
+      // Continue regardless of user verification failure
     }
 
     // Buscar o prompt ativo para plano de treino
@@ -114,6 +124,7 @@ serve(async (req) => {
       
       // Se não tivermos exercícios suficientes após o filtro, use todos
       if (filteredExercises.length < 10) {
+        console.log('Poucos exercícios após filtragem por tipo, usando todos os exercícios disponíveis');
         filteredExercises = exercises;
       }
     }
@@ -124,7 +135,7 @@ serve(async (req) => {
     const exercisesWithGifs = filteredExercises.filter(ex => ex.gif_url);
     
     if (exercisesWithGifs.length < 20) {
-      console.warn('Poucos exercícios com GIFs disponíveis');
+      console.warn('Poucos exercícios com GIFs disponíveis, usando todos os exercícios filtrados');
     }
     
     // Preferir exercícios com GIFs, mas usar todos se necessário
@@ -270,6 +281,11 @@ serve(async (req) => {
       
       // Selecionar exercícios de cada grupo muscular nesta sessão
       for (const muscleGroup of dayStructure.muscle_groups) {
+        if (!exercisesByMuscle[muscleGroup] || exercisesByMuscle[muscleGroup].length === 0) {
+          console.warn(`Nenhum exercício disponível para o grupo muscular: ${muscleGroup}`);
+          continue;
+        }
+        
         const availableExercises = exercisesByMuscle[muscleGroup].filter(ex => !usedExerciseIds.has(ex.id));
         
         // Pegar alguns exercícios deste grupo muscular
