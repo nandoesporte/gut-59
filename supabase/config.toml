@@ -22,3 +22,6 @@ verify_jwt = false
 
 [functions.generate-workout-plan-llama]
 verify_jwt = false
+
+# Disable all other functions to stay within the limits
+# We prioritized functions that are actively being used in the application
