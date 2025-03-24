@@ -4,6 +4,8 @@ project_id = "sxjafhzikftdenqnkcri"
 # Keep only the absolute minimum functions needed
 # All others will be disabled to stay within the plan limits
 [functions]
+
+[functions.verify_jwt]
 verify_jwt = false
 
 [functions.generate-workout-plan]
