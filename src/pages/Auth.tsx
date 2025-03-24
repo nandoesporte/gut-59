@@ -11,6 +11,7 @@ const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -42,49 +43,69 @@ const Auth = () => {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setErrorMessage("");
 
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
+        
         if (error) throw error;
         
-        toast({
-          title: "Login realizado",
-          description: "Bem-vindo de volta!",
-        });
+        if (data?.user) {
+          toast({
+            title: "Login realizado",
+            description: "Bem-vindo de volta!",
+          });
+        }
       } else {
-        const { error } = await supabase.auth.signUp({
+        // Signup flow
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: window.location.origin,
           },
         });
+        
         if (error) throw error;
         
-        toast({
-          title: "Cadastro realizado",
-          description: "Verifique seu email para confirmar o cadastro.",
-        });
+        if (data?.user) {
+          if (data.user.identities?.length === 0) {
+            throw new Error("Este email já está cadastrado. Por favor, faça login.");
+          }
+          
+          toast({
+            title: "Cadastro realizado",
+            description: "Verifique seu email para confirmar o cadastro.",
+          });
+          
+          // Automatically switch to login view after successful signup
+          setIsLogin(true);
+        }
       }
     } catch (error: any) {
       console.error("Authentication error:", error);
-      let errorMessage = "Ocorreu um erro durante a autenticação.";
+      let errorMsg = "Ocorreu um erro durante a autenticação.";
       
       if (error.message.includes("Email not confirmed")) {
-        errorMessage = "Por favor, confirme seu email antes de fazer login.";
+        errorMsg = "Por favor, confirme seu email antes de fazer login.";
       } else if (error.message.includes("Invalid login credentials")) {
-        errorMessage = "Email ou senha incorretos.";
+        errorMsg = "Email ou senha incorretos.";
       } else if (error.message.includes("User already registered")) {
-        errorMessage = "Este email já está cadastrado.";
+        errorMsg = "Este email já está cadastrado. Por favor, faça login.";
+      } else if (error.message.includes("already registered")) {
+        errorMsg = "Este email já está cadastrado. Por favor, faça login.";
+      } else if (error.message.includes("password")) {
+        errorMsg = "A senha deve ter pelo menos 6 caracteres.";
       }
       
+      setErrorMessage(errorMsg);
       toast({
         title: "Erro na autenticação",
-        description: errorMessage,
+        description: errorMsg,
         variant: "destructive",
       });
     } finally {
@@ -110,6 +131,12 @@ const Auth = () => {
             </p>
           </div>
         </div>
+
+        {errorMessage && (
+          <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">
+            {errorMessage}
+          </div>
+        )}
 
         <form onSubmit={handleAuth} className="mt-8 space-y-6">
           <div className="space-y-4">
@@ -151,7 +178,10 @@ const Auth = () => {
           <div className="text-center">
             <button
               type="button"
-              onClick={() => setIsLogin(!isLogin)}
+              onClick={() => {
+                setIsLogin(!isLogin);
+                setErrorMessage("");
+              }}
               className="text-sm text-primary-600 hover:text-primary-500 font-medium"
             >
               {isLogin
