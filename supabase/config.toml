@@ -5,19 +5,10 @@ project_id = "sxjafhzikftdenqnkcri"
 # All others will be disabled to stay within the plan limits
 [functions]
 
-[functions.verify_jwt]
-verify_jwt = false
-
 [functions.generate-workout-plan]
 verify_jwt = false
 
 [functions.generate-workout-plan-llama]
-verify_jwt = false
-
-[functions.create-mercadopago-preference]
-verify_jwt = false
-
-[functions.check-mercadopago-payment]
 verify_jwt = false
 
 [functions.check-auth-status]

@@ -98,8 +98,14 @@ export const generateWorkoutPlanWithTrenner2025 = async (
       };
     }
 
+    // Make sure the returned data satisfies the WorkoutPlan type
+    const validWorkoutPlan: WorkoutPlan = {
+      ...workoutPlanData,
+      workout_sessions: workoutPlanData.workout_sessions || []
+    };
+
     return {
-      workoutPlan: workoutPlanData as WorkoutPlan,
+      workoutPlan: validWorkoutPlan,
       error: null,
       rawResponse: workoutPlanData
     };

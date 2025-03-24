@@ -37,8 +37,7 @@ serve(async (req) => {
       preferences.available_equipment = ["all"];
     }
     
-    // This function has an error, but without access to complete code, 
-    // we'll return an appropriate error message
+    // Return a proper error response for now
     return new Response(
       JSON.stringify({
         error: "Serviço Llama temporariamente indisponível. O sistema usará o método alternativo.",
