@@ -61,20 +61,23 @@ const Auth = () => {
           });
         }
       } else {
-        // Primeiro verifica se o email já está cadastrado
-        const { data: existingUsers } = await supabase.auth.admin
-          .listUsers({ 
-            filter: { 
-              email: email 
-            } 
-          })
-          .catch(() => ({ data: null }));
-
-        if (existingUsers && existingUsers.length > 0) {
+        // Better approach to check for existing users using signUp with no confirmation
+        const { error: checkUserError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: window.location.origin,
+          }
+        });
+        
+        // If user already exists, Supabase will return an error
+        if (checkUserError && 
+            (checkUserError.message.includes("already registered") || 
+             checkUserError.message.includes("already exists"))) {
           throw new Error("Este email já está cadastrado. Por favor, faça login.");
         }
 
-        // Signup flow
+        // If we reached here, the email is available, proceed with actual signup
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
