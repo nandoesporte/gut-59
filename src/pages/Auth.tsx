@@ -61,6 +61,19 @@ const Auth = () => {
           });
         }
       } else {
+        // Primeiro verifica se o email já está cadastrado
+        const { data: existingUsers } = await supabase.auth.admin
+          .listUsers({ 
+            filter: { 
+              email: email 
+            } 
+          })
+          .catch(() => ({ data: null }));
+
+        if (existingUsers && existingUsers.length > 0) {
+          throw new Error("Este email já está cadastrado. Por favor, faça login.");
+        }
+
         // Signup flow
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -94,10 +107,13 @@ const Auth = () => {
         errorMsg = "Por favor, confirme seu email antes de fazer login.";
       } else if (error.message.includes("Invalid login credentials")) {
         errorMsg = "Email ou senha incorretos.";
-      } else if (error.message.includes("User already registered")) {
+      } else if (error.message.includes("User already registered") || 
+                error.message.includes("already registered") ||
+                error.message.includes("already exists") ||
+                error.message.includes("já está cadastrado")) {
         errorMsg = "Este email já está cadastrado. Por favor, faça login.";
-      } else if (error.message.includes("already registered")) {
-        errorMsg = "Este email já está cadastrado. Por favor, faça login.";
+        // Automaticamente muda para a tela de login quando o usuário já existe
+        setIsLogin(true);
       } else if (error.message.includes("password")) {
         errorMsg = "A senha deve ter pelo menos 6 caracteres.";
       }
