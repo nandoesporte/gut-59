@@ -124,9 +124,15 @@ export const saveWorkoutPlan = async (plan: WorkoutPlan, userId: string): Promis
   try {
     console.log('Saving workout plan to database...');
     
+    // Ensure plan has workout_sessions property before saving
+    const planToSave: WorkoutPlan = {
+      ...plan,
+      workout_sessions: plan.workout_sessions || []
+    };
+    
     const { data, error } = await supabase
       .from('workout_plans')
-      .update(plan)
+      .update(planToSave)
       .eq('id', plan.id)
       .eq('user_id', userId)
       .select()
@@ -137,8 +143,14 @@ export const saveWorkoutPlan = async (plan: WorkoutPlan, userId: string): Promis
       throw new Error(`Erro ao salvar o plano de treino: ${error.message}`);
     }
     
-    console.log('Workout plan saved successfully:', data);
-    return data;
+    // Ensure returned data has workout_sessions
+    const savedPlan: WorkoutPlan = {
+      ...data,
+      workout_sessions: data.workout_sessions || []
+    };
+    
+    console.log('Workout plan saved successfully:', savedPlan);
+    return savedPlan;
   } catch (error) {
     console.error('Error in saveWorkoutPlan:', error);
     return null;

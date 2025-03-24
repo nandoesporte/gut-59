@@ -8,8 +8,6 @@ project_id = "sxjafhzikftdenqnkcri"
 [functions.generate-workout-plan]
 verify_jwt = false
 
-[functions.generate-workout-plan-llama]
-verify_jwt = false
-
 [functions.check-auth-status]
 verify_jwt = false
+
