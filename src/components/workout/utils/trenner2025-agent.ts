@@ -1,3 +1,4 @@
+
 import { WorkoutPreferences } from "../types";
 import { supabase } from "@/integrations/supabase/client";
 import { WorkoutPlan } from "../types/workout-plan";
@@ -33,7 +34,7 @@ export const generateWorkoutPlanWithTrenner2025 = async (
   
   try {
     // First, attempt to call the regular workout plan function
-    const { data: workoutPlan, error } = await supabase.functions.invoke('generate-workout-plan', {
+    const { data: workoutPlanData, error } = await supabase.functions.invoke('generate-workout-plan', {
       body: { 
         preferences,
         userId
@@ -48,11 +49,59 @@ export const generateWorkoutPlanWithTrenner2025 = async (
         rawResponse: error
       };
     }
+    
+    // Ensure the response has the expected structure
+    if (!workoutPlanData || !workoutPlanData.workout_sessions) {
+      console.error('Workout plan data is missing or incomplete:', workoutPlanData);
+      
+      // If the workout plan doesn't have workout_sessions, try to fetch the complete plan
+      if (workoutPlanData && workoutPlanData.id) {
+        console.log('Attempting to fetch complete workout plan with sessions...');
+        const { data: fullPlan, error: fetchError } = await supabase
+          .from('workout_plans')
+          .select(`
+            *,
+            workout_sessions (
+              *,
+              session_exercises (
+                *,
+                exercise:exercises (*)
+              )
+            )
+          `)
+          .eq('id', workoutPlanData.id)
+          .single();
+          
+        if (fetchError) {
+          console.error('Error fetching complete workout plan:', fetchError);
+          return {
+            workoutPlan: null,
+            error: `Erro ao buscar detalhes do plano de treino: ${fetchError.message}`,
+            rawResponse: { originalData: workoutPlanData, fetchError }
+          };
+        }
+        
+        if (fullPlan) {
+          console.log('Successfully fetched complete workout plan');
+          return {
+            workoutPlan: fullPlan as WorkoutPlan,
+            error: null,
+            rawResponse: { originalData: workoutPlanData, fullPlan }
+          };
+        }
+      }
+      
+      return {
+        workoutPlan: null,
+        error: 'Resposta incompleta do serviço de plano de treino. Tente novamente.',
+        rawResponse: workoutPlanData
+      };
+    }
 
     return {
-      workoutPlan,
+      workoutPlan: workoutPlanData as WorkoutPlan,
       error: null,
-      rawResponse: workoutPlan
+      rawResponse: workoutPlanData
     };
     
   } catch (error) {
