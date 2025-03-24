@@ -6,13 +6,33 @@ export const useAuthCheck = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [authToken, setAuthToken] = useState<string | null>(null);
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        // Get the current session which includes the access token
+        const { data: sessionData } = await supabase.auth.getSession();
+        const session = sessionData?.session;
+        
+        console.log("Auth check - Session:", !!session);
+        
+        // Get the current user
+        const { data: { user }, error } = await supabase.auth.getUser();
+        
+        if (error) {
+          console.error("Error checking authentication:", error);
+          setIsAuthenticated(false);
+          setUserId(null);
+          setAuthToken(null);
+          return;
+        }
+        
         setIsAuthenticated(!!user);
         setUserId(user?.id || null);
+        setAuthToken(session?.access_token || null);
+        
+        console.log("Authentication status:", !!user, "User ID:", user?.id);
         
         if (user) {
           // Verificar se o usuário é admin (opcional)
@@ -30,12 +50,11 @@ export const useAuthCheck = () => {
             setIsAdmin(false);
           }
         }
-        
-        console.log("Authentication status:", !!user, "User ID:", user?.id);
       } catch (error) {
         console.error("Error checking authentication:", error);
         setIsAuthenticated(false);
         setUserId(null);
+        setAuthToken(null);
       }
     };
     
@@ -43,9 +62,15 @@ export const useAuthCheck = () => {
     
     // Listen for auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("Auth state change:", event, !!session?.user);
       setIsAuthenticated(!!session?.user);
       setUserId(session?.user?.id || null);
-      console.log("Auth state change:", event, !!session?.user);
+      setAuthToken(session?.access_token || null);
+      
+      // When logging out, clear states
+      if (event === 'SIGNED_OUT') {
+        setIsAdmin(false);
+      }
     });
     
     return () => {
@@ -53,5 +78,5 @@ export const useAuthCheck = () => {
     };
   }, []);
 
-  return { isAuthenticated, isAdmin, userId };
+  return { isAuthenticated, isAdmin, userId, authToken };
 };
