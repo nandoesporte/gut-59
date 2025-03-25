@@ -12,7 +12,8 @@ interface WorkoutErrorProps {
 export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
   const isInitializationError = errorMessage.includes("inicialização") || 
                                errorMessage.includes("booted") || 
-                               errorMessage.includes("função de geração");
+                               errorMessage.includes("função de geração") ||
+                               errorMessage.includes("Edge Function returned a non-2xx status code");
                                
   const isNetworkError = errorMessage.includes("conexão") || 
                          errorMessage.includes("API") || 
@@ -38,12 +39,13 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
           <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 p-4 rounded-md text-sm">
             {isInitializationError ? (
               <div className="space-y-2">
-                <p className="font-medium">Erro de inicialização</p>
-                <p>Isso geralmente ocorre quando o serviço está sobrecarregado.</p>
+                <p className="font-medium">Erro no serviço de geração</p>
+                <p>O serviço de geração de planos de treino está com problemas.</p>
                 <p>Recomendamos:</p>
                 <ul className="text-left list-disc pl-5 space-y-1">
                   <li>Recarregar a página completa</li>
                   <li>Tentar novamente em alguns minutos</li>
+                  <li>Verificar se há atualizações disponíveis</li>
                 </ul>
               </div>
             ) : isNetworkError ? (
