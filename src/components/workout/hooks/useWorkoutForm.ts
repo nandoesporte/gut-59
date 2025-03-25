@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -29,15 +28,9 @@ export const useWorkoutForm = (onSubmit: (data: WorkoutPreferences) => void) => 
   // Import functionality from smaller hooks
   const { isSaving, user, initializeUser, savePartialData, saveUserPreferences } = useWorkoutData();
   const { loadUserPreferences } = useWorkoutPreferences(form);
-  const { 
-    isPaymentDialogOpen, 
-    setIsPaymentDialogOpen, 
-    isPaymentEnabled, 
-    isProcessingPayment, 
-    hasPaid, 
-    currentPrice,
-    handlePaymentAndContinue 
-  } = useWorkoutPayment();
+  
+  // Payment is now disabled, but we keep the hook for compatibility
+  const { isPaymentDialogOpen, setIsPaymentDialogOpen } = useWorkoutPayment();
 
   // Setup form watch to detect changes
   const formValues = form.watch();
@@ -69,12 +62,6 @@ export const useWorkoutForm = (onSubmit: (data: WorkoutPreferences) => void) => 
   }, [formValues, user]);
 
   const handleSubmit = async (data: FormSchema) => {
-    if (isPaymentEnabled && !hasPaid) {
-      setFormData(data);
-      setIsPaymentDialogOpen(true);
-      return;
-    }
-
     try {
       // Salvar as preferências do usuário no banco de dados
       await saveUserPreferences(data);
@@ -97,26 +84,22 @@ export const useWorkoutForm = (onSubmit: (data: WorkoutPreferences) => void) => 
     }
   };
 
+  // Simplified payment function that just submits the form
   const handlePaymentProcess = async () => {
-    try {
-      await handlePaymentAndContinue();
-      if (formData) {
-        await handleSubmit(formData);
-      }
-      setIsPaymentDialogOpen(false);
-    } catch (error) {
-      console.error("Erro no processo de pagamento:", error);
+    if (formData) {
+      await handleSubmit(formData);
     }
+    setIsPaymentDialogOpen(false);
   };
 
   return {
     form,
     isPaymentDialogOpen,
     setIsPaymentDialogOpen,
-    isProcessingPayment,
-    currentPrice,
+    isProcessingPayment: false,
+    currentPrice: 0,
     handleSubmit,
     handlePaymentProcess,
-    isPaymentEnabled
+    isPaymentEnabled: false // Always disabled
   };
 };

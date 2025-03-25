@@ -14,13 +14,14 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocation, useSearchParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { useAuthCheck } from '@/components/fisio/hooks/useAuthCheck';
 
 const Workout = () => {
   const [preferences, setPreferences] = useState<WorkoutPreferences | null>(null);
   const [historyPlans, setHistoryPlans] = useState<WorkoutPlan[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const { isAuthenticated } = useAuthCheck();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -35,27 +36,6 @@ const Workout = () => {
       setSelectedPlanId(planId);
     }
   }, [searchParams]);
-
-  // Check authentication status
-  useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setIsAuthenticated(!!user);
-      console.log("Authentication status:", !!user);
-    };
-    
-    checkAuth();
-    
-    // Listen for auth changes
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      setIsAuthenticated(!!session?.user);
-      console.log("Auth state change:", event, !!session?.user);
-    });
-    
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, []);
 
   const fetchWorkoutHistory = useCallback(async () => {
     try {

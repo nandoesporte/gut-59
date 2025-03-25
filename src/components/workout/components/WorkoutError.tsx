@@ -2,7 +2,7 @@
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, RefreshCw, RotateCcw, Zap } from "lucide-react";
+import { AlertTriangle, RefreshCw, RotateCcw } from "lucide-react";
 
 interface WorkoutErrorProps {
   onReset: () => void;
@@ -12,9 +12,7 @@ interface WorkoutErrorProps {
 export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
   const isInitializationError = errorMessage.includes("inicialização") || 
                                errorMessage.includes("booted") || 
-                               errorMessage.includes("função de geração") ||
-                               errorMessage.includes("autenticado") ||
-                               errorMessage.includes("autenticação");
+                               errorMessage.includes("função de geração");
                                
   const isNetworkError = errorMessage.includes("conexão") || 
                          errorMessage.includes("API") || 
@@ -26,8 +24,6 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
         <div className="flex flex-col items-center text-center space-y-6">
           <div className="p-4 bg-red-100 dark:bg-red-900/20 rounded-full">
             {isInitializationError ? (
-              <Zap className="w-12 h-12 text-red-500" />
-            ) : isNetworkError ? (
               <RefreshCw className="w-12 h-12 text-red-500" />
             ) : (
               <AlertTriangle className="w-12 h-12 text-red-500" />
@@ -42,11 +38,10 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
           <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 p-4 rounded-md text-sm">
             {isInitializationError ? (
               <div className="space-y-2">
-                <p className="font-medium">Erro de inicialização ou autenticação</p>
-                <p>Isso geralmente ocorre quando você não está autenticado ou o serviço está sobrecarregado.</p>
+                <p className="font-medium">Erro de inicialização</p>
+                <p>Isso geralmente ocorre quando o serviço está sobrecarregado.</p>
                 <p>Recomendamos:</p>
                 <ul className="text-left list-disc pl-5 space-y-1">
-                  <li>Verificar se você está logado na plataforma</li>
                   <li>Recarregar a página completa</li>
                   <li>Tentar novamente em alguns minutos</li>
                 </ul>
@@ -60,7 +55,6 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
               <div className="space-y-2">
                 <p className="font-medium">Dicas para resolver o problema:</p>
                 <ul className="text-left list-disc pl-5 space-y-1">
-                  <li>Verifique se você está logado</li>
                   <li>Verifique suas preferências e tente novamente</li>
                   <li>Tente com diferentes tipos de exercícios</li>
                 </ul>
