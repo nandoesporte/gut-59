@@ -10,4 +10,3 @@ verify_jwt = false
 
 [functions.check-auth-status]
 verify_jwt = false
-

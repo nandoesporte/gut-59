@@ -143,10 +143,11 @@ export const saveWorkoutPlan = async (plan: WorkoutPlan, userId: string): Promis
       throw new Error(`Erro ao salvar o plano de treino: ${error.message}`);
     }
     
-    // Ensure returned data has workout_sessions
+    // The key fix - the response data doesn't always include the workout_sessions
+    // So we need to ensure it's there by creating a proper WorkoutPlan object
     const savedPlan: WorkoutPlan = {
       ...data,
-      workout_sessions: data.workout_sessions || []
+      workout_sessions: plan.workout_sessions || [] // Use the original plan's sessions since they may not be in the response
     };
     
     console.log('Workout plan saved successfully:', savedPlan);
