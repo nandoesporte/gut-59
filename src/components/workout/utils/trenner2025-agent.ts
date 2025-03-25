@@ -34,7 +34,7 @@ export const generateWorkoutPlanWithTrenner2025 = async (
   
   try {
     // First, check user connection status with a simple, lightweight request
-    const connectionCheck = await supabase.from('health_check').select('id').limit(1);
+    const connectionCheck = await supabase.rpc('get_payment_setting', { setting_name_param: 'any' });
     if (connectionCheck.error) {
       console.error('Connection error during initial check:', connectionCheck.error);
       return {
