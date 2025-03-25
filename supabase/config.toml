@@ -1,12 +1,18 @@
 
 project_id = "sxjafhzikftdenqnkcri"
 
-# Keep only the absolute minimum functions needed
-# All others will be disabled to stay within the plan limits
-[functions]
-
-[functions.generate-workout-plan]
+# Funções principais - mantendo apenas estas habilitadas e desabilitando o resto
+[functions.mental-health-chat]
 verify_jwt = false
 
-[functions.check-auth-status]
+[functions.groq-chat]
+verify_jwt = false
+
+[functions.generate-rehab-plan-groq]
+verify_jwt = false
+
+[functions.check-mercadopago-payment]
+verify_jwt = false
+
+[functions.create-mercadopago-preference]
 verify_jwt = false

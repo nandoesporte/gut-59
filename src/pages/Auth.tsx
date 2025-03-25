@@ -11,7 +11,6 @@ const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -43,88 +42,49 @@ const Auth = () => {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setErrorMessage("");
 
     try {
       if (isLogin) {
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
-        
         if (error) throw error;
         
-        if (data?.user) {
-          toast({
-            title: "Login realizado",
-            description: "Bem-vindo de volta!",
-          });
-        }
-      } else {
-        // Better approach to check for existing users using signUp with no confirmation
-        const { error: checkUserError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: window.location.origin,
-          }
+        toast({
+          title: "Login realizado",
+          description: "Bem-vindo de volta!",
         });
-        
-        // If user already exists, Supabase will return an error
-        if (checkUserError && 
-            (checkUserError.message.includes("already registered") || 
-             checkUserError.message.includes("already exists"))) {
-          throw new Error("Este email já está cadastrado. Por favor, faça login.");
-        }
-
-        // If we reached here, the email is available, proceed with actual signup
-        const { data, error } = await supabase.auth.signUp({
+      } else {
+        const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: window.location.origin,
           },
         });
-        
         if (error) throw error;
         
-        if (data?.user) {
-          if (data.user.identities?.length === 0) {
-            throw new Error("Este email já está cadastrado. Por favor, faça login.");
-          }
-          
-          toast({
-            title: "Cadastro realizado",
-            description: "Verifique seu email para confirmar o cadastro.",
-          });
-          
-          // Automatically switch to login view after successful signup
-          setIsLogin(true);
-        }
+        toast({
+          title: "Cadastro realizado",
+          description: "Verifique seu email para confirmar o cadastro.",
+        });
       }
     } catch (error: any) {
       console.error("Authentication error:", error);
-      let errorMsg = "Ocorreu um erro durante a autenticação.";
+      let errorMessage = "Ocorreu um erro durante a autenticação.";
       
       if (error.message.includes("Email not confirmed")) {
-        errorMsg = "Por favor, confirme seu email antes de fazer login.";
+        errorMessage = "Por favor, confirme seu email antes de fazer login.";
       } else if (error.message.includes("Invalid login credentials")) {
-        errorMsg = "Email ou senha incorretos.";
-      } else if (error.message.includes("User already registered") || 
-                error.message.includes("already registered") ||
-                error.message.includes("already exists") ||
-                error.message.includes("já está cadastrado")) {
-        errorMsg = "Este email já está cadastrado. Por favor, faça login.";
-        // Automaticamente muda para a tela de login quando o usuário já existe
-        setIsLogin(true);
-      } else if (error.message.includes("password")) {
-        errorMsg = "A senha deve ter pelo menos 6 caracteres.";
+        errorMessage = "Email ou senha incorretos.";
+      } else if (error.message.includes("User already registered")) {
+        errorMessage = "Este email já está cadastrado.";
       }
       
-      setErrorMessage(errorMsg);
       toast({
         title: "Erro na autenticação",
-        description: errorMsg,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -150,12 +110,6 @@ const Auth = () => {
             </p>
           </div>
         </div>
-
-        {errorMessage && (
-          <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">
-            {errorMessage}
-          </div>
-        )}
 
         <form onSubmit={handleAuth} className="mt-8 space-y-6">
           <div className="space-y-4">
@@ -197,10 +151,7 @@ const Auth = () => {
           <div className="text-center">
             <button
               type="button"
-              onClick={() => {
-                setIsLogin(!isLogin);
-                setErrorMessage("");
-              }}
+              onClick={() => setIsLogin(!isLogin)}
               className="text-sm text-primary-600 hover:text-primary-500 font-medium"
             >
               {isLogin

@@ -2,7 +2,7 @@
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, RefreshCw, RotateCcw, Zap, Wifi, ServerCrash } from "lucide-react";
+import { AlertTriangle, RefreshCw, RotateCcw, Zap } from "lucide-react";
 
 interface WorkoutErrorProps {
   onReset: () => void;
@@ -14,31 +14,11 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
                                errorMessage.includes("booted") || 
                                errorMessage.includes("função de geração") ||
                                errorMessage.includes("autenticado") ||
-                               errorMessage.includes("autenticação") ||
-                               errorMessage.includes("login") ||
-                               errorMessage.includes("permissão necessária");
+                               errorMessage.includes("autenticação");
                                
   const isNetworkError = errorMessage.includes("conexão") || 
                          errorMessage.includes("API") || 
-                         errorMessage.includes("timeout") ||
-                         errorMessage.includes("non-2xx status code") ||
-                         errorMessage.includes("Edge Function returned") ||
-                         errorMessage.includes("Failed to send") ||
-                         errorMessage.includes("Failed to fetch") ||
-                         errorMessage.includes("rede") ||
-                         errorMessage.includes("internet");
-
-  const isServerError = errorMessage.includes("servidor") ||
-                        errorMessage.includes("temporariamente indisponível") ||
-                        errorMessage.includes("serviço") ||
-                        errorMessage.includes("resposta") ||
-                        errorMessage.includes("service unavailable");
-
-  const isPermissionError = errorMessage.includes("permissão") ||
-                           errorMessage.includes("acesso negado") ||
-                           errorMessage.includes("não autorizado") ||
-                           errorMessage.includes("admin") ||
-                           errorMessage.includes("administrador");
+                         errorMessage.includes("timeout");
 
   return (
     <Card className="w-full max-w-lg mx-auto border-none overflow-hidden">
@@ -48,9 +28,7 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
             {isInitializationError ? (
               <Zap className="w-12 h-12 text-red-500" />
             ) : isNetworkError ? (
-              <Wifi className="w-12 h-12 text-red-500" />
-            ) : isServerError ? (
-              <ServerCrash className="w-12 h-12 text-red-500" />
+              <RefreshCw className="w-12 h-12 text-red-500" />
             ) : (
               <AlertTriangle className="w-12 h-12 text-red-500" />
             )}
@@ -75,54 +53,23 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
               </div>
             ) : isNetworkError ? (
               <div className="space-y-2">
-                <p className="font-medium">Erro de conexão com a internet</p>
-                <p>Não foi possível conectar ao serviço de geração de plano de treino.</p>
-                <p>Recomendamos:</p>
-                <ul className="text-left list-disc pl-5 space-y-1">
-                  <li>Verificar sua conexão com a internet</li>
-                  <li>Desabilitar VPNs ou proxies, se estiver usando</li>
-                  <li>Tentar em outra rede de internet</li>
-                  <li>Recarregar a página e tentar novamente</li>
-                </ul>
-              </div>
-            ) : isServerError ? (
-              <div className="space-y-2">
-                <p className="font-medium">Erro no servidor</p>
-                <p>O servidor de geração de planos está temporariamente indisponível ou sobrecarregado.</p>
-                <p>Recomendamos:</p>
-                <ul className="text-left list-disc pl-5 space-y-1">
-                  <li>Aguardar alguns minutos e tentar novamente</li>
-                  <li>Tentar em um horário diferente</li>
-                  <li>Se o problema persistir, entre em contato com o suporte</li>
-                </ul>
-              </div>
-            ) : isPermissionError ? (
-              <div className="space-y-2">
-                <p className="font-medium">Erro de permissão</p>
-                <p>Você não tem permissão para acessar este recurso ou o acesso está temporariamente indisponível.</p>
-                <p>Recomendamos:</p>
-                <ul className="text-left list-disc pl-5 space-y-1">
-                  <li>Verificar se você está logado com a conta correta</li>
-                  <li>Tentar novamente em alguns minutos</li>
-                  <li>Se o erro persistir, pode ser necessário contatar o administrador</li>
-                </ul>
+                <p className="font-medium">Erro de rede ou tempo limite excedido</p>
+                <p>Verifique sua conexão com a internet e tente novamente.</p>
               </div>
             ) : (
               <div className="space-y-2">
                 <p className="font-medium">Dicas para resolver o problema:</p>
                 <ul className="text-left list-disc pl-5 space-y-1">
                   <li>Verifique se você está logado</li>
-                  <li>Verifique sua conexão com a internet</li>
-                  <li>Recarregue a página completa</li>
-                  <li>Aguarde alguns minutos e tente novamente</li>
-                  <li>Se o problema persistir, o serviço pode estar temporariamente indisponível</li>
+                  <li>Verifique suas preferências e tente novamente</li>
+                  <li>Tente com diferentes tipos de exercícios</li>
                 </ul>
               </div>
             )}
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
-            {isInitializationError || isNetworkError || isServerError ? (
+            {isInitializationError && (
               <Button 
                 variant="default" 
                 onClick={() => window.location.reload()}
@@ -132,9 +79,9 @@ export const WorkoutError = ({ onReset, errorMessage }: WorkoutErrorProps) => {
                 <RefreshCw className="w-4 h-4" />
                 Recarregar Página
               </Button>
-            ) : null}
+            )}
             <Button 
-              variant={isInitializationError || isNetworkError || isServerError ? "outline" : "default"} 
+              variant={isInitializationError ? "outline" : "default"} 
               onClick={onReset}
               className="gap-2"
               size="lg"
