@@ -33,7 +33,18 @@ export const generateWorkoutPlanWithTrenner2025 = async (
   }
   
   try {
-    // First, attempt to call the regular workout plan function
+    // First, check user connection status with a simple, lightweight request
+    const connectionCheck = await supabase.from('health_check').select('id').limit(1);
+    if (connectionCheck.error) {
+      console.error('Connection error during initial check:', connectionCheck.error);
+      return {
+        workoutPlan: null,
+        error: `Erro de conexão com o serviço: ${connectionCheck.error.message || 'Verifique sua internet'}`,
+        rawResponse: connectionCheck.error
+      };
+    }
+
+    // Connection is good, attempt to call the workout plan function
     const { data: workoutPlanData, error } = await supabase.functions.invoke('generate-workout-plan', {
       body: { 
         preferences,
@@ -43,9 +54,21 @@ export const generateWorkoutPlanWithTrenner2025 = async (
 
     if (error) {
       console.error('Error invoking generate-workout-plan function:', error);
+      
+      // More user-friendly error messages
+      let errorMessage = 'Erro ao gerar plano de treino';
+      
+      if (error.message.includes('non-2xx status code')) {
+        errorMessage = 'Erro de servidor: O serviço de geração de plano está temporariamente indisponível. Tente novamente em alguns minutos.';
+      } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+        errorMessage = 'Erro de conexão: Verifique sua internet e tente novamente.';
+      } else {
+        errorMessage = `${errorMessage}: ${error.message || 'Erro desconhecido'}`;
+      }
+      
       return {
         workoutPlan: null,
-        error: `Erro ao gerar plano de treino: ${error.message || 'Erro desconhecido'}`,
+        error: errorMessage,
         rawResponse: error
       };
     }
@@ -112,9 +135,17 @@ export const generateWorkoutPlanWithTrenner2025 = async (
     
   } catch (error) {
     console.error('Error in generateWorkoutPlanWithTrenner2025:', error);
+    
+    let errorMessage = 'Erro ao gerar plano de treino';
+    const errorStr = String(error);
+    
+    if (errorStr.includes('fetch') || errorStr.includes('network') || errorStr.includes('conexão')) {
+      errorMessage = 'Erro de conexão com o serviço de geração de plano. Verifique sua internet e tente novamente em alguns minutos.';
+    }
+    
     return {
       workoutPlan: null,
-      error: `Erro ao gerar plano de treino: ${(error as Error).message || 'Erro desconhecido'}`,
+      error: errorMessage,
       rawResponse: error
     };
   }
