@@ -217,7 +217,7 @@ serve(async (req) => {
       
       console.log(`Criando sessão ${dayNumber}: ${dayStructure.name}`);
       
-      // Criar a sessão no banco de dados
+      // Criar a sessão no banco de dados - REMOVIDO day_name e focus que não existem na tabela
       const createSessionResponse = await fetch(`${SUPABASE_URL}/rest/v1/workout_sessions`, {
         method: 'POST',
         headers: {
@@ -230,8 +230,6 @@ serve(async (req) => {
           id: sessionId,
           plan_id: planId,
           day_number: dayNumber,
-          day_name: dayStructure.name,
-          focus: dayStructure.focus,
           warmup_description: `5-10 minutos de aquecimento cardiovascular leve, seguido por exercícios de mobilidade focados nos grupos musculares que serão trabalhados: ${dayStructure.muscle_groups.join(", ")}.`,
           cooldown_description: "5 minutos de alongamento estático para os músculos trabalhados, seguido por respiração profunda para reduzir a frequência cardíaca."
         })
@@ -322,9 +320,9 @@ serve(async (req) => {
       }
     }
     
-    // Buscar o plano completo com todas as suas associações
+    // Buscar o plano completo com todas as suas associações - REMOVIDO day_name da consulta
     console.log('Buscando plano completo...');
-    const planQueryUrl = `${SUPABASE_URL}/rest/v1/workout_plans?id=eq.${planId}&select=id,user_id,goal,start_date,end_date,created_at,workout_sessions(id,day_number,day_name,focus,warmup_description,cooldown_description,session_exercises(id,sets,reps,rest_time_seconds,exercise:exercises(id,name,description,gif_url,muscle_group,exercise_type)))`;
+    const planQueryUrl = `${SUPABASE_URL}/rest/v1/workout_plans?id=eq.${planId}&select=id,user_id,goal,start_date,end_date,created_at,workout_sessions(id,day_number,warmup_description,cooldown_description,session_exercises(id,sets,reps,rest_time_seconds,exercise:exercises(id,name,description,gif_url,muscle_group,exercise_type)))`;
     
     const planResponse = await fetch(planQueryUrl, {
       headers: {
