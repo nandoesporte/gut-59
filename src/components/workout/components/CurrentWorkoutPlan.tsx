@@ -92,7 +92,7 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
                   onClick={() => setActiveSessionIndex(index)}
                   className={`${isMobile ? 'px-2 py-1 text-xs' : 'min-w-[80px] px-3'}`}
                 >
-                  {session.day_name || `Dia ${index + 1}`}
+                  {`Dia ${index + 1}`}
                 </TabsTrigger>
               ))}
             </TabsList>
@@ -103,13 +103,9 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
               <div className="rounded-lg bg-primary/5 p-2 sm:p-3">
                 <div className="flex justify-between items-center">
                   <h3 className="text-sm sm:text-lg font-semibold text-primary">
-                    {session.day_name || `Dia ${index + 1}`}
+                    {`Dia ${index + 1}`}
                   </h3>
-                  {session.focus && (
-                    <Badge variant="secondary" className="text-xs">
-                      {session.focus}
-                    </Badge>
-                  )}
+                  {/* Focus badge removed since the column doesn't exist */}
                 </div>
                 
                 <div className="grid grid-cols-2 gap-2 mt-2">
