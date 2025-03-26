@@ -1,3 +1,4 @@
+
 import { WorkoutPreferences } from "../types";
 import { supabase } from "@/integrations/supabase/client";
 import { v4 as uuidv4 } from 'uuid';
@@ -48,8 +49,9 @@ export const generateWorkoutPlanWithTrenner2025 = async (
     // 1. Filter by exercise types if specified
     let filteredExercises = exercises;
     if (preferences.preferred_exercise_types && preferences.preferred_exercise_types.length > 0) {
-      // If 'all' is included in preferred types, don't filter
-      if (!preferences.preferred_exercise_types.includes('all')) {
+      // If any preferred types include 'all', don't filter by type
+      // Note: We need to use type assertion as 'all' is not a valid ExerciseType
+      if (!preferences.preferred_exercise_types.includes("all" as any)) {
         filteredExercises = exercises.filter(ex => 
           preferences.preferred_exercise_types.includes(ex.exercise_type)
         );
@@ -63,7 +65,7 @@ export const generateWorkoutPlanWithTrenner2025 = async (
 
     // 3. Organize by muscle group for balanced routine
     const muscleGroups = ["chest", "back", "legs", "shoulders", "arms", "core", "full_body"];
-    const exercisesByMuscle = {};
+    const exercisesByMuscle: Record<string, any[]> = {};
     
     muscleGroups.forEach(group => {
       exercisesByMuscle[group] = exercisesWithGifs.filter(ex => ex.muscle_group === group);
@@ -161,8 +163,9 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
           id: session.id,
           plan_id: plan.id,
           day_number: session.day_number,
-          day_name: session.day_name,
-          focus: session.focus,
+          // Removed day_name which isn't in the database schema
+          // day_name: session.day_name,
+          // focus: session.focus,
           warmup_description: session.warmup_description,
           cooldown_description: session.cooldown_description,
         };
@@ -202,7 +205,34 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
     }
 
     console.log("Workout plan and associated data saved successfully");
-    return savedPlan as WorkoutPlan;
+    
+    // Now fetch the complete workout plan with all sessions and exercises
+    const { data: completePlan, error: fetchError } = await supabase
+      .from('workout_plans')
+      .select(`
+        *,
+        workout_sessions (
+          *,
+          session_exercises (
+            *,
+            exercise:exercises (*)
+          )
+        )
+      `)
+      .eq('id', plan.id)
+      .single();
+      
+    if (fetchError) {
+      console.error("Error fetching complete workout plan:", fetchError);
+      // Even if fetching the complete plan fails, return the basic saved plan
+      // but we need to cast it to WorkoutPlan and add the missing workout_sessions property
+      return {
+        ...savedPlan,
+        workout_sessions: []
+      } as WorkoutPlan;
+    }
+    
+    return completePlan as WorkoutPlan;
   } catch (error) {
     console.error("Error in saveWorkoutPlan:", error);
     return null;
