@@ -1,4 +1,3 @@
-
 import { AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { WorkoutSession } from "../types/workout-plan";

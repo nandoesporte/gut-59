@@ -217,7 +217,7 @@ serve(async (req) => {
       
       console.log(`Criando sessão ${dayNumber}: ${dayStructure.name}`);
       
-      // Criar a sessão no banco de dados - REMOVIDO day_name e focus que não existem na tabela
+      // IMPORTANTE: Removida referências a day_name e focus que não existem na tabela
       const createSessionResponse = await fetch(`${SUPABASE_URL}/rest/v1/workout_sessions`, {
         method: 'POST',
         headers: {
@@ -320,7 +320,7 @@ serve(async (req) => {
       }
     }
     
-    // Buscar o plano completo com todas as suas associações - REMOVIDO day_name da consulta
+    // IMPORTANTE: Removida referência a day_name na consulta final
     console.log('Buscando plano completo...');
     const planQueryUrl = `${SUPABASE_URL}/rest/v1/workout_plans?id=eq.${planId}&select=id,user_id,goal,start_date,end_date,created_at,workout_sessions(id,day_number,warmup_description,cooldown_description,session_exercises(id,sets,reps,rest_time_seconds,exercise:exercises(id,name,description,gif_url,muscle_group,exercise_type)))`;
     
