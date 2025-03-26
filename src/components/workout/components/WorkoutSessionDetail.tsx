@@ -53,12 +53,15 @@ export const WorkoutSessionDetail = ({ session, getDayName }: WorkoutSessionDeta
   // Get all muscle groups present in the workout
   const muscleGroups = Object.keys(exercisesByMuscleGroup).sort();
 
+  // Get the day name using the provided function
+  const dayName = getDayName(session.day_number);
+
   return (
     <AccordionItem key={session.day_number} value={`day-${session.day_number}`}>
       <AccordionTrigger className="bg-white rounded-t-lg shadow px-4 hover:no-underline hover:bg-gray-50">
         <div className="flex items-center gap-3 text-left">
           <span className="font-semibold text-base md:text-lg">
-            {session.day_name || getDayName(session.day_number)}
+            {dayName}
           </span>
           {session.focus && (
             <Badge variant="outline" className="bg-primary/5 text-sm">

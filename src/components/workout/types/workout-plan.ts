@@ -1,4 +1,5 @@
 
+
 interface Exercise {
   id: string;
   name: string;
@@ -20,8 +21,8 @@ export interface SessionExercise {
 export interface WorkoutSession {
   id: string;
   day_number: number;
-  day_name?: string; // Added this property
-  focus?: string; // Added this property
+  day_name?: string; // Making this property optional
+  focus?: string; // Making this property optional
   intensity?: string; // Adding this missing property
   warmup_description: string;
   cooldown_description: string;
