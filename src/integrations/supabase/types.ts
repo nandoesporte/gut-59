@@ -2300,29 +2300,19 @@ export type Database = {
     }
     Functions: {
       calculate_daily_water_goal: {
-        Args: {
-          user_weight: number
-          user_height: number
-        }
+        Args: { user_weight: number; user_height: number }
         Returns: number
       }
       get_payment_setting: {
-        Args: {
-          setting_name_param: string
-        }
+        Args: { setting_name_param: string }
         Returns: boolean
       }
       grant_plan_access: {
-        Args: {
-          p_user_id: string
-          p_plan_type: string
-        }
+        Args: { p_user_id: string; p_plan_type: string }
         Returns: undefined
       }
       has_role: {
-        Args: {
-          role: Database["public"]["Enums"]["app_role"]
-        }
+        Args: { role: Database["public"]["Enums"]["app_role"] }
         Returns: boolean
       }
       process_transfer: {
@@ -2349,25 +2339,15 @@ export type Database = {
         Returns: undefined
       }
       update_nutrition_preferences: {
-        Args: {
-          p_user_id: string
-          p_data: Json
-        }
+        Args: { p_user_id: string; p_data: Json }
         Returns: undefined
       }
       update_nutrition_selected_foods: {
-        Args: {
-          p_user_id: string
-          p_selected_foods: string[]
-        }
+        Args: { p_user_id: string; p_selected_foods: string[] }
         Returns: undefined
       }
       update_user_water_goal: {
-        Args: {
-          p_user_id: string
-          p_weight: number
-          p_height: number
-        }
+        Args: { p_user_id: string; p_weight: number; p_height: number }
         Returns: undefined
       }
     }
@@ -2492,27 +2472,29 @@ export type Database = {
   }
 }
 
-type PublicSchema = Database[Extract<keyof Database, "public">]
+type DefaultSchema = Database[Extract<keyof Database, "public">]
 
 export type Tables<
-  PublicTableNameOrOptions extends
-    | keyof (PublicSchema["Tables"] & PublicSchema["Views"])
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-        Database[PublicTableNameOrOptions["schema"]]["Views"])
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-      Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
+  ? (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : PublicTableNameOrOptions extends keyof (PublicSchema["Tables"] &
-        PublicSchema["Views"])
-    ? (PublicSchema["Tables"] &
-        PublicSchema["Views"])[PublicTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
         Row: infer R
       }
       ? R
@@ -2520,20 +2502,22 @@ export type Tables<
     : never
 
 export type TablesInsert<
-  PublicTableNameOrOptions extends
-    | keyof PublicSchema["Tables"]
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
     | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
+  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Insert: infer I
       }
       ? I
@@ -2541,20 +2525,22 @@ export type TablesInsert<
     : never
 
 export type TablesUpdate<
-  PublicTableNameOrOptions extends
-    | keyof PublicSchema["Tables"]
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
     | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
+  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Update: infer U
       }
       ? U
@@ -2562,21 +2548,23 @@ export type TablesUpdate<
     : never
 
 export type Enums<
-  PublicEnumNameOrOptions extends
-    | keyof PublicSchema["Enums"]
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
     | { schema: keyof Database },
-  EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
-> = PublicEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : PublicEnumNameOrOptions extends keyof PublicSchema["Enums"]
-    ? PublicSchema["Enums"][PublicEnumNameOrOptions]
+> = DefaultSchemaEnumNameOrOptions extends { schema: keyof Database }
+  ? Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof PublicSchema["CompositeTypes"]
+    | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof Database },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof Database
@@ -2585,6 +2573,136 @@ export type CompositeTypes<
     : never = never,
 > = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
   ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
-    ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      activity_level: ["sedentary", "light", "moderate", "intense"],
+      agent_type: ["meal_plan", "workout", "physiotherapy", "mental_health"],
+      app_role: ["admin", "user", "personal"],
+      condition_type: [
+        "plantar_fasciitis",
+        "calcaneal_spur",
+        "ankle_sprain",
+        "anterior_compartment",
+        "shin_splints",
+        "achilles_tendinitis",
+        "patellofemoral",
+        "patellar_tendinitis",
+        "acl_postop",
+        "mcl_injury",
+        "meniscus_injury",
+        "knee_arthrosis",
+        "trochanteric_bursitis",
+        "piriformis_syndrome",
+        "sports_hernia",
+        "it_band_syndrome",
+        "disc_protrusion",
+        "herniated_disc",
+        "cervical_lordosis",
+        "frozen_shoulder",
+        "shoulder_bursitis",
+        "rotator_cuff",
+        "impingement",
+        "medial_epicondylitis",
+        "lateral_epicondylitis",
+        "carpal_tunnel",
+      ],
+      exercise_difficulty: ["beginner", "intermediate", "advanced"],
+      exercise_type: ["strength", "cardio", "mobility"],
+      health_condition: ["hypertension", "diabetes", "depression_anxiety"],
+      joint_area: [
+        "ankle_foot",
+        "leg",
+        "knee",
+        "hip",
+        "spine",
+        "shoulder",
+        "elbow_hand",
+      ],
+      mental_video_status: ["active", "inactive"],
+      message_type: ["nutricionista", "personal", "mental_health"],
+      module_status: ["active", "inactive"],
+      muscle_group: [
+        "chest",
+        "back",
+        "legs",
+        "shoulders",
+        "arms",
+        "core",
+        "full_body",
+        "cardio",
+        "mobility",
+        "weight_training",
+        "stretching",
+        "ball_exercises",
+        "resistance_band",
+      ],
+      nutritional_goal: ["lose_weight", "maintain", "gain_mass"],
+      physio_condition: [
+        "plantar_fasciitis",
+        "calcaneal_spur",
+        "ankle_sprain",
+        "anterior_compartment",
+        "shin_splints",
+        "achilles_tendinitis",
+        "patellofemoral",
+        "patellar_tendinitis",
+        "acl_postop",
+        "mcl_injury",
+        "meniscus_injury",
+        "knee_arthrosis",
+        "trochanteric_bursitis",
+        "piriformis_syndrome",
+        "sports_hernia",
+        "it_band_syndrome",
+        "disc_protrusion",
+        "herniated_disc",
+        "cervical_lordosis",
+        "frozen_shoulder",
+        "shoulder_bursitis",
+        "rotator_cuff",
+        "impingement",
+        "medial_epicondylitis",
+        "lateral_epicondylitis",
+        "carpal_tunnel",
+      ],
+      physio_joint_area: [
+        "ankle_foot",
+        "leg",
+        "knee",
+        "hip",
+        "spine",
+        "shoulder",
+        "elbow_hand",
+      ],
+      plan_type: ["workout", "nutrition", "rehabilitation"],
+      rehab_goal: ["pain_relief", "mobility", "strength", "return_to_sport"],
+      resource_type: [
+        "emergency_contact",
+        "educational_content",
+        "useful_link",
+      ],
+      training_goal: ["lose_weight", "maintain", "gain_mass"],
+      transaction_type: [
+        "daily_tip",
+        "water_intake",
+        "steps",
+        "meal_plan",
+        "workout_plan",
+        "physio_plan",
+        "transfer",
+        "steps_reward",
+        "water_reward",
+        "meal_plan_generation",
+        "workout_plan_generation",
+        "rehab_plan_generation",
+        "breathing_exercise",
+      ],
+      workout_goal: ["lose_weight", "maintain", "gain_mass"],
+    },
+  },
+} as const
