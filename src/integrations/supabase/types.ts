@@ -55,6 +55,7 @@ export type Database = {
           system_prompt: string
           updated_at: string | null
           use_custom_prompt: boolean
+          xai_api_key: string | null
         }
         Insert: {
           active_model?: string
@@ -65,6 +66,7 @@ export type Database = {
           system_prompt: string
           updated_at?: string | null
           use_custom_prompt?: boolean
+          xai_api_key?: string | null
         }
         Update: {
           active_model?: string
@@ -75,6 +77,7 @@ export type Database = {
           system_prompt?: string
           updated_at?: string | null
           use_custom_prompt?: boolean
+          xai_api_key?: string | null
         }
         Relationships: []
       }

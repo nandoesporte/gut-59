@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -43,8 +44,8 @@ export const AIModelSettings = () => {
         const useXAI = data.active_model === 'grok-3-mini';
         
         let apiKeyHasError = false;
-        let groqKeyContent = data.groq_api_key || '';
-        let xaiKeyContent = data.xai_api_key || '';
+        let groqKeyContent = (data as any).groq_api_key || '';
+        let xaiKeyContent = (data as any).xai_api_key || '';
         let errorMessage = null;
         
         if (groqKeyContent && (groqKeyContent.includes("Validation") || 
