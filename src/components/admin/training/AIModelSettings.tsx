@@ -14,10 +14,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 export const AIModelSettings = () => {
   const [loading, setLoading] = useState(false);
   const [aiSettings, setAiSettings] = useState({
-    activeModel: 'llama3',
+    activeModel: 'grok-3-mini',
     systemPrompt: '',
     useCustomPrompt: false,
-    groqApiKey: ''
+    groqApiKey: '',
+    xaiApiKey: ''
   });
   const [showMissingKeyAlert, setShowMissingKeyAlert] = useState(false);
   const [keyError, setKeyError] = useState<string | null>(null);
@@ -39,31 +40,33 @@ export const AIModelSettings = () => {
       
       if (data) {
         const useGroq = data.active_model === 'groq' || data.active_model === 'llama3';
+        const useXAI = data.active_model === 'grok-3-mini';
         
         let apiKeyHasError = false;
-        let keyContent = data.groq_api_key || '';
+        let groqKeyContent = data.groq_api_key || '';
+        let xaiKeyContent = data.xai_api_key || '';
         let errorMessage = null;
         
-        if (keyContent) {
-          if (keyContent.includes("Validation") || 
-              keyContent.includes("must have required property") ||
-              keyContent.includes("Error:")) {
-            apiKeyHasError = true;
-            errorMessage = keyContent;
-            keyContent = '';
-          }
+        if (groqKeyContent && (groqKeyContent.includes("Validation") || 
+            groqKeyContent.includes("must have required property") ||
+            groqKeyContent.includes("Error:"))) {
+          apiKeyHasError = true;
+          errorMessage = groqKeyContent;
+          groqKeyContent = '';
         }
         
-        const hasGroqKey = keyContent && keyContent.trim() !== '';
+        const hasGroqKey = groqKeyContent && groqKeyContent.trim() !== '';
+        const hasXAIKey = xaiKeyContent && xaiKeyContent.trim() !== '';
         
-        setShowMissingKeyAlert(useGroq && (!hasGroqKey || apiKeyHasError));
+        setShowMissingKeyAlert((useGroq && (!hasGroqKey || apiKeyHasError)) || (useXAI && !hasXAIKey));
         setKeyError(apiKeyHasError ? errorMessage : null);
         
         setAiSettings({
-          activeModel: data.active_model || 'llama3',
+          activeModel: data.active_model || 'grok-3-mini',
           systemPrompt: data.system_prompt || getDefaultPrompt(),
           useCustomPrompt: data.use_custom_prompt || false,
-          groqApiKey: keyContent
+          groqApiKey: groqKeyContent,
+          xaiApiKey: xaiKeyContent
         });
       }
     } catch (error) {
@@ -86,17 +89,28 @@ IMPORTANTE: Todo o conteúdo deve estar SEMPRE em português do Brasil, nunca em
       setLoading(true);
       
       const useGroq = aiSettings.activeModel === 'groq' || aiSettings.activeModel === 'llama3';
+      const useXAI = aiSettings.activeModel === 'grok-3-mini';
       const hasGroqKey = aiSettings.groqApiKey && aiSettings.groqApiKey.trim() !== '';
+      const hasXAIKey = aiSettings.xaiApiKey && aiSettings.xaiApiKey.trim() !== '';
       
       if (useGroq && !hasGroqKey) {
         setShowMissingKeyAlert(true);
         toast.warning('Uma chave da API Groq é necessária para utilizar o modelo Llama 3');
       }
       
+      if (useXAI && !hasXAIKey) {
+        setShowMissingKeyAlert(true);
+        toast.warning('Uma chave da API xAI é necessária para utilizar o modelo Grok-3 Mini');
+      }
+      
       setKeyError(null);
       
       if (hasGroqKey && !aiSettings.groqApiKey.startsWith('gsk_')) {
         toast.warning('A chave da API Groq não parece estar no formato correto (deve começar com "gsk_")');
+      }
+      
+      if (hasXAIKey && !aiSettings.xaiApiKey.startsWith('xai-')) {
+        toast.warning('A chave da API xAI não parece estar no formato correto (deve começar com "xai-")');
       }
       
       const { data, error: fetchError } = await supabase
@@ -117,6 +131,7 @@ IMPORTANTE: Todo o conteúdo deve estar SEMPRE em português do Brasil, nunca em
             system_prompt: aiSettings.systemPrompt,
             use_custom_prompt: aiSettings.useCustomPrompt,
             groq_api_key: aiSettings.groqApiKey,
+            xai_api_key: aiSettings.xaiApiKey,
             updated_at: new Date().toISOString()
           })
           .eq('id', data.id);
@@ -131,6 +146,7 @@ IMPORTANTE: Todo o conteúdo deve estar SEMPRE em português do Brasil, nunca em
             system_prompt: aiSettings.systemPrompt,
             use_custom_prompt: aiSettings.useCustomPrompt,
             groq_api_key: aiSettings.groqApiKey,
+            xai_api_key: aiSettings.xaiApiKey,
             updated_at: new Date().toISOString()
           });
         
@@ -139,7 +155,7 @@ IMPORTANTE: Todo o conteúdo deve estar SEMPRE em português do Brasil, nunca em
 
       if (saveError) throw saveError;
       
-      setShowMissingKeyAlert(useGroq && !hasGroqKey);
+      setShowMissingKeyAlert((useGroq && !hasGroqKey) || (useXAI && !hasXAIKey));
       
       toast.success('Configurações salvas com sucesso');
       fetchSettings();
@@ -163,8 +179,10 @@ IMPORTANTE: Todo o conteúdo deve estar SEMPRE em português do Brasil, nunca em
     setAiSettings(newSettings);
     
     const useGroq = value === 'groq' || value === 'llama3';
+    const useXAI = value === 'grok-3-mini';
     const hasGroqKey = aiSettings.groqApiKey && aiSettings.groqApiKey.trim() !== '';
-    setShowMissingKeyAlert(useGroq && !hasGroqKey);
+    const hasXAIKey = aiSettings.xaiApiKey && aiSettings.xaiApiKey.trim() !== '';
+    setShowMissingKeyAlert((useGroq && !hasGroqKey) || (useXAI && !hasXAIKey));
   };
 
   return (
@@ -182,12 +200,12 @@ IMPORTANTE: Todo o conteúdo deve estar SEMPRE em português do Brasil, nunca em
             <AlertDescription>
               {keyError ? (
                 <>
-                  <p>A chave da API Groq contém erros de validação:</p>
+                  <p>A chave da API contém erros de validação:</p>
                   <p className="text-xs mt-1 font-mono bg-red-950/30 p-1 rounded">{keyError}</p>
-                  <p className="mt-2">Por favor, obtenha uma nova chave válida no site da Groq.</p>
+                  <p className="mt-2">Por favor, obtenha uma nova chave válida.</p>
                 </>
               ) : (
-                <>A chave da API Groq não está configurada ou contém erros. Os modelos Llama 3 e Groq não funcionarão sem uma chave válida.</>
+                <>A chave da API necessária não está configurada. O modelo selecionado não funcionará sem uma chave válida.</>
               )}
             </AlertDescription>
           </Alert>
@@ -204,11 +222,47 @@ IMPORTANTE: Todo o conteúdo deve estar SEMPRE em português do Brasil, nunca em
               <SelectValue placeholder="Selecione o modelo" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="grok-3-mini">Grok-3 Mini (xAI)</SelectItem>
               <SelectItem value="llama3">Llama 3 (8B)</SelectItem>
               <SelectItem value="groq">Groq</SelectItem>
               <SelectItem value="gpt4">GPT-4</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="xai-api-key">Chave da API xAI</Label>
+          <Input
+            id="xai-api-key"
+            type="password"
+            value={aiSettings.xaiApiKey}
+            onChange={(e) => setAiSettings({...aiSettings, xaiApiKey: e.target.value})}
+            disabled={loading}
+            placeholder="Insira a chave da API xAI"
+            className={showMissingKeyAlert && aiSettings.activeModel === 'grok-3-mini' ? "border-red-500 focus:border-red-500" : ""}
+          />
+          <p className="text-sm text-muted-foreground">
+            Necessária para utilizar o modelo Grok-3 Mini
+          </p>
+          {showMissingKeyAlert && aiSettings.activeModel === 'grok-3-mini' && (
+            <div className="text-sm text-red-500 space-y-1">
+              <p>
+                Obtenha uma chave API em{" "}
+                <a 
+                  href="https://console.x.ai/" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="underline inline-flex items-center"
+                >
+                  console.x.ai
+                  <ExternalLink className="w-3 h-3 ml-1" />
+                </a>
+              </p>
+              <p>
+                As chaves xAI começam com <code className="bg-red-100 dark:bg-red-900/20 px-1 py-0.5 rounded">xai-</code> seguido por caracteres alfanuméricos
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -220,30 +274,11 @@ IMPORTANTE: Todo o conteúdo deve estar SEMPRE em português do Brasil, nunca em
             onChange={(e) => setAiSettings({...aiSettings, groqApiKey: e.target.value})}
             disabled={loading}
             placeholder="Insira a chave da API Groq"
-            className={showMissingKeyAlert ? "border-red-500 focus:border-red-500" : ""}
+            className={showMissingKeyAlert && (aiSettings.activeModel === 'groq' || aiSettings.activeModel === 'llama3') ? "border-red-500 focus:border-red-500" : ""}
           />
           <p className="text-sm text-muted-foreground">
             Necessária para utilizar o modelo Llama 3 via Groq
           </p>
-          {showMissingKeyAlert && (
-            <div className="text-sm text-red-500 space-y-1">
-              <p>
-                Obtenha uma chave API gratuita em{" "}
-                <a 
-                  href="https://console.groq.com/keys" 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="underline inline-flex items-center"
-                >
-                  console.groq.com/keys
-                  <ExternalLink className="w-3 h-3 ml-1" />
-                </a>
-              </p>
-              <p>
-                As chaves Groq começam com <code className="bg-red-100 dark:bg-red-900/20 px-1 py-0.5 rounded">gsk_</code> seguido por caracteres alfanuméricos
-              </p>
-            </div>
-          )}
         </div>
 
         <div className="flex items-center space-x-2">

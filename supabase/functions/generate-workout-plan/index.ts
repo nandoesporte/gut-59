@@ -4,7 +4,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY');
+const XAI_API_KEY = Deno.env.get('XAI_API_KEY');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,15 +19,15 @@ serve(async (req) => {
   try {
     const { preferences, userId } = await req.json();
     
-    console.log('Gerando plano de treino com Groq para usuário:', userId);
+    console.log('Gerando plano de treino com Grok-3 Mini para usuário:', userId);
     console.log('Preferências recebidas:', JSON.stringify(preferences));
 
     if (!userId) {
       throw new Error('ID do usuário é obrigatório');
     }
 
-    if (!GROQ_API_KEY) {
-      throw new Error('Chave da API Groq não configurada');
+    if (!XAI_API_KEY) {
+      throw new Error('Chave da API xAI não configurada');
     }
 
     // Buscar exercícios disponíveis
@@ -52,7 +52,7 @@ serve(async (req) => {
       throw new Error('Nenhum exercício disponível no banco de dados');
     }
 
-    // Preparar prompt para Groq
+    // Preparar prompt para xAI Grok-3 Mini
     const systemPrompt = `Você é um personal trainer especializado em criar planos de treino personalizados. 
     Crie um plano de treino detalhado baseado nas preferências do usuário e nos exercícios disponíveis.
     IMPORTANTE: Responda SEMPRE em português do Brasil e retorne APENAS um JSON válido sem formatação markdown.`;
@@ -104,33 +104,33 @@ serve(async (req) => {
     }
     `;
 
-    // Chamar API da Groq
-    const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    // Chamar API da xAI Grok-3 Mini
+    const xaiResponse = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'Authorization': `Bearer ${XAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama3-8b-8192',
+        model: 'grok-3-mini',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        temperature: 0.7,
-        max_tokens: 4000,
+        temperature: 0.3,
+        stream: false
       }),
     });
 
-    if (!groqResponse.ok) {
-      throw new Error(`Erro da API Groq: ${groqResponse.status}`);
+    if (!xaiResponse.ok) {
+      throw new Error(`Erro da API xAI: ${xaiResponse.status}`);
     }
 
-    const groqData = await groqResponse.json();
-    const content = groqData.choices[0]?.message?.content;
+    const xaiData = await xaiResponse.json();
+    const content = xaiData.choices[0]?.message?.content;
 
     if (!content) {
-      throw new Error('Nenhum conteúdo retornado pela API Groq');
+      throw new Error('Nenhum conteúdo retornado pela API xAI');
     }
 
     // Parse do JSON retornado
@@ -233,7 +233,7 @@ serve(async (req) => {
       }
     }
 
-    console.log('Plano de treino gerado com sucesso via Groq');
+    console.log('Plano de treino gerado com sucesso via Grok-3 Mini');
     
     return new Response(
       JSON.stringify(workoutPlan),

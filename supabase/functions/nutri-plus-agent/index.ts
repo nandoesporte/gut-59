@@ -2,7 +2,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
-const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY');
+const XAI_API_KEY = Deno.env.get('XAI_API_KEY');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,13 +17,13 @@ serve(async (req) => {
   try {
     const { userData, selectedFoods, foodsByMealType, dietaryPreferences } = await req.json();
     
-    console.log('Gerando plano alimentar com Groq para usuário:', userData.id);
+    console.log('Gerando plano alimentar com Grok-3 Mini para usuário:', userData.id);
 
-    if (!GROQ_API_KEY) {
-      throw new Error('Chave da API Groq não configurada');
+    if (!XAI_API_KEY) {
+      throw new Error('Chave da API xAI não configurada');
     }
 
-    // Preparar prompt para Groq
+    // Preparar prompt para Grok-3 Mini
     const systemPrompt = `Você é um nutricionista especializado em criar planos alimentares personalizados. 
     Crie um plano alimentar semanal detalhado baseado nas informações do usuário.
     IMPORTANTE: Responda SEMPRE em português do Brasil e retorne APENAS um JSON válido sem formatação markdown.`;
@@ -106,33 +106,33 @@ serve(async (req) => {
     Complete todos os dias da semana seguindo o padrão mostrado para segunda-feira.
     `;
 
-    // Chamar API da Groq
-    const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    // Chamar API da xAI Grok-3 Mini
+    const xaiResponse = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'Authorization': `Bearer ${XAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama3-8b-8192',
+        model: 'grok-3-mini',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        temperature: 0.7,
-        max_tokens: 4000,
+        temperature: 0.3,
+        stream: false
       }),
     });
 
-    if (!groqResponse.ok) {
-      throw new Error(`Erro da API Groq: ${groqResponse.status}`);
+    if (!xaiResponse.ok) {
+      throw new Error(`Erro da API xAI: ${xaiResponse.status}`);
     }
 
-    const groqData = await groqResponse.json();
-    const content = groqData.choices[0]?.message?.content;
+    const xaiData = await xaiResponse.json();
+    const content = xaiData.choices[0]?.message?.content;
 
     if (!content) {
-      throw new Error('Nenhum conteúdo retornado pela API Groq');
+      throw new Error('Nenhum conteúdo retornado pela API xAI');
     }
 
     // Parse do JSON retornado
@@ -147,9 +147,9 @@ serve(async (req) => {
 
     // Adicionar propriedades extras
     mealPlan.userCalories = userData.dailyCalories;
-    mealPlan.generatedBy = 'groq';
+    mealPlan.generatedBy = 'grok-3-mini';
 
-    console.log('Plano alimentar gerado com sucesso via Groq');
+    console.log('Plano alimentar gerado com sucesso via Grok-3 Mini');
     
     return new Response(
       JSON.stringify({ mealPlan }),
