@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
@@ -206,6 +205,10 @@ serve(async (req) => {
     console.log(`- Sessões: ${workoutPlan.workout_sessions.length}`);
     workoutPlan.workout_sessions.forEach((session, index) => {
       console.log(`- Dia ${index + 1}: ${session.session_exercises.length} exercícios válidos com GIFs`);
+      // Log das URLs dos GIFs para debug
+      session.session_exercises.forEach((exercise, exIndex) => {
+        console.log(`  📸 Exercício ${exIndex + 1}: ${exercise.exercise.name} - GIF URL: ${exercise.exercise.gif_url}`);
+      });
     });
     
     return new Response(
@@ -358,7 +361,7 @@ async function generateWithXAI(preferences: any, validBatchExercises: any[]) {
   - Varie os grupos musculares entre os dias
   - Respeite os limites de séries e repetições de cada exercício
   `;
-
+  
   // Chamar API da xAI com modelo Grok-2
   const xaiResponse = await fetch('https://api.x.ai/v1/chat/completions', {
     method: 'POST',
@@ -395,7 +398,7 @@ async function generateWithXAI(preferences: any, validBatchExercises: any[]) {
   }
 
   console.log('📝 Conteúdo bruto da IA:', content.substring(0, 500) + '...');
-
+  
   // Parse do JSON retornado
   try {
     const cleanContent = content.replace(/```json|```/g, '').trim();

@@ -19,26 +19,42 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
   const [imageError, setImageError] = useState(false);
   const [expandDescription, setExpandDescription] = useState(false);
   const [isInView, setIsInView] = useState(false);
+  const [debugInfo, setDebugInfo] = useState('');
   const cardRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const isMobile = useIsMobile();
   
   if (!exercise) {
-    console.log('Exercise data missing:', exerciseSession);
+    console.log('❌ Exercise data missing:', exerciseSession);
     return null;
   }
+
+  // Log exercise data for debugging
+  useEffect(() => {
+    console.log('🏋️ Exercise Debug Info:', {
+      exerciseName: exercise.name,
+      exerciseId: exercise.id,
+      originalGifUrl: exercise.gif_url,
+      hasGifUrl: !!exercise.gif_url,
+      gifUrlLength: exercise.gif_url?.length || 0,
+      exerciseSession: exerciseSession
+    });
+    
+    setDebugInfo(`ID: ${exercise.id}, GIF: ${exercise.gif_url ? 'exists' : 'missing'}`);
+  }, [exercise]);
 
   // Intersection Observer para lazy loading mais eficiente
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
+          console.log(`📺 Exercise ${exercise.name} entered viewport`);
           setIsInView(true);
           observer.disconnect();
         }
       },
       { 
-        rootMargin: '100px', // Começar a carregar 100px antes de aparecer
+        rootMargin: '100px',
         threshold: 0.1 
       }
     );
@@ -48,35 +64,52 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     }
 
     return () => observer.disconnect();
-  }, []);
+  }, [exercise.name]);
 
   // Reset image states if exercise changes
   useEffect(() => {
     setImageLoaded(false);
     setImageError(false);
     
-    console.log(`Loading exercise: ${exercise.name} (${exercise.id})`);
-  }, [exercise.id, exercise.name]);
+    console.log(`🔄 Loading exercise: ${exercise.name} (${exercise.id})`);
+    console.log(`🔗 Original GIF URL: ${exercise.gif_url}`);
+  }, [exercise.id, exercise.name, exercise.gif_url]);
   
   const handleImageError = () => {
-    console.error(`Failed to load image for exercise: ${exercise.name} (${exercise.id}). URL: ${exercise.gif_url}`);
+    console.error(`❌ Failed to load image for exercise: ${exercise.name} (${exercise.id})`);
+    console.error(`❌ Failed URL: ${exercise.gif_url}`);
+    console.error(`❌ Formatted URL: ${imageUrl}`);
     setImageError(true);
     setImageLoaded(true);
   };
   
   const handleImageLoad = () => {
     console.log(`✅ Image loaded successfully for: ${exercise.name} (${exercise.id})`);
+    console.log(`✅ Loaded URL: ${imageUrl}`);
     setImageLoaded(true);
     setImageError(false);
   };
   
+  // Melhor validação da URL
   const imageUrl = exercise.gif_url ? formatImageUrl(exercise.gif_url) : null;
   
+  console.log(`🔍 Image validation for ${exercise.name}:`, {
+    hasOriginalUrl: !!exercise.gif_url,
+    originalUrl: exercise.gif_url,
+    formattedUrl: imageUrl,
+    urlLength: exercise.gif_url?.length || 0
+  });
+  
   const isLikelyValidUrl = imageUrl && 
+                          imageUrl.trim().length > 10 &&
+                          (imageUrl.includes('/storage/v1/object/public/exercise-gifs/') ||
+                           imageUrl.includes('http')) &&
                           !imageUrl.includes('placeholder') && 
                           !imageUrl.includes('example.') &&
-                          imageUrl.trim().length > 10 &&
-                          imageUrl.includes('/storage/v1/object/public/exercise-gifs/batch/');
+                          !imageUrl.includes('null') &&
+                          !imageUrl.includes('undefined');
+  
+  console.log(`🎯 URL validation result for ${exercise.name}: ${isLikelyValidUrl ? 'VALID' : 'INVALID'}`);
   
   return (
     <Card ref={cardRef} className="overflow-hidden border-none shadow-sm hover:shadow-md transition-shadow duration-200">
@@ -84,6 +117,13 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
         <div className="flex flex-col md:flex-row gap-3">
           {/* Exercise GIF/Image com lazy loading otimizado */}
           <div className="w-full md:w-1/3 bg-gray-100 dark:bg-gray-800 overflow-hidden flex items-center justify-center h-48 md:h-44 relative">
+            {/* Debug info */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="absolute top-0 left-0 z-30 bg-black/70 text-white text-xs p-1 max-w-full overflow-hidden">
+                {debugInfo}
+              </div>
+            )}
+            
             {(!imageLoaded && isInView && isLikelyValidUrl) && (
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <Skeleton className="h-48 md:h-44 w-full absolute inset-0" />
@@ -105,12 +145,17 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                   {exercise.name}
                 </p>
                 <span className="text-xs text-muted-foreground/70 mt-1">
-                  {imageError ? 'Imagem não disponível' : 'Sem imagem'}
+                  {imageError ? 'Erro ao carregar GIF' : 'GIF não disponível'}
                 </span>
+                {process.env.NODE_ENV === 'development' && (
+                  <span className="text-xs text-red-500 mt-1 break-all">
+                    URL: {exercise.gif_url || 'N/A'}
+                  </span>
+                )}
               </div>
             )}
             
-            {/* Só renderizar a imagem quando estiver em view */}
+            {/* Só renderizar a imagem quando estiver em view e URL for válida */}
             {isInView && isLikelyValidUrl && (
               <>
                 <Dialog>
@@ -179,11 +224,10 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                   <span className="bg-primary/10 text-primary px-2 py-1 rounded-md font-medium">
                     {Math.floor(exerciseSession.rest_time_seconds / 60)}:{(exerciseSession.rest_time_seconds % 60).toString().padStart(2, '0')} descanso
                   </span>
-                  {/* Agora a carga recomendada vem do banco de dados */}
-                  {(exerciseSession.recommended_weight || exerciseSession.exercise?.recommended_weight) && (
+                  {exerciseSession.recommended_weight && (
                     <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded-md font-medium flex items-center gap-1">
                       <Weight className="h-3 w-3" />
-                      {exerciseSession.recommended_weight || exerciseSession.exercise?.recommended_weight}
+                      {exerciseSession.recommended_weight}
                     </span>
                   )}
                 </div>
