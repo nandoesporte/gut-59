@@ -213,7 +213,7 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
         // Process and save session exercises COM recommended_weight
         if (session.session_exercises && Array.isArray(session.session_exercises)) {
           for (const exercise of session.session_exercises) {
-            const exerciseData = {
+            const exerciseData: any = {
               id: exercise.id,
               session_id: session.id,
               exercise_id: exercise.exercise?.id,
@@ -221,11 +221,14 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
               reps: exercise.reps,
               rest_time_seconds: exercise.rest_time_seconds,
               order_in_session: exercise.order_in_session,
-              // AGORA salvamos a carga recomendada no banco
-              recommended_weight: exercise.recommended_weight
             };
 
-            console.log(`💪 Salvando exercício ${exercise.exercise?.name} com carga: ${exercise.recommended_weight}`);
+            // Only add recommended_weight if it exists (for backwards compatibility)
+            if (exercise.recommended_weight) {
+              exerciseData.recommended_weight = exercise.recommended_weight;
+            }
+
+            console.log(`💪 Salvando exercício ${exercise.exercise?.name} com carga: ${exercise.recommended_weight || 'não especificada'}`);
 
             const { error: exerciseError } = await supabase
               .from('session_exercises')
@@ -242,7 +245,8 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
     console.log("✅ Plano de treino e cargas salvos com sucesso");
     
     // Now fetch the complete workout plan with all sessions and exercises
-    const { data: completePlan, error: fetchError } = await supabase
+    // Try with recommended_weight first, fallback if column doesn't exist
+    let { data: completePlan, error: fetchError } = await supabase
       .from('workout_plans')
       .select(`
         *,
@@ -258,7 +262,35 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
       .eq('id', plan.id)
       .single();
       
-    if (fetchError) {
+    // If error is about recommended_weight column not existing, try without it
+    if (fetchError && fetchError.message?.includes("recommended_weight") && fetchError.message?.includes("does not exist")) {
+      console.log("⚠️ Coluna recommended_weight não existe, buscando sem ela...");
+      
+      const { data: fallbackPlan, error: fallbackError } = await supabase
+        .from('workout_plans')
+        .select(`
+          *,
+          workout_sessions (
+            *,
+            session_exercises (
+              *,
+              exercise:exercises (*)
+            )
+          )
+        `)
+        .eq('id', plan.id)
+        .single();
+        
+      if (fallbackError) {
+        console.error("Error fetching complete workout plan (fallback):", fallbackError);
+        return {
+          ...savedPlan,
+          workout_sessions: []
+        } as WorkoutPlan;
+      }
+      
+      completePlan = fallbackPlan;
+    } else if (fetchError) {
       console.error("Error fetching complete workout plan:", fetchError);
       return {
         ...savedPlan,
@@ -266,7 +298,7 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
       } as WorkoutPlan;
     }
     
-    console.log("✅ Plano completo recuperado com cargas preservadas");
+    console.log("✅ Plano completo recuperado");
     return completePlan as WorkoutPlan;
   } catch (error) {
     console.error("Error in saveWorkoutPlan:", error);

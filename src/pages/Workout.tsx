@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { useState, useEffect, useCallback } from 'react';
 import { WorkoutPreferences } from '@/components/workout/types';
@@ -47,9 +46,10 @@ const Workout = () => {
         return;
       }
 
-      console.log("📋 Buscando histórico com cargas recomendadas...");
+      console.log("📋 Buscando histórico de treinos...");
 
-      const { data: plans, error } = await supabase
+      // First, try with recommended_weight column
+      let { data: plans, error } = await supabase
         .from('workout_plans')
         .select(`
           *,
@@ -65,14 +65,40 @@ const Workout = () => {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) {
+      // If error is about recommended_weight column not existing, try without it
+      if (error && error.message?.includes("recommended_weight") && error.message?.includes("does not exist")) {
+        console.log("⚠️ Coluna recommended_weight não existe, buscando sem ela...");
+        
+        const { data: plansWithoutWeight, error: fallbackError } = await supabase
+          .from('workout_plans')
+          .select(`
+            *,
+            workout_sessions (
+              *,
+              session_exercises (
+                *,
+                exercise:exercises (*)
+              )
+            )
+          `)
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (fallbackError) {
+          console.error('Error fetching workout history (fallback):', fallbackError);
+          toast.error('Erro ao carregar o histórico de treinos');
+          throw fallbackError;
+        }
+
+        plans = plansWithoutWeight;
+      } else if (error) {
         console.error('Error fetching workout history:', error);
         toast.error('Erro ao carregar o histórico de treinos');
         throw error;
       }
 
-      console.log(`✅ Histórico carregado: ${plans?.length || 0} planos com cargas preservadas`);
-      setHistoryPlans(plans || []);
+      console.log(`✅ Histórico carregado: ${plans?.length || 0} planos`);
+      setHistoryPlans((plans || []) as WorkoutPlan[]);
     } catch (error) {
       console.error('Error fetching workout history:', error);
     } finally {
