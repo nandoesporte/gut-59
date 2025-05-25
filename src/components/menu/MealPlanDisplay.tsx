@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -21,15 +20,20 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
   const [activeDay, setActiveDay] = useState("monday");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showProfessionalNotification, setShowProfessionalNotification] = useState(false);
-  const [previousPlanId, setPreviousPlanId] = useState<string | null>(null);
+  const [previousPlanTimestamp, setPreviousPlanTimestamp] = useState<string | null>(null);
   
   // Show professional analysis notification when a new plan is generated
   useEffect(() => {
-    if (mealPlan && mealPlan.id !== previousPlanId) {
-      setShowProfessionalNotification(true);
-      setPreviousPlanId(mealPlan.id);
+    if (mealPlan && mealPlan.weeklyPlan) {
+      // Create a unique identifier based on the plan content
+      const currentPlanTimestamp = JSON.stringify(mealPlan.weeklyTotals) + JSON.stringify(Object.keys(mealPlan.weeklyPlan));
+      
+      if (currentPlanTimestamp !== previousPlanTimestamp) {
+        setShowProfessionalNotification(true);
+        setPreviousPlanTimestamp(currentPlanTimestamp);
+      }
     }
-  }, [mealPlan, previousPlanId]);
+  }, [mealPlan, previousPlanTimestamp]);
   
   if (!mealPlan || !mealPlan.weeklyPlan) {
     return (
