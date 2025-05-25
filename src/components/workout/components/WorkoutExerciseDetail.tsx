@@ -38,7 +38,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
         }
       },
       { 
-        rootMargin: '100px', // Começar a carregar 100px antes de aparecer
+        rootMargin: '100px',
         threshold: 0.1 
       }
     );
@@ -56,7 +56,13 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     setImageError(false);
     
     console.log(`Loading exercise: ${exercise.name} (${exercise.id})`);
-  }, [exercise.id, exercise.name]);
+    console.log(`Database gif_url: ${exercise.gif_url}`);
+    
+    if (exercise.gif_url) {
+      const formattedUrl = formatImageUrl(exercise.gif_url);
+      console.log(`Formatted URL: ${formattedUrl}`);
+    }
+  }, [exercise.id, exercise.name, exercise.gif_url]);
   
   const handleImageError = () => {
     console.error(`Failed to load image for exercise: ${exercise.name} (${exercise.id}). URL: ${exercise.gif_url}`);
@@ -76,7 +82,8 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                           !imageUrl.includes('placeholder') && 
                           !imageUrl.includes('example.') &&
                           imageUrl.trim().length > 10 &&
-                          imageUrl.includes('/storage/v1/object/public/exercise-gifs/batch/');
+                          (imageUrl.includes('/storage/v1/object/public/exercise-gifs/batch/') || 
+                           imageUrl.startsWith('https://'));
   
   return (
     <Card ref={cardRef} className="overflow-hidden border-none shadow-sm hover:shadow-md transition-shadow duration-200">

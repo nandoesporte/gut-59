@@ -26,23 +26,25 @@ export const ExerciseCard = ({ exercise, onUpdate }: ExerciseCardProps) => {
     
     if (exercise.gif_url) {
       const url = formatImageUrl(exercise.gif_url);
+      console.log(`Exercise ${exercise.id} (${exercise.name}) - Database URL: ${exercise.gif_url}`);
       console.log(`Exercise ${exercise.id} (${exercise.name}) - Formatted URL: ${url}`);
       setImgSrc(url);
 
       // Pre-fetch the image to test if it loads correctly
       const img = new Image();
       img.onload = () => {
-        console.log(`Pre-fetch successful for exercise card: ${exercise.name}`);
+        console.log(`✅ Image loaded successfully for: ${exercise.name}`);
         setIsLoading(false);
       };
       img.onerror = () => {
-        console.error(`Pre-fetch failed for exercise card: ${exercise.name}`);
+        console.error(`❌ Image failed to load for: ${exercise.name} - URL: ${url}`);
         setImgError(true);
         setImgSrc("/placeholder.svg");
         setIsLoading(false);
       };
-      img.src = `${url}?t=${Date.now()}`;
+      img.src = url;
     } else {
+      console.log(`⚠️ No gif_url for exercise: ${exercise.name}`);
       setImgSrc("/placeholder.svg");
       setIsLoading(false);
     }
@@ -118,7 +120,7 @@ export const ExerciseCard = ({ exercise, onUpdate }: ExerciseCardProps) => {
               </div>
             ) : (
               <img
-                src={`${imgSrc || "/placeholder.svg"}?t=${Date.now()}`}
+                src={imgSrc || "/placeholder.svg"}
                 alt={exercise.name}
                 className="absolute top-0 left-0 w-full h-full object-contain rounded-md"
                 onError={handleImageError}
