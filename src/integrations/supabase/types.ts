@@ -1751,7 +1751,9 @@ export type Database = {
           created_at: string
           exercise_id: string | null
           id: string
+          intensity: string | null
           order_in_session: number
+          recommended_weight: string | null
           reps: number
           rest_time_seconds: number
           session_id: string | null
@@ -1762,7 +1764,9 @@ export type Database = {
           created_at?: string
           exercise_id?: string | null
           id?: string
+          intensity?: string | null
           order_in_session: number
+          recommended_weight?: string | null
           reps: number
           rest_time_seconds: number
           session_id?: string | null
@@ -1773,7 +1777,9 @@ export type Database = {
           created_at?: string
           exercise_id?: string | null
           id?: string
+          intensity?: string | null
           order_in_session?: number
+          recommended_weight?: string | null
           reps?: number
           rest_time_seconds?: number
           session_id?: string | null
@@ -2175,6 +2181,7 @@ export type Database = {
       workout_plans: {
         Row: {
           created_at: string
+          critique: Json | null
           end_date: string
           goal: string
           id: string
@@ -2184,6 +2191,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          critique?: Json | null
           end_date: string
           goal: string
           id?: string
@@ -2193,6 +2201,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          critique?: Json | null
           end_date?: string
           goal?: string
           id?: string
@@ -2263,27 +2272,39 @@ export type Database = {
         Row: {
           cooldown_description: string
           created_at: string
+          day_name: string | null
           day_number: number
+          focus: string | null
           id: string
+          intensity: string | null
           plan_id: string | null
+          training_load: Json | null
           updated_at: string
           warmup_description: string
         }
         Insert: {
           cooldown_description: string
           created_at?: string
+          day_name?: string | null
           day_number: number
+          focus?: string | null
           id?: string
+          intensity?: string | null
           plan_id?: string | null
+          training_load?: Json | null
           updated_at?: string
           warmup_description: string
         }
         Update: {
           cooldown_description?: string
           created_at?: string
+          day_name?: string | null
           day_number?: number
+          focus?: string | null
           id?: string
+          intensity?: string | null
           plan_id?: string | null
+          training_load?: Json | null
           updated_at?: string
           warmup_description?: string
         }
