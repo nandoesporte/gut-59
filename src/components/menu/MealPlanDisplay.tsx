@@ -9,6 +9,8 @@ import { MealPlanActionButtons } from "./components/MealPlanActionButtons";
 import { WeeklyOverview } from "./components/WeeklyOverview";
 import { Recommendations } from "./components/Recommendations";
 import { generateMealPlanPDF } from "./utils/pdf-generator";
+import { ProfessionalAnalysisNotification } from "../workout/components/ProfessionalAnalysisNotification";
+import { useEffect } from "react";
 
 interface MealPlanDisplayProps {
   mealPlan: MealPlan;
@@ -18,6 +20,16 @@ interface MealPlanDisplayProps {
 export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) => {
   const [activeDay, setActiveDay] = useState("monday");
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showProfessionalNotification, setShowProfessionalNotification] = useState(false);
+  const [previousPlanId, setPreviousPlanId] = useState<string | null>(null);
+  
+  // Show professional analysis notification when a new plan is generated
+  useEffect(() => {
+    if (mealPlan && mealPlan.id !== previousPlanId) {
+      setShowProfessionalNotification(true);
+      setPreviousPlanId(mealPlan.id);
+    }
+  }, [mealPlan, previousPlanId]);
   
   if (!mealPlan || !mealPlan.weeklyPlan) {
     return (
@@ -158,6 +170,12 @@ export const MealPlanDisplay = ({ mealPlan, onRefresh }: MealPlanDisplayProps) =
         mealPlan={mealPlan}
         mealTypeLabels={mealTypeLabels}
         macroLabels={macroLabels}
+      />
+
+      <ProfessionalAnalysisNotification
+        isOpen={showProfessionalNotification}
+        onClose={() => setShowProfessionalNotification(false)}
+        planType="rehab"
       />
     </div>
   );
