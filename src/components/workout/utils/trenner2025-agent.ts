@@ -1,4 +1,3 @@
-
 import { WorkoutPreferences } from "../types";
 import { supabase } from "@/integrations/supabase/client";
 import { v4 as uuidv4 } from 'uuid';
@@ -167,6 +166,8 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
       return null;
     }
 
+    console.log("💾 Salvando plano com cargas recomendadas...");
+
     // Prepare the workout plan data for saving
     const workoutPlanData = {
       id: plan.id,
@@ -206,10 +207,10 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
 
         if (sessionError) {
           console.error("Error saving workout session:", sessionError);
-          continue; // Skip to the next session
+          continue;
         }
 
-        // Process and save session exercises with recommended weight
+        // Process and save session exercises COM recommended_weight
         if (session.session_exercises && Array.isArray(session.session_exercises)) {
           for (const exercise of session.session_exercises) {
             const exerciseData = {
@@ -220,9 +221,11 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
               reps: exercise.reps,
               rest_time_seconds: exercise.rest_time_seconds,
               order_in_session: exercise.order_in_session,
-              // Note: recommended_weight é armazenado temporariamente no objeto exercise
-              // e será usado na interface, mas não é persistido no banco de dados
+              // AGORA salvamos a carga recomendada no banco
+              recommended_weight: exercise.recommended_weight
             };
+
+            console.log(`💪 Salvando exercício ${exercise.exercise?.name} com carga: ${exercise.recommended_weight}`);
 
             const { error: exerciseError } = await supabase
               .from('session_exercises')
@@ -236,7 +239,7 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
       }
     }
 
-    console.log("Workout plan and associated data saved successfully");
+    console.log("✅ Plano de treino e cargas salvos com sucesso");
     
     // Now fetch the complete workout plan with all sessions and exercises
     const { data: completePlan, error: fetchError } = await supabase
@@ -247,6 +250,7 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
           *,
           session_exercises (
             *,
+            recommended_weight,
             exercise:exercises (*)
           )
         )
@@ -262,21 +266,7 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
       } as WorkoutPlan;
     }
     
-    // Add recommended_weight back to the exercises from the original plan
-    if (completePlan && plan.workout_sessions) {
-      completePlan.workout_sessions.forEach((session: any, sessionIndex: number) => {
-        const originalSession = plan.workout_sessions[sessionIndex];
-        if (originalSession && session.session_exercises) {
-          session.session_exercises.forEach((exercise: any, exerciseIndex: number) => {
-            const originalExercise = originalSession.session_exercises?.[exerciseIndex];
-            if (originalExercise?.recommended_weight) {
-              exercise.recommended_weight = originalExercise.recommended_weight;
-            }
-          });
-        }
-      });
-    }
-    
+    console.log("✅ Plano completo recuperado com cargas preservadas");
     return completePlan as WorkoutPlan;
   } catch (error) {
     console.error("Error in saveWorkoutPlan:", error);

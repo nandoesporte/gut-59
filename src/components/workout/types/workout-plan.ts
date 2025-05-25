@@ -15,6 +15,7 @@ export interface SessionExercise {
   exercise: Exercise;
   intensity?: string;
   recommended_weight?: string;
+  order_in_session?: number;
 }
 
 export interface WorkoutSession {

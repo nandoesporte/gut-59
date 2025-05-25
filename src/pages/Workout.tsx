@@ -47,6 +47,8 @@ const Workout = () => {
         return;
       }
 
+      console.log("📋 Buscando histórico com cargas recomendadas...");
+
       const { data: plans, error } = await supabase
         .from('workout_plans')
         .select(`
@@ -55,6 +57,7 @@ const Workout = () => {
             *,
             session_exercises (
               *,
+              recommended_weight,
               exercise:exercises (*)
             )
           )
@@ -67,7 +70,8 @@ const Workout = () => {
         toast.error('Erro ao carregar o histórico de treinos');
         throw error;
       }
-      
+
+      console.log(`✅ Histórico carregado: ${plans?.length || 0} planos com cargas preservadas`);
       setHistoryPlans(plans || []);
     } catch (error) {
       console.error('Error fetching workout history:', error);
