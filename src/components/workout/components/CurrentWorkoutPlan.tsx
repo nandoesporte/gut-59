@@ -1,48 +1,33 @@
 
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { WorkoutPlan } from "../types/workout-plan";
+import { WorkoutSessionCard } from "./WorkoutSessionCard";
+import { WorkoutPlanOverview } from "./WorkoutPlanOverview";
 import { 
-  Dumbbell, ChevronDown, ChevronUp, Info, Calendar, 
-  Target, BarChart, Clock, Zap
+  Calendar, 
+  Target, 
+  Dumbbell,
+  TrendingUp
 } from "lucide-react";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { 
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { WorkoutExerciseDetail } from "./WorkoutExerciseDetail";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface CurrentWorkoutPlanProps {
-  plan: any;
+  plan: WorkoutPlan;
 }
 
 export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
-  const [activeSessionIndex, setActiveSessionIndex] = useState(0);
-  const [expandedExercises, setExpandedExercises] = useState<Record<string, boolean>>({});
-  const isMobile = useIsMobile();
-  
-  console.log('CurrentWorkoutPlan: received plan:', plan);
-  console.log('CurrentWorkoutPlan: plan.workout_sessions:', plan?.workout_sessions);
-  
-  // Reset states when plan changes
-  useEffect(() => {
-    setExpandedExercises({});
-    setActiveSessionIndex(0);
-  }, [plan?.id]);
-
-  const toggleExerciseExpanded = (exerciseId: string) => {
-    setExpandedExercises(prev => ({
-      ...prev,
-      [exerciseId]: !prev[exerciseId]
-    }));
+  const formatDate = (dateString: string) => {
+    try {
+      return format(new Date(dateString), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
+    } catch (e) {
+      return "Data indisponível";
+    }
   };
 
-  // Format goal for display
   const formatGoal = (goal: string | undefined) => {
     if (!goal) return "Não definido";
     
@@ -54,163 +39,94 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
       case "maintain":
         return "Manter Peso";
       default:
-        return goal.charAt(0).toUpperCase() + goal.slice(1).replace(/_/g, ' ');
+        return goal;
     }
   };
 
-  // Verificar se há sessões de treino
-  if (!plan?.workout_sessions || !Array.isArray(plan.workout_sessions) || plan.workout_sessions.length === 0) {
-    console.log('CurrentWorkoutPlan: No workout sessions found');
-    return (
-      <Card className="w-full border-primary/20">
-        <CardHeader className={`pb-2 ${isMobile ? 'px-3 py-3' : ''}`}>
-          <CardTitle className="flex justify-between items-center text-lg sm:text-xl">
-            <span>Seu Plano de Treino</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className={`space-y-4 ${isMobile ? 'p-3' : ''}`}>
-          <div className="text-center p-6 text-muted-foreground">
-            <p>Nenhuma sessão de treino encontrada neste plano.</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  // Ensure workout_sessions is an array
+  const sessions = Array.isArray(plan.workout_sessions) ? plan.workout_sessions : [];
+  
+  // Sort sessions by day_number
+  const sortedSessions = [...sessions].sort((a, b) => a.day_number - b.day_number);
 
   return (
-    <Card className="w-full border-primary/20">
-      <CardHeader className={`pb-2 ${isMobile ? 'px-3 py-3' : ''}`}>
-        <CardTitle className="flex justify-between items-center text-lg sm:text-xl">
-          <span>Seu Plano de Treino</span>
-          {!isMobile && (
-            <Badge variant="outline" className="text-xs ml-2">
-              {plan?.workout_sessions?.length || 0} dias
+    <div className="space-y-6">
+      {/* Plan Header */}
+      <Card className="overflow-hidden border border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
+        <CardHeader className="pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <CardTitle className="text-xl font-bold text-primary">
+                Plano de Treino - {formatGoal(plan.goal)}
+              </CardTitle>
+              <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <Calendar className="w-4 h-4" />
+                  <span>Criado em {formatDate(plan.created_at)}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Target className="w-4 h-4" />
+                  <span>{sessions.length} dias de treino</span>
+                </div>
+              </div>
+            </div>
+            <Badge variant="secondary" className="self-start sm:self-center">
+              <Dumbbell className="w-3 h-3 mr-1" />
+              Ativo
             </Badge>
-          )}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className={`space-y-4 ${isMobile ? 'p-3' : ''}`}>
-        {/* Mobile plan summary */}
-        {isMobile && (
-          <div className="grid grid-cols-2 gap-2 mb-3">
-            <div className="flex items-center bg-primary/5 p-2 rounded-lg">
-              <Calendar className="h-4 w-4 text-primary mr-1.5" />
-              <span className="text-xs font-medium">{plan?.workout_sessions?.length || 0} dias</span>
-            </div>
-            <div className="flex items-center bg-primary/5 p-2 rounded-lg">
-              <Target className="h-4 w-4 text-primary mr-1.5" />
-              <span className="text-xs font-medium">{formatGoal(plan?.goal)}</span>
-            </div>
           </div>
-        )}
-        
-        <Tabs value={`session-${activeSessionIndex + 1}`} className="space-y-4">
-          <ScrollArea className={`w-full ${isMobile ? 'pb-1' : ''}`}>
-            <TabsList className={`mb-2 w-full justify-start ${isMobile ? 'h-9' : ''}`}>
-              {plan.workout_sessions.map((session: any, index: number) => (
-                <TabsTrigger
-                  key={`tab-${session.id || index}`}
-                  value={`session-${index + 1}`}
-                  onClick={() => setActiveSessionIndex(index)}
-                  className={`${isMobile ? 'px-2 py-1 text-xs' : 'min-w-[80px] px-3'}`}
+        </CardHeader>
+      </Card>
+
+      {/* Plan Overview */}
+      <WorkoutPlanOverview plan={plan} />
+
+      {/* Workout Sessions */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-primary" />
+            Sessões de Treino
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {sortedSessions.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Dumbbell className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
+              <p>Nenhuma sessão de treino encontrada neste plano.</p>
+            </div>
+          ) : (
+            <Tabs defaultValue={`session-${sortedSessions[0]?.day_number}`} className="w-full">
+              <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-1 h-auto p-1">
+                {sortedSessions.map((session) => (
+                  <TabsTrigger 
+                    key={session.id} 
+                    value={`session-${session.day_number}`}
+                    className="text-xs py-2 px-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                  >
+                    Dia {session.day_number}
+                    {session.focus && (
+                      <span className="block text-xs opacity-70 mt-0.5 truncate">
+                        {session.focus}
+                      </span>
+                    )}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              
+              {sortedSessions.map((session) => (
+                <TabsContent 
+                  key={session.id} 
+                  value={`session-${session.day_number}`}
+                  className="mt-6"
                 >
-                  {`Dia ${index + 1}`}
-                </TabsTrigger>
+                  <WorkoutSessionCard session={session} />
+                </TabsContent>
               ))}
-            </TabsList>
-          </ScrollArea>
-          
-          {plan.workout_sessions.map((session: any, index: number) => {
-            console.log(`CurrentWorkoutPlan: session ${index}:`, session);
-            console.log(`CurrentWorkoutPlan: session exercises:`, session?.session_exercises);
-            
-            return (
-              <TabsContent key={`content-${session.id || index}`} value={`session-${index + 1}`} className="space-y-3 sm:space-y-4 animate-fadeIn">
-                <div className="rounded-lg bg-primary/5 p-2 sm:p-3">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-sm sm:text-lg font-semibold text-primary">
-                      {`Dia ${index + 1}`}
-                    </h3>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-2 mt-2">
-                    <div className="bg-card rounded p-2 text-center flex flex-col items-center justify-center">
-                      <span className="text-xs text-muted-foreground">Exercícios</span>
-                      <div className="flex items-center">
-                        <Dumbbell className="w-3 h-3 mr-1 text-primary" />
-                        <span className="font-medium text-sm">{session.session_exercises?.length || 0}</span>
-                      </div>
-                    </div>
-                    <div className="bg-card rounded p-2 text-center flex flex-col items-center justify-center">
-                      <span className="text-xs text-muted-foreground">Tempo Total</span>
-                      <div className="flex items-center">
-                        <Clock className="w-3 h-3 mr-1 text-primary" />
-                        <span className="font-medium text-sm">~{(session.session_exercises?.length || 0) * 5} min</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-2 sm:space-y-3">
-                  <div className="flex items-center gap-1.5">
-                    <h4 className="text-xs sm:text-sm font-semibold">Aquecimento</h4>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Info className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-muted-foreground" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="max-w-xs text-xs">Realize sempre o aquecimento antes do treino principal</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                  <p className="text-xs sm:text-sm text-muted-foreground bg-muted/30 p-2 rounded">
-                    {session.warmup_description || "Aquecimento de 5-10 minutos com movimentos dinâmicos"}
-                  </p>
-                </div>
-
-                <div className="space-y-2 sm:space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs sm:text-sm font-semibold">Exercícios</h4>
-                    <Badge variant="outline" className="text-xs">
-                      {session.session_exercises?.length || 0} exercícios
-                    </Badge>
-                  </div>
-                  
-                  {!session.session_exercises || session.session_exercises.length === 0 ? (
-                    <div className="text-center p-4 text-muted-foreground">
-                      <p className="text-sm">Nenhum exercício encontrado para esta sessão.</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2 sm:space-y-3">
-                      {session.session_exercises.map((exerciseSession: any, exIndex: number) => {
-                        const uniqueKey = `exercise-${session.id || index}-${exIndex}-${exerciseSession.id || 'unknown'}-${exerciseSession.exercise?.id || 'no-id'}`;
-                        
-                        console.log(`CurrentWorkoutPlan: exercise ${exIndex}:`, exerciseSession);
-                        
-                        return (
-                          <WorkoutExerciseDetail 
-                            key={uniqueKey}
-                            exerciseSession={exerciseSession}
-                          />
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-2 sm:space-y-3">
-                  <h4 className="text-xs sm:text-sm font-semibold">Resfriamento</h4>
-                  <p className="text-xs sm:text-sm text-muted-foreground bg-muted/30 p-2 rounded">
-                    {session.cooldown_description || "Alongamento e relaxamento de 5-10 minutos"}
-                  </p>
-                </div>
-              </TabsContent>
-            );
-          })}
-        </Tabs>
-      </CardContent>
-    </Card>
+            </Tabs>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 };
