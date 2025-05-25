@@ -8,7 +8,6 @@ import {
   Dumbbell, ChevronDown, ChevronUp, Info, Calendar, 
   Target, BarChart, Clock, Zap
 } from "lucide-react";
-import { formatImageUrl } from "@/utils/imageUtils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { 
   Collapsible,
@@ -27,9 +26,13 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
   const [expandedExercises, setExpandedExercises] = useState<Record<string, boolean>>({});
   const isMobile = useIsMobile();
   
+  console.log('CurrentWorkoutPlan: received plan:', plan);
+  console.log('CurrentWorkoutPlan: plan.workout_sessions:', plan?.workout_sessions);
+  
   // Reset states when plan changes
   useEffect(() => {
     setExpandedExercises({});
+    setActiveSessionIndex(0);
   }, [plan?.id]);
 
   const toggleExerciseExpanded = (exerciseId: string) => {
@@ -54,6 +57,25 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
         return goal.charAt(0).toUpperCase() + goal.slice(1).replace(/_/g, ' ');
     }
   };
+
+  // Verificar se há sessões de treino
+  if (!plan?.workout_sessions || !Array.isArray(plan.workout_sessions) || plan.workout_sessions.length === 0) {
+    console.log('CurrentWorkoutPlan: No workout sessions found');
+    return (
+      <Card className="w-full border-primary/20">
+        <CardHeader className={`pb-2 ${isMobile ? 'px-3 py-3' : ''}`}>
+          <CardTitle className="flex justify-between items-center text-lg sm:text-xl">
+            <span>Seu Plano de Treino</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className={`space-y-4 ${isMobile ? 'p-3' : ''}`}>
+          <div className="text-center p-6 text-muted-foreground">
+            <p>Nenhuma sessão de treino encontrada neste plano.</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="w-full border-primary/20">
@@ -82,10 +104,10 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
           </div>
         )}
         
-        <Tabs defaultValue={`session-${activeSessionIndex + 1}`} className="space-y-4">
+        <Tabs value={`session-${activeSessionIndex + 1}`} className="space-y-4">
           <ScrollArea className={`w-full ${isMobile ? 'pb-1' : ''}`}>
             <TabsList className={`mb-2 w-full justify-start ${isMobile ? 'h-9' : ''}`}>
-              {plan?.workout_sessions?.map((session: any, index: number) => (
+              {plan.workout_sessions.map((session: any, index: number) => (
                 <TabsTrigger
                   key={`tab-${session.id || index}`}
                   value={`session-${index + 1}`}
@@ -98,83 +120,95 @@ export const CurrentWorkoutPlan = ({ plan }: CurrentWorkoutPlanProps) => {
             </TabsList>
           </ScrollArea>
           
-          {plan?.workout_sessions?.map((session: any, index: number) => (
-            <TabsContent key={`content-${session.id || index}`} value={`session-${index + 1}`} className="space-y-3 sm:space-y-4 animate-fadeIn">
-              <div className="rounded-lg bg-primary/5 p-2 sm:p-3">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-sm sm:text-lg font-semibold text-primary">
-                    {`Dia ${index + 1}`}
-                  </h3>
-                  {/* Focus badge removed since the column doesn't exist */}
-                </div>
-                
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  <div className="bg-card rounded p-2 text-center flex flex-col items-center justify-center">
-                    <span className="text-xs text-muted-foreground">Exercícios</span>
-                    <div className="flex items-center">
-                      <Dumbbell className="w-3 h-3 mr-1 text-primary" />
-                      <span className="font-medium text-sm">{session.session_exercises?.length || 0}</span>
+          {plan.workout_sessions.map((session: any, index: number) => {
+            console.log(`CurrentWorkoutPlan: session ${index}:`, session);
+            console.log(`CurrentWorkoutPlan: session exercises:`, session?.session_exercises);
+            
+            return (
+              <TabsContent key={`content-${session.id || index}`} value={`session-${index + 1}`} className="space-y-3 sm:space-y-4 animate-fadeIn">
+                <div className="rounded-lg bg-primary/5 p-2 sm:p-3">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-sm sm:text-lg font-semibold text-primary">
+                      {`Dia ${index + 1}`}
+                    </h3>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    <div className="bg-card rounded p-2 text-center flex flex-col items-center justify-center">
+                      <span className="text-xs text-muted-foreground">Exercícios</span>
+                      <div className="flex items-center">
+                        <Dumbbell className="w-3 h-3 mr-1 text-primary" />
+                        <span className="font-medium text-sm">{session.session_exercises?.length || 0}</span>
+                      </div>
+                    </div>
+                    <div className="bg-card rounded p-2 text-center flex flex-col items-center justify-center">
+                      <span className="text-xs text-muted-foreground">Tempo Total</span>
+                      <div className="flex items-center">
+                        <Clock className="w-3 h-3 mr-1 text-primary" />
+                        <span className="font-medium text-sm">~{(session.session_exercises?.length || 0) * 5} min</span>
+                      </div>
                     </div>
                   </div>
-                  <div className="bg-card rounded p-2 text-center flex flex-col items-center justify-center">
-                    <span className="text-xs text-muted-foreground">Tempo Total</span>
-                    <div className="flex items-center">
-                      <Clock className="w-3 h-3 mr-1 text-primary" />
-                      <span className="font-medium text-sm">~{session.session_exercises?.length * 5 || 0} min</span>
-                    </div>
-                  </div>
                 </div>
-              </div>
 
-              <div className="space-y-2 sm:space-y-3">
-                <div className="flex items-center gap-1.5">
-                  <h4 className="text-xs sm:text-sm font-semibold">Aquecimento</h4>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-muted-foreground" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="max-w-xs text-xs">Realize sempre o aquecimento antes do treino principal</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
-                <p className="text-xs sm:text-sm text-muted-foreground bg-muted/30 p-2 rounded">
-                  {session.warmup_description}
-                </p>
-              </div>
-
-              <div className="space-y-2 sm:space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs sm:text-sm font-semibold">Exercícios</h4>
-                  <Badge variant="outline" className="text-xs">
-                    {session.session_exercises?.length || 0} exercícios
-                  </Badge>
-                </div>
                 <div className="space-y-2 sm:space-y-3">
-                  {session?.session_exercises?.map((exerciseSession: any, exIndex: number) => {
-                    // Criar uma chave realmente única que inclua todos os identificadores
-                    const uniqueKey = `exercise-${session.id || index}-${exIndex}-${exerciseSession.id || 'unknown'}-${exerciseSession.exercise?.id || 'no-id'}`;
-                    
-                    return (
-                      <WorkoutExerciseDetail 
-                        key={uniqueKey}
-                        exerciseSession={exerciseSession}
-                      />
-                    );
-                  })}
+                  <div className="flex items-center gap-1.5">
+                    <h4 className="text-xs sm:text-sm font-semibold">Aquecimento</h4>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="max-w-xs text-xs">Realize sempre o aquecimento antes do treino principal</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  <p className="text-xs sm:text-sm text-muted-foreground bg-muted/30 p-2 rounded">
+                    {session.warmup_description || "Aquecimento de 5-10 minutos com movimentos dinâmicos"}
+                  </p>
                 </div>
-              </div>
 
-              <div className="space-y-2 sm:space-y-3">
-                <h4 className="text-xs sm:text-sm font-semibold">Resfriamento</h4>
-                <p className="text-xs sm:text-sm text-muted-foreground bg-muted/30 p-2 rounded">
-                  {session.cooldown_description}
-                </p>
-              </div>
-            </TabsContent>
-          ))}
+                <div className="space-y-2 sm:space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs sm:text-sm font-semibold">Exercícios</h4>
+                    <Badge variant="outline" className="text-xs">
+                      {session.session_exercises?.length || 0} exercícios
+                    </Badge>
+                  </div>
+                  
+                  {!session.session_exercises || session.session_exercises.length === 0 ? (
+                    <div className="text-center p-4 text-muted-foreground">
+                      <p className="text-sm">Nenhum exercício encontrado para esta sessão.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 sm:space-y-3">
+                      {session.session_exercises.map((exerciseSession: any, exIndex: number) => {
+                        const uniqueKey = `exercise-${session.id || index}-${exIndex}-${exerciseSession.id || 'unknown'}-${exerciseSession.exercise?.id || 'no-id'}`;
+                        
+                        console.log(`CurrentWorkoutPlan: exercise ${exIndex}:`, exerciseSession);
+                        
+                        return (
+                          <WorkoutExerciseDetail 
+                            key={uniqueKey}
+                            exerciseSession={exerciseSession}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2 sm:space-y-3">
+                  <h4 className="text-xs sm:text-sm font-semibold">Resfriamento</h4>
+                  <p className="text-xs sm:text-sm text-muted-foreground bg-muted/30 p-2 rounded">
+                    {session.cooldown_description || "Alongamento e relaxamento de 5-10 minutos"}
+                  </p>
+                </div>
+              </TabsContent>
+            );
+          })}
         </Tabs>
       </CardContent>
     </Card>
