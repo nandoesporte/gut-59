@@ -43,7 +43,6 @@ export const useWorkoutPlanGeneration = (
   const generationAttempted = useRef(false);
   const retryCount = useRef(0);
   const MAX_RETRIES = 3;
-  const edgeFunctionStarted = useRef(false);
   const loadingTimer = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -52,11 +51,13 @@ export const useWorkoutPlanGeneration = (
         setLoadingTime(prev => {
           const newTime = prev + 1;
           
-          if (newTime === 5 && loadingPhase === "preparing") {
-            setLoadingPhase("analyzing");
-          } else if (newTime === 15 && loadingPhase === "analyzing") {
+          if (newTime === 3 && loadingPhase === "preparing") {
+            setLoadingPhase("trenner2025");
+          } else if (newTime === 8 && loadingPhase === "trenner2025") {
+            setLoadingPhase("grok");
+          } else if (newTime === 15 && loadingPhase === "grok") {
             setLoadingPhase("generating");
-          } else if (newTime === 30 && loadingPhase === "generating") {
+          } else if (newTime === 25 && loadingPhase === "generating") {
             setLoadingPhase("finalizing");
           }
           
@@ -82,13 +83,15 @@ export const useWorkoutPlanGeneration = (
   const getLoadingMessage = () => {
     switch (loadingPhase) {
       case "preparing":
-        return `Preparando seu plano de treino ${activityLevelDescriptions[preferences.activity_level]}...`;
-      case "analyzing":
-        return `Analisando exercícios ideais para seu perfil...`;
+        return `Preparando ambiente para geração...`;
+      case "trenner2025":
+        return `🤖 Trenner2025 analisando suas preferências...`;
+      case "grok":
+        return `🧠 Grok-3 Mini criando seu plano personalizado...`;
       case "generating":
-        return `Gerando sequência de treinos otimizada...`;
+        return `⚡ Gerando sequência de exercícios otimizada...`;
       case "finalizing":
-        return `Finalizando seu plano personalizado...`;
+        return `✨ Finalizando seu plano de treino...`;
       default:
         return `Gerando plano de treino ${activityLevelDescriptions[preferences.activity_level]}...`;
     }
@@ -96,7 +99,7 @@ export const useWorkoutPlanGeneration = (
 
   const generatePlan = useCallback(async () => {
     if (generationInProgress.current) {
-      console.log("Workout plan generation already in progress, skipping...");
+      console.log("🚫 Geração já em progresso, ignorando nova solicitação...");
       return;
     }
     
@@ -107,29 +110,30 @@ export const useWorkoutPlanGeneration = (
     setRawResponse(null);
     setLoadingTime(0);
     setLoadingPhase("preparing");
-    edgeFunctionStarted.current = false;
 
     try {
-      console.log("Checking authentication status...");
+      console.log("🔐 Verificando autenticação...");
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       
       if (authError) {
-        console.error("Authentication error:", authError);
+        console.error("❌ Erro de autenticação:", authError);
         throw new Error(`Erro de autenticação: ${authError.message}`);
       }
       
       if (!user) {
-        console.error("User not authenticated");
+        console.error("❌ Usuário não autenticado");
         throw new Error("Usuário não autenticado. Por favor, faça login para gerar um plano de treino.");
       }
       
-      console.log("User authenticated:", user.id);
+      console.log("✅ Usuário autenticado:", user.id);
       
       const activityDesc = activityLevelDescriptions[preferences.activity_level as keyof typeof activityLevelDescriptions] || 
                            "Personalizado";
       
-      toast.info(getLoadingMessage());
+      toast.info("🤖 Trenner2025 iniciando geração do seu plano...");
       
+      // Buscar configurações de IA
+      setLoadingPhase("trenner2025");
       const { data: aiSettings, error: aiSettingsError } = await supabase
         .from('ai_model_settings')
         .select('*')
@@ -137,55 +141,48 @@ export const useWorkoutPlanGeneration = (
         .maybeSingle();
         
       if (aiSettingsError) {
-        console.warn("Erro ao buscar configurações de IA, usando padrões:", aiSettingsError);
+        console.warn("⚠️ Erro ao buscar configurações de IA, usando padrões:", aiSettingsError);
       }
       
-      console.log("Starting generation of workout plan with Trenner2025...");
-      console.log(`Activity level: ${preferences.activity_level}`);
+      console.log("🏃‍♂️ Iniciando geração com Trenner2025...");
+      console.log(`📊 Nível de atividade: ${preferences.activity_level}`);
       
       const timestamp = Date.now();
-      const requestId = `${user.id}_${timestamp}`;
+      const requestId = `trenner2025_${user.id}_${timestamp}`;
       
-      const edgeFunctionTimeoutId = setTimeout(() => {
-        if (!edgeFunctionStarted.current) {
-          console.error("Edge function init timeout - function may be stuck at booted stage");
-          throw new Error("Timeout ao iniciar função de geração do plano. A função parece estar presa no estágio inicial.");
-        }
-      }, 5000);
+      setLoadingPhase("grok");
+      toast.info("🧠 Grok-3 Mini processando suas preferências...");
       
-      console.log("Calling generateWorkoutPlanWithTrenner2025...");
-      console.log(`Using unique timestamp for variation: ${timestamp}`);
+      console.log("🚀 Chamando generateWorkoutPlanWithTrenner2025...");
       
       const { workoutPlan: generatedPlan, error: generationError, rawResponse: rawResponseData } = 
         await generateWorkoutPlanWithTrenner2025(preferences, user.id, aiSettings || undefined, requestId);
       
-      clearTimeout(edgeFunctionTimeoutId);
-      edgeFunctionStarted.current = true;
-      
       if (rawResponseData) {
-        console.log("RAW RESPONSE FROM EDGE FUNCTION:", JSON.stringify(rawResponseData, null, 2));
+        console.log("📋 RAW RESPONSE FROM TRENNER2025:", JSON.stringify(rawResponseData, null, 2));
         setRawResponse(rawResponseData);
       } else {
-        console.warn("No raw response data received from edge function");
+        console.warn("⚠️ Nenhuma resposta bruta recebida do Trenner2025");
       }
       
       if (generationError) {
-        console.error("Generation error:", generationError);
+        console.error("❌ Erro na geração:", generationError);
         throw new Error(generationError);
       }
       
       if (!generatedPlan) {
-        console.error("No workout plan generated");
-        throw new Error("Não foi possível gerar o plano de treino - resposta vazia");
+        console.error("❌ Nenhum plano gerado");
+        throw new Error("Não foi possível gerar o plano de treino - resposta vazia do Trenner2025");
       }
       
-      console.log("Workout plan successfully generated, saving to database...");
-      console.log("COMPLETE GENERATED PLAN:", JSON.stringify(generatedPlan, null, 2));
+      setLoadingPhase("finalizing");
+      console.log("💾 Plano gerado com sucesso, salvando na base de dados...");
+      console.log("📋 PLANO COMPLETO GERADO:", JSON.stringify(generatedPlan, null, 2));
       
       const savedPlan = await saveWorkoutPlan(generatedPlan, user.id);
       
       if (!savedPlan) {
-        throw new Error("Erro ao salvar o plano de treino");
+        throw new Error("Erro ao salvar o plano de treino na base de dados");
       }
       
       setWorkoutPlan(savedPlan);
@@ -203,8 +200,8 @@ export const useWorkoutPlanGeneration = (
         setPlanGenerationCount(countData.workout_count);
       }
       
-      toast.success(`Plano de treino ${activityDesc} gerado com sucesso!`);
-      console.log("Workout plan generation and saving completed successfully");
+      toast.success(`🎉 Plano ${activityDesc} criado pelo Trenner2025!`);
+      console.log("✅ Geração e salvamento completados com sucesso");
       
       if (onPlanGenerated) {
         onPlanGenerated();
@@ -213,7 +210,7 @@ export const useWorkoutPlanGeneration = (
       retryCount.current = 0;
       setLoadingTime(0);
     } catch (err: any) {
-      console.error("Erro na geração do plano de treino:", err);
+      console.error("💥 Erro na geração do plano de treino:", err);
       
       const isAuthError = err.message && (
         err.message.includes("autenticado") ||
@@ -244,12 +241,12 @@ export const useWorkoutPlanGeneration = (
           description: "Faça login para gerar um plano de treino"
         });
       } else if (isNetworkError) {
-        const networkErrorMsg = "Erro de conexão com o serviço de geração de plano. Por favor, verifique sua conexão e tente novamente.";
+        const networkErrorMsg = "Erro de conexão com o Trenner2025. Por favor, verifique sua conexão e tente novamente.";
         setError(networkErrorMsg);
-        toast.error("Erro de conexão. Tente novamente mais tarde.");
+        toast.error("Erro de conexão com Trenner2025. Tente novamente mais tarde.");
       } else {
-        setError(`Erro ao gerar plano de treino: ${err.message}`);
-        toast.error(err.message || "Erro ao gerar plano de treino");
+        setError(`Erro no Trenner2025: ${err.message}`);
+        toast.error(err.message || "Erro no agente Trenner2025");
       }
     } finally {
       setLoading(false);

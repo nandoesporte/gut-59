@@ -13,8 +13,8 @@ export const generateWorkoutPlanWithTrenner2025 = async (
   requestId?: string
 ) => {
   try {
-    console.log("Generating workout plan with Trenner2025 agent...");
-    console.log("Preferences:", JSON.stringify(preferences, null, 2));
+    console.log("🏃‍♂️ Trenner2025 Agent: Iniciando geração do plano de treino...");
+    console.log("📋 Preferências recebidas:", JSON.stringify(preferences, null, 2));
     
     // Determine days per week based on activity level
     let daysPerWeek = 3;
@@ -24,77 +24,67 @@ export const generateWorkoutPlanWithTrenner2025 = async (
       case "moderate": daysPerWeek = 5; break;
       case "intense": daysPerWeek = 6; break;
     }
-    console.log(`Activity level: ${preferences.activity_level}, Training days: ${daysPerWeek}`);
+    console.log(`🎯 Trenner2025: Nível de atividade ${preferences.activity_level} → ${daysPerWeek} dias por semana`);
 
     // Generate a unique request ID if not provided
-    const reqId = requestId || `${userId}_${Date.now()}`;
-    console.log(`Using request ID: ${reqId}`);
+    const reqId = requestId || `trenner2025_${userId}_${Date.now()}`;
+    console.log(`🔑 Trenner2025: Request ID: ${reqId}`);
 
     // Get available exercises from database
+    console.log("📚 Trenner2025: Carregando base de exercícios...");
     const { data: exercises, error: exercisesError } = await supabase
       .from("exercises")
       .select("*");
 
     if (exercisesError) {
-      console.error("Error fetching exercises:", exercisesError);
+      console.error("❌ Trenner2025: Erro ao buscar exercícios:", exercisesError);
       throw new Error(`Erro ao buscar exercícios: ${exercisesError.message}`);
     }
 
-    console.log(`Fetched ${exercises.length} exercises from the database`);
+    console.log(`✅ Trenner2025: ${exercises.length} exercícios carregados da base de dados`);
 
     // Filter exercises based on user preferences
-    console.log("Starting comprehensive exercise filtering based on user preferences...");
-    console.log(`Total exercises in database: ${exercises.length}`);
-
-    // 1. Filter by exercise types if specified
+    console.log("🔍 Trenner2025: Filtrando exercícios baseado nas preferências...");
     let filteredExercises = exercises;
+    
     if (preferences.preferred_exercise_types && preferences.preferred_exercise_types.length > 0) {
-      // If any preferred types include 'all', don't filter by type
-      // Note: We need to use type assertion as 'all' is not a valid ExerciseType
       if (!preferences.preferred_exercise_types.includes("all" as any)) {
         filteredExercises = exercises.filter(ex => 
           preferences.preferred_exercise_types.includes(ex.exercise_type)
         );
       }
     }
-    console.log(`After filtering by exercise types: ${filteredExercises.length} (removed ${exercises.length - filteredExercises.length})`);
+    console.log(`🎯 Trenner2025: ${filteredExercises.length} exercícios após filtro de tipo`);
 
-    // 2. Ensure exercises have valid GIF URLs
+    // Ensure exercises have valid GIF URLs
     const exercisesWithGifs = filteredExercises.filter(ex => ex.gif_url && ex.gif_url.trim() !== '');
-    console.log(`Exercises with valid GIF URLs: ${exercisesWithGifs.length} out of ${filteredExercises.length}`);
+    console.log(`🎬 Trenner2025: ${exercisesWithGifs.length} exercícios com GIFs válidos`);
 
-    // 3. Organize by muscle group for balanced routine
+    // Organize by muscle group for balanced routine
     const muscleGroups = ["chest", "back", "legs", "shoulders", "arms", "core", "full_body"];
     const exercisesByMuscle: Record<string, any[]> = {};
     
     muscleGroups.forEach(group => {
       exercisesByMuscle[group] = exercisesWithGifs.filter(ex => ex.muscle_group === group);
-      console.log(`- ${group}: ${exercisesByMuscle[group].length} exercises`);
+      console.log(`💪 Trenner2025: ${group} → ${exercisesByMuscle[group].length} exercícios`);
     });
 
-    // 4. Select a subset of exercises to use in the plan (at least 5-8 for each muscle group)
+    // Select a subset of exercises to use in the plan
     const selectedExercises = [];
-    const exercisesPerGroup = 12; // Aim for 12 exercises per muscle group
+    const exercisesPerGroup = 12;
 
     for (const group of muscleGroups) {
-      // Shuffle available exercises for this muscle group
       const shuffled = [...exercisesByMuscle[group]].sort(() => 0.5 - Math.random());
-      
-      // Select up to exercisesPerGroup exercises for this muscle group
       const selected = shuffled.slice(0, exercisesPerGroup);
       selectedExercises.push(...selected);
-      
-      // Log some of the selected exercises
-      if (selected.length > 0) {
-        console.log(`Top muscle groups: ${selected.slice(0, Math.min(6, selected.length)).map(e => e.muscle_group).join(', ')}`);
-      }
     }
 
-    console.log(`Filtered ${selectedExercises.length} exercises from ${exercises.length} total exercises based on user preferences`);
+    console.log(`🎲 Trenner2025: ${selectedExercises.length} exercícios selecionados para o plano`);
 
-    // Call edge function for workout plan generation using the simplified function
-    console.log(`Invoking edge function: generate-workout-plan`);
+    // Call edge function for workout plan generation
+    console.log(`🚀 Trenner2025: Invocando edge function generate-workout-plan...`);
     const startTime = Date.now();
+    
     const { data: workoutPlan, error } = await supabase.functions.invoke('generate-workout-plan', {
       body: {
         preferences: {
@@ -102,25 +92,35 @@ export const generateWorkoutPlanWithTrenner2025 = async (
           days_per_week: daysPerWeek
         },
         userId,
-        requestId: reqId
+        requestId: reqId,
+        agentName: "Trenner2025"
       }
     });
+    
     const endTime = Date.now();
-    console.log(`Edge function completed in ${((endTime - startTime) / 1000).toFixed(2)} seconds`);
+    console.log(`⏱️ Trenner2025: Edge function executada em ${((endTime - startTime) / 1000).toFixed(2)} segundos`);
 
     if (error) {
-      console.error("Error invoking generate-workout-plan function:", error);
+      console.error("❌ Trenner2025: Erro no edge function:", error);
       throw new Error(`Erro ao gerar plano de treino: ${error.message}`);
     }
+
+    if (!workoutPlan) {
+      console.error("❌ Trenner2025: Nenhum plano retornado");
+      throw new Error("Nenhum plano de treino foi gerado");
+    }
+
+    console.log("✅ Trenner2025: Plano de treino gerado com sucesso!");
+    console.log(`📊 Trenner2025: Plano contém ${workoutPlan.workout_sessions?.length || 0} sessões`);
 
     return {
       workoutPlan,
       rawResponse: workoutPlan
     };
   } catch (error) {
-    console.error("Error generating workout plan:", error);
+    console.error("💥 Trenner2025: Erro durante geração:", error);
     return {
-      error: error instanceof Error ? error.message : "Erro desconhecido",
+      error: error instanceof Error ? error.message : "Erro desconhecido no Trenner2025",
       rawResponse: null
     };
   }
