@@ -92,7 +92,21 @@ const Workout = () => {
             rest_time_seconds: sessionExercise.rest_time_seconds,
             intensity: sessionExercise.intensity,
             recommended_weight: sessionExercise.recommended_weight,
-            exercise: sessionExercise.exercise || {}
+            exercise: sessionExercise.exercise ? {
+              id: sessionExercise.exercise.id || '',
+              name: sessionExercise.exercise.name || 'Exercício não encontrado',
+              gif_url: sessionExercise.exercise.gif_url,
+              description: sessionExercise.exercise.description,
+              muscle_group: sessionExercise.exercise.muscle_group,
+              exercise_type: sessionExercise.exercise.exercise_type
+            } : {
+              id: '',
+              name: 'Exercício não encontrado',
+              gif_url: undefined,
+              description: undefined,
+              muscle_group: undefined,
+              exercise_type: undefined
+            }
           }))
         }))
       }));
