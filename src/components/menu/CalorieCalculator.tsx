@@ -166,10 +166,12 @@ const CalorieCalculator = ({
 
             <Button
               type="submit"
-              className="w-full bg-green-500 hover:bg-green-600 text-white mt-4 py-6 sm:py-4 rounded-full text-lg font-semibold"
+              className="w-full bg-green-500 hover:bg-green-600 text-white mt-6 h-12 sm:h-14 rounded-xl text-base sm:text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
               disabled={!formData.goal}
             >
-              Calcular Necessidades Calóricas
+              <span className="px-2 text-center leading-tight">
+                Calcular Necessidades Calóricas
+              </span>
             </Button>
           </div>
         </form>
