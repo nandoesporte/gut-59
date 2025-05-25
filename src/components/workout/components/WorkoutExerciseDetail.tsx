@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatImageUrl } from '@/utils/imageUtils';
+import { formatImageUrl, validateGifUrl } from '@/utils/imageUtils';
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dumbbell, AlertCircle, Maximize, Weight } from 'lucide-react';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
@@ -17,37 +17,58 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
   const exercise = exerciseSession.exercise;
   const [imageStatus, setImageStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
   const [expandDescription, setExpandDescription] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
   const isMobile = useIsMobile();
   
   if (!exercise) {
-    console.log('Exercise data missing:', exerciseSession);
+    console.log('WorkoutExerciseDetail: Exercise data missing:', exerciseSession);
     return null;
   }
 
   const imageUrl = exercise.gif_url ? formatImageUrl(exercise.gif_url) : null;
   
-  // Reset image status when exercise changes
+  // Reset image status when exercise changes and validate URL
   useEffect(() => {
-    setImageStatus('loading');
-    console.log(`Loading exercise: ${exercise.name} (${exercise.id})`);
-    console.log('Image URL:', imageUrl);
-  }, [exercise.id, imageUrl]);
+    const validateAndLoadImage = async () => {
+      setImageStatus('loading');
+      setIsValidating(true);
+      
+      console.log(`WorkoutExerciseDetail: Loading exercise: ${exercise.name} (${exercise.id})`);
+      console.log('WorkoutExerciseDetail: Image URL:', imageUrl);
+      
+      if (imageUrl && imageUrl !== '/placeholder.svg') {
+        // Validate URL first
+        const isValid = await validateGifUrl(imageUrl);
+        if (!isValid) {
+          console.error(`WorkoutExerciseDetail: URL validation failed for: ${exercise.name}. URL: ${imageUrl}`);
+          setImageStatus('error');
+          setIsValidating(false);
+          return;
+        }
+      }
+      
+      setIsValidating(false);
+    };
+    
+    validateAndLoadImage();
+  }, [exercise.id, imageUrl, exercise.name]);
   
   const handleImageError = () => {
-    console.error(`Failed to load image for exercise: ${exercise.name}. URL: ${imageUrl}`);
+    console.error(`WorkoutExerciseDetail: Failed to load image for exercise: ${exercise.name}. URL: ${imageUrl}`);
     setImageStatus('error');
   };
   
   const handleImageLoad = () => {
-    console.log(`Image loaded successfully for: ${exercise.name}`);
+    console.log(`WorkoutExerciseDetail: Image loaded successfully for: ${exercise.name}`);
     setImageStatus('loaded');
   };
   
   const shouldShowImage = imageUrl && 
                          imageUrl !== '/placeholder.svg' && 
                          !imageUrl.includes('placeholder') && 
-                         !imageUrl.includes('example.');
+                         !imageUrl.includes('example.') &&
+                         !isValidating;
   
   return (
     <Card className="overflow-hidden border-none shadow-sm hover:shadow-md transition-shadow duration-200">
@@ -58,14 +79,19 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
             {shouldShowImage ? (
               <>
                 {/* Loading skeleton */}
-                {imageStatus === 'loading' && (
+                {(imageStatus === 'loading' || isValidating) && (
                   <div className="absolute inset-0">
                     <Skeleton className="h-full w-full" />
+                    {isValidating && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="text-xs text-muted-foreground">Validando...</div>
+                      </div>
+                    )}
                   </div>
                 )}
                 
                 {/* Expand button */}
-                {imageStatus === 'loaded' && (
+                {imageStatus === 'loaded' && !isValidating && (
                   <Dialog>
                     <DialogTrigger asChild>
                       <button className="absolute top-2 right-2 p-1.5 bg-black/50 rounded-full text-white z-20 hover:bg-black/70 transition-colors">
@@ -85,20 +111,22 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                 )}
 
                 {/* Main image */}
-                <img 
-                  ref={imageRef}
-                  src={imageUrl}
-                  alt={exercise.name}
-                  className={`h-full w-full object-contain transition-opacity duration-300 ${
-                    imageStatus === 'loaded' ? 'opacity-100' : 'opacity-0'
-                  }`}
-                  onLoad={handleImageLoad}
-                  onError={handleImageError}
-                  loading="lazy"
-                />
+                {!isValidating && (
+                  <img 
+                    ref={imageRef}
+                    src={imageUrl}
+                    alt={exercise.name}
+                    className={`h-full w-full object-contain transition-opacity duration-300 ${
+                      imageStatus === 'loaded' ? 'opacity-100' : 'opacity-0'
+                    }`}
+                    onLoad={handleImageLoad}
+                    onError={handleImageError}
+                    loading="lazy"
+                  />
+                )}
                 
                 {/* Error state */}
-                {imageStatus === 'error' && (
+                {imageStatus === 'error' && !isValidating && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted text-center px-2">
                     <AlertCircle className="h-8 w-8 mb-2 text-amber-500" />
                     <p className="text-sm text-muted-foreground font-medium">
@@ -106,6 +134,9 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                     </p>
                     <span className="text-xs text-muted-foreground/70 mt-1">
                       Imagem não disponível
+                    </span>
+                    <span className="text-xs text-muted-foreground/70 mt-1">
+                      URL: {imageUrl?.substring(0, 50)}...
                     </span>
                   </div>
                 )}
@@ -118,7 +149,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                   {exercise.name}
                 </p>
                 <span className="text-xs text-muted-foreground/70 mt-1">
-                  Sem imagem disponível
+                  {isValidating ? 'Validando imagem...' : 'Sem imagem disponível'}
                 </span>
               </div>
             )}
