@@ -25,7 +25,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
   const isMobile = useIsMobile();
   
   if (!exercise) {
-    console.log('Exercise data missing:', exerciseSession);
+    console.log('❌ Exercise data missing:', exerciseSession);
     return null;
   }
 
@@ -61,10 +61,11 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     console.log(`🔗 Original GIF URL: ${exercise.gif_url}`);
   }, [exercise.id, exercise.name]);
   
-  const handleImageError = () => {
+  const handleImageError = (event: React.SyntheticEvent<HTMLImageElement, Event>) => {
     console.error(`❌ Failed to load image for exercise: ${exercise.name}`);
     console.error(`🔗 URL that failed: ${imageUrl}`);
     console.error(`🔗 Original URL: ${exercise.gif_url}`);
+    console.error('🔗 Error event:', event);
     setImageError(true);
     setImageLoaded(true);
   };
@@ -78,31 +79,36 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
 
   const handleRetry = () => {
     console.log(`🔄 Retrying image load for: ${exercise.name} (attempt ${retryCount + 1})`);
-    setRetryCount(prev => prev + 1);
+    const newRetryCount = retryCount + 1;
+    setRetryCount(newRetryCount);
     setImageError(false);
     setImageLoaded(false);
     
     if (imageRef.current) {
-      // Force reload by changing src
+      // Force reload by changing src with cache busting
       const url = formatImageUrl(exercise.gif_url);
-      imageRef.current.src = `${url}?retry=${retryCount + 1}`;
+      const separator = url.includes('?') ? '&' : '?';
+      imageRef.current.src = `${url}${separator}retry=${newRetryCount}&t=${Date.now()}`;
     }
   };
   
   const imageUrl = formatImageUrl(exercise.gif_url);
   console.log(`🎯 Formatted URL for ${exercise.name}: ${imageUrl}`);
   
-  // Verificar se a URL parece válida
+  // Verificar se a URL parece válida - relaxando as validações
   const hasValidUrl = exercise.gif_url && 
-                     exercise.gif_url.trim().length > 10 &&
+                     typeof exercise.gif_url === 'string' &&
+                     exercise.gif_url.trim().length > 5 &&
                      !exercise.gif_url.includes('null') &&
-                     !exercise.gif_url.includes('undefined');
+                     !exercise.gif_url.includes('undefined') &&
+                     !exercise.gif_url.includes('placeholder');
   
   console.log(`🔍 URL validation for ${exercise.name}:`, {
     original: exercise.gif_url,
     formatted: imageUrl,
     hasValidUrl,
-    length: exercise.gif_url?.length || 0
+    length: exercise.gif_url?.length || 0,
+    type: typeof exercise.gif_url
   });
   
   return (
@@ -132,13 +138,15 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                     <span className="text-xs text-muted-foreground/70 mb-2">
                       Erro ao carregar imagem
                     </span>
-                    <button
-                      onClick={handleRetry}
-                      className="text-xs bg-primary/10 text-primary px-2 py-1 rounded hover:bg-primary/20 transition-colors flex items-center gap-1"
-                    >
-                      <RefreshCw className="h-3 w-3" />
-                      Tentar novamente
-                    </button>
+                    {retryCount < 3 && (
+                      <button
+                        onClick={handleRetry}
+                        className="text-xs bg-primary/10 text-primary px-2 py-1 rounded hover:bg-primary/20 transition-colors flex items-center gap-1"
+                      >
+                        <RefreshCw className="h-3 w-3" />
+                        Tentar novamente
+                      </button>
+                    )}
                   </>
                 ) : (
                   <>
@@ -154,7 +162,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
               </div>
             )}
             
-            {/* Renderizar imagem quando estiver em view */}
+            {/* Renderizar imagem quando estiver em view e URL for válida */}
             {isInView && hasValidUrl && (
               <>
                 <Dialog>
