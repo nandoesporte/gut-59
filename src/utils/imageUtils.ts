@@ -16,8 +16,8 @@ export const formatImageUrl = (url: string | null): string => {
     return '/placeholder.svg';
   }
   
-  // Se já é uma URL completa do Supabase, retornar como está
-  if (urlString.startsWith('https://sxjafhzikftdenqnkcri.supabase.co/')) {
+  // Se já é uma URL completa válida do Supabase, retornar como está
+  if (urlString.startsWith('https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/')) {
     console.log(`🔗 Using complete Supabase URL: ${urlString}`);
     return urlString;
   }
@@ -28,26 +28,41 @@ export const formatImageUrl = (url: string | null): string => {
     return urlString;
   }
   
-  // Se é um caminho que já começa com /storage/v1/object/public/, construir a URL completa
+  // Se começa com /storage/v1/object/public/, construir a URL completa
   if (urlString.startsWith('/storage/v1/object/public/')) {
     const fullUrl = `https://sxjafhzikftdenqnkcri.supabase.co${urlString}`;
     console.log(`🔗 Built complete URL from storage path: ${fullUrl}`);
     return fullUrl;
   }
   
-  // Se o caminho contém 'exercise-gifs' mas não começa com storage path
-  if (urlString.includes('exercise-gifs')) {
-    // Extrair apenas a parte relevante do caminho
+  // Se contém 'exercise-gifs' ou 'batch', construir a URL correta
+  if (urlString.includes('exercise-gifs') || urlString.includes('batch')) {
     let cleanPath = urlString;
     
-    // Se já contém o bucket path, usar como está
-    if (urlString.includes('exercise-gifs/')) {
-      const bucketIndex = urlString.indexOf('exercise-gifs/');
-      cleanPath = urlString.substring(bucketIndex);
+    // Remover prefixos desnecessários
+    if (cleanPath.startsWith('/')) {
+      cleanPath = cleanPath.substring(1);
     }
     
-    const fullUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/${cleanPath}`;
-    console.log(`🔗 Built URL for exercise-gifs path: ${fullUrl}`);
+    // Se já contém o caminho do bucket, usar como está
+    if (cleanPath.startsWith('exercise-gifs/')) {
+      const fullUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/${cleanPath}`;
+      console.log(`🔗 Built URL for exercise-gifs path: ${fullUrl}`);
+      return fullUrl;
+    }
+    
+    // Se contém 'batch' mas não está no formato correto
+    if (cleanPath.includes('batch/')) {
+      const batchIndex = cleanPath.indexOf('batch/');
+      const pathFromBatch = cleanPath.substring(batchIndex);
+      const fullUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/exercise-gifs/${pathFromBatch}`;
+      console.log(`🔗 Built URL for batch path: ${fullUrl}`);
+      return fullUrl;
+    }
+    
+    // Para outros casos com exercise-gifs
+    const fullUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/exercise-gifs/${cleanPath}`;
+    console.log(`🔗 Built URL for general exercise-gifs path: ${fullUrl}`);
     return fullUrl;
   }
   
@@ -58,24 +73,34 @@ export const formatImageUrl = (url: string | null): string => {
     return fullUrl;
   }
   
-  // Para outros casos, tentar construir a URL assumindo que é um caminho absoluto
-  const fullUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public${urlString.startsWith('/') ? urlString : '/' + urlString}`;
-  console.log(`🔗 Built URL for absolute path: ${fullUrl}`);
+  // Para outros casos, tentar construir a URL assumindo que é um caminho no bucket exercise-gifs
+  const cleanPath = urlString.startsWith('/') ? urlString.substring(1) : urlString;
+  const fullUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/exercise-gifs/${cleanPath}`;
+  console.log(`🔗 Built URL for fallback path: ${fullUrl}`);
   return fullUrl;
 };
 
 // Função para testar se uma URL de imagem é válida
 export const testImageUrl = async (url: string): Promise<boolean> => {
   try {
-    const response = await fetch(url, { method: 'HEAD' });
-    return response.ok;
+    console.log('🔍 Testing URL:', url);
+    const response = await fetch(url, { 
+      method: 'HEAD',
+      mode: 'cors',
+      headers: {
+        'Accept': 'image/*'
+      }
+    });
+    const isValid = response.ok;
+    console.log(`🔍 URL test result: ${isValid ? 'Valid' : 'Invalid'} (${response.status})`);
+    return isValid;
   } catch (error) {
-    console.error('Error testing image URL:', error);
+    console.error('🔍 Error testing image URL:', error);
     return false;
   }
 };
 
-// Função para validar URLs de GIF
+// Função para validar URLs de GIF com critérios mais rigorosos
 export const validateGifUrl = (url: string | null): boolean => {
   if (!url) return false;
   
@@ -86,8 +111,29 @@ export const validateGifUrl = (url: string | null): boolean => {
   if (urlString.includes('null') || urlString.includes('undefined')) return false;
   if (urlString.includes('placeholder')) return false;
   
-  // Deve conter 'exercise-gifs' ou ser uma URL completa válida
-  return urlString.includes('exercise-gifs') || 
-         urlString.startsWith('http://') || 
-         urlString.startsWith('https://');
+  // Deve ser uma URL válida ou conter paths conhecidos
+  const isValidUrl = urlString.startsWith('http://') || 
+                    urlString.startsWith('https://') ||
+                    urlString.includes('exercise-gifs') ||
+                    urlString.includes('batch') ||
+                    urlString.startsWith('/storage/v1/object/public/');
+  
+  console.log(`🔍 URL validation for "${urlString}": ${isValidUrl}`);
+  return isValidUrl;
+};
+
+// Nova função para debug de URLs
+export const debugImageUrl = (originalUrl: string | null, exerciseName: string) => {
+  console.log(`🐛 DEBUG - Exercise: ${exerciseName}`);
+  console.log(`🐛 Original URL from DB: "${originalUrl}"`);
+  console.log(`🐛 URL type: ${typeof originalUrl}`);
+  console.log(`🐛 URL length: ${originalUrl?.length || 0}`);
+  
+  const formatted = formatImageUrl(originalUrl);
+  console.log(`🐛 Formatted URL: "${formatted}"`);
+  
+  const isValid = validateGifUrl(originalUrl);
+  console.log(`🐛 Is valid: ${isValid}`);
+  
+  return { original: originalUrl, formatted, isValid };
 };

@@ -2,9 +2,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatImageUrl, testImageUrl, validateGifUrl } from '@/utils/imageUtils';
+import { formatImageUrl, testImageUrl, validateGifUrl, debugImageUrl } from '@/utils/imageUtils';
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dumbbell, AlertCircle, RefreshCw, Maximize, Loader2, Weight, ExternalLink, CheckCircle } from 'lucide-react';
+import { Dumbbell, AlertCircle, RefreshCw, Maximize, Loader2, Weight, ExternalLink, CheckCircle, Bug } from 'lucide-react';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
   const [retryCount, setRetryCount] = useState(0);
   const [urlTestResult, setUrlTestResult] = useState<string | null>(null);
   const [isTestingUrl, setIsTestingUrl] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<any>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const isMobile = useIsMobile();
@@ -31,6 +32,12 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     console.log('❌ Exercise data missing:', exerciseSession);
     return null;
   }
+
+  // Debug da URL na inicialização
+  useEffect(() => {
+    const debug = debugImageUrl(exercise.gif_url, exercise.name);
+    setDebugInfo(debug);
+  }, [exercise.gif_url, exercise.name]);
 
   // Test URL functionality
   const testCurrentUrl = async () => {
@@ -120,6 +127,19 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     const url = formatImageUrl(exercise.gif_url);
     window.open(url, '_blank');
   };
+
+  const handleDebugUrl = () => {
+    console.log('🐛 FULL DEBUG INFO:');
+    console.log('🐛 Exercise:', exercise);
+    console.log('🐛 Debug Info:', debugInfo);
+    console.log('🐛 Current states:', {
+      imageLoaded,
+      imageError,
+      isInView,
+      hasValidUrl,
+      urlTestResult
+    });
+  };
   
   const imageUrl = formatImageUrl(exercise.gif_url);
   console.log(`🎯 Formatted URL for ${exercise.name}:`, imageUrl);
@@ -165,7 +185,10 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                       Erro ao carregar imagem
                     </span>
                     <div className="text-xs text-red-400 mb-2 px-2 py-1 bg-red-50 rounded max-w-full break-all">
-                      URL: {exercise.gif_url || 'Não disponível'}
+                      URL Original: {exercise.gif_url || 'Não disponível'}
+                    </div>
+                    <div className="text-xs text-blue-400 mb-2 px-2 py-1 bg-blue-50 rounded max-w-full break-all">
+                      URL Formatada: {imageUrl}
                     </div>
                     {urlTestResult && (
                       <div className={`text-xs mb-2 px-2 py-1 rounded flex items-center gap-1 ${
@@ -213,6 +236,15 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                         <ExternalLink className="h-3 w-3 mr-1" />
                         Abrir URL
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleDebugUrl}
+                        className="text-xs h-7"
+                      >
+                        <Bug className="h-3 w-3 mr-1" />
+                        Debug
+                      </Button>
                     </div>
                   </>
                 ) : (
@@ -222,25 +254,36 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                       {exercise.name}
                     </p>
                     <span className="text-xs text-muted-foreground/70 mt-1">
-                      Sem imagem disponível
+                      URL inválida ou sem imagem
                     </span>
                     <div className="text-xs text-gray-400 mt-1 px-2 py-1 bg-gray-50 rounded max-w-full break-all">
                       URL: {exercise.gif_url || 'Não disponível'}
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={testCurrentUrl}
-                      disabled={isTestingUrl}
-                      className="text-xs h-7 mt-2"
-                    >
-                      {isTestingUrl ? (
-                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                      ) : (
-                        <CheckCircle className="h-3 w-3 mr-1" />
-                      )}
-                      Testar URL
-                    </Button>
+                    <div className="flex gap-1 flex-wrap mt-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={testCurrentUrl}
+                        disabled={isTestingUrl}
+                        className="text-xs h-7"
+                      >
+                        {isTestingUrl ? (
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        ) : (
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                        )}
+                        Testar URL
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleDebugUrl}
+                        className="text-xs h-7"
+                      >
+                        <Bug className="h-3 w-3 mr-1" />
+                        Debug
+                      </Button>
+                    </div>
                   </>
                 )}
               </div>
