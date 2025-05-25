@@ -79,13 +79,13 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     console.error(`❌ Formatted URL: ${imageUrl}`);
     console.error(`❌ Retry count: ${retryCount}`);
     
-    if (retryCount < 2) {
+    if (retryCount < 3) {
       console.log(`🔄 Retrying image load for ${exercise.name} (attempt ${retryCount + 1})`);
       setRetryCount(prev => prev + 1);
       // Force reload after a short delay
       setTimeout(() => {
         if (imageRef.current) {
-          imageRef.current.src = imageUrl + `?retry=${retryCount + 1}`;
+          imageRef.current.src = imageUrl + `?retry=${retryCount + 1}&t=${Date.now()}`;
         }
       }, 1000);
     } else {
@@ -101,7 +101,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     setImageError(false);
   };
   
-  // Melhor validação da URL
+  // Validação mais flexível da URL
   const imageUrl = exercise.gif_url ? formatImageUrl(exercise.gif_url) : null;
   
   console.log(`🔍 Image validation for ${exercise.name}:`, {
@@ -111,19 +111,29 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     urlLength: exercise.gif_url?.length || 0
   });
   
+  // Validação mais relaxada - aceitar qualquer URL que pareça válida
   const isLikelyValidUrl = imageUrl && 
                           imageUrl.trim().length > 10 &&
-                          imageUrl.includes('supabase.co') &&
-                          imageUrl.includes('/storage/v1/object/public/') &&
-                          !imageUrl.includes('placeholder') && 
-                          !imageUrl.includes('example.') &&
+                          (imageUrl.includes('supabase.co') || imageUrl.includes('http')) &&
                           !imageUrl.includes('null') &&
                           !imageUrl.includes('undefined');
   
   console.log(`🎯 URL validation result for ${exercise.name}: ${isLikelyValidUrl ? 'VALID' : 'INVALID'}`);
   if (isLikelyValidUrl) {
     console.log(`📸 Will attempt to load: ${imageUrl}`);
+  } else {
+    console.log(`❌ URL rejected: ${imageUrl}`);
   }
+  
+  const handleManualRetry = () => {
+    console.log(`🔁 Manual retry for ${exercise.name}`);
+    setImageError(false);
+    setImageLoaded(false);
+    setRetryCount(0);
+    if (imageRef.current && imageUrl) {
+      imageRef.current.src = imageUrl + `?manual_retry=${Date.now()}`;
+    }
+  };
   
   return (
     <Card ref={cardRef} className="overflow-hidden border-none shadow-sm hover:shadow-md transition-shadow duration-200">
@@ -162,14 +172,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                       Erro ao carregar GIF
                     </span>
                     <button 
-                      onClick={() => {
-                        setImageError(false);
-                        setImageLoaded(false);
-                        setRetryCount(0);
-                        if (imageRef.current && imageUrl) {
-                          imageRef.current.src = imageUrl + `?retry=${Date.now()}`;
-                        }
-                      }}
+                      onClick={handleManualRetry}
                       className="text-xs text-primary mt-1 hover:underline flex items-center gap-1"
                     >
                       <RefreshCw className="h-3 w-3" />
@@ -188,9 +191,10 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                   </>
                 )}
                 {process.env.NODE_ENV === 'development' && (
-                  <span className="text-xs text-red-500 mt-1 break-all max-w-full">
-                    URL: {exercise.gif_url || 'N/A'}
-                  </span>
+                  <div className="text-xs text-red-500 mt-1 break-all max-w-full">
+                    <div>URL original: {exercise.gif_url || 'N/A'}</div>
+                    <div>URL formatada: {imageUrl || 'N/A'}</div>
+                  </div>
                 )}
               </div>
             )}

@@ -22,10 +22,10 @@ export const formatImageUrl = (url: string | null | undefined): string => {
     return fullUrl;
   }
   
-  // Se não tem o prefixo /storage, adiciona
-  if (cleanUrl.startsWith('exercise-gifs/') || cleanUrl.includes('exercise-gifs/')) {
-    const fullUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/${cleanUrl}`;
-    console.log('✅ formatImageUrl: Added storage prefix:', fullUrl);
+  // Se contém apenas o nome do arquivo ou path relativo, construir URL completa
+  if (cleanUrl.includes('.gif') || cleanUrl.includes('.jpg') || cleanUrl.includes('.png') || cleanUrl.includes('.webp')) {
+    const fullUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/exercise-gifs/${cleanUrl}`;
+    console.log('✅ formatImageUrl: Built complete URL:', fullUrl);
     return fullUrl;
   }
   
