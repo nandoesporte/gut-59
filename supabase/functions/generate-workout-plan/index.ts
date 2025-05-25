@@ -300,7 +300,7 @@ function determineRecommendedWeight(exercise, activityLevel, userWeight, userAge
   return `${recommendedKg}kg`;
 }
 
-async function generateWithXAI(preferences: any, validBatchExercises: any[]) {
+async function generateWithXAI(preferences, validBatchExercises) {
   console.log('🧠 Preparando prompt para Grok-2...');
   
   const systemPrompt = `Você é o Trenner2025, um agente de IA especializado em educação física e criação de planos de treino personalizados. 
@@ -439,14 +439,14 @@ async function generateWithXAI(preferences: any, validBatchExercises: any[]) {
   }
 }
 
-function generateLocalPlan(preferences: any, validBatchExercises: any[]) {
+function generateLocalPlan(preferences, validBatchExercises) {
   console.log('🏠 Gerando plano localmente com exercícios válidos da pasta batch...');
   
   const daysPerWeek = preferences.days_per_week || 3;
   const muscleGroups = ["chest", "back", "legs", "shoulders", "arms", "core"];
   
   // Organizar exercícios válidos por grupo muscular
-  const exercisesByMuscle: Record<string, any[]> = {};
+  const exercisesByMuscle = {};
   muscleGroups.forEach(group => {
     exercisesByMuscle[group] = validBatchExercises.filter(ex => ex.muscle_group === group);
     console.log(`💪 Grupo ${group}: ${exercisesByMuscle[group].length} exercícios válidos`);
@@ -525,74 +525,4 @@ function generateLocalPlan(preferences: any, validBatchExercises: any[]) {
   });
   
   return { workout_sessions: sessions };
-}
-
-function determineRecommendedWeight(exercise, activityLevel, userWeight, userAge, userGender) {
-  // Se o exercício tem pesos recomendados específicos, usar eles
-  if (exercise.beginner_weight || exercise.moderate_weight || exercise.advanced_weight) {
-    switch (activityLevel) {
-      case 'sedentary':
-      case 'light':
-        return exercise.beginner_weight || "Peso corporal";
-      case 'moderate':
-        return exercise.moderate_weight || exercise.beginner_weight || "Peso corporal";
-      case 'intense':
-        return exercise.advanced_weight || exercise.moderate_weight || "Peso corporal";
-      default:
-        return exercise.beginner_weight || "Peso corporal";
-    }
-  }
-
-  // Calcular carga baseada no tipo de exercício e características do usuário
-  const baseWeight = userWeight || 70;
-  const isStrength = exercise.exercise_type === 'strength';
-  
-  if (!isStrength) {
-    return "Peso corporal";
-  }
-
-  // Percentuais baseados no nível de atividade e gênero
-  let weightPercentage = 0.3; // Iniciante padrão
-  
-  switch (activityLevel) {
-    case 'sedentary':
-      weightPercentage = userGender === 'female' ? 0.2 : 0.25;
-      break;
-    case 'light':
-      weightPercentage = userGender === 'female' ? 0.3 : 0.35;
-      break;
-    case 'moderate':
-      weightPercentage = userGender === 'female' ? 0.4 : 0.5;
-      break;
-    case 'intense':
-      weightPercentage = userGender === 'female' ? 0.5 : 0.6;
-      break;
-  }
-
-  // Ajustar baseado na idade
-  if (userAge > 50) {
-    weightPercentage *= 0.8;
-  } else if (userAge > 35) {
-    weightPercentage *= 0.9;
-  }
-
-  // Ajustar baseado no grupo muscular
-  switch (exercise.muscle_group) {
-    case 'legs':
-      weightPercentage *= 1.5; // Pernas suportam mais peso
-      break;
-    case 'back':
-      weightPercentage *= 1.2;
-      break;
-    case 'chest':
-      weightPercentage *= 1.1;
-      break;
-    case 'shoulders':
-    case 'arms':
-      weightPercentage *= 0.8; // Músculos menores
-      break;
-  }
-
-  const recommendedKg = Math.round(baseWeight * weightPercentage);
-  return `${recommendedKg}kg`;
 }
