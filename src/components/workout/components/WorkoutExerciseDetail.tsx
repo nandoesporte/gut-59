@@ -2,10 +2,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dumbbell, Weight, Maximize } from 'lucide-react';
+import { formatImageUrl } from '@/utils/imageUtils';
+import { Skeleton } from "@/components/ui/skeleton";
+import { Dumbbell, AlertCircle, RefreshCw, Maximize, Loader2, Weight } from 'lucide-react';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { OptimizedGifImage } from './OptimizedGifImage';
 
 interface WorkoutExerciseDetailProps {
   exerciseSession: any;
@@ -14,17 +15,20 @@ interface WorkoutExerciseDetailProps {
 
 export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: WorkoutExerciseDetailProps) => {
   const exercise = exerciseSession.exercise;
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const [expandDescription, setExpandDescription] = useState(false);
   const [isInView, setIsInView] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
   const isMobile = useIsMobile();
   
   if (!exercise) {
-    console.log('❌ Exercise data missing:', exerciseSession);
+    console.log('Exercise data missing:', exerciseSession);
     return null;
   }
 
-  // Intersection Observer para lazy loading
+  // Intersection Observer para lazy loading mais eficiente
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -34,7 +38,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
         }
       },
       { 
-        rootMargin: '100px',
+        rootMargin: '100px', // Começar a carregar 100px antes de aparecer
         threshold: 0.1 
       }
     );
@@ -46,47 +50,99 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     return () => observer.disconnect();
   }, []);
 
-  console.log(`🏋️ Loading exercise: ${exercise.name} (${exercise.id})`);
-  console.log(`🔗 GIF URL from DB:`, exercise.gif_url);
+  // Reset image states if exercise changes
+  useEffect(() => {
+    setImageLoaded(false);
+    setImageError(false);
+    
+    console.log(`Loading exercise: ${exercise.name} (${exercise.id})`);
+  }, [exercise.id, exercise.name]);
+  
+  const handleImageError = () => {
+    console.error(`Failed to load image for exercise: ${exercise.name} (${exercise.id}). URL: ${exercise.gif_url}`);
+    setImageError(true);
+    setImageLoaded(true);
+  };
+  
+  const handleImageLoad = () => {
+    console.log(`✅ Image loaded successfully for: ${exercise.name} (${exercise.id})`);
+    setImageLoaded(true);
+    setImageError(false);
+  };
+  
+  const imageUrl = exercise.gif_url ? formatImageUrl(exercise.gif_url) : null;
+  
+  const isLikelyValidUrl = imageUrl && 
+                          !imageUrl.includes('placeholder') && 
+                          !imageUrl.includes('example.') &&
+                          imageUrl.trim().length > 10 &&
+                          imageUrl.includes('/storage/v1/object/public/exercise-gifs/batch/');
   
   return (
     <Card ref={cardRef} className="overflow-hidden border-none shadow-sm hover:shadow-md transition-shadow duration-200">
       <CardContent className="p-0">
         <div className="flex flex-col md:flex-row gap-3">
-          {/* Exercise GIF/Image */}
+          {/* Exercise GIF/Image com lazy loading otimizado */}
           <div className="w-full md:w-1/3 bg-gray-100 dark:bg-gray-800 overflow-hidden flex items-center justify-center h-48 md:h-44 relative">
-            {isInView ? (
+            {(!imageLoaded && isInView && isLikelyValidUrl) && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <Skeleton className="h-48 md:h-44 w-full absolute inset-0" />
+                <span className="text-xs text-muted-foreground z-10 bg-background/80 px-2 py-1 rounded-md flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Carregando GIF...
+                </span>
+              </div>
+            )}
+            
+            {(!isLikelyValidUrl || imageError) && (
+              <div className="flex flex-col items-center justify-center h-full w-full bg-muted text-center px-2">
+                {imageError ? (
+                  <AlertCircle className="h-8 w-8 mb-2 text-amber-500" />
+                ) : (
+                  <Dumbbell className="h-8 w-8 mb-2 text-primary/40" />
+                )}
+                <p className="text-sm text-muted-foreground font-medium">
+                  {exercise.name}
+                </p>
+                <span className="text-xs text-muted-foreground/70 mt-1">
+                  {imageError ? 'Imagem não disponível' : 'Sem imagem'}
+                </span>
+              </div>
+            )}
+            
+            {/* Só renderizar a imagem quando estiver em view */}
+            {isInView && isLikelyValidUrl && (
               <>
                 <Dialog>
                   <DialogTrigger asChild>
-                    <button className="absolute top-2 right-2 p-1.5 bg-black/50 rounded-full text-white z-20 hover:bg-black/70 transition-colors">
+                    <button 
+                      className={`absolute top-2 right-2 p-1.5 bg-black/50 rounded-full text-white z-20 transition-opacity ${imageLoaded && !imageError ? 'opacity-100' : 'opacity-0'}`}
+                    >
                       <Maximize className="h-3.5 w-3.5" />
                     </button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-lg max-h-[90vh] flex items-center justify-center p-2">
                     <div className="w-full h-full flex items-center justify-center overflow-hidden">
-                      <OptimizedGifImage 
-                        gifUrl={exercise.gif_url}
-                        exerciseName={exercise.name}
-                        className="max-h-[80vh] max-w-full"
-                        showControls={false}
+                      <img 
+                        src={imageUrl}
+                        alt={exercise.name}
+                        className="max-h-[80vh] max-w-full object-contain"
                       />
                     </div>
                   </DialogContent>
                 </Dialog>
 
-                <OptimizedGifImage 
-                  gifUrl={exercise.gif_url}
-                  exerciseName={exercise.name}
-                  className="h-48 md:h-44 w-full"
-                  showControls={true}
+                <img 
+                  ref={imageRef}
+                  src={imageUrl}
+                  alt={exercise.name}
+                  className={`h-48 md:h-44 w-full object-contain transition-opacity duration-300 ${imageLoaded && !imageError ? 'opacity-100' : 'opacity-0'}`}
+                  onLoad={handleImageLoad}
+                  onError={handleImageError}
+                  loading="lazy"
+                  decoding="async"
                 />
               </>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                <Dumbbell className="h-8 w-8 mb-2 text-primary/40" />
-                <p className="text-sm font-medium">{exercise.name}</p>
-              </div>
             )}
           </div>
           
@@ -123,6 +179,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                   <span className="bg-primary/10 text-primary px-2 py-1 rounded-md font-medium">
                     {Math.floor(exerciseSession.rest_time_seconds / 60)}:{(exerciseSession.rest_time_seconds % 60).toString().padStart(2, '0')} descanso
                   </span>
+                  {/* Agora a carga recomendada vem do banco de dados */}
                   {(exerciseSession.recommended_weight || exerciseSession.exercise?.recommended_weight) && (
                     <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded-md font-medium flex items-center gap-1">
                       <Weight className="h-3 w-3" />

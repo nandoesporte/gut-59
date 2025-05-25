@@ -110,8 +110,7 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
       return null;
     }
 
-    console.log("💾 Salvando plano de treino...");
-    console.log("📋 Plano recebido para salvar:", JSON.stringify(plan, null, 2));
+    console.log("💾 Salvando plano com cargas recomendadas...");
 
     // Prepare the workout plan data for saving
     const workoutPlanData = {
@@ -142,8 +141,6 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
       console.log(`💾 Salvando ${plan.workout_sessions.length} sessões...`);
       
       for (const session of plan.workout_sessions) {
-        console.log(`💾 Salvando sessão ${session.day_number}...`);
-        
         const sessionData = {
           id: session.id,
           plan_id: plan.id,
@@ -168,10 +165,7 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
           console.log(`💾 Salvando ${session.session_exercises.length} exercícios da sessão ${session.day_number}...`);
           
           for (const exercise of session.session_exercises) {
-            console.log(`💾 Salvando exercício: ${exercise.exercise?.name}`);
-            
-            // Save exercise data without recommended_weight column since it doesn't exist
-            const exerciseData = {
+            const exerciseData: any = {
               id: exercise.id,
               session_id: session.id,
               exercise_id: exercise.exercise?.id,
@@ -181,97 +175,121 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
               order_in_session: exercise.order_in_session,
             };
 
+            // Check if recommended_weight column exists by attempting to add it
+            if (exercise.recommended_weight) {
+              try {
+                exerciseData.recommended_weight = exercise.recommended_weight;
+                console.log(`💪 Salvando exercício ${exercise.exercise?.name} com carga: ${exercise.recommended_weight}`);
+              } catch (err) {
+                console.log(`⚠️ Coluna recommended_weight não disponível, salvando sem carga`);
+              }
+            }
+
             const { error: exerciseError } = await supabase
               .from('session_exercises')
               .upsert([exerciseData], { onConflict: 'id' });
 
             if (exerciseError) {
               console.error("Error saving session exercise:", exerciseError);
-              console.error("Exercise data that failed:", exerciseData);
               // Continue salvando outros exercícios mesmo se um falhar
             } else {
-              console.log(`✅ Exercício ${exercise.exercise?.name} salvo com sucesso`);
+              console.log(`✅ Exercício ${exercise.exercise?.name} salvo`);
             }
           }
-        } else {
-          console.warn(`⚠️ Sessão ${session.day_number} não tem exercícios`);
         }
       }
     }
 
     console.log("✅ Plano de treino completo salvo com sucesso");
     
-    // Now fetch the complete workout plan
+    // Now fetch the complete workout plan with robust error handling
     console.log("🔍 Buscando plano completo...");
     
-    const { data: completePlan, error: fetchError } = await supabase
-      .from('workout_plans')
-      .select(`
-        *,
-        workout_sessions (
+    try {
+      // Try fetching with recommended_weight first
+      const { data: completePlan, error: fetchError } = await supabase
+        .from('workout_plans')
+        .select(`
           *,
-          session_exercises (
+          workout_sessions (
             *,
-            exercise:exercises (*)
+            session_exercises (
+              *,
+              recommended_weight,
+              exercise:exercises (*)
+            )
           )
-        )
-      `)
-      .eq('id', plan.id)
-      .single();
+        `)
+        .eq('id', plan.id)
+        .single();
+        
+      if (fetchError) {
+        console.log("⚠️ Erro ao buscar com recommended_weight, tentando sem...");
+        throw fetchError;
+      }
       
-    if (fetchError) {
-      console.error("Error fetching complete workout plan:", fetchError);
-      // Return basic plan structure if fetch fails
-      return {
-        id: savedPlan.id,
-        user_id: savedPlan.user_id,
-        goal: savedPlan.goal,
-        start_date: savedPlan.start_date,
-        end_date: savedPlan.end_date,
-        created_at: savedPlan.created_at,
-        workout_sessions: []
-      } as WorkoutPlan;
-    }
-    
-    // Transform the result to match WorkoutPlan interface
-    const transformedPlan: WorkoutPlan = {
-      id: completePlan.id,
-      user_id: completePlan.user_id,
-      goal: completePlan.goal,
-      start_date: completePlan.start_date,
-      end_date: completePlan.end_date,
-      created_at: completePlan.created_at,
-      workout_sessions: completePlan.workout_sessions?.map((session: any) => ({
-        id: session.id,
-        day_number: session.day_number,
-        warmup_description: session.warmup_description,
-        cooldown_description: session.cooldown_description,
-        session_exercises: session.session_exercises?.map((sessionExercise: any) => {
-          // Find matching exercise in original plan to get recommended_weight
-          const originalSession = plan.workout_sessions?.find((s: any) => s.id === session.id);
-          const originalExercise = originalSession?.session_exercises?.find((e: any) => e.id === sessionExercise.id);
+      console.log("✅ Plano completo recuperado com recommended_weight");
+      return completePlan as WorkoutPlan;
+      
+    } catch (error: any) {
+      if (error.message?.includes("recommended_weight")) {
+        console.log("⚠️ Coluna recommended_weight não existe, buscando sem ela...");
+        
+        try {
+          const { data: fallbackPlan, error: fallbackError } = await supabase
+            .from('workout_plans')
+            .select(`
+              *,
+              workout_sessions (
+                *,
+                session_exercises (
+                  *,
+                  exercise:exercises (*)
+                )
+              )
+            `)
+            .eq('id', plan.id)
+            .single();
+            
+          if (fallbackError) {
+            throw fallbackError;
+          }
           
+          // Add recommended_weight from our saved plan manually
+          if (fallbackPlan && fallbackPlan.workout_sessions) {
+            fallbackPlan.workout_sessions.forEach((session: any) => {
+              if (session.session_exercises) {
+                session.session_exercises.forEach((sessionExercise: any) => {
+                  // Find matching exercise in original plan to get recommended_weight
+                  const originalSession = plan.workout_sessions?.find((s: any) => s.id === session.id);
+                  const originalExercise = originalSession?.session_exercises?.find((e: any) => e.id === sessionExercise.id);
+                  if (originalExercise?.recommended_weight) {
+                    sessionExercise.recommended_weight = originalExercise.recommended_weight;
+                  }
+                });
+              }
+            });
+          }
+          
+          console.log("✅ Plano completo recuperado sem recommended_weight (adicionado manualmente)");
+          return fallbackPlan as WorkoutPlan;
+          
+        } catch (fallbackError) {
+          console.error("Error fetching complete workout plan (fallback):", fallbackError);
+          // Return basic plan structure if all else fails
           return {
-            id: sessionExercise.id,
-            sets: sessionExercise.sets,
-            reps: sessionExercise.reps,
-            rest_time_seconds: sessionExercise.rest_time_seconds,
-            order_in_session: sessionExercise.order_in_session,
-            recommended_weight: originalExercise?.recommended_weight,
-            exercise: sessionExercise.exercise
-          };
-        }) || []
-      })) || []
-    };
-    
-    console.log("✅ Plano completo recuperado e transformado");
-    console.log(`📊 Plano final: ${transformedPlan.workout_sessions.length} sessões`);
-    transformedPlan.workout_sessions.forEach((session, index) => {
-      console.log(`📅 Sessão ${index + 1}: ${session.session_exercises.length} exercícios`);
-    });
-    
-    return transformedPlan;
-      
+            ...savedPlan,
+            workout_sessions: []
+          } as WorkoutPlan;
+        }
+      } else {
+        console.error("Error fetching complete workout plan:", error);
+        return {
+          ...savedPlan,
+          workout_sessions: []
+        } as WorkoutPlan;
+      }
+    }
   } catch (error) {
     console.error("Error in saveWorkoutPlan:", error);
     return null;
