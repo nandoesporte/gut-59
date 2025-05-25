@@ -20,26 +20,14 @@ export const formatImageUrl = (url: string | null): string => {
     return formattedUrl;
   }
   
-  // Primeiro tenta o bucket exercise-gifs (que parece ser onde estão os arquivos baseado nos logs de rede)
+  // Para arquivos GIF, tenta diferentes caminhos baseado no exemplo funcional
   if (url.includes('.gif')) {
-    // Se já tem o caminho completo com batch, usa como está
-    if (url.includes('exercise-gifs/batch/')) {
-      const fullUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/${url}`;
-      console.log('ImageUtils: Created full URL for exercise-gifs/batch:', fullUrl);
-      return fullUrl;
-    }
+    // Remove qualquer prefixo de bucket e usa apenas o nome do arquivo
+    const fileName = url.replace(/^(exercise-gifs\/batch\/|exercicios\/)?/, '');
     
-    // Se tem apenas o nome do arquivo com prefixo timestamp, adiciona o caminho batch
-    if (url.match(/^\d+_[a-z0-9]+_/)) {
-      const fullUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/exercise-gifs/batch/${url}`;
-      console.log('ImageUtils: Created full URL for batch file with timestamp:', fullUrl);
-      return fullUrl;
-    }
-    
-    // Tenta primeiro no bucket exercicios (exemplo funcional que você mostrou)
-    const cleanUrl = url.replace(/^(exercise-gifs\/batch\/|exercicios\/)?/, '');
-    const exerciciosUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/exercicios/${cleanUrl}`;
-    console.log('ImageUtils: Created full URL using exercicios bucket:', exerciciosUrl);
+    // Primeiro tenta com o bucket 'exercicios' (exemplo funcional)
+    const exerciciosUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/exercicios/${fileName}`;
+    console.log('ImageUtils: Created URL for exercicios bucket:', exerciciosUrl);
     return exerciciosUrl;
   }
   
@@ -51,6 +39,7 @@ export const formatImageUrl = (url: string | null): string => {
 // Função auxiliar para verificar se o GIF é válido
 export const validateGifUrl = async (url: string): Promise<boolean> => {
   try {
+    console.log('ImageUtils: Validating URL:', url);
     const response = await fetch(url, { method: 'HEAD' });
     const contentType = response.headers.get('Content-Type');
     const isValid = response.ok && contentType?.includes('image/gif');
@@ -58,6 +47,7 @@ export const validateGifUrl = async (url: string): Promise<boolean> => {
     console.log('ImageUtils: URL validation result:', {
       url,
       status: response.status,
+      statusText: response.statusText,
       contentType,
       isValid
     });
