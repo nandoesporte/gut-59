@@ -15,14 +15,25 @@ export const generateWorkoutPlanWithTrenner2025 = async (
     console.log("🏃‍♂️ Trenner2025 Agent: Iniciando geração do plano de treino...");
     console.log("📋 Preferências recebidas:", JSON.stringify(preferences, null, 2));
     
-    // Determine days per week based on activity level
+    // Determine days per week based on activity level with better logic
     let daysPerWeek = 3;
     switch (preferences.activity_level) {
-      case "sedentary": daysPerWeek = 2; break;
-      case "light": daysPerWeek = 3; break;
-      case "moderate": daysPerWeek = 5; break;
-      case "intense": daysPerWeek = 6; break;
+      case "sedentary": 
+        daysPerWeek = 2; 
+        break;
+      case "light": 
+        daysPerWeek = 3; 
+        break;
+      case "moderate": 
+        daysPerWeek = 4; 
+        break;
+      case "intense": 
+        daysPerWeek = 5; 
+        break;
+      default:
+        daysPerWeek = 3;
     }
+    
     console.log(`🎯 Trenner2025: Nível de atividade ${preferences.activity_level} → ${daysPerWeek} dias por semana`);
 
     // Generate a unique request ID if not provided
@@ -34,7 +45,8 @@ export const generateWorkoutPlanWithTrenner2025 = async (
     const { data: exercises, error: exercisesError } = await supabase
       .from("exercises")
       .select("*")
-      .like('gif_url', '%/storage/v1/object/public/exercise-gifs/batch/%');
+      .like('gif_url', '%/storage/v1/object/public/exercise-gifs/batch/%')
+      .limit(200); // Aumentar limite para ter mais opções
 
     if (exercisesError) {
       console.error("❌ Trenner2025: Erro ao buscar exercícios da pasta batch:", exercisesError);
@@ -72,27 +84,6 @@ export const generateWorkoutPlanWithTrenner2025 = async (
       throw new Error("Nenhum exercício com GIFs válidos encontrado na pasta batch");
     }
 
-    // Organize by muscle group for balanced routine from batch exercises
-    const muscleGroups = ["chest", "back", "legs", "shoulders", "arms", "core", "full_body"];
-    const exercisesByMuscle: Record<string, any[]> = {};
-    
-    muscleGroups.forEach(group => {
-      exercisesByMuscle[group] = exercisesWithBatchGifs.filter(ex => ex.muscle_group === group);
-      console.log(`💪 Trenner2025: ${group} → ${exercisesByMuscle[group].length} exercícios da pasta batch`);
-    });
-
-    // Select a subset of exercises to use in the plan from batch folder
-    const selectedExercises = [];
-    const exercisesPerGroup = 12;
-
-    for (const group of muscleGroups) {
-      const shuffled = [...exercisesByMuscle[group]].sort(() => 0.5 - Math.random());
-      const selected = shuffled.slice(0, exercisesPerGroup);
-      selectedExercises.push(...selected);
-    }
-
-    console.log(`🎲 Trenner2025: ${selectedExercises.length} exercícios da pasta batch selecionados para o plano`);
-
     // Call edge function for workout plan generation
     console.log(`🚀 Trenner2025: Invocando edge function generate-workout-plan...`);
     const startTime = Date.now();
@@ -124,6 +115,13 @@ export const generateWorkoutPlanWithTrenner2025 = async (
 
     console.log("✅ Trenner2025: Plano de treino gerado com sucesso usando exercícios da pasta batch!");
     console.log(`📊 Trenner2025: Plano contém ${workoutPlan.workout_sessions?.length || 0} sessões`);
+    
+    // Log detalhes de cada sessão
+    if (workoutPlan.workout_sessions) {
+      workoutPlan.workout_sessions.forEach((session: any, index: number) => {
+        console.log(`📅 Sessão ${index + 1}: ${session.session_exercises?.length || 0} exercícios`);
+      });
+    }
 
     return {
       workoutPlan,

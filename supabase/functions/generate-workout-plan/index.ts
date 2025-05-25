@@ -31,7 +31,7 @@ serve(async (req) => {
     // Buscar exercícios disponíveis que tenham GIFs na pasta batch
     console.log('📚 Buscando exercícios da pasta batch no storage...');
     const exercisesResponse = await fetch(
-      `${SUPABASE_URL}/rest/v1/exercises?select=id,name,gif_url,description,muscle_group,equipment_needed,exercise_type,min_sets,max_sets,min_reps,max_reps,rest_time_seconds&gif_url=like.*batch*&limit=100`, 
+      `${SUPABASE_URL}/rest/v1/exercises?select=id,name,gif_url,description,muscle_group,equipment_needed,exercise_type,min_sets,max_sets,min_reps,max_reps,rest_time_seconds&gif_url=like.*batch*&limit=200`, 
       {
         headers: {
           'apikey': SUPABASE_SERVICE_ROLE_KEY,
@@ -109,7 +109,7 @@ serve(async (req) => {
         if (session.session_exercises && Array.isArray(session.session_exercises)) {
           console.log(`💪 Processando ${session.session_exercises.length} exercícios para o dia ${sessionIndex + 1}...`);
           
-          processedSession.session_exercises = session.session_exercises.map((exercise, exerciseIndex) => {
+          processedSession.session_exercises = session.session_exercises.map((exercise, exIndex) => {
             // Buscar exercício na lista filtrada da pasta batch
             const foundExercise = batchExercises.find(ex => ex.id === exercise.exercise_id);
             
@@ -120,7 +120,7 @@ serve(async (req) => {
                 sets: Math.min(Math.max(exercise.sets || 3, foundExercise.min_sets || 1), foundExercise.max_sets || 5),
                 reps: Math.min(Math.max(exercise.reps || 12, foundExercise.min_reps || 1), foundExercise.max_reps || 20),
                 rest_time_seconds: exercise.rest_time_seconds || foundExercise.rest_time_seconds || 60,
-                order_in_session: exercise.order_in_session || (exerciseIndex + 1),
+                order_in_session: exercise.order_in_session || (exIndex + 1),
                 exercise: {
                   id: foundExercise.id,
                   name: foundExercise.name,
@@ -133,13 +133,13 @@ serve(async (req) => {
             } else {
               console.warn(`⚠️ Exercício não encontrado na pasta batch: ${exercise.exercise_id}, usando substituto`);
               // Usar exercício padrão da pasta batch se não encontrar
-              const defaultExercise = batchExercises[exerciseIndex % batchExercises.length];
+              const defaultExercise = batchExercises[exIndex % batchExercises.length];
               return {
                 id: crypto.randomUUID(),
                 sets: 3,
                 reps: 12,
                 rest_time_seconds: 60,
-                order_in_session: exerciseIndex + 1,
+                order_in_session: exIndex + 1,
                 exercise: {
                   id: defaultExercise.id,
                   name: defaultExercise.name,
@@ -190,7 +190,14 @@ async function generateWithXAI(preferences: any, batchExercises: any[]) {
   const systemPrompt = `Você é o Trenner2025, um agente de IA especializado em educação física e criação de planos de treino personalizados. 
   Crie um plano de treino detalhado baseado nas preferências do usuário e nos exercícios disponíveis da pasta batch.
   IMPORTANTE: Responda SEMPRE em português do Brasil e retorne APENAS um JSON válido sem formatação markdown.
-  Você deve criar planos científicos, seguros e eficazes usando APENAS exercícios com GIFs da pasta batch.`;
+  Você deve criar planos científicos, seguros e eficazes usando APENAS exercícios com GIFs da pasta batch.
+  
+  REGRAS IMPORTANTES:
+  - Crie EXATAMENTE ${preferences.days_per_week || 3} dias de treino
+  - Cada dia deve ter entre 6-8 exercícios diferentes
+  - Varie os exercícios entre os dias focando em diferentes grupos musculares
+  - Use apenas IDs de exercícios que existem na lista fornecida
+  - Distribua os exercícios de forma equilibrada entre os grupos musculares`;
 
   const userPrompt = `
   Eu sou o Trenner2025 e vou criar um plano de treino personalizado baseado nestas informações:
@@ -206,15 +213,15 @@ async function generateWithXAI(preferences: any, batchExercises: any[]) {
   - Gênero: ${preferences.gender || 'não informado'}
   
   Exercícios disponíveis da pasta batch (use APENAS estes IDs):
-  ${batchExercises.slice(0, 30).map((ex, index) => `${index + 1}. ID: ${ex.id} - ${ex.name} (${ex.muscle_group}, ${ex.exercise_type}, Séries: ${ex.min_sets}-${ex.max_sets}, Reps: ${ex.min_reps}-${ex.max_reps})`).join('\n')}
+  ${batchExercises.slice(0, 50).map((ex, index) => `${index + 1}. ID: ${ex.id} - ${ex.name} (${ex.muscle_group}, ${ex.exercise_type}, Séries: ${ex.min_sets}-${ex.max_sets}, Reps: ${ex.min_reps}-${ex.max_reps})`).join('\n')}
   
-  Retorne um JSON com esta estrutura exata (use exercícios REAIS da lista acima):
+  Retorne um JSON com esta estrutura exata (crie ${preferences.days_per_week || 3} dias com 6-8 exercícios cada):
   {
     "workout_sessions": [
       {
         "day_number": 1,
-        "warmup_description": "Aquecimento dinâmico de 5-10 minutos com movimentos específicos",
-        "cooldown_description": "Alongamento e relaxamento de 5-10 minutos",
+        "warmup_description": "Aquecimento dinâmico específico para o treino do dia",
+        "cooldown_description": "Alongamento e relaxamento específico",
         "session_exercises": [
           {
             "exercise_id": "ID_REAL_DO_EXERCICIO_DA_LISTA_ACIMA",
@@ -223,16 +230,19 @@ async function generateWithXAI(preferences: any, batchExercises: any[]) {
             "rest_time_seconds": 60,
             "order_in_session": 1
           }
+          // ... mais 5-7 exercícios diferentes
         ]
       }
+      // ... mais ${(preferences.days_per_week || 3) - 1} dias
     ]
   }
   
-  REGRAS IMPORTANTES:
+  CRITÉRIOS OBRIGATÓRIOS:
   - Use apenas IDs de exercícios que existem na lista fornecida da pasta batch!
-  - Inclua order_in_session para cada exercício (1, 2, 3, etc.)
   - Crie ${preferences.days_per_week || 3} dias de treino
-  - Varie os exercícios entre os dias focando em diferentes grupos musculares
+  - Cada dia deve ter 6-8 exercícios diferentes 
+  - Inclua order_in_session para cada exercício (1, 2, 3, etc.)
+  - Varie os grupos musculares entre os dias
   - Respeite os limites de séries e repetições de cada exercício
   - Crie aquecimentos e resfriamentos específicos para cada dia
   `;
@@ -250,8 +260,8 @@ async function generateWithXAI(preferences: any, batchExercises: any[]) {
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
       ],
-      temperature: 0.3,
-      max_tokens: 4000,
+      temperature: 0.7,
+      max_tokens: 6000,
       stream: false
     }),
   });
@@ -272,7 +282,7 @@ async function generateWithXAI(preferences: any, batchExercises: any[]) {
     throw new Error('Nenhum conteúdo retornado pela API xAI');
   }
 
-  console.log('📝 Conteúdo bruto da IA:', content.substring(0, 200) + '...');
+  console.log('📝 Conteúdo bruto da IA:', content.substring(0, 500) + '...');
 
   // Parse do JSON retornado
   try {
@@ -304,36 +314,71 @@ function generateLocalPlan(preferences: any, batchExercises: any[]) {
     const sessionExercises = [];
     let exerciseOrder = 1;
     
-    // Selecionar 4-6 exercícios por sessão da pasta batch
-    const exercisesPerSession = Math.min(6, Math.max(4, Math.floor(12 / daysPerWeek)));
+    // Selecionar 6-8 exercícios por sessão da pasta batch
+    const exercisesPerSession = Math.min(8, Math.max(6, Math.floor(24 / daysPerWeek)));
     
-    for (let i = 0; i < exercisesPerSession; i++) {
-      const muscleGroup = muscleGroups[i % muscleGroups.length];
-      const groupExercises = exercisesByMuscle[muscleGroup];
+    // Distribuir exercícios pelos grupos musculares de forma equilibrada
+    const exercisesPerGroup = Math.ceil(exercisesPerSession / muscleGroups.length);
+    
+    for (const group of muscleGroups) {
+      const groupExercises = exercisesByMuscle[group];
       
       if (groupExercises && groupExercises.length > 0) {
-        const randomExercise = groupExercises[Math.floor(Math.random() * groupExercises.length)];
+        // Embaralhar exercícios do grupo
+        const shuffled = [...groupExercises].sort(() => 0.5 - Math.random());
         
-        sessionExercises.push({
-          exercise_id: randomExercise.id,
-          sets: Math.max(randomExercise.min_sets || 3, 3),
-          reps: Math.max(randomExercise.min_reps || 10, 10),
-          rest_time_seconds: randomExercise.rest_time_seconds || 60,
-          order_in_session: exerciseOrder++
-        });
+        // Selecionar exercícios para este dia (máximo de exercisesPerGroup por grupo)
+        const selectedFromGroup = shuffled.slice(0, Math.min(exercisesPerGroup, exercisesPerSession - sessionExercises.length));
         
-        console.log(`✅ Exercício selecionado para o dia ${day}: ${randomExercise.name} (${randomExercise.muscle_group})`);
+        for (const exercise of selectedFromGroup) {
+          if (sessionExercises.length >= exercisesPerSession) break;
+          
+          sessionExercises.push({
+            exercise_id: exercise.id,
+            sets: Math.max(exercise.min_sets || 3, 3),
+            reps: Math.max(exercise.min_reps || 10, 10),
+            rest_time_seconds: exercise.rest_time_seconds || 60,
+            order_in_session: exerciseOrder++
+          });
+          
+          console.log(`✅ Exercício selecionado para o dia ${day}: ${exercise.name} (${exercise.muscle_group})`);
+        }
       }
+    }
+    
+    // Se ainda precisamos de mais exercícios, pegar de qualquer grupo
+    while (sessionExercises.length < exercisesPerSession && sessionExercises.length < batchExercises.length) {
+      const remainingExercises = batchExercises.filter(ex => 
+        !sessionExercises.some(se => se.exercise_id === ex.id)
+      );
+      
+      if (remainingExercises.length === 0) break;
+      
+      const randomExercise = remainingExercises[Math.floor(Math.random() * remainingExercises.length)];
+      
+      sessionExercises.push({
+        exercise_id: randomExercise.id,
+        sets: Math.max(randomExercise.min_sets || 3, 3),
+        reps: Math.max(randomExercise.min_reps || 10, 10),
+        rest_time_seconds: randomExercise.rest_time_seconds || 60,
+        order_in_session: exerciseOrder++
+      });
+      
+      console.log(`✅ Exercício adicional para o dia ${day}: ${randomExercise.name} (${randomExercise.muscle_group})`);
     }
     
     sessions.push({
       day_number: day,
-      warmup_description: `Aquecimento dinâmico de 5-10 minutos - Dia ${day}`,
-      cooldown_description: `Alongamento específico de 5-10 minutos - Dia ${day}`,
+      warmup_description: `Aquecimento dinâmico de 5-10 minutos focado nos grupos musculares do Dia ${day}`,
+      cooldown_description: `Alongamento específico de 5-10 minutos para os músculos trabalhados no Dia ${day}`,
       session_exercises: sessionExercises
     });
   }
   
   console.log(`🎯 Plano local gerado com ${sessions.length} sessões usando exercícios da pasta batch`);
+  sessions.forEach((session, index) => {
+    console.log(`📅 Dia ${index + 1}: ${session.session_exercises.length} exercícios`);
+  });
+  
   return { workout_sessions: sessions };
 }
