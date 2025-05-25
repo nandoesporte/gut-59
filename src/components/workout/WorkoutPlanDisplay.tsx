@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Dumbbell, RotateCcw, RefreshCw, Trash2 } from "lucide-react";
@@ -8,7 +7,8 @@ import { useWorkoutPlanGeneration } from "./hooks/useWorkoutPlanGeneration";
 import { CurrentWorkoutPlan } from "./components/CurrentWorkoutPlan";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { DeleteWorkoutDialog } from "./components/DeleteWorkoutDialog";
-import { useState } from "react";
+import { ProfessionalAnalysisNotification } from "./components/ProfessionalAnalysisNotification";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { WorkoutError } from "./components/WorkoutError";
@@ -38,6 +38,16 @@ export const WorkoutPlanDisplay = ({
   const isMobile = useIsMobile();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeletingPlan, setIsDeletingPlan] = useState(false);
+  const [showProfessionalNotification, setShowProfessionalNotification] = useState(false);
+  const [previousPlanId, setPreviousPlanId] = useState<string | null>(null);
+
+  // Show professional analysis notification when a new plan is generated
+  useEffect(() => {
+    if (workoutPlan && workoutPlan.id !== previousPlanId) {
+      setShowProfessionalNotification(true);
+      setPreviousPlanId(workoutPlan.id);
+    }
+  }, [workoutPlan, previousPlanId]);
 
   const handleGenerateNewPlan = () => {
     generatePlan();
@@ -165,6 +175,12 @@ export const WorkoutPlanDisplay = ({
         isOpen={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}
         onConfirm={handleDeletePlan}
+      />
+
+      <ProfessionalAnalysisNotification
+        isOpen={showProfessionalNotification}
+        onClose={() => setShowProfessionalNotification(false)}
+        planType="workout"
       />
     </div>
   );
