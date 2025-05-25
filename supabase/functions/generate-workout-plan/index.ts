@@ -66,44 +66,34 @@ serve(async (req) => {
     - Dias por semana: ${preferences.days_per_week || 3}
     - Tipos de exercício preferidos: ${preferences.preferred_exercise_types?.join(', ') || 'todos'}
     
-    Exercícios disponíveis (primeiros 20):
-    ${exercises.slice(0, 20).map(ex => `- ${ex.name} (${ex.muscle_group}, ${ex.exercise_type})`).join('\n')}
+    Exercícios disponíveis (primeiros 30):
+    ${exercises.slice(0, 30).map((ex, index) => `${index + 1}. ID: ${ex.id} - ${ex.name} (${ex.muscle_group}, ${ex.exercise_type})`).join('\n')}
     
     Retorne um JSON com esta estrutura exata (use exercícios REAIS da lista acima):
     {
-      "id": "${crypto.randomUUID()}",
-      "user_id": "${userId}",
-      "goal": "${preferences.goal || 'maintain'}",
-      "start_date": "${new Date().toISOString().split('T')[0]}",
-      "end_date": "${new Date(new Date().setDate(new Date().getDate() + 30)).toISOString().split('T')[0]}",
-      "created_at": "${new Date().toISOString()}",
       "workout_sessions": [
         {
-          "id": "${crypto.randomUUID()}",
           "day_number": 1,
           "warmup_description": "Descrição do aquecimento",
           "cooldown_description": "Descrição da volta à calma",
           "session_exercises": [
             {
-              "id": "${crypto.randomUUID()}",
+              "exercise_id": "ID_REAL_DO_EXERCICIO_DA_LISTA_ACIMA",
               "sets": 3,
               "reps": 12,
               "rest_time_seconds": 60,
-              "exercise": {
-                "id": "ID_REAL_DO_EXERCICIO_DA_LISTA_ACIMA",
-                "name": "Nome exato do exercício da lista",
-                "description": "Descrição",
-                "muscle_group": "chest",
-                "exercise_type": "strength",
-                "gif_url": "url-do-gif"
-              }
+              "order_in_session": 1
             }
           ]
         }
       ]
     }
     
-    IMPORTANTE: Use apenas exercícios que existem na lista fornecida e use seus IDs reais!
+    IMPORTANTE: 
+    - Use apenas IDs de exercícios que existem na lista fornecida!
+    - Inclua order_in_session para cada exercício (1, 2, 3, etc.)
+    - Crie ${preferences.days_per_week || 3} dias de treino
+    - Varie os exercícios entre os dias
     `;
 
     // Chamar API da xAI Grok-3 Mini
@@ -136,60 +126,86 @@ serve(async (req) => {
     }
 
     // Parse do JSON retornado
-    let workoutPlan;
+    let aiPlan;
     try {
       const cleanContent = content.replace(/```json|```/g, '').trim();
-      workoutPlan = JSON.parse(cleanContent);
+      aiPlan = JSON.parse(cleanContent);
     } catch (parseError) {
       console.error('Erro ao fazer parse do JSON:', parseError);
       throw new Error('Erro ao processar resposta da IA');
     }
 
-    // Validar e corrigir IDs
-    workoutPlan.id = workoutPlan.id || crypto.randomUUID();
-    workoutPlan.user_id = userId;
+    // Criar o plano completo
+    const workoutPlan = {
+      id: crypto.randomUUID(),
+      user_id: userId,
+      goal: preferences.goal || 'maintain',
+      start_date: new Date().toISOString().split('T')[0],
+      end_date: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString().split('T')[0],
+      created_at: new Date().toISOString(),
+      workout_sessions: []
+    };
 
-    // Garantir que as sessões tenham IDs únicos e válidos
-    if (workoutPlan.workout_sessions) {
-      workoutPlan.workout_sessions.forEach((session, sessionIndex) => {
-        session.id = session.id || crypto.randomUUID();
-        
+    // Processar sessões e exercícios
+    if (aiPlan.workout_sessions) {
+      workoutPlan.workout_sessions = aiPlan.workout_sessions.map((session, sessionIndex) => {
+        const processedSession = {
+          id: crypto.randomUUID(),
+          day_number: session.day_number || (sessionIndex + 1),
+          warmup_description: session.warmup_description || "Aquecimento de 5-10 minutos",
+          cooldown_description: session.cooldown_description || "Alongamento e relaxamento",
+          session_exercises: []
+        };
+
         if (session.session_exercises) {
-          session.session_exercises.forEach((exercise, exerciseIndex) => {
-            exercise.id = exercise.id || crypto.randomUUID();
-            
-            // Validar se o exercício existe na base de dados
-            const foundExercise = exercises.find(ex => 
-              ex.id === exercise.exercise?.id || ex.name === exercise.exercise?.name
-            );
+          processedSession.session_exercises = session.session_exercises.map((exercise, exerciseIndex) => {
+            // Buscar exercício na lista
+            const foundExercise = exercises.find(ex => ex.id === exercise.exercise_id);
             
             if (foundExercise) {
-              exercise.exercise = {
-                id: foundExercise.id,
-                name: foundExercise.name,
-                description: foundExercise.description,
-                muscle_group: foundExercise.muscle_group,
-                exercise_type: foundExercise.exercise_type,
-                gif_url: foundExercise.gif_url
+              return {
+                id: crypto.randomUUID(),
+                sets: exercise.sets || 3,
+                reps: exercise.reps || 12,
+                rest_time_seconds: exercise.rest_time_seconds || 60,
+                order_in_session: exercise.order_in_session || (exerciseIndex + 1),
+                exercise: {
+                  id: foundExercise.id,
+                  name: foundExercise.name,
+                  description: foundExercise.description,
+                  muscle_group: foundExercise.muscle_group,
+                  exercise_type: foundExercise.exercise_type,
+                  gif_url: foundExercise.gif_url
+                }
               };
             } else {
-              // Se não encontrar, usar um exercício padrão da lista
-              const defaultExercise = exercises[0];
-              exercise.exercise = {
-                id: defaultExercise.id,
-                name: defaultExercise.name,
-                description: defaultExercise.description,
-                muscle_group: defaultExercise.muscle_group,
-                exercise_type: defaultExercise.exercise_type,
-                gif_url: defaultExercise.gif_url
+              // Usar exercício padrão se não encontrar
+              const defaultExercise = exercises[exerciseIndex % exercises.length];
+              return {
+                id: crypto.randomUUID(),
+                sets: 3,
+                reps: 12,
+                rest_time_seconds: 60,
+                order_in_session: exerciseIndex + 1,
+                exercise: {
+                  id: defaultExercise.id,
+                  name: defaultExercise.name,
+                  description: defaultExercise.description,
+                  muscle_group: defaultExercise.muscle_group,
+                  exercise_type: defaultExercise.exercise_type,
+                  gif_url: defaultExercise.gif_url
+                }
               };
             }
           });
         }
+
+        return processedSession;
       });
     }
 
     console.log('Plano de treino gerado com sucesso via Grok-3 Mini');
+    console.log('Exercícios incluídos:', workoutPlan.workout_sessions.map(s => s.session_exercises.length));
     
     return new Response(
       JSON.stringify(workoutPlan),
