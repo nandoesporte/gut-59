@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
@@ -90,16 +91,16 @@ serve(async (req) => {
     if (XAI_API_KEY) {
       console.log('🚀 Tentando gerar plano com xAI Grok-2...');
       try {
-        aiPlan = await generateWithXAI(preferences, validBatchExercises);
+        aiPlan = await generateWithXAI(preferences, validBatchExercises, exercisesByGroup);
         console.log('✅ Plano gerado com sucesso usando Grok-2');
       } catch (xaiError) {
         console.error('❌ Erro com Grok-2:', xaiError.message);
         console.log('🔄 Caindo para geração local...');
-        aiPlan = generateLocalPlan(preferences, validBatchExercises);
+        aiPlan = generateLocalPlan(preferences, validBatchExercises, exercisesByGroup);
       }
     } else {
       console.log('⚠️ XAI_API_KEY não encontrada, usando geração local');
-      aiPlan = generateLocalPlan(preferences, validBatchExercises);
+      aiPlan = generateLocalPlan(preferences, validBatchExercises, exercisesByGroup);
     }
 
     // Criar o plano completo PRESERVANDO EXATAMENTE OS EXERCÍCIOS ESCOLHIDOS PELO AGENTE
@@ -299,23 +300,25 @@ function determineRecommendedWeight(exercise, activityLevel, userWeight, userAge
   return `${recommendedKg}kg`;
 }
 
-async function generateWithXAI(preferences, validBatchExercises) {
-  console.log('🧠 Preparando prompt para Grok-2...');
+async function generateWithXAI(preferences, validBatchExercises, exercisesByGroup) {
+  console.log('🧠 Preparando prompt para Grok-2 com foco em ALTERNÂNCIA DE GRUPOS MUSCULARES...');
   
   const systemPrompt = `Você é o Trenner2025, um agente de IA especializado em educação física e criação de planos de treino personalizados. 
   Crie um plano de treino detalhado baseado nas preferências do usuário e nos exercícios disponíveis da pasta batch.
   IMPORTANTE: Responda SEMPRE em português do Brasil e retorne APENAS um JSON válido sem formatação markdown.
   Você deve criar planos científicos, seguros e eficazes usando APENAS exercícios com GIFs válidos da pasta batch.
   
-  REGRAS CRÍTICAS:
+  REGRAS CRÍTICAS PARA ALTERNÂNCIA DE GRUPOS MUSCULARES:
   - Crie EXATAMENTE ${preferences.days_per_week || 3} dias de treino
   - Cada dia deve ter entre 6-8 exercícios diferentes
-  - Varie os exercícios entre os dias focando em diferentes grupos musculares
+  - OBRIGATÓRIO: Alterne entre diferentes grupos musculares em cada sessão
+  - NUNCA coloque apenas exercícios de um grupo muscular em uma sessão
+  - Distribua os exercícios de forma equilibrada: peito, costas, pernas, ombros, braços, core
+  - Para treino de 3 dias: Dia 1 (peito+tríceps+ombros), Dia 2 (pernas+glúteos+core), Dia 3 (costas+bíceps+ombros)
+  - Para treino de 4+ dias: distribua ainda mais os grupos musculares
   - Use SOMENTE IDs de exercícios que existem na lista fornecida (TODOS têm GIFs válidos)
   - NUNCA invente IDs de exercícios - use apenas os da lista
-  - Distribua os exercícios de forma equilibrada entre os grupos musculares
-  - Especifique cargas apropriadas baseadas no nível de condicionamento físico
-  - CADA exercise_id DEVE existir na lista de exercícios fornecida`;
+  - Especifique cargas apropriadas baseadas no nível de condicionamento físico`;
 
   const userPrompt = `
   Crie um plano de treino personalizado baseado nestas informações:
@@ -330,8 +333,25 @@ async function generateWithXAI(preferences, validBatchExercises) {
   - Altura: ${preferences.height || 'não informada'}cm
   - Gênero: ${preferences.gender || 'não informado'}
   
-  EXERCÍCIOS DISPONÍVEIS COM GIFs VÁLIDOS (use APENAS estes IDs):
-  ${validBatchExercises.map((ex, index) => `${index + 1}. ID: "${ex.id}" - ${ex.name} (${ex.muscle_group}, ${ex.exercise_type}, Séries: ${ex.min_sets}-${ex.max_sets}, Reps: ${ex.min_reps}-${ex.max_reps})`).join('\n')}
+  EXERCÍCIOS DISPONÍVEIS POR GRUPO MUSCULAR (use APENAS estes IDs):
+  
+  PEITO (${exercisesByGroup.chest.length} exercícios):
+  ${exercisesByGroup.chest.map((ex, index) => `${index + 1}. ID: "${ex.id}" - ${ex.name} (${ex.exercise_type})`).join('\n')}
+  
+  COSTAS (${exercisesByGroup.back.length} exercícios):
+  ${exercisesByGroup.back.map((ex, index) => `${index + 1}. ID: "${ex.id}" - ${ex.name} (${ex.exercise_type})`).join('\n')}
+  
+  PERNAS (${exercisesByGroup.legs.length} exercícios):
+  ${exercisesByGroup.legs.map((ex, index) => `${index + 1}. ID: "${ex.id}" - ${ex.name} (${ex.exercise_type})`).join('\n')}
+  
+  OMBROS (${exercisesByGroup.shoulders.length} exercícios):
+  ${exercisesByGroup.shoulders.map((ex, index) => `${index + 1}. ID: "${ex.id}" - ${ex.name} (${ex.exercise_type})`).join('\n')}
+  
+  BRAÇOS (${exercisesByGroup.arms.length} exercícios):
+  ${exercisesByGroup.arms.map((ex, index) => `${index + 1}. ID: "${ex.id}" - ${ex.name} (${ex.exercise_type})`).join('\n')}
+  
+  CORE (${exercisesByGroup.core.length} exercícios):
+  ${exercisesByGroup.core.map((ex, index) => `${index + 1}. ID: "${ex.id}" - ${ex.name} (${ex.exercise_type})`).join('\n')}
   
   Retorne APENAS um JSON válido com esta estrutura exata:
   {
@@ -353,12 +373,13 @@ async function generateWithXAI(preferences, validBatchExercises) {
     ]
   }
   
-  CRITÉRIOS OBRIGATÓRIOS:
+  CRITÉRIOS OBRIGATÓRIOS PARA ALTERNÂNCIA:
   - Use APENAS IDs de exercícios que existem na lista fornecida (copie exatamente como mostrado)!
   - Crie ${preferences.days_per_week || 3} dias de treino
-  - Cada dia deve ter 6-8 exercícios diferentes 
+  - Cada dia deve ter 6-8 exercícios diferentes DE GRUPOS MUSCULARES VARIADOS
+  - ALTERNE os grupos musculares em cada sessão - NUNCA use apenas um grupo
   - Inclua order_in_session para cada exercício (1, 2, 3, etc.)
-  - Varie os grupos musculares entre os dias
+  - Distribua equilibradamente: peito, costas, pernas, ombros, braços, core
   - Respeite os limites de séries e repetições de cada exercício
   - NUNCA use IDs inventados - apenas os da lista acima
   `;
@@ -410,24 +431,27 @@ async function generateWithXAI(preferences, validBatchExercises) {
       throw new Error('Plano inválido: sem sessões de treino');
     }
     
-    // Verificar se cada sessão tem exercícios
+    // Verificar se cada sessão tem exercícios variados
     parsedPlan.workout_sessions.forEach((session, index) => {
       if (!session.session_exercises || !Array.isArray(session.session_exercises) || session.session_exercises.length === 0) {
         console.error(`❌ Sessão ${index + 1} sem exercícios`);
         throw new Error(`Sessão ${index + 1} sem exercícios`);
       }
-      console.log(`✅ Sessão ${index + 1}: ${session.session_exercises.length} exercícios`);
       
-      // Verificar se todos os IDs de exercícios existem
+      // Verificar variedade de grupos musculares
+      const muscleGroups = new Set();
       session.session_exercises.forEach((exercise, exIndex) => {
         const exerciseExists = validBatchExercises.find(ex => ex.id === exercise.exercise_id);
         if (!exerciseExists) {
           console.error(`❌ ERRO: Exercício com ID ${exercise.exercise_id} não existe na lista de exercícios válidos!`);
           throw new Error(`Exercício com ID ${exercise.exercise_id} não encontrado na lista de exercícios válidos`);
         } else {
-          console.log(`✅ Exercício validado: ${exerciseExists.name} (ID: ${exercise.exercise_id})`);
+          muscleGroups.add(exerciseExists.muscle_group);
+          console.log(`✅ Exercício validado: ${exerciseExists.name} (ID: ${exercise.exercise_id}, Grupo: ${exerciseExists.muscle_group})`);
         }
       });
+      
+      console.log(`✅ Sessão ${index + 1}: ${session.session_exercises.length} exercícios com ${muscleGroups.size} grupos musculares diferentes: ${Array.from(muscleGroups).join(', ')}`);
     });
     
     return parsedPlan;
@@ -438,18 +462,15 @@ async function generateWithXAI(preferences, validBatchExercises) {
   }
 }
 
-function generateLocalPlan(preferences, validBatchExercises) {
-  console.log('🏠 Gerando plano localmente com exercícios válidos da pasta batch...');
+function generateLocalPlan(preferences, validBatchExercises, exercisesByGroup) {
+  console.log('🏠 Gerando plano localmente com ALTERNÂNCIA DE GRUPOS MUSCULARES...');
   
   const daysPerWeek = preferences.days_per_week || 3;
   const muscleGroups = ["chest", "back", "legs", "shoulders", "arms", "core"];
   
-  // Organizar exercícios válidos por grupo muscular
-  const exercisesByMuscle = {};
-  muscleGroups.forEach(group => {
-    exercisesByMuscle[group] = validBatchExercises.filter(ex => ex.muscle_group === group);
-    console.log(`💪 Grupo ${group}: ${exercisesByMuscle[group].length} exercícios válidos`);
-  });
+  // Verificar exercícios disponíveis por grupo
+  const availableGroups = muscleGroups.filter(group => exercisesByGroup[group].length > 0);
+  console.log(`💪 Grupos musculares disponíveis: ${availableGroups.join(', ')}`);
   
   const sessions = [];
   
@@ -457,39 +478,66 @@ function generateLocalPlan(preferences, validBatchExercises) {
     const sessionExercises = [];
     let exerciseOrder = 1;
     
-    // Selecionar 6-8 exercícios por sessão
-    const exercisesPerSession = Math.min(8, Math.max(6, Math.floor(24 / daysPerWeek)));
+    // Definir estratégia de distribuição baseada no número de dias
+    let targetGroups = [];
+    if (daysPerWeek === 3) {
+      // 3 dias: treino full body variado
+      targetGroups = availableGroups.slice(); // Todos os grupos disponíveis
+    } else if (daysPerWeek === 4) {
+      // 4 dias: dividir upper/lower ou push/pull
+      if (day % 2 === 1) {
+        targetGroups = ["chest", "shoulders", "arms", "core"]; // Upper
+      } else {
+        targetGroups = ["legs", "back", "core"]; // Lower + back
+      }
+    } else {
+      // 5+ dias: mais específico
+      const groupRotation = [
+        ["chest", "shoulders", "arms"],
+        ["legs", "core"],
+        ["back", "arms"],
+        ["shoulders", "core"],
+        ["legs", "back"]
+      ];
+      targetGroups = groupRotation[(day - 1) % groupRotation.length];
+    }
     
-    // Distribuir exercícios pelos grupos musculares de forma equilibrada
-    const exercisesPerGroup = Math.ceil(exercisesPerSession / muscleGroups.length);
+    // Filtrar apenas grupos que têm exercícios disponíveis
+    targetGroups = targetGroups.filter(group => exercisesByGroup[group] && exercisesByGroup[group].length > 0);
     
-    for (const group of muscleGroups) {
-      const groupExercises = exercisesByMuscle[group];
+    console.log(`📅 Dia ${day}: Grupos alvos = ${targetGroups.join(', ')}`);
+    
+    // Distribuir exercícios pelos grupos selecionados
+    const exercisesPerSession = Math.min(8, Math.max(6, 24 / daysPerWeek));
+    const exercisesPerGroup = Math.max(1, Math.floor(exercisesPerSession / targetGroups.length));
+    
+    for (const group of targetGroups) {
+      const groupExercises = exercisesByGroup[group];
       
       if (groupExercises && groupExercises.length > 0) {
         // Embaralhar exercícios do grupo
         const shuffled = [...groupExercises].sort(() => 0.5 - Math.random());
         
-        // Selecionar exercícios para este dia (máximo de exercisesPerGroup por grupo)
+        // Selecionar exercícios para este grupo
         const selectedFromGroup = shuffled.slice(0, Math.min(exercisesPerGroup, exercisesPerSession - sessionExercises.length));
         
         for (const exercise of selectedFromGroup) {
           if (sessionExercises.length >= exercisesPerSession) break;
           
           sessionExercises.push({
-            exercise_id: exercise.id, // Usar o ID real do exercício
+            exercise_id: exercise.id,
             sets: Math.max(exercise.min_sets || 3, 3),
             reps: Math.max(exercise.min_reps || 10, 10),
             rest_time_seconds: exercise.rest_time_seconds || 60,
             order_in_session: exerciseOrder++
           });
           
-          console.log(`✅ Exercício válido selecionado para o dia ${day}: ${exercise.name} (ID: ${exercise.id}, ${exercise.muscle_group}) - GIF: ${exercise.gif_url}`);
+          console.log(`✅ Exercício selecionado para o dia ${day}: ${exercise.name} (ID: ${exercise.id}, Grupo: ${exercise.muscle_group}) - GIF: ${exercise.gif_url}`);
         }
       }
     }
     
-    // Se ainda precisamos de mais exercícios, pegar de qualquer grupo (todos são válidos)
+    // Se ainda precisamos de mais exercícios, pegar de qualquer grupo disponível (mantendo variedade)
     while (sessionExercises.length < exercisesPerSession && sessionExercises.length < validBatchExercises.length) {
       const remainingExercises = validBatchExercises.filter(ex => 
         !sessionExercises.some(se => se.exercise_id === ex.id)
@@ -497,30 +545,51 @@ function generateLocalPlan(preferences, validBatchExercises) {
       
       if (remainingExercises.length === 0) break;
       
-      const randomExercise = remainingExercises[Math.floor(Math.random() * remainingExercises.length)];
+      // Priorizar exercícios de grupos que ainda não temos na sessão
+      const usedGroups = new Set(sessionExercises.map(se => {
+        const exercise = validBatchExercises.find(ex => ex.id === se.exercise_id);
+        return exercise?.muscle_group;
+      }));
+      
+      const preferredExercises = remainingExercises.filter(ex => !usedGroups.has(ex.muscle_group));
+      const finalChoice = preferredExercises.length > 0 ? preferredExercises : remainingExercises;
+      
+      const randomExercise = finalChoice[Math.floor(Math.random() * finalChoice.length)];
       
       sessionExercises.push({
-        exercise_id: randomExercise.id, // Usar o ID real do exercício
+        exercise_id: randomExercise.id,
         sets: Math.max(randomExercise.min_sets || 3, 3),
         reps: Math.max(randomExercise.min_reps || 10, 10),
         rest_time_seconds: randomExercise.rest_time_seconds || 60,
         order_in_session: exerciseOrder++
       });
       
-      console.log(`✅ Exercício adicional válido para o dia ${day}: ${randomExercise.name} (ID: ${randomExercise.id}, ${randomExercise.muscle_group}) - GIF: ${randomExercise.gif_url}`);
+      console.log(`✅ Exercício adicional para variedade no dia ${day}: ${randomExercise.name} (ID: ${randomExercise.id}, Grupo: ${randomExercise.muscle_group}) - GIF: ${randomExercise.gif_url}`);
     }
+    
+    // Verificar variedade final da sessão
+    const finalMuscleGroups = new Set(sessionExercises.map(se => {
+      const exercise = validBatchExercises.find(ex => ex.id === se.exercise_id);
+      return exercise?.muscle_group;
+    }));
+    
+    console.log(`🎯 Dia ${day} final: ${sessionExercises.length} exercícios com ${finalMuscleGroups.size} grupos musculares: ${Array.from(finalMuscleGroups).join(', ')}`);
     
     sessions.push({
       day_number: day,
-      warmup_description: `Aquecimento dinâmico de 5-10 minutos focado nos grupos musculares do Dia ${day}`,
-      cooldown_description: `Alongamento específico de 5-10 minutos para os músculos trabalhados no Dia ${day}`,
+      warmup_description: `Aquecimento dinâmico de 5-10 minutos focado nos grupos musculares do Dia ${day}: ${Array.from(finalMuscleGroups).join(', ')}`,
+      cooldown_description: `Alongamento específico de 5-10 minutos para os músculos trabalhados: ${Array.from(finalMuscleGroups).join(', ')}`,
       session_exercises: sessionExercises
     });
   }
   
-  console.log(`🎯 Plano local gerado com ${sessions.length} sessões usando apenas exercícios válidos da pasta batch`);
+  console.log(`🎯 Plano local gerado com ${sessions.length} sessões usando exercícios variados de múltiplos grupos musculares`);
   sessions.forEach((session, index) => {
-    console.log(`📅 Dia ${index + 1}: ${session.session_exercises.length} exercícios válidos`);
+    const muscleGroups = new Set(session.session_exercises.map(se => {
+      const exercise = validBatchExercises.find(ex => ex.id === se.exercise_id);
+      return exercise?.muscle_group;
+    }));
+    console.log(`📅 Dia ${index + 1}: ${session.session_exercises.length} exercícios de ${muscleGroups.size} grupos: ${Array.from(muscleGroups).join(', ')}`);
   });
   
   return { workout_sessions: sessions };
