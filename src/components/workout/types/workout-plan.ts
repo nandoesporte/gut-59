@@ -1,3 +1,4 @@
+
 interface Exercise {
   id: string;
   name: string;
@@ -26,11 +27,7 @@ export interface WorkoutSession {
   warmup_description: string;
   cooldown_description: string;
   session_exercises: SessionExercise[];
-  training_load?: {
-    intensity?: string;
-    volume?: string;
-    progression?: string;
-  };
+  training_load?: any; // Changed from specific type to any to handle Json from Supabase
 }
 
 interface Critique {
@@ -47,5 +44,5 @@ export interface WorkoutPlan {
   end_date: string;
   created_at: string;
   workout_sessions: WorkoutSession[];
-  critique?: Critique;
+  critique?: any; // Changed from Critique to any to handle Json from Supabase
 }

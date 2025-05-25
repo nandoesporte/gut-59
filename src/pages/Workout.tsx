@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { useState, useEffect, useCallback } from 'react';
 import { WorkoutPreferences } from '@/components/workout/types';
@@ -68,7 +67,37 @@ const Workout = () => {
         throw error;
       }
       
-      setHistoryPlans(plans || []);
+      // Transform the data to match our WorkoutPlan interface
+      const transformedPlans: WorkoutPlan[] = (plans || []).map(plan => ({
+        id: plan.id,
+        user_id: plan.user_id,
+        goal: plan.goal,
+        start_date: plan.start_date,
+        end_date: plan.end_date,
+        created_at: plan.created_at,
+        critique: plan.critique,
+        workout_sessions: (plan.workout_sessions || []).map(session => ({
+          id: session.id,
+          day_number: session.day_number,
+          day_name: session.day_name,
+          focus: session.focus,
+          intensity: session.intensity,
+          warmup_description: session.warmup_description,
+          cooldown_description: session.cooldown_description,
+          training_load: session.training_load,
+          session_exercises: (session.session_exercises || []).map(sessionExercise => ({
+            id: sessionExercise.id,
+            sets: sessionExercise.sets,
+            reps: sessionExercise.reps,
+            rest_time_seconds: sessionExercise.rest_time_seconds,
+            intensity: sessionExercise.intensity,
+            recommended_weight: sessionExercise.recommended_weight,
+            exercise: sessionExercise.exercise || {}
+          }))
+        }))
+      }));
+      
+      setHistoryPlans(transformedPlans);
     } catch (error) {
       console.error('Error fetching workout history:', error);
     } finally {
