@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
@@ -88,12 +89,12 @@ serve(async (req) => {
     
     // Tentar usar xAI primeiro, se disponível
     if (XAI_API_KEY) {
-      console.log('🚀 Tentando gerar plano com xAI Grok-3 Mini...');
+      console.log('🚀 Tentando gerar plano com xAI Grok-2...');
       try {
         aiPlan = await generateWithXAI(preferences, validBatchExercises);
-        console.log('✅ Plano gerado com sucesso usando Grok-3 Mini');
+        console.log('✅ Plano gerado com sucesso usando Grok-2');
       } catch (xaiError) {
-        console.error('❌ Erro com Grok-3 Mini:', xaiError.message);
+        console.error('❌ Erro com Grok-2:', xaiError.message);
         console.log('🔄 Caindo para geração local...');
         aiPlan = generateLocalPlan(preferences, validBatchExercises);
       }
@@ -298,7 +299,7 @@ function determineRecommendedWeight(exercise, activityLevel, userWeight, userAge
 }
 
 async function generateWithXAI(preferences: any, validBatchExercises: any[]) {
-  console.log('🧠 Preparando prompt para Grok-3 Mini...');
+  console.log('🧠 Preparando prompt para Grok-2...');
   
   const systemPrompt = `Você é o Trenner2025, um agente de IA especializado em educação física e criação de planos de treino personalizados. 
   Crie um plano de treino detalhado baseado nas preferências do usuário e nos exercícios disponíveis da pasta batch.
@@ -314,7 +315,7 @@ async function generateWithXAI(preferences: any, validBatchExercises: any[]) {
   - Especifique cargas apropriadas baseadas no nível de condicionamento físico`;
 
   const userPrompt = `
-  Eu sou o Trenner2025 e vou criar um plano de treino personalizado baseado nestas informações:
+  Crie um plano de treino personalizado baseado nestas informações:
   
   Preferências do usuário:
   - Objetivo: ${preferences.goal || 'manter forma'}
@@ -327,9 +328,9 @@ async function generateWithXAI(preferences: any, validBatchExercises: any[]) {
   - Gênero: ${preferences.gender || 'não informado'}
   
   Exercícios disponíveis com GIFs válidos da pasta batch (use APENAS estes IDs):
-  ${validBatchExercises.slice(0, 50).map((ex, index) => `${index + 1}. ID: ${ex.id} - ${ex.name} (${ex.muscle_group}, ${ex.exercise_type}, Séries: ${ex.min_sets}-${ex.max_sets}, Reps: ${ex.min_reps}-${ex.max_reps}, Peso iniciante: ${ex.beginner_weight || 'não especificado'}, Peso intermediário: ${ex.moderate_weight || 'não especificado'}, Peso avançado: ${ex.advanced_weight || 'não especificado'})`).join('\n')}
+  ${validBatchExercises.slice(0, 50).map((ex, index) => `${index + 1}. ID: ${ex.id} - ${ex.name} (${ex.muscle_group}, ${ex.exercise_type}, Séries: ${ex.min_sets}-${ex.max_sets}, Reps: ${ex.min_reps}-${ex.max_reps})`).join('\n')}
   
-  Retorne um JSON com esta estrutura exata (crie ${preferences.days_per_week || 3} dias com 6-8 exercícios cada):
+  Retorne APENAS um JSON válido com esta estrutura exata:
   {
     "workout_sessions": [
       {
@@ -342,30 +343,23 @@ async function generateWithXAI(preferences: any, validBatchExercises: any[]) {
             "sets": 3,
             "reps": 12,
             "rest_time_seconds": 60,
-            "order_in_session": 1,
-            "recommended_weight": "15kg ou peso corporal"
+            "order_in_session": 1
           }
-          // ... mais 5-7 exercícios diferentes
         ]
       }
-      // ... mais ${(preferences.days_per_week || 3) - 1} dias
     ]
   }
   
   CRITÉRIOS OBRIGATÓRIOS:
-  - Use apenas IDs de exercícios que existem na lista fornecida (TODOS têm GIFs válidos)!
+  - Use apenas IDs de exercícios que existem na lista fornecida!
   - Crie ${preferences.days_per_week || 3} dias de treino
   - Cada dia deve ter 6-8 exercícios diferentes 
   - Inclua order_in_session para cada exercício (1, 2, 3, etc.)
   - Varie os grupos musculares entre os dias
   - Respeite os limites de séries e repetições de cada exercício
-  - Especifique cargas apropriadas para o nível do usuário
-  - Para exercícios de peso corporal, especifique "peso corporal"
-  - Para exercícios com peso, especifique valores em kg apropriados para o nível
-  - Crie aquecimentos e resfriamentos específicos para cada dia
   `;
 
-  // Chamar API da xAI com modelo Grok-3 Mini
+  // Chamar API da xAI com modelo Grok-2
   const xaiResponse = await fetch('https://api.x.ai/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -405,7 +399,23 @@ async function generateWithXAI(preferences: any, validBatchExercises: any[]) {
   // Parse do JSON retornado
   try {
     const cleanContent = content.replace(/```json|```/g, '').trim();
-    return JSON.parse(cleanContent);
+    const parsedPlan = JSON.parse(cleanContent);
+    
+    // Validar se temos exercícios
+    if (!parsedPlan.workout_sessions || !Array.isArray(parsedPlan.workout_sessions)) {
+      throw new Error('Plano inválido: sem sessões de treino');
+    }
+    
+    // Verificar se cada sessão tem exercícios
+    parsedPlan.workout_sessions.forEach((session, index) => {
+      if (!session.session_exercises || !Array.isArray(session.session_exercises) || session.session_exercises.length === 0) {
+        console.error(`❌ Sessão ${index + 1} sem exercícios`);
+        throw new Error(`Sessão ${index + 1} sem exercícios`);
+      }
+      console.log(`✅ Sessão ${index + 1}: ${session.session_exercises.length} exercícios`);
+    });
+    
+    return parsedPlan;
   } catch (parseError) {
     console.error('❌ Erro ao fazer parse do JSON:', parseError);
     console.error('Conteúdo que falhou:', content);
@@ -451,25 +461,15 @@ function generateLocalPlan(preferences: any, validBatchExercises: any[]) {
         for (const exercise of selectedFromGroup) {
           if (sessionExercises.length >= exercisesPerSession) break;
           
-          // Determinar carga recomendada
-          const recommendedWeight = determineRecommendedWeight(
-            exercise, 
-            preferences.activity_level, 
-            preferences.weight,
-            preferences.age,
-            preferences.gender
-          );
-          
           sessionExercises.push({
             exercise_id: exercise.id,
             sets: Math.max(exercise.min_sets || 3, 3),
             reps: Math.max(exercise.min_reps || 10, 10),
             rest_time_seconds: exercise.rest_time_seconds || 60,
-            order_in_session: exerciseOrder++,
-            recommended_weight: recommendedWeight
+            order_in_session: exerciseOrder++
           });
           
-          console.log(`✅ Exercício válido selecionado para o dia ${day}: ${exercise.name} (${exercise.muscle_group}) - Carga: ${recommendedWeight} - GIF: ${exercise.gif_url}`);
+          console.log(`✅ Exercício válido selecionado para o dia ${day}: ${exercise.name} (${exercise.muscle_group}) - GIF: ${exercise.gif_url}`);
         }
       }
     }
@@ -484,24 +484,15 @@ function generateLocalPlan(preferences: any, validBatchExercises: any[]) {
       
       const randomExercise = remainingExercises[Math.floor(Math.random() * remainingExercises.length)];
       
-      const recommendedWeight = determineRecommendedWeight(
-        randomExercise, 
-        preferences.activity_level, 
-        preferences.weight,
-        preferences.age,
-        preferences.gender
-      );
-      
       sessionExercises.push({
         exercise_id: randomExercise.id,
         sets: Math.max(randomExercise.min_sets || 3, 3),
         reps: Math.max(randomExercise.min_reps || 10, 10),
         rest_time_seconds: randomExercise.rest_time_seconds || 60,
-        order_in_session: exerciseOrder++,
-        recommended_weight: recommendedWeight
+        order_in_session: exerciseOrder++
       });
       
-      console.log(`✅ Exercício adicional válido para o dia ${day}: ${randomExercise.name} (${randomExercise.muscle_group}) - Carga: ${recommendedWeight} - GIF: ${randomExercise.gif_url}`);
+      console.log(`✅ Exercício adicional válido para o dia ${day}: ${randomExercise.name} (${randomExercise.muscle_group}) - GIF: ${randomExercise.gif_url}`);
     }
     
     sessions.push({

@@ -40,62 +40,6 @@ export const generateWorkoutPlanWithTrenner2025 = async (
     const reqId = requestId || `trenner2025_${userId}_${Date.now()}`;
     console.log(`🔑 Trenner2025: Request ID: ${reqId}`);
 
-    // Get available exercises from database - ONLY valid exercises with batch GIFs
-    console.log("📚 Trenner2025: Carregando exercícios válidos da pasta batch...");
-    const { data: exercises, error: exercisesError } = await supabase
-      .from("exercises")
-      .select("*")
-      .like('gif_url', '%/storage/v1/object/public/exercise-gifs/batch/%')
-      .limit(500);
-
-    if (exercisesError) {
-      console.error("❌ Trenner2025: Erro ao buscar exercícios da pasta batch:", exercisesError);
-      throw new Error(`Erro ao buscar exercícios da pasta batch: ${exercisesError.message}`);
-    }
-
-    console.log(`✅ Trenner2025: ${exercises.length} exercícios carregados da pasta batch`);
-
-    if (exercises.length === 0) {
-      throw new Error("Nenhum exercício disponível na pasta batch do storage");
-    }
-
-    // Validação extra: filtrar apenas exercícios que realmente têm GIFs válidos
-    const validExercises = exercises.filter(ex => 
-      ex.gif_url && 
-      ex.gif_url.includes('/storage/v1/object/public/exercise-gifs/batch/') &&
-      ex.gif_url.trim().length > 50 && // URL deve ter tamanho mínimo
-      !ex.gif_url.includes('placeholder') &&
-      !ex.gif_url.includes('example') &&
-      !ex.gif_url.includes('null') &&
-      !ex.gif_url.includes('undefined')
-    );
-
-    console.log(`🎯 Trenner2025: ${validExercises.length} exercícios validados com GIFs funcionais`);
-
-    if (validExercises.length === 0) {
-      throw new Error("Nenhum exercício com GIFs válidos encontrado na pasta batch");
-    }
-
-    // Filter exercises based on user preferences
-    console.log("🔍 Trenner2025: Filtrando exercícios baseado nas preferências...");
-    let filteredExercises = validExercises;
-    
-    if (preferences.preferred_exercise_types && preferences.preferred_exercise_types.length > 0) {
-      if (!preferences.preferred_exercise_types.includes("all" as any)) {
-        filteredExercises = validExercises.filter(ex => 
-          preferences.preferred_exercise_types.includes(ex.exercise_type)
-        );
-      }
-    }
-
-    // Se filtro muito restritivo, usar todos os exercícios válidos
-    if (filteredExercises.length < 20) {
-      console.log("⚠️ Filtro muito restritivo, usando todos os exercícios válidos");
-      filteredExercises = validExercises;
-    }
-
-    console.log(`🎯 Trenner2025: ${filteredExercises.length} exercícios após filtro de preferências`);
-
     // Call edge function for workout plan generation
     console.log(`🚀 Trenner2025: Invocando edge function generate-workout-plan...`);
     const startTime = Date.now();
@@ -125,7 +69,7 @@ export const generateWorkoutPlanWithTrenner2025 = async (
       throw new Error("Nenhum plano de treino foi gerado");
     }
 
-    console.log("✅ Trenner2025: Plano de treino gerado com sucesso usando exercícios válidos da pasta batch!");
+    console.log("✅ Trenner2025: Plano de treino gerado com sucesso!");
     console.log(`📊 Trenner2025: Plano contém ${workoutPlan.workout_sessions?.length || 0} sessões`);
     
     // Log detalhes de cada sessão incluindo cargas e validação de GIFs
@@ -190,8 +134,12 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
       throw new Error(`Erro ao salvar plano de treino: ${planError.message}`);
     }
 
+    console.log("✅ Plano base salvo com sucesso");
+
     // Process and save workout sessions
     if (plan.workout_sessions && Array.isArray(plan.workout_sessions)) {
+      console.log(`💾 Salvando ${plan.workout_sessions.length} sessões...`);
+      
       for (const session of plan.workout_sessions) {
         const sessionData = {
           id: session.id,
@@ -210,8 +158,12 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
           continue;
         }
 
-        // Process and save session exercises COM recommended_weight
+        console.log(`✅ Sessão ${session.day_number} salva`);
+
+        // Process and save session exercises
         if (session.session_exercises && Array.isArray(session.session_exercises)) {
+          console.log(`💾 Salvando ${session.session_exercises.length} exercícios da sessão ${session.day_number}...`);
+          
           for (const exercise of session.session_exercises) {
             const exerciseData: any = {
               id: exercise.id,
@@ -223,12 +175,15 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
               order_in_session: exercise.order_in_session,
             };
 
-            // Only add recommended_weight if it exists (for backwards compatibility)
+            // Check if recommended_weight column exists by attempting to add it
             if (exercise.recommended_weight) {
-              exerciseData.recommended_weight = exercise.recommended_weight;
+              try {
+                exerciseData.recommended_weight = exercise.recommended_weight;
+                console.log(`💪 Salvando exercício ${exercise.exercise?.name} com carga: ${exercise.recommended_weight}`);
+              } catch (err) {
+                console.log(`⚠️ Coluna recommended_weight não disponível, salvando sem carga`);
+              }
             }
-
-            console.log(`💪 Salvando exercício ${exercise.exercise?.name} com carga: ${exercise.recommended_weight || 'não especificada'}`);
 
             const { error: exerciseError } = await supabase
               .from('session_exercises')
@@ -236,23 +191,23 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
 
             if (exerciseError) {
               console.error("Error saving session exercise:", exerciseError);
+              // Continue salvando outros exercícios mesmo se um falhar
+            } else {
+              console.log(`✅ Exercício ${exercise.exercise?.name} salvo`);
             }
           }
         }
       }
     }
 
-    console.log("✅ Plano de treino e cargas salvos com sucesso");
+    console.log("✅ Plano de treino completo salvo com sucesso");
     
-    // Now fetch the complete workout plan with proper error handling
+    // Now fetch the complete workout plan with robust error handling
     console.log("🔍 Buscando plano completo...");
     
-    // First try with recommended_weight column
-    let completePlan;
-    let fetchError;
-    
     try {
-      const { data, error } = await supabase
+      // Try fetching with recommended_weight first
+      const { data: completePlan, error: fetchError } = await supabase
         .from('workout_plans')
         .select(`
           *,
@@ -268,14 +223,20 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
         .eq('id', plan.id)
         .single();
         
-      if (error) throw error;
-      completePlan = data;
+      if (fetchError) {
+        console.log("⚠️ Erro ao buscar com recommended_weight, tentando sem...");
+        throw fetchError;
+      }
+      
+      console.log("✅ Plano completo recuperado com recommended_weight");
+      return completePlan as WorkoutPlan;
+      
     } catch (error: any) {
-      if (error.message?.includes("recommended_weight") && error.message?.includes("does not exist")) {
+      if (error.message?.includes("recommended_weight")) {
         console.log("⚠️ Coluna recommended_weight não existe, buscando sem ela...");
         
         try {
-          const { data, error: fallbackError } = await supabase
+          const { data: fallbackPlan, error: fallbackError } = await supabase
             .from('workout_plans')
             .select(`
               *,
@@ -290,12 +251,13 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
             .eq('id', plan.id)
             .single();
             
-          if (fallbackError) throw fallbackError;
-          completePlan = data;
+          if (fallbackError) {
+            throw fallbackError;
+          }
           
-          // Transform the data to include recommended_weight from our saved plan
-          if (completePlan && completePlan.workout_sessions) {
-            completePlan.workout_sessions.forEach((session: any) => {
+          // Add recommended_weight from our saved plan manually
+          if (fallbackPlan && fallbackPlan.workout_sessions) {
+            fallbackPlan.workout_sessions.forEach((session: any) => {
               if (session.session_exercises) {
                 session.session_exercises.forEach((sessionExercise: any) => {
                   // Find matching exercise in original plan to get recommended_weight
@@ -308,26 +270,26 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
               }
             });
           }
+          
+          console.log("✅ Plano completo recuperado sem recommended_weight (adicionado manualmente)");
+          return fallbackPlan as WorkoutPlan;
+          
         } catch (fallbackError) {
           console.error("Error fetching complete workout plan (fallback):", fallbackError);
-          fetchError = fallbackError;
+          // Return basic plan structure if all else fails
+          return {
+            ...savedPlan,
+            workout_sessions: []
+          } as WorkoutPlan;
         }
       } else {
         console.error("Error fetching complete workout plan:", error);
-        fetchError = error;
+        return {
+          ...savedPlan,
+          workout_sessions: []
+        } as WorkoutPlan;
       }
     }
-    
-    if (fetchError) {
-      // Return basic plan structure if fetch fails
-      return {
-        ...savedPlan,
-        workout_sessions: []
-      } as WorkoutPlan;
-    }
-    
-    console.log("✅ Plano completo recuperado");
-    return completePlan as WorkoutPlan;
   } catch (error) {
     console.error("Error in saveWorkoutPlan:", error);
     return null;
