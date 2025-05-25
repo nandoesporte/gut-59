@@ -13,7 +13,6 @@ import { supabase } from "@/integrations/supabase/client";
 const exerciseSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
   description: z.string().optional(),
-  gif_url: z.string().url('URL inválida').optional(),
   exercise_type: z.enum(['strength', 'cardio', 'mobility']),
   muscle_group: z.enum(['legs', 'chest', 'back', 'shoulders', 'arms', 'core', 'full_body']),
   equipment_needed: z.array(z.string()),
@@ -38,7 +37,6 @@ export const ExerciseForm = ({ onSuccess, onCancel, exerciseData, editMode = fal
     defaultValues: exerciseData || {
       name: '',
       description: '',
-      gif_url: '',
       exercise_type: 'strength',
       muscle_group: 'legs',
       equipment_needed: [],
@@ -53,7 +51,6 @@ export const ExerciseForm = ({ onSuccess, onCancel, exerciseData, editMode = fal
 
   const onSubmit = async (data: any) => {
     try {
-      // Ensure exercise_type is one of the allowed values
       const validExerciseType = data.exercise_type === "strength" || 
                                 data.exercise_type === "cardio" || 
                                 data.exercise_type === "mobility" 
@@ -106,19 +103,6 @@ export const ExerciseForm = ({ onSuccess, onCancel, exerciseData, editMode = fal
               <FormLabel>Descrição</FormLabel>
               <FormControl>
                 <Textarea {...field} />
-              </FormControl>
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="gif_url"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>URL do GIF</FormLabel>
-              <FormControl>
-                <Input {...field} type="url" />
               </FormControl>
             </FormItem>
           )}

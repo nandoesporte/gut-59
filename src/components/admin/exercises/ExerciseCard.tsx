@@ -1,11 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Pencil, Trash2, Dumbbell, Loader2 } from "lucide-react";
+import { Pencil, Trash2, Dumbbell } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { formatImageUrl } from "@/utils/imageUtils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ExerciseForm } from './ExerciseForm';
 
@@ -15,52 +14,7 @@ interface ExerciseCardProps {
 }
 
 export const ExerciseCard = ({ exercise, onUpdate }: ExerciseCardProps) => {
-  const [imgError, setImgError] = useState(false);
-  const [imgSrc, setImgSrc] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  
-  useEffect(() => {
-    setIsLoading(true);
-    setImgError(false);
-    
-    if (exercise.gif_url) {
-      const url = formatImageUrl(exercise.gif_url);
-      console.log(`Exercise ${exercise.id} (${exercise.name}) - Database URL: ${exercise.gif_url}`);
-      console.log(`Exercise ${exercise.id} (${exercise.name}) - Formatted URL: ${url}`);
-      setImgSrc(url);
-
-      // Pre-fetch the image to test if it loads correctly
-      const img = new Image();
-      img.onload = () => {
-        console.log(`✅ Image loaded successfully for: ${exercise.name}`);
-        setIsLoading(false);
-      };
-      img.onerror = () => {
-        console.error(`❌ Image failed to load for: ${exercise.name} - URL: ${url}`);
-        setImgError(true);
-        setImgSrc("/placeholder.svg");
-        setIsLoading(false);
-      };
-      img.src = url;
-    } else {
-      console.log(`⚠️ No gif_url for exercise: ${exercise.name}`);
-      setImgSrc("/placeholder.svg");
-      setIsLoading(false);
-    }
-  }, [exercise.gif_url, exercise.id, exercise.name]);
-
-  const handleImageLoad = () => {
-    console.log(`Successfully loaded image for ${exercise.name}`);
-    setIsLoading(false);
-  };
-
-  const handleImageError = () => {
-    console.error(`Error loading GIF for ${exercise.name}:`, exercise.gif_url);
-    setImgError(true);
-    setImgSrc("/placeholder.svg");
-    setIsLoading(false);
-  };
 
   const handleDelete = async () => {
     if (!confirm('Tem certeza que deseja excluir este exercício?')) return;
@@ -105,29 +59,13 @@ export const ExerciseCard = ({ exercise, onUpdate }: ExerciseCardProps) => {
         </CardHeader>
         <CardContent>
           <div className="mb-4 relative pt-[56.25%] flex items-center justify-center bg-white">
-            {isLoading && (
-              <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center bg-gray-100 rounded-md">
-                <Loader2 className="w-8 h-8 text-primary animate-spin" />
+            <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center bg-gray-100 rounded-md">
+              <div className="text-gray-400 text-center p-2">
+                <Dumbbell className="h-10 w-10 mx-auto mb-1" />
+                <p className="text-xs">{exercise.name}</p>
+                <p className="text-xs mt-1">Sem imagem disponível</p>
               </div>
-            )}
-            {imgError ? (
-              <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center bg-gray-100 rounded-md">
-                <div className="text-gray-400 text-center p-2">
-                  <Dumbbell className="h-10 w-10 mx-auto mb-1" />
-                  <p className="text-xs">{exercise.name}</p>
-                  <p className="text-xs mt-1">Imagem não disponível</p>
-                </div>
-              </div>
-            ) : (
-              <img
-                src={imgSrc || "/placeholder.svg"}
-                alt={exercise.name}
-                className="absolute top-0 left-0 w-full h-full object-contain rounded-md"
-                onError={handleImageError}
-                onLoad={handleImageLoad}
-                style={{ display: isLoading ? 'none' : 'block' }}
-              />
-            )}
+            </div>
           </div>
           <div className="space-y-2 text-sm">
             <p><strong>Tipo:</strong> {exercise.exercise_type}</p>
