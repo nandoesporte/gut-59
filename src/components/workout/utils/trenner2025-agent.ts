@@ -1,4 +1,3 @@
-
 import { WorkoutPreferences } from "../types";
 import { supabase } from "@/integrations/supabase/client";
 import { v4 as uuidv4 } from 'uuid';
@@ -30,21 +29,26 @@ export const generateWorkoutPlanWithTrenner2025 = async (
     const reqId = requestId || `trenner2025_${userId}_${Date.now()}`;
     console.log(`🔑 Trenner2025: Request ID: ${reqId}`);
 
-    // Get available exercises from database
-    console.log("📚 Trenner2025: Carregando base de exercícios...");
+    // Get available exercises from database - ONLY from batch folder
+    console.log("📚 Trenner2025: Carregando exercícios da pasta batch...");
     const { data: exercises, error: exercisesError } = await supabase
       .from("exercises")
-      .select("*");
+      .select("*")
+      .like('gif_url', '%/storage/v1/object/public/exercise-gifs/batch/%');
 
     if (exercisesError) {
-      console.error("❌ Trenner2025: Erro ao buscar exercícios:", exercisesError);
-      throw new Error(`Erro ao buscar exercícios: ${exercisesError.message}`);
+      console.error("❌ Trenner2025: Erro ao buscar exercícios da pasta batch:", exercisesError);
+      throw new Error(`Erro ao buscar exercícios da pasta batch: ${exercisesError.message}`);
     }
 
-    console.log(`✅ Trenner2025: ${exercises.length} exercícios carregados da base de dados`);
+    console.log(`✅ Trenner2025: ${exercises.length} exercícios carregados da pasta batch`);
 
-    // Filter exercises based on user preferences
-    console.log("🔍 Trenner2025: Filtrando exercícios baseado nas preferências...");
+    if (exercises.length === 0) {
+      throw new Error("Nenhum exercício disponível na pasta batch do storage");
+    }
+
+    // Filter exercises based on user preferences from batch folder
+    console.log("🔍 Trenner2025: Filtrando exercícios da pasta batch baseado nas preferências...");
     let filteredExercises = exercises;
     
     if (preferences.preferred_exercise_types && preferences.preferred_exercise_types.length > 0) {
@@ -54,22 +58,30 @@ export const generateWorkoutPlanWithTrenner2025 = async (
         );
       }
     }
-    console.log(`🎯 Trenner2025: ${filteredExercises.length} exercícios após filtro de tipo`);
+    console.log(`🎯 Trenner2025: ${filteredExercises.length} exercícios da pasta batch após filtro de tipo`);
 
-    // Ensure exercises have valid GIF URLs
-    const exercisesWithGifs = filteredExercises.filter(ex => ex.gif_url && ex.gif_url.trim() !== '');
-    console.log(`🎬 Trenner2025: ${exercisesWithGifs.length} exercícios com GIFs válidos`);
+    // Ensure exercises have valid GIF URLs from batch folder
+    const exercisesWithBatchGifs = filteredExercises.filter(ex => 
+      ex.gif_url && 
+      ex.gif_url.includes('/storage/v1/object/public/exercise-gifs/batch/') &&
+      ex.gif_url.trim() !== ''
+    );
+    console.log(`🎬 Trenner2025: ${exercisesWithBatchGifs.length} exercícios com GIFs válidos da pasta batch`);
 
-    // Organize by muscle group for balanced routine
+    if (exercisesWithBatchGifs.length === 0) {
+      throw new Error("Nenhum exercício com GIFs válidos encontrado na pasta batch");
+    }
+
+    // Organize by muscle group for balanced routine from batch exercises
     const muscleGroups = ["chest", "back", "legs", "shoulders", "arms", "core", "full_body"];
     const exercisesByMuscle: Record<string, any[]> = {};
     
     muscleGroups.forEach(group => {
-      exercisesByMuscle[group] = exercisesWithGifs.filter(ex => ex.muscle_group === group);
-      console.log(`💪 Trenner2025: ${group} → ${exercisesByMuscle[group].length} exercícios`);
+      exercisesByMuscle[group] = exercisesWithBatchGifs.filter(ex => ex.muscle_group === group);
+      console.log(`💪 Trenner2025: ${group} → ${exercisesByMuscle[group].length} exercícios da pasta batch`);
     });
 
-    // Select a subset of exercises to use in the plan
+    // Select a subset of exercises to use in the plan from batch folder
     const selectedExercises = [];
     const exercisesPerGroup = 12;
 
@@ -79,7 +91,7 @@ export const generateWorkoutPlanWithTrenner2025 = async (
       selectedExercises.push(...selected);
     }
 
-    console.log(`🎲 Trenner2025: ${selectedExercises.length} exercícios selecionados para o plano`);
+    console.log(`🎲 Trenner2025: ${selectedExercises.length} exercícios da pasta batch selecionados para o plano`);
 
     // Call edge function for workout plan generation
     console.log(`🚀 Trenner2025: Invocando edge function generate-workout-plan...`);
@@ -110,7 +122,7 @@ export const generateWorkoutPlanWithTrenner2025 = async (
       throw new Error("Nenhum plano de treino foi gerado");
     }
 
-    console.log("✅ Trenner2025: Plano de treino gerado com sucesso!");
+    console.log("✅ Trenner2025: Plano de treino gerado com sucesso usando exercícios da pasta batch!");
     console.log(`📊 Trenner2025: Plano contém ${workoutPlan.workout_sessions?.length || 0} sessões`);
 
     return {
@@ -163,9 +175,6 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
           id: session.id,
           plan_id: plan.id,
           day_number: session.day_number,
-          // Removed day_name which isn't in the database schema
-          // day_name: session.day_name,
-          // focus: session.focus,
           warmup_description: session.warmup_description,
           cooldown_description: session.cooldown_description,
         };
