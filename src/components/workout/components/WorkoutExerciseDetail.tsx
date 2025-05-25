@@ -1,11 +1,13 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatImageUrl } from '@/utils/imageUtils';
+import { formatImageUrl, testImageUrl, validateGifUrl } from '@/utils/imageUtils';
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dumbbell, AlertCircle, RefreshCw, Maximize, Loader2, Weight, ExternalLink } from 'lucide-react';
+import { Dumbbell, AlertCircle, RefreshCw, Maximize, Loader2, Weight, ExternalLink, CheckCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { Button } from '@/components/ui/button';
 
 interface WorkoutExerciseDetailProps {
   exerciseSession: any;
@@ -19,7 +21,8 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
   const [expandDescription, setExpandDescription] = useState(false);
   const [isInView, setIsInView] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
-  const [storageTestResult, setStorageTestResult] = useState<string | null>(null);
+  const [urlTestResult, setUrlTestResult] = useState<string | null>(null);
+  const [isTestingUrl, setIsTestingUrl] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const isMobile = useIsMobile();
@@ -29,22 +32,24 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     return null;
   }
 
-  // Test Supabase Storage connectivity
-  useEffect(() => {
-    const testStorageConnectivity = async () => {
-      try {
-        const testUrl = 'https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/exercise-gifs/';
-        const response = await fetch(testUrl, { method: 'HEAD' });
-        setStorageTestResult(response.ok ? 'accessible' : `error-${response.status}`);
-        console.log(`🔗 Storage connectivity test: ${response.ok ? 'OK' : 'FAILED'} (${response.status})`);
-      } catch (error) {
-        setStorageTestResult('network-error');
-        console.error('🔗 Storage connectivity test failed:', error);
-      }
-    };
-
-    testStorageConnectivity();
-  }, []);
+  // Test URL functionality
+  const testCurrentUrl = async () => {
+    if (!exercise.gif_url) return;
+    
+    setIsTestingUrl(true);
+    const formattedUrl = formatImageUrl(exercise.gif_url);
+    
+    try {
+      const isValid = await testImageUrl(formattedUrl);
+      setUrlTestResult(isValid ? 'valid' : 'invalid');
+      console.log(`🔗 URL test result for ${exercise.name}:`, isValid ? 'Valid' : 'Invalid');
+    } catch (error) {
+      setUrlTestResult('error');
+      console.error('🔗 URL test error:', error);
+    } finally {
+      setIsTestingUrl(false);
+    }
+  };
 
   // Intersection Observer para lazy loading
   useEffect(() => {
@@ -73,10 +78,11 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     setImageLoaded(false);
     setImageError(false);
     setRetryCount(0);
+    setUrlTestResult(null);
     
     console.log(`🏋️ Loading exercise: ${exercise.name} (${exercise.id})`);
     console.log(`🔗 Original GIF URL from DB:`, exercise.gif_url);
-    console.log(`🔗 Exercise object keys:`, Object.keys(exercise));
+    console.log(`🔗 URL validation:`, validateGifUrl(exercise.gif_url));
   }, [exercise.id, exercise.name, exercise.gif_url]);
   
   const handleImageError = (event: React.SyntheticEvent<HTMLImageElement, Event>) => {
@@ -84,7 +90,6 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     console.error(`🔗 URL that failed: ${imageUrl}`);
     console.error(`🔗 Original URL from DB: ${exercise.gif_url}`);
     console.error('🔗 Error event:', event);
-    console.error(`🔗 Storage test result: ${storageTestResult}`);
     setImageError(true);
     setImageLoaded(true);
   };
@@ -118,25 +123,16 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
   
   const imageUrl = formatImageUrl(exercise.gif_url);
   console.log(`🎯 Formatted URL for ${exercise.name}:`, imageUrl);
-  console.log(`🔍 URL Type check:`, typeof exercise.gif_url, 'Length:', exercise.gif_url?.length);
   
   // Verificar se a URL parece válida
-  const hasValidUrl = exercise.gif_url && 
-                     typeof exercise.gif_url === 'string' &&
-                     exercise.gif_url.trim().length > 5 &&
-                     !exercise.gif_url.toLowerCase().includes('null') &&
-                     !exercise.gif_url.toLowerCase().includes('undefined') &&
-                     !exercise.gif_url.toLowerCase().includes('placeholder');
+  const hasValidUrl = validateGifUrl(exercise.gif_url);
   
   console.log(`🔍 URL validation for ${exercise.name}:`, {
     original: exercise.gif_url,
     formatted: imageUrl,
     hasValidUrl,
     length: exercise.gif_url?.length || 0,
-    type: typeof exercise.gif_url,
-    isString: typeof exercise.gif_url === 'string',
-    trimmedLength: exercise.gif_url?.trim?.()?.length || 0,
-    storageTest: storageTestResult
+    type: typeof exercise.gif_url
   });
   
   return (
@@ -171,28 +167,52 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                     <div className="text-xs text-red-400 mb-2 px-2 py-1 bg-red-50 rounded max-w-full break-all">
                       URL: {exercise.gif_url || 'Não disponível'}
                     </div>
-                    {storageTestResult && (
-                      <div className="text-xs text-blue-400 mb-2 px-2 py-1 bg-blue-50 rounded">
-                        Storage: {storageTestResult}
+                    {urlTestResult && (
+                      <div className={`text-xs mb-2 px-2 py-1 rounded flex items-center gap-1 ${
+                        urlTestResult === 'valid' ? 'text-green-600 bg-green-50' :
+                        urlTestResult === 'invalid' ? 'text-red-600 bg-red-50' :
+                        'text-amber-600 bg-amber-50'
+                      }`}>
+                        {urlTestResult === 'valid' && <CheckCircle className="h-3 w-3" />}
+                        {urlTestResult === 'invalid' && <AlertCircle className="h-3 w-3" />}
+                        URL: {urlTestResult === 'valid' ? 'Válida' : urlTestResult === 'invalid' ? 'Inválida' : 'Erro no teste'}
                       </div>
                     )}
-                    <div className="flex gap-1">
+                    <div className="flex gap-1 flex-wrap">
                       {retryCount < 3 && (
-                        <button
+                        <Button
+                          size="sm"
+                          variant="outline"
                           onClick={handleRetry}
-                          className="text-xs bg-primary/10 text-primary px-2 py-1 rounded hover:bg-primary/20 transition-colors flex items-center gap-1"
+                          className="text-xs h-7"
                         >
-                          <RefreshCw className="h-3 w-3" />
+                          <RefreshCw className="h-3 w-3 mr-1" />
                           Tentar novamente
-                        </button>
+                        </Button>
                       )}
-                      <button
-                        onClick={handleTestUrl}
-                        className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded hover:bg-blue-200 transition-colors flex items-center gap-1"
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={testCurrentUrl}
+                        disabled={isTestingUrl}
+                        className="text-xs h-7"
                       >
-                        <ExternalLink className="h-3 w-3" />
+                        {isTestingUrl ? (
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        ) : (
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                        )}
                         Testar URL
-                      </button>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleTestUrl}
+                        className="text-xs h-7"
+                      >
+                        <ExternalLink className="h-3 w-3 mr-1" />
+                        Abrir URL
+                      </Button>
                     </div>
                   </>
                 ) : (
@@ -207,6 +227,20 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                     <div className="text-xs text-gray-400 mt-1 px-2 py-1 bg-gray-50 rounded max-w-full break-all">
                       URL: {exercise.gif_url || 'Não disponível'}
                     </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={testCurrentUrl}
+                      disabled={isTestingUrl}
+                      className="text-xs h-7 mt-2"
+                    >
+                      {isTestingUrl ? (
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      ) : (
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                      )}
+                      Testar URL
+                    </Button>
                   </>
                 )}
               </div>

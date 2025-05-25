@@ -63,3 +63,31 @@ export const formatImageUrl = (url: string | null): string => {
   console.log(`🔗 Built URL for absolute path: ${fullUrl}`);
   return fullUrl;
 };
+
+// Função para testar se uma URL de imagem é válida
+export const testImageUrl = async (url: string): Promise<boolean> => {
+  try {
+    const response = await fetch(url, { method: 'HEAD' });
+    return response.ok;
+  } catch (error) {
+    console.error('Error testing image URL:', error);
+    return false;
+  }
+};
+
+// Função para validar URLs de GIF
+export const validateGifUrl = (url: string | null): boolean => {
+  if (!url) return false;
+  
+  const urlString = String(url).trim();
+  
+  // Verificações básicas
+  if (!urlString || urlString.length < 10) return false;
+  if (urlString.includes('null') || urlString.includes('undefined')) return false;
+  if (urlString.includes('placeholder')) return false;
+  
+  // Deve conter 'exercise-gifs' ou ser uma URL completa válida
+  return urlString.includes('exercise-gifs') || 
+         urlString.startsWith('http://') || 
+         urlString.startsWith('https://');
+};
