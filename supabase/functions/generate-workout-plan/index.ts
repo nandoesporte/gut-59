@@ -350,7 +350,7 @@ async function generateIntelligentPlanWithXAI(preferences, validBatchExercises, 
   Object.entries(exerciseCategories.byMuscleGroup).forEach(([group, exercises]) => {
     bestExercisesByGroup[group] = exercises
       .sort((a, b) => b.suitabilityScore - a.suitabilityScore)
-      .slice(0, 10); // Top 10 exercícios por grupo
+      .slice(0, 15); // Top 15 exercícios por grupo para dar mais variedade
   });
   
   // Exercícios específicos para tríceps e bíceps
@@ -381,21 +381,23 @@ async function generateIntelligentPlanWithXAI(preferences, validBatchExercises, 
   
   const systemPrompt = `Você é o Trenner2025 AVANÇADO, especialista em criar planos de treino ÚNICOS e PERSONALIZADOS.
 
-MISSÃO CRÍTICA: Criar um plano de treino com COBERTURA COMPLETA dos grupos musculares obrigatórios.
+MISSÃO CRÍTICA: Criar um plano de treino com EXATAMENTE 8 EXERCÍCIOS POR SESSÃO e COBERTURA COMPLETA dos grupos musculares obrigatórios.
 
-GRUPOS MUSCULARES OBRIGATÓRIOS (DEVE INCLUIR TODOS):
-1. COSTAS - obrigatório em todos os treinos
-2. PERNAS - obrigatório em todos os treinos  
-3. PEITO - obrigatório em todos os treinos
-4. TRÍCEPS - obrigatório (braços posteriores)
-5. BÍCEPS - obrigatório (braços anteriores)
-6. PANTURRILHA - incluir pelo menos uma vez
-7. GLÚTEOS - incluir se houver exercícios disponíveis
+GRUPOS MUSCULARES OBRIGATÓRIOS (DEVE INCLUIR TODOS EM CADA SESSÃO):
+1. COSTAS - obrigatório (pelo menos 1 exercício por sessão)
+2. PERNAS - obrigatório (pelo menos 1 exercício por sessão)  
+3. PEITO - obrigatório (pelo menos 1 exercício por sessão)
+4. TRÍCEPS - obrigatório (braços posteriores - pelo menos 1 por sessão)
+5. BÍCEPS - obrigatório (braços anteriores - pelo menos 1 por sessão)
+6. PANTURRILHA - incluir pelo menos 1 vez por semana
+7. GLÚTEOS - incluir pelo menos 1 vez por semana
+8. OMBROS - adicionar conforme espaço disponível
 
 REGRAS FUNDAMENTAIS:
+- CADA SESSÃO DEVE TER EXATAMENTE 8 EXERCÍCIOS
 - PRIORIZE exercícios com SCORES DE ADEQUAÇÃO mais altos
 - EVITE exercícios usados recentemente (scores baixos)
-- GARANTA que CADA SESSÃO tenha pelo menos 5 grupos musculares diferentes
+- GARANTA que CADA SESSÃO tenha pelo menos 6 grupos musculares diferentes
 - ADAPTE intensidade ao nível de condicionamento
 - Responda APENAS em português do Brasil
 - Retorne APENAS JSON válido sem formatação markdown
@@ -407,7 +409,7 @@ ANÁLISE DO PERFIL:
 - Exercícios de alta adequação: ${exerciseCategories.highSuitability.length}`;
 
   const userPrompt = `
-CRIE UM PLANO DE TREINO COM COBERTURA MUSCULAR COMPLETA:
+CRIE UM PLANO DE TREINO COM 8 EXERCÍCIOS POR SESSÃO E COBERTURA MUSCULAR COMPLETA:
 
 Preferências:
 - Objetivo: ${preferences.goal}
@@ -418,27 +420,27 @@ Preferências:
 EXERCÍCIOS DISPONÍVEIS POR GRUPO (ordenados por adequação):
 
 COSTAS (${bestExercisesByGroup.back?.length || 0} opções):
-${(bestExercisesByGroup.back || []).slice(0, 5).map((ex, i) => 
+${(bestExercisesByGroup.back || []).slice(0, 8).map((ex, i) => 
   `${i + 1}. ID: "${ex.id}" - ${ex.name} [Score: ${ex.suitabilityScore}]`
 ).join('\n')}
 
 PEITO (${bestExercisesByGroup.chest?.length || 0} opções):
-${(bestExercisesByGroup.chest || []).slice(0, 5).map((ex, i) => 
+${(bestExercisesByGroup.chest || []).slice(0, 8).map((ex, i) => 
   `${i + 1}. ID: "${ex.id}" - ${ex.name} [Score: ${ex.suitabilityScore}]`
 ).join('\n')}
 
 PERNAS (${bestExercisesByGroup.legs?.length || 0} opções):
-${(bestExercisesByGroup.legs || []).slice(0, 5).map((ex, i) => 
+${(bestExercisesByGroup.legs || []).slice(0, 8).map((ex, i) => 
   `${i + 1}. ID: "${ex.id}" - ${ex.name} [Score: ${ex.suitabilityScore}]`
 ).join('\n')}
 
 TRÍCEPS (${tricepsExercises.length} opções):
-${tricepsExercises.slice(0, 3).map((ex, i) => 
+${tricepsExercises.slice(0, 5).map((ex, i) => 
   `${i + 1}. ID: "${ex.id}" - ${ex.name} [Score: ${ex.suitabilityScore}]`
 ).join('\n')}
 
 BÍCEPS (${bicepsExercises.length} opções):
-${bicepsExercises.slice(0, 3).map((ex, i) => 
+${bicepsExercises.slice(0, 5).map((ex, i) => 
   `${i + 1}. ID: "${ex.id}" - ${ex.name} [Score: ${ex.suitabilityScore}]`
 ).join('\n')}
 
@@ -448,24 +450,31 @@ ${calfExercises.slice(0, 3).map((ex, i) =>
 ).join('\n')}
 
 OMBROS (${bestExercisesByGroup.shoulders?.length || 0} opções):
-${(bestExercisesByGroup.shoulders || []).slice(0, 3).map((ex, i) => 
+${(bestExercisesByGroup.shoulders || []).slice(0, 5).map((ex, i) => 
+  `${i + 1}. ID: "${ex.id}" - ${ex.name} [Score: ${ex.suitabilityScore}]`
+).join('\n')}
+
+GLÚTEOS (${bestExercisesByGroup.glutes?.length || 0} opções):
+${(bestExercisesByGroup.glutes || []).slice(0, 3).map((ex, i) => 
   `${i + 1}. ID: "${ex.id}" - ${ex.name} [Score: ${ex.suitabilityScore}]`
 ).join('\n')}
 
 INSTRUÇÕES CRÍTICAS:
-1. CADA DIA deve ter exercícios de COSTAS, PERNAS, PEITO
-2. CADA DIA deve ter pelo menos UM exercício de TRÍCEPS e UM de BÍCEPS
-3. INCLUIR exercícios de PANTURRILHA em pelo menos um dia
-4. PRIORIZAR exercícios com scores 70+
-5. Criar ${preferences.days_per_week || 3} dias com 6-8 exercícios cada
-6. VARIAR os exercícios entre os dias (não repetir)
+1. CADA SESSÃO deve ter EXATAMENTE 8 EXERCÍCIOS
+2. CADA SESSÃO deve ter exercícios de COSTAS, PERNAS, PEITO, TRÍCEPS e BÍCEPS (obrigatórios)
+3. INCLUIR exercícios de PANTURRILHA em pelo menos uma sessão por semana
+4. INCLUIR exercícios de GLÚTEOS em pelo menos uma sessão por semana
+5. PRIORIZAR exercícios com scores 70+ quando disponível
+6. Criar ${preferences.days_per_week || 3} dias com EXATAMENTE 8 exercícios cada
+7. VARIAR os exercícios entre os dias (não repetir exercícios)
+8. USAR os exercícios restantes para ombros, abdômen ou outras áreas
 
 Retorne JSON:
 {
   "workout_sessions": [
     {
       "day_number": 1,
-      "warmup_description": "Aquecimento dinâmico específico",
+      "warmup_description": "Aquecimento dinâmico específico para os grupos musculares do treino",
       "cooldown_description": "Relaxamento focado nos músculos trabalhados",
       "session_exercises": [
         {
@@ -475,12 +484,13 @@ Retorne JSON:
           "rest_time_seconds": 60,
           "order_in_session": 1
         }
+        // ... EXATAMENTE 8 EXERCÍCIOS POR SESSÃO
       ]
     }
   ]
 }
 
-FOQUE EM: Cobertura completa + Variedade + Adequação ao perfil
+FOQUE EM: 8 exercícios por sessão + Cobertura completa + Variedade + Adequação ao perfil
 `;
 
   const xaiResponse = await fetch('https://api.x.ai/v1/chat/completions', {
@@ -521,10 +531,32 @@ FOQUE EM: Cobertura completa + Variedade + Adequação ao perfil
       throw new Error('Plano inválido: sem sessões de treino');
     }
     
-    // Validar cobertura muscular
+    // Validar que cada sessão tem exatamente 8 exercícios
     parsedPlan.workout_sessions.forEach((session, index) => {
-      if (!session.session_exercises || session.session_exercises.length === 0) {
-        throw new Error(`Sessão ${index + 1} sem exercícios`);
+      if (!session.session_exercises || session.session_exercises.length !== 8) {
+        console.warn(`⚠️ Sessão ${index + 1} não tem 8 exercícios (${session.session_exercises?.length || 0}). Ajustando...`);
+        
+        // Se tem menos de 8, adicionar exercícios aleatórios
+        if (session.session_exercises && session.session_exercises.length < 8) {
+          const usedIds = new Set(session.session_exercises.map(ex => ex.exercise_id));
+          const availableExercises = validBatchExercises.filter(ex => !usedIds.has(ex.id));
+          
+          while (session.session_exercises.length < 8 && availableExercises.length > 0) {
+            const randomEx = availableExercises.splice(Math.floor(Math.random() * availableExercises.length), 1)[0];
+            session.session_exercises.push({
+              exercise_id: randomEx.id,
+              sets: 3,
+              reps: 12,
+              rest_time_seconds: 60,
+              order_in_session: session.session_exercises.length + 1
+            });
+          }
+        }
+        
+        // Se tem mais de 8, manter apenas os primeiros 8
+        if (session.session_exercises && session.session_exercises.length > 8) {
+          session.session_exercises = session.session_exercises.slice(0, 8);
+        }
       }
       
       const muscleGroups = new Set();
@@ -542,13 +574,6 @@ FOQUE EM: Cobertura completa + Variedade + Adequação ao perfil
       
       const avgScore = totalScore / session.session_exercises.length;
       console.log(`✅ Sessão ${index + 1}: ${session.session_exercises.length} exercícios, ${muscleGroups.size} grupos, score médio: ${avgScore.toFixed(1)}`);
-      
-      // Verificar se tem grupos obrigatórios
-      const hasBack = Array.from(muscleGroups).includes('back');
-      const hasLegs = Array.from(muscleGroups).includes('legs');
-      const hasChest = Array.from(muscleGroups).includes('chest');
-      
-      console.log(`🎯 Sessão ${index + 1} - Costas: ${hasBack}, Pernas: ${hasLegs}, Peito: ${hasChest}`);
     });
     
     return parsedPlan;
@@ -558,13 +583,13 @@ FOQUE EM: Cobertura completa + Variedade + Adequação ao perfil
 }
 
 function generateIntelligentLocalPlan(preferences, validBatchExercises, exerciseCategories, recentlyUsedExercises) {
-  console.log('🏠 Gerando plano local INTELIGENTE com cobertura completa...');
+  console.log('🏠 Gerando plano local INTELIGENTE com 8 exercícios por sessão...');
   
   const daysPerWeek = preferences.days_per_week || 3;
   const sessions = [];
   
-  // Grupos musculares obrigatórios
-  const requiredMuscleGroups = ['back', 'legs', 'arms', 'glutes', 'chest'];
+  // Grupos musculares obrigatórios por sessão
+  const requiredMuscleGroups = ['back', 'legs', 'chest', 'arms', 'arms']; // arms duas vezes para tríceps e bíceps
   
   // Mapear exercícios por grupo muscular específico
   const exercisesBySpecificMuscle = {
@@ -615,11 +640,10 @@ function generateIntelligentLocalPlan(preferences, validBatchExercises, exercise
   
   for (let day = 1; day <= daysPerWeek; day++) {
     const sessionExercises = [];
-    const exercisesPerSession = Math.min(8, Math.max(6, 28 / daysPerWeek));
     
-    console.log(`📅 Dia ${day}: Planejando ${exercisesPerSession} exercícios`);
+    console.log(`📅 Dia ${day}: Planejando EXATAMENTE 8 exercícios`);
     
-    // Garantir pelo menos um exercício de cada grupo muscular obrigatório
+    // Garantir exercícios obrigatórios (5 exercícios)
     const targetMuscleGroups = [
       { group: 'back', exercises: exercisesBySpecificMuscle.back, name: 'Costas' },
       { group: 'chest', exercises: exercisesBySpecificMuscle.chest, name: 'Peito' },
@@ -628,20 +652,8 @@ function generateIntelligentLocalPlan(preferences, validBatchExercises, exercise
       { group: 'biceps', exercises: bicepsExercises, name: 'Bíceps' }
     ];
     
-    // Se for o primeiro ou último dia, incluir panturrilha
-    if (day === 1 || day === daysPerWeek) {
-      targetMuscleGroups.push({ group: 'calves', exercises: calfExercises, name: 'Panturrilha' });
-    }
-    
-    // Se tiver espaço e exercícios de glúteos, incluir
-    if (exercisesBySpecificMuscle.glutes.length > 0 && targetMuscleGroups.length < exercisesPerSession) {
-      targetMuscleGroups.push({ group: 'glutes', exercises: exercisesBySpecificMuscle.glutes, name: 'Glúteos' });
-    }
-    
-    // Selecionar exercícios para cada grupo alvo
+    // Selecionar exercícios obrigatórios (5 exercícios)
     for (const { group, exercises, name } of targetMuscleGroups) {
-      if (sessionExercises.length >= exercisesPerSession) break;
-      
       const availableExercises = exercises
         .filter(ex => !usedExerciseIds.has(ex.id))
         .sort((a, b) => b.suitabilityScore - a.suitabilityScore);
@@ -659,13 +671,53 @@ function generateIntelligentLocalPlan(preferences, validBatchExercises, exercise
         });
         
         console.log(`✅ ${name}: ${selectedExercise.name} (Score: ${selectedExercise.suitabilityScore})`);
-      } else {
-        console.log(`⚠️ Não há exercícios disponíveis para ${name}`);
       }
     }
     
-    // Preencher com exercícios adicionais se necessário, priorizando variedade
-    while (sessionExercises.length < exercisesPerSession) {
+    // Adicionar exercícios adicionais para completar 8 exercícios (3 exercícios restantes)
+    const additionalGroups = [];
+    
+    // Se for o primeiro ou último dia, incluir panturrilha
+    if (day === 1 || day === daysPerWeek) {
+      additionalGroups.push({ group: 'calves', exercises: calfExercises, name: 'Panturrilha' });
+    }
+    
+    // Incluir glúteos se disponível
+    if (exercisesBySpecificMuscle.glutes.length > 0) {
+      additionalGroups.push({ group: 'glutes', exercises: exercisesBySpecificMuscle.glutes, name: 'Glúteos' });
+    }
+    
+    // Incluir ombros
+    if (exercisesBySpecificMuscle.shoulders.length > 0) {
+      additionalGroups.push({ group: 'shoulders', exercises: exercisesBySpecificMuscle.shoulders, name: 'Ombros' });
+    }
+    
+    // Adicionar exercícios dos grupos adicionais
+    for (const { group, exercises, name } of additionalGroups) {
+      if (sessionExercises.length >= 8) break;
+      
+      const availableExercises = exercises
+        .filter(ex => !usedExerciseIds.has(ex.id))
+        .sort((a, b) => b.suitabilityScore - a.suitabilityScore);
+      
+      if (availableExercises.length > 0) {
+        const selectedExercise = availableExercises[0];
+        usedExerciseIds.add(selectedExercise.id);
+        
+        sessionExercises.push({
+          exercise_id: selectedExercise.id,
+          sets: Math.max(selectedExercise.min_sets || 3, 3),
+          reps: Math.max(selectedExercise.min_reps || 10, 10),
+          rest_time_seconds: selectedExercise.rest_time_seconds || 60,
+          order_in_session: sessionExercises.length + 1
+        });
+        
+        console.log(`➕ ${name}: ${selectedExercise.name} (Score: ${selectedExercise.suitabilityScore})`);
+      }
+    }
+    
+    // Preencher com exercícios aleatórios até completar 8
+    while (sessionExercises.length < 8) {
       const availableExercises = validBatchExercises
         .filter(ex => !usedExerciseIds.has(ex.id))
         .sort((a, b) => b.suitabilityScore - a.suitabilityScore);
@@ -683,12 +735,12 @@ function generateIntelligentLocalPlan(preferences, validBatchExercises, exercise
         order_in_session: sessionExercises.length + 1
       });
       
-      console.log(`➕ Adicional: ${selectedExercise.name} (${selectedExercise.muscle_group})`);
+      console.log(`🔄 Adicional: ${selectedExercise.name} (${selectedExercise.muscle_group})`);
     }
     
     sessions.push({
       day_number: day,
-      warmup_description: `Aquecimento dinâmico personalizado para o Dia ${day} - foco em mobilidade`,
+      warmup_description: `Aquecimento dinâmico personalizado para o Dia ${day} - 8 exercícios balanceados`,
       cooldown_description: `Alongamento específico para músculos trabalhados no Dia ${day}`,
       session_exercises: sessionExercises
     });
@@ -696,7 +748,7 @@ function generateIntelligentLocalPlan(preferences, validBatchExercises, exercise
     console.log(`🎯 Dia ${day} finalizado: ${sessionExercises.length} exercícios únicos`);
   }
   
-  console.log(`🎯 Plano local inteligente gerado: ${sessions.length} sessões com cobertura completa`);
+  console.log(`🎯 Plano local inteligente gerado: ${sessions.length} sessões com 8 exercícios cada`);
   return { workout_sessions: sessions };
 }
 
