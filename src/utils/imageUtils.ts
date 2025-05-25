@@ -20,13 +20,27 @@ export const formatImageUrl = (url: string | null): string => {
     return formattedUrl;
   }
   
-  // Formato padrão para o bucket exercicios (baseado no seu exemplo funcional)
+  // Primeiro tenta o bucket exercise-gifs (que parece ser onde estão os arquivos baseado nos logs de rede)
   if (url.includes('.gif')) {
-    // Remove qualquer pasta inicial se presente
+    // Se já tem o caminho completo com batch, usa como está
+    if (url.includes('exercise-gifs/batch/')) {
+      const fullUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/${url}`;
+      console.log('ImageUtils: Created full URL for exercise-gifs/batch:', fullUrl);
+      return fullUrl;
+    }
+    
+    // Se tem apenas o nome do arquivo com prefixo timestamp, adiciona o caminho batch
+    if (url.match(/^\d+_[a-z0-9]+_/)) {
+      const fullUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/exercise-gifs/batch/${url}`;
+      console.log('ImageUtils: Created full URL for batch file with timestamp:', fullUrl);
+      return fullUrl;
+    }
+    
+    // Tenta primeiro no bucket exercicios (exemplo funcional que você mostrou)
     const cleanUrl = url.replace(/^(exercise-gifs\/batch\/|exercicios\/)?/, '');
-    const fullUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/exercicios/${cleanUrl}`;
-    console.log('ImageUtils: Created full URL using exercicios bucket:', fullUrl);
-    return fullUrl;
+    const exerciciosUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/exercicios/${cleanUrl}`;
+    console.log('ImageUtils: Created full URL using exercicios bucket:', exerciciosUrl);
+    return exerciciosUrl;
   }
   
   // Fallback para placeholder

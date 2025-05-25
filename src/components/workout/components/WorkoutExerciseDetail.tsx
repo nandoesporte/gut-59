@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +16,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
   const exercise = exerciseSession.exercise;
   const [imageStatus, setImageStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
   const [expandDescription, setExpandDescription] = useState(false);
-  const [isValidating, setIsValidating] = useState(false);
+  const [finalImageUrl, setFinalImageUrl] = useState<string | null>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const isMobile = useIsMobile();
   
@@ -28,47 +27,39 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
 
   const imageUrl = exercise.gif_url ? formatImageUrl(exercise.gif_url) : null;
   
-  // Reset image status when exercise changes and validate URL
+  // Debug da URL final
   useEffect(() => {
-    const validateAndLoadImage = async () => {
-      setImageStatus('loading');
-      setIsValidating(true);
-      
-      console.log(`WorkoutExerciseDetail: Loading exercise: ${exercise.name} (${exercise.id})`);
-      console.log('WorkoutExerciseDetail: Image URL:', imageUrl);
-      
-      if (imageUrl && imageUrl !== '/placeholder.svg') {
-        // Validate URL first
-        const isValid = await validateGifUrl(imageUrl);
-        if (!isValid) {
-          console.error(`WorkoutExerciseDetail: URL validation failed for: ${exercise.name}. URL: ${imageUrl}`);
-          setImageStatus('error');
-          setIsValidating(false);
-          return;
-        }
-      }
-      
-      setIsValidating(false);
-    };
+    console.log(`WorkoutExerciseDetail: Exercise "${exercise.name}" (ID: ${exercise.id})`);
+    console.log('WorkoutExerciseDetail: Raw gif_url:', exercise.gif_url);
+    console.log('WorkoutExerciseDetail: Formatted imageUrl:', imageUrl);
+    setFinalImageUrl(imageUrl);
+  }, [exercise.id, exercise.gif_url, imageUrl, exercise.name]);
+  
+  // Reset image status when exercise changes
+  useEffect(() => {
+    setImageStatus('loading');
     
-    validateAndLoadImage();
-  }, [exercise.id, imageUrl, exercise.name]);
+    if (finalImageUrl && finalImageUrl !== '/placeholder.svg') {
+      console.log(`WorkoutExerciseDetail: Loading image for ${exercise.name}: ${finalImageUrl}`);
+    }
+  }, [exercise.id, finalImageUrl, exercise.name]);
   
   const handleImageError = () => {
-    console.error(`WorkoutExerciseDetail: Failed to load image for exercise: ${exercise.name}. URL: ${imageUrl}`);
+    console.error(`WorkoutExerciseDetail: Image load ERROR for exercise: ${exercise.name}`);
+    console.error('WorkoutExerciseDetail: Failed URL:', finalImageUrl);
     setImageStatus('error');
   };
   
   const handleImageLoad = () => {
-    console.log(`WorkoutExerciseDetail: Image loaded successfully for: ${exercise.name}`);
+    console.log(`WorkoutExerciseDetail: Image loaded SUCCESS for: ${exercise.name}`);
+    console.log('WorkoutExerciseDetail: Successful URL:', finalImageUrl);
     setImageStatus('loaded');
   };
   
-  const shouldShowImage = imageUrl && 
-                         imageUrl !== '/placeholder.svg' && 
-                         !imageUrl.includes('placeholder') && 
-                         !imageUrl.includes('example.') &&
-                         !isValidating;
+  const shouldShowImage = finalImageUrl && 
+                         finalImageUrl !== '/placeholder.svg' && 
+                         !finalImageUrl.includes('placeholder') && 
+                         !finalImageUrl.includes('example.');
   
   return (
     <Card className="overflow-hidden border-none shadow-sm hover:shadow-md transition-shadow duration-200">
@@ -79,19 +70,17 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
             {shouldShowImage ? (
               <>
                 {/* Loading skeleton */}
-                {(imageStatus === 'loading' || isValidating) && (
+                {imageStatus === 'loading' && (
                   <div className="absolute inset-0">
                     <Skeleton className="h-full w-full" />
-                    {isValidating && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="text-xs text-muted-foreground">Validando...</div>
-                      </div>
-                    )}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="text-xs text-muted-foreground">Carregando...</div>
+                    </div>
                   </div>
                 )}
                 
                 {/* Expand button */}
-                {imageStatus === 'loaded' && !isValidating && (
+                {imageStatus === 'loaded' && (
                   <Dialog>
                     <DialogTrigger asChild>
                       <button className="absolute top-2 right-2 p-1.5 bg-black/50 rounded-full text-white z-20 hover:bg-black/70 transition-colors">
@@ -101,7 +90,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                     <DialogContent className="sm:max-w-lg max-h-[90vh] flex items-center justify-center p-2">
                       <div className="w-full h-full flex items-center justify-center overflow-hidden">
                         <img 
-                          src={imageUrl}
+                          src={finalImageUrl}
                           alt={exercise.name}
                           className="max-h-[80vh] max-w-full object-contain"
                         />
@@ -110,47 +99,50 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                   </Dialog>
                 )}
 
-                {/* Main image */}
-                {!isValidating && (
-                  <img 
-                    ref={imageRef}
-                    src={imageUrl}
-                    alt={exercise.name}
-                    className={`h-full w-full object-contain transition-opacity duration-300 ${
-                      imageStatus === 'loaded' ? 'opacity-100' : 'opacity-0'
-                    }`}
-                    onLoad={handleImageLoad}
-                    onError={handleImageError}
-                    loading="lazy"
-                  />
-                )}
+                {/* Main image - RENDERIZAÇÃO PRINCIPAL COM URL COMPLETA */}
+                <img 
+                  ref={imageRef}
+                  src={finalImageUrl}
+                  alt={exercise.name}
+                  className={`h-full w-full object-contain transition-opacity duration-300 ${
+                    imageStatus === 'loaded' ? 'opacity-100' : 'opacity-0'
+                  }`}
+                  onLoad={handleImageLoad}
+                  onError={handleImageError}
+                  loading="lazy"
+                />
                 
-                {/* Error state */}
-                {imageStatus === 'error' && !isValidating && (
+                {/* Error state com mais detalhes */}
+                {imageStatus === 'error' && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted text-center px-2">
                     <AlertCircle className="h-8 w-8 mb-2 text-amber-500" />
                     <p className="text-sm text-muted-foreground font-medium">
                       {exercise.name}
                     </p>
                     <span className="text-xs text-muted-foreground/70 mt-1">
-                      Imagem não disponível
+                      Erro ao carregar imagem
                     </span>
-                    <span className="text-xs text-muted-foreground/70 mt-1">
-                      URL: {imageUrl?.substring(0, 50)}...
+                    <span className="text-xs text-muted-foreground/70 mt-1 font-mono">
+                      {finalImageUrl?.substring(0, 60)}...
                     </span>
                   </div>
                 )}
               </>
             ) : (
-              /* Fallback when no valid image */
+              /* Fallback quando não há imagem válida */
               <div className="flex flex-col items-center justify-center h-full w-full bg-muted text-center px-2">
                 <Dumbbell className="h-8 w-8 mb-2 text-primary/40" />
                 <p className="text-sm text-muted-foreground font-medium">
                   {exercise.name}
                 </p>
                 <span className="text-xs text-muted-foreground/70 mt-1">
-                  {isValidating ? 'Validando imagem...' : 'Sem imagem disponível'}
+                  Imagem não disponível
                 </span>
+                {exercise.gif_url && (
+                  <span className="text-xs text-muted-foreground/70 mt-1 font-mono">
+                    Raw: {exercise.gif_url.substring(0, 30)}...
+                  </span>
+                )}
               </div>
             )}
           </div>
