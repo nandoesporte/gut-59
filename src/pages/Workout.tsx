@@ -47,64 +47,30 @@ const Workout = () => {
         return;
       }
 
-      console.log("📋 Buscando histórico de treinos...");
-
-      // Function to safely fetch plans with proper error handling
-      const fetchPlansWithFallback = async () => {
-        try {
-          // First, try with recommended_weight column
-          const { data: plans, error } = await supabase
-            .from('workout_plans')
-            .select(`
+      const { data: plans, error } = await supabase
+        .from('workout_plans')
+        .select(`
+          *,
+          workout_sessions (
+            *,
+            session_exercises (
               *,
-              workout_sessions (
-                *,
-                session_exercises (
-                  *,
-                  recommended_weight,
-                  exercise:exercises (*)
-                )
-              )
-            `)
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false });
+              exercise:exercises (*)
+            )
+          )
+        `)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
-          if (error) throw error;
-          return plans;
-        } catch (error: any) {
-          if (error.message?.includes("recommended_weight") && error.message?.includes("does not exist")) {
-            console.log("⚠️ Coluna recommended_weight não existe, buscando sem ela...");
-            
-            const { data: plansWithoutWeight, error: fallbackError } = await supabase
-              .from('workout_plans')
-              .select(`
-                *,
-                workout_sessions (
-                  *,
-                  session_exercises (
-                    *,
-                    exercise:exercises (*)
-                  )
-                )
-              `)
-              .eq('user_id', user.id)
-              .order('created_at', { ascending: false });
-
-            if (fallbackError) throw fallbackError;
-            return plansWithoutWeight;
-          } else {
-            throw error;
-          }
-        }
-      };
-
-      const plans = await fetchPlansWithFallback();
-
-      console.log(`✅ Histórico carregado: ${plans?.length || 0} planos`);
-      setHistoryPlans((plans || []) as WorkoutPlan[]);
+      if (error) {
+        console.error('Error fetching workout history:', error);
+        toast.error('Erro ao carregar o histórico de treinos');
+        throw error;
+      }
+      
+      setHistoryPlans(plans || []);
     } catch (error) {
       console.error('Error fetching workout history:', error);
-      toast.error('Erro ao carregar o histórico de treinos');
     } finally {
       setIsLoadingHistory(false);
     }

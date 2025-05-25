@@ -18,8 +18,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [expandDescription, setExpandDescription] = useState(false);
-  const [isInView, setIsInView] = useState(false);
-  const cardRef = useRef<HTMLDivElement>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const imageRef = useRef<HTMLImageElement>(null);
   const isMobile = useIsMobile();
   
@@ -28,34 +27,14 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     return null;
   }
 
-  // Intersection Observer para lazy loading mais eficiente
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsInView(true);
-          observer.disconnect();
-        }
-      },
-      { 
-        rootMargin: '100px', // Começar a carregar 100px antes de aparecer
-        threshold: 0.1 
-      }
-    );
-
-    if (cardRef.current) {
-      observer.observe(cardRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, []);
-
   // Reset image states if exercise changes
   useEffect(() => {
     setImageLoaded(false);
     setImageError(false);
+    setRetryCount(0);
     
     console.log(`Loading exercise: ${exercise.name} (${exercise.id})`);
+    console.log('Exercise data:', exercise);
   }, [exercise.id, exercise.name]);
   
   const handleImageError = () => {
@@ -65,7 +44,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
   };
   
   const handleImageLoad = () => {
-    console.log(`✅ Image loaded successfully for: ${exercise.name} (${exercise.id})`);
+    console.log(`Image loaded successfully for: ${exercise.name} (${exercise.id})`);
     setImageLoaded(true);
     setImageError(false);
   };
@@ -75,21 +54,20 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
   const isLikelyValidUrl = imageUrl && 
                           !imageUrl.includes('placeholder') && 
                           !imageUrl.includes('example.') &&
-                          imageUrl.trim().length > 10 &&
-                          imageUrl.includes('/storage/v1/object/public/exercise-gifs/batch/');
+                          imageUrl.trim().length > 10;
   
   return (
-    <Card ref={cardRef} className="overflow-hidden border-none shadow-sm hover:shadow-md transition-shadow duration-200">
+    <Card className="overflow-hidden border-none shadow-sm hover:shadow-md transition-shadow duration-200">
       <CardContent className="p-0">
         <div className="flex flex-col md:flex-row gap-3">
-          {/* Exercise GIF/Image com lazy loading otimizado */}
+          {/* Exercise GIF/Image */}
           <div className="w-full md:w-1/3 bg-gray-100 dark:bg-gray-800 overflow-hidden flex items-center justify-center h-48 md:h-44 relative">
-            {(!imageLoaded && isInView && isLikelyValidUrl) && (
+            {(!imageLoaded || !imageError) && isLikelyValidUrl && (
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <Skeleton className="h-48 md:h-44 w-full absolute inset-0" />
                 <span className="text-xs text-muted-foreground z-10 bg-background/80 px-2 py-1 rounded-md flex items-center gap-1">
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  Carregando GIF...
+                  Carregando...
                 </span>
               </div>
             )}
@@ -110,8 +88,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
               </div>
             )}
             
-            {/* Só renderizar a imagem quando estiver em view */}
-            {isInView && isLikelyValidUrl && (
+            {isLikelyValidUrl && (
               <>
                 <Dialog>
                   <DialogTrigger asChild>
@@ -136,11 +113,10 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                   ref={imageRef}
                   src={imageUrl}
                   alt={exercise.name}
-                  className={`h-48 md:h-44 w-full object-contain transition-opacity duration-300 ${imageLoaded && !imageError ? 'opacity-100' : 'opacity-0'}`}
+                  className={`h-48 md:h-44 w-full object-contain ${imageLoaded && !imageError ? 'block' : 'hidden'}`}
                   onLoad={handleImageLoad}
                   onError={handleImageError}
                   loading="lazy"
-                  decoding="async"
                 />
               </>
             )}
@@ -179,11 +155,10 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                   <span className="bg-primary/10 text-primary px-2 py-1 rounded-md font-medium">
                     {Math.floor(exerciseSession.rest_time_seconds / 60)}:{(exerciseSession.rest_time_seconds % 60).toString().padStart(2, '0')} descanso
                   </span>
-                  {/* Agora a carga recomendada vem do banco de dados */}
-                  {(exerciseSession.recommended_weight || exerciseSession.exercise?.recommended_weight) && (
+                  {exerciseSession.recommended_weight && (
                     <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded-md font-medium flex items-center gap-1">
                       <Weight className="h-3 w-3" />
-                      {exerciseSession.recommended_weight || exerciseSession.exercise?.recommended_weight}
+                      {exerciseSession.recommended_weight}
                     </span>
                   )}
                 </div>
