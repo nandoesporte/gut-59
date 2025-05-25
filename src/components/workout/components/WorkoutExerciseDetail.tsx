@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatImageUrl } from '@/utils/imageUtils';
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dumbbell, AlertCircle, RefreshCw, Maximize, Loader2, Weight } from 'lucide-react';
+import { Dumbbell, AlertCircle, RefreshCw, Maximize, Loader2, Weight, ExternalLink } from 'lucide-react';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -20,6 +19,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
   const [expandDescription, setExpandDescription] = useState(false);
   const [isInView, setIsInView] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [storageTestResult, setStorageTestResult] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const isMobile = useIsMobile();
@@ -28,6 +28,23 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     console.log('❌ Exercise data missing:', exerciseSession);
     return null;
   }
+
+  // Test Supabase Storage connectivity
+  useEffect(() => {
+    const testStorageConnectivity = async () => {
+      try {
+        const testUrl = 'https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/exercise-gifs/';
+        const response = await fetch(testUrl, { method: 'HEAD' });
+        setStorageTestResult(response.ok ? 'accessible' : `error-${response.status}`);
+        console.log(`🔗 Storage connectivity test: ${response.ok ? 'OK' : 'FAILED'} (${response.status})`);
+      } catch (error) {
+        setStorageTestResult('network-error');
+        console.error('🔗 Storage connectivity test failed:', error);
+      }
+    };
+
+    testStorageConnectivity();
+  }, []);
 
   // Intersection Observer para lazy loading
   useEffect(() => {
@@ -67,6 +84,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     console.error(`🔗 URL that failed: ${imageUrl}`);
     console.error(`🔗 Original URL from DB: ${exercise.gif_url}`);
     console.error('🔗 Error event:', event);
+    console.error(`🔗 Storage test result: ${storageTestResult}`);
     setImageError(true);
     setImageLoaded(true);
   };
@@ -93,6 +111,11 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     }
   };
   
+  const handleTestUrl = () => {
+    const url = formatImageUrl(exercise.gif_url);
+    window.open(url, '_blank');
+  };
+  
   const imageUrl = formatImageUrl(exercise.gif_url);
   console.log(`🎯 Formatted URL for ${exercise.name}:`, imageUrl);
   console.log(`🔍 URL Type check:`, typeof exercise.gif_url, 'Length:', exercise.gif_url?.length);
@@ -112,7 +135,8 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     length: exercise.gif_url?.length || 0,
     type: typeof exercise.gif_url,
     isString: typeof exercise.gif_url === 'string',
-    trimmedLength: exercise.gif_url?.trim?.()?.length || 0
+    trimmedLength: exercise.gif_url?.trim?.()?.length || 0,
+    storageTest: storageTestResult
   });
   
   return (
@@ -144,18 +168,32 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                     <span className="text-xs text-muted-foreground/70 mb-2">
                       Erro ao carregar imagem
                     </span>
-                    <div className="text-xs text-red-400 mb-2 px-2 py-1 bg-red-50 rounded">
+                    <div className="text-xs text-red-400 mb-2 px-2 py-1 bg-red-50 rounded max-w-full break-all">
                       URL: {exercise.gif_url || 'Não disponível'}
                     </div>
-                    {retryCount < 3 && (
-                      <button
-                        onClick={handleRetry}
-                        className="text-xs bg-primary/10 text-primary px-2 py-1 rounded hover:bg-primary/20 transition-colors flex items-center gap-1"
-                      >
-                        <RefreshCw className="h-3 w-3" />
-                        Tentar novamente
-                      </button>
+                    {storageTestResult && (
+                      <div className="text-xs text-blue-400 mb-2 px-2 py-1 bg-blue-50 rounded">
+                        Storage: {storageTestResult}
+                      </div>
                     )}
+                    <div className="flex gap-1">
+                      {retryCount < 3 && (
+                        <button
+                          onClick={handleRetry}
+                          className="text-xs bg-primary/10 text-primary px-2 py-1 rounded hover:bg-primary/20 transition-colors flex items-center gap-1"
+                        >
+                          <RefreshCw className="h-3 w-3" />
+                          Tentar novamente
+                        </button>
+                      )}
+                      <button
+                        onClick={handleTestUrl}
+                        className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded hover:bg-blue-200 transition-colors flex items-center gap-1"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        Testar URL
+                      </button>
+                    </div>
                   </>
                 ) : (
                   <>
@@ -166,7 +204,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                     <span className="text-xs text-muted-foreground/70 mt-1">
                       Sem imagem disponível
                     </span>
-                    <div className="text-xs text-gray-400 mt-1 px-2 py-1 bg-gray-50 rounded">
+                    <div className="text-xs text-gray-400 mt-1 px-2 py-1 bg-gray-50 rounded max-w-full break-all">
                       URL: {exercise.gif_url || 'Não disponível'}
                     </div>
                   </>

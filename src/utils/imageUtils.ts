@@ -35,15 +35,31 @@ export const formatImageUrl = (url: string | null): string => {
     return fullUrl;
   }
   
-  // Se é apenas o nome do arquivo ou caminho relativo, construir a URL completa
+  // Se o caminho contém 'exercise-gifs' mas não começa com storage path
+  if (urlString.includes('exercise-gifs')) {
+    // Extrair apenas a parte relevante do caminho
+    let cleanPath = urlString;
+    
+    // Se já contém o bucket path, usar como está
+    if (urlString.includes('exercise-gifs/')) {
+      const bucketIndex = urlString.indexOf('exercise-gifs/');
+      cleanPath = urlString.substring(bucketIndex);
+    }
+    
+    const fullUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/${cleanPath}`;
+    console.log(`🔗 Built URL for exercise-gifs path: ${fullUrl}`);
+    return fullUrl;
+  }
+  
+  // Para URLs que podem ser apenas o nome do arquivo ou caminho relativo
   if (!urlString.startsWith('/')) {
     const fullUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/exercise-gifs/${urlString}`;
     console.log(`🔗 Built URL for relative path: ${fullUrl}`);
     return fullUrl;
   }
   
-  // Para outros casos, tentar construir a URL
-  const fullUrl = `https://sxjafhzikftdenqnkcri.supabase.co${urlString}`;
+  // Para outros casos, tentar construir a URL assumindo que é um caminho absoluto
+  const fullUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public${urlString.startsWith('/') ? urlString : '/' + urlString}`;
   console.log(`🔗 Built URL for absolute path: ${fullUrl}`);
   return fullUrl;
 };
