@@ -1,5 +1,3 @@
-
-
 interface Exercise {
   id: string;
   name: string;
@@ -15,19 +13,20 @@ export interface SessionExercise {
   reps: number;
   rest_time_seconds: number;
   exercise: Exercise;
-  intensity?: string; // Added this property
+  intensity?: string;
+  recommended_weight?: string;
 }
 
 export interface WorkoutSession {
   id: string;
   day_number: number;
-  day_name?: string; // Making this property optional
-  focus?: string; // Making this property optional
-  intensity?: string; // Adding this missing property
+  day_name?: string;
+  focus?: string;
+  intensity?: string;
   warmup_description: string;
   cooldown_description: string;
   session_exercises: SessionExercise[];
-  training_load?: { // Added this property
+  training_load?: {
     intensity?: string;
     volume?: string;
     progression?: string;
@@ -46,7 +45,7 @@ export interface WorkoutPlan {
   goal: string;
   start_date: string;
   end_date: string;
-  created_at: string; // Adding this missing property
+  created_at: string;
   workout_sessions: WorkoutSession[];
-  critique?: Critique; // Added this property
+  critique?: Critique;
 }

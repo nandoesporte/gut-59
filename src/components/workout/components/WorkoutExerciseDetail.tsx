@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatImageUrl } from '@/utils/imageUtils';
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dumbbell, AlertCircle, RefreshCw, Maximize, Loader2 } from 'lucide-react';
+import { Dumbbell, AlertCircle, RefreshCw, Maximize, Loader2, Weight } from 'lucide-react';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -49,10 +49,8 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     setImageError(false);
   };
   
-  // Get the correct image URL, handling null or empty strings
   const imageUrl = exercise.gif_url ? formatImageUrl(exercise.gif_url) : null;
   
-  // Check if URL is likely valid (not just a placeholder)
   const isLikelyValidUrl = imageUrl && 
                           !imageUrl.includes('placeholder') && 
                           !imageUrl.includes('example.') &&
@@ -157,6 +155,12 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                   <span className="bg-primary/10 text-primary px-2 py-1 rounded-md font-medium">
                     {Math.floor(exerciseSession.rest_time_seconds / 60)}:{(exerciseSession.rest_time_seconds % 60).toString().padStart(2, '0')} descanso
                   </span>
+                  {exerciseSession.recommended_weight && (
+                    <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded-md font-medium flex items-center gap-1">
+                      <Weight className="h-3 w-3" />
+                      {exerciseSession.recommended_weight}
+                    </span>
+                  )}
                 </div>
                 
                 {exercise.description && (

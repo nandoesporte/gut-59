@@ -46,7 +46,7 @@ export const generateWorkoutPlanWithTrenner2025 = async (
       .from("exercises")
       .select("*")
       .like('gif_url', '%/storage/v1/object/public/exercise-gifs/batch/%')
-      .limit(200); // Aumentar limite para ter mais opções
+      .limit(200);
 
     if (exercisesError) {
       console.error("❌ Trenner2025: Erro ao buscar exercícios da pasta batch:", exercisesError);
@@ -116,10 +116,15 @@ export const generateWorkoutPlanWithTrenner2025 = async (
     console.log("✅ Trenner2025: Plano de treino gerado com sucesso usando exercícios da pasta batch!");
     console.log(`📊 Trenner2025: Plano contém ${workoutPlan.workout_sessions?.length || 0} sessões`);
     
-    // Log detalhes de cada sessão
+    // Log detalhes de cada sessão incluindo cargas
     if (workoutPlan.workout_sessions) {
       workoutPlan.workout_sessions.forEach((session: any, index: number) => {
         console.log(`📅 Sessão ${index + 1}: ${session.session_exercises?.length || 0} exercícios`);
+        if (session.session_exercises) {
+          session.session_exercises.forEach((exercise: any, exIndex: number) => {
+            console.log(`  💪 Exercício ${exIndex + 1}: ${exercise.exercise?.name} - Carga: ${exercise.recommended_weight || 'não especificada'}`);
+          });
+        }
       });
     }
 
@@ -186,7 +191,7 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
           continue; // Skip to the next session
         }
 
-        // Process and save session exercises
+        // Process and save session exercises with recommended weight
         if (session.session_exercises && Array.isArray(session.session_exercises)) {
           for (const exercise of session.session_exercises) {
             const exerciseData = {
@@ -197,6 +202,8 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
               reps: exercise.reps,
               rest_time_seconds: exercise.rest_time_seconds,
               order_in_session: exercise.order_in_session,
+              // Note: recommended_weight é armazenado temporariamente no objeto exercise
+              // e será usado na interface, mas não é persistido no banco de dados
             };
 
             const { error: exerciseError } = await supabase
@@ -231,12 +238,25 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
       
     if (fetchError) {
       console.error("Error fetching complete workout plan:", fetchError);
-      // Even if fetching the complete plan fails, return the basic saved plan
-      // but we need to cast it to WorkoutPlan and add the missing workout_sessions property
       return {
         ...savedPlan,
         workout_sessions: []
       } as WorkoutPlan;
+    }
+    
+    // Add recommended_weight back to the exercises from the original plan
+    if (completePlan && plan.workout_sessions) {
+      completePlan.workout_sessions.forEach((session: any, sessionIndex: number) => {
+        const originalSession = plan.workout_sessions[sessionIndex];
+        if (originalSession && session.session_exercises) {
+          session.session_exercises.forEach((exercise: any, exerciseIndex: number) => {
+            const originalExercise = originalSession.session_exercises?.[exerciseIndex];
+            if (originalExercise?.recommended_weight) {
+              exercise.recommended_weight = originalExercise.recommended_weight;
+            }
+          });
+        }
+      });
     }
     
     return completePlan as WorkoutPlan;

@@ -31,7 +31,7 @@ serve(async (req) => {
     // Buscar exercícios disponíveis que tenham GIFs na pasta batch
     console.log('📚 Buscando exercícios da pasta batch no storage...');
     const exercisesResponse = await fetch(
-      `${SUPABASE_URL}/rest/v1/exercises?select=id,name,gif_url,description,muscle_group,equipment_needed,exercise_type,min_sets,max_sets,min_reps,max_reps,rest_time_seconds&gif_url=like.*batch*&limit=200`, 
+      `${SUPABASE_URL}/rest/v1/exercises?select=id,name,gif_url,description,muscle_group,equipment_needed,exercise_type,min_sets,max_sets,min_reps,max_reps,rest_time_seconds,beginner_weight,moderate_weight,advanced_weight&gif_url=like.*batch*&limit=200`, 
       {
         headers: {
           'apikey': SUPABASE_SERVICE_ROLE_KEY,
@@ -115,12 +115,23 @@ serve(async (req) => {
             
             if (foundExercise) {
               console.log(`✅ Exercício da batch encontrado: ${foundExercise.name}`);
+              
+              // Determinar carga baseada no nível de atividade e peso recomendado
+              const recommendedWeight = determineRecommendedWeight(
+                foundExercise, 
+                preferences.activity_level, 
+                preferences.weight,
+                preferences.age,
+                preferences.gender
+              );
+              
               return {
                 id: crypto.randomUUID(),
                 sets: Math.min(Math.max(exercise.sets || 3, foundExercise.min_sets || 1), foundExercise.max_sets || 5),
                 reps: Math.min(Math.max(exercise.reps || 12, foundExercise.min_reps || 1), foundExercise.max_reps || 20),
                 rest_time_seconds: exercise.rest_time_seconds || foundExercise.rest_time_seconds || 60,
                 order_in_session: exercise.order_in_session || (exIndex + 1),
+                recommended_weight: recommendedWeight,
                 exercise: {
                   id: foundExercise.id,
                   name: foundExercise.name,
@@ -134,12 +145,21 @@ serve(async (req) => {
               console.warn(`⚠️ Exercício não encontrado na pasta batch: ${exercise.exercise_id}, usando substituto`);
               // Usar exercício padrão da pasta batch se não encontrar
               const defaultExercise = batchExercises[exIndex % batchExercises.length];
+              const recommendedWeight = determineRecommendedWeight(
+                defaultExercise, 
+                preferences.activity_level, 
+                preferences.weight,
+                preferences.age,
+                preferences.gender
+              );
+              
               return {
                 id: crypto.randomUUID(),
                 sets: 3,
                 reps: 12,
                 rest_time_seconds: 60,
                 order_in_session: exIndex + 1,
+                recommended_weight: recommendedWeight,
                 exercise: {
                   id: defaultExercise.id,
                   name: defaultExercise.name,
@@ -184,6 +204,76 @@ serve(async (req) => {
   }
 });
 
+function determineRecommendedWeight(exercise, activityLevel, userWeight, userAge, userGender) {
+  // Se o exercício tem pesos recomendados específicos, usar eles
+  if (exercise.beginner_weight || exercise.moderate_weight || exercise.advanced_weight) {
+    switch (activityLevel) {
+      case 'sedentary':
+      case 'light':
+        return exercise.beginner_weight || "Peso corporal";
+      case 'moderate':
+        return exercise.moderate_weight || exercise.beginner_weight || "Peso corporal";
+      case 'intense':
+        return exercise.advanced_weight || exercise.moderate_weight || "Peso corporal";
+      default:
+        return exercise.beginner_weight || "Peso corporal";
+    }
+  }
+
+  // Calcular carga baseada no tipo de exercício e características do usuário
+  const baseWeight = userWeight || 70;
+  const isStrength = exercise.exercise_type === 'strength';
+  
+  if (!isStrength) {
+    return "Peso corporal";
+  }
+
+  // Percentuais baseados no nível de atividade e gênero
+  let weightPercentage = 0.3; // Iniciante padrão
+  
+  switch (activityLevel) {
+    case 'sedentary':
+      weightPercentage = userGender === 'female' ? 0.2 : 0.25;
+      break;
+    case 'light':
+      weightPercentage = userGender === 'female' ? 0.3 : 0.35;
+      break;
+    case 'moderate':
+      weightPercentage = userGender === 'female' ? 0.4 : 0.5;
+      break;
+    case 'intense':
+      weightPercentage = userGender === 'female' ? 0.5 : 0.6;
+      break;
+  }
+
+  // Ajustar baseado na idade
+  if (userAge > 50) {
+    weightPercentage *= 0.8;
+  } else if (userAge > 35) {
+    weightPercentage *= 0.9;
+  }
+
+  // Ajustar baseado no grupo muscular
+  switch (exercise.muscle_group) {
+    case 'legs':
+      weightPercentage *= 1.5; // Pernas suportam mais peso
+      break;
+    case 'back':
+      weightPercentage *= 1.2;
+      break;
+    case 'chest':
+      weightPercentage *= 1.1;
+      break;
+    case 'shoulders':
+    case 'arms':
+      weightPercentage *= 0.8; // Músculos menores
+      break;
+  }
+
+  const recommendedKg = Math.round(baseWeight * weightPercentage);
+  return `${recommendedKg}kg`;
+}
+
 async function generateWithXAI(preferences: any, batchExercises: any[]) {
   console.log('🧠 Preparando prompt para Grok-3 Mini...');
   
@@ -197,7 +287,8 @@ async function generateWithXAI(preferences: any, batchExercises: any[]) {
   - Cada dia deve ter entre 6-8 exercícios diferentes
   - Varie os exercícios entre os dias focando em diferentes grupos musculares
   - Use apenas IDs de exercícios que existem na lista fornecida
-  - Distribua os exercícios de forma equilibrada entre os grupos musculares`;
+  - Distribua os exercícios de forma equilibrada entre os grupos musculares
+  - Especifique cargas apropriadas baseadas no nível de condicionamento físico`;
 
   const userPrompt = `
   Eu sou o Trenner2025 e vou criar um plano de treino personalizado baseado nestas informações:
@@ -213,7 +304,7 @@ async function generateWithXAI(preferences: any, batchExercises: any[]) {
   - Gênero: ${preferences.gender || 'não informado'}
   
   Exercícios disponíveis da pasta batch (use APENAS estes IDs):
-  ${batchExercises.slice(0, 50).map((ex, index) => `${index + 1}. ID: ${ex.id} - ${ex.name} (${ex.muscle_group}, ${ex.exercise_type}, Séries: ${ex.min_sets}-${ex.max_sets}, Reps: ${ex.min_reps}-${ex.max_reps})`).join('\n')}
+  ${batchExercises.slice(0, 50).map((ex, index) => `${index + 1}. ID: ${ex.id} - ${ex.name} (${ex.muscle_group}, ${ex.exercise_type}, Séries: ${ex.min_sets}-${ex.max_sets}, Reps: ${ex.min_reps}-${ex.max_reps}, Peso iniciante: ${ex.beginner_weight || 'não especificado'}, Peso intermediário: ${ex.moderate_weight || 'não especificado'}, Peso avançado: ${ex.advanced_weight || 'não especificado'})`).join('\n')}
   
   Retorne um JSON com esta estrutura exata (crie ${preferences.days_per_week || 3} dias com 6-8 exercícios cada):
   {
@@ -228,7 +319,8 @@ async function generateWithXAI(preferences: any, batchExercises: any[]) {
             "sets": 3,
             "reps": 12,
             "rest_time_seconds": 60,
-            "order_in_session": 1
+            "order_in_session": 1,
+            "recommended_weight": "15kg ou peso corporal"
           }
           // ... mais 5-7 exercícios diferentes
         ]
@@ -244,6 +336,9 @@ async function generateWithXAI(preferences: any, batchExercises: any[]) {
   - Inclua order_in_session para cada exercício (1, 2, 3, etc.)
   - Varie os grupos musculares entre os dias
   - Respeite os limites de séries e repetições de cada exercício
+  - Especifique cargas apropriadas para o nível do usuário
+  - Para exercícios de peso corporal, especifique "peso corporal"
+  - Para exercícios com peso, especifique valores em kg apropriados para o nível
   - Crie aquecimentos e resfriamentos específicos para cada dia
   `;
 
@@ -333,15 +428,25 @@ function generateLocalPlan(preferences: any, batchExercises: any[]) {
         for (const exercise of selectedFromGroup) {
           if (sessionExercises.length >= exercisesPerSession) break;
           
+          // Determinar carga recomendada
+          const recommendedWeight = determineRecommendedWeight(
+            exercise, 
+            preferences.activity_level, 
+            preferences.weight,
+            preferences.age,
+            preferences.gender
+          );
+          
           sessionExercises.push({
             exercise_id: exercise.id,
             sets: Math.max(exercise.min_sets || 3, 3),
             reps: Math.max(exercise.min_reps || 10, 10),
             rest_time_seconds: exercise.rest_time_seconds || 60,
-            order_in_session: exerciseOrder++
+            order_in_session: exerciseOrder++,
+            recommended_weight: recommendedWeight
           });
           
-          console.log(`✅ Exercício selecionado para o dia ${day}: ${exercise.name} (${exercise.muscle_group})`);
+          console.log(`✅ Exercício selecionado para o dia ${day}: ${exercise.name} (${exercise.muscle_group}) - Carga: ${recommendedWeight}`);
         }
       }
     }
@@ -356,15 +461,24 @@ function generateLocalPlan(preferences: any, batchExercises: any[]) {
       
       const randomExercise = remainingExercises[Math.floor(Math.random() * remainingExercises.length)];
       
+      const recommendedWeight = determineRecommendedWeight(
+        randomExercise, 
+        preferences.activity_level, 
+        preferences.weight,
+        preferences.age,
+        preferences.gender
+      );
+      
       sessionExercises.push({
         exercise_id: randomExercise.id,
         sets: Math.max(randomExercise.min_sets || 3, 3),
         reps: Math.max(randomExercise.min_reps || 10, 10),
         rest_time_seconds: randomExercise.rest_time_seconds || 60,
-        order_in_session: exerciseOrder++
+        order_in_session: exerciseOrder++,
+        recommended_weight: recommendedWeight
       });
       
-      console.log(`✅ Exercício adicional para o dia ${day}: ${randomExercise.name} (${randomExercise.muscle_group})`);
+      console.log(`✅ Exercício adicional para o dia ${day}: ${randomExercise.name} (${randomExercise.muscle_group}) - Carga: ${recommendedWeight}`);
     }
     
     sessions.push({
