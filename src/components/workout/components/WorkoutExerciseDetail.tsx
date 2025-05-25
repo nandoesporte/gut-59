@@ -4,9 +4,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatImageUrl, validateGifUrl } from '@/utils/imageUtils';
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dumbbell, AlertCircle, Maximize, Weight, ExternalLink } from 'lucide-react';
+import { Dumbbell, AlertCircle, Maximize, Weight, ExternalLink, Copy } from 'lucide-react';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { toast } from 'sonner';
 
 interface WorkoutExerciseDetailProps {
   exerciseSession: any;
@@ -18,6 +19,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
   const [imageStatus, setImageStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
   const [expandDescription, setExpandDescription] = useState(false);
   const [finalImageUrl, setFinalImageUrl] = useState<string | null>(null);
+  const [urlValidation, setUrlValidation] = useState<boolean | null>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const isMobile = useIsMobile();
   
@@ -31,20 +33,36 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
   // Debug da URL final - LOG COMPLETO SEM TRUNCAR
   useEffect(() => {
     console.log(`\n=== WorkoutExerciseDetail: Exercise "${exercise.name}" (ID: ${exercise.id}) ===`);
-    console.log('Raw gif_url:', exercise.gif_url);
-    console.log('Formatted imageUrl (COMPLETE):', imageUrl);
+    console.log('Raw gif_url from database:', exercise.gif_url);
+    console.log('Formatted imageUrl (COMPLETE - NO TRUNCATION):', imageUrl);
     console.log('ImageUrl length:', imageUrl?.length);
+    console.log('ImageUrl starts with:', imageUrl?.substring(0, 50));
+    console.log('ImageUrl ends with:', imageUrl?.substring(imageUrl.length - 50));
     setFinalImageUrl(imageUrl);
+    
+    // Validar URL se disponível
+    if (imageUrl && imageUrl !== '/placeholder.svg') {
+      validateGifUrl(imageUrl).then(isValid => {
+        setUrlValidation(isValid);
+        console.log(`URL validation for ${exercise.name}:`, isValid);
+      });
+    }
   }, [exercise.id, exercise.gif_url, imageUrl, exercise.name]);
   
   // Reset image status when exercise changes
   useEffect(() => {
     setImageStatus('loading');
+    setUrlValidation(null);
     
     if (finalImageUrl && finalImageUrl !== '/placeholder.svg') {
       console.log(`\n=== Loading image for ${exercise.name} ===`);
-      console.log('COMPLETE URL:', finalImageUrl);
+      console.log('COMPLETE URL (NO TRUNCATION):', finalImageUrl);
       console.log('URL length:', finalImageUrl.length);
+      console.log('URL structure check:');
+      console.log('- Contains sxjafhzikftdenqnkcri:', finalImageUrl.includes('sxjafhzikftdenqnkcri'));
+      console.log('- Contains storage/v1/object/public:', finalImageUrl.includes('/storage/v1/object/public/'));
+      console.log('- Contains exercise-gifs/batch:', finalImageUrl.includes('exercise-gifs/batch'));
+      console.log('- Ends with .gif:', finalImageUrl.endsWith('.gif'));
     }
   }, [exercise.id, finalImageUrl, exercise.name]);
   
@@ -52,27 +70,35 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     const imgElement = event.target as HTMLImageElement;
     console.error(`\n=== IMAGE LOAD ERROR ===`);
     console.error('Exercise:', exercise.name);
-    console.error('Failed URL (COMPLETE):', imgElement.src);
-    console.error('Original gif_url:', exercise.gif_url);
-    console.error('Event:', event);
+    console.error('Failed URL (COMPLETE - NO TRUNCATION):', imgElement.src);
+    console.error('Original gif_url from database:', exercise.gif_url);
+    console.error('Event details:', event);
+    console.error('Image element naturalWidth:', imgElement.naturalWidth);
+    console.error('Image element naturalHeight:', imgElement.naturalHeight);
     setImageStatus('error');
   };
   
   const handleImageLoad = () => {
     console.log(`\n=== IMAGE LOAD SUCCESS ===`);
     console.log('Exercise:', exercise.name);
-    console.log('Successful URL (COMPLETE):', finalImageUrl);
+    console.log('Successful URL (COMPLETE - NO TRUNCATION):', finalImageUrl);
     setImageStatus('loaded');
   };
   
   const shouldShowImage = finalImageUrl && 
                          finalImageUrl !== '/placeholder.svg' && 
-                         !finalImageUrl.includes('placeholder') && 
-                         !finalImageUrl.includes('example.');
+                         !finalImageUrl.includes('placeholder');
 
   const testImageUrl = () => {
     if (finalImageUrl) {
       window.open(finalImageUrl, '_blank');
+    }
+  };
+
+  const copyUrlToClipboard = () => {
+    if (finalImageUrl) {
+      navigator.clipboard.writeText(finalImageUrl);
+      toast.success('URL copiada para a área de transferência');
     }
   };
   
@@ -129,23 +155,54 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                 
                 {/* Error state com URL completa visível */}
                 {imageStatus === 'error' && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted text-center px-2">
-                    <AlertCircle className="h-8 w-8 mb-2 text-red-500" />
-                    <p className="text-sm text-muted-foreground font-medium">
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted text-center px-2 py-2 overflow-auto">
+                    <AlertCircle className="h-6 w-6 mb-2 text-red-500 flex-shrink-0" />
+                    <p className="text-sm text-muted-foreground font-medium mb-2">
                       {exercise.name}
                     </p>
-                    <div className="mt-2 p-2 bg-red-50 dark:bg-red-950 rounded text-xs">
-                      <p className="text-red-600 dark:text-red-400 font-medium mb-1">Erro ao carregar</p>
-                      <p className="text-red-500 dark:text-red-300 break-all font-mono text-[10px]">
-                        {finalImageUrl}
-                      </p>
-                      <button 
-                        onClick={testImageUrl}
-                        className="mt-1 text-red-600 dark:text-red-400 hover:underline flex items-center gap-1"
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        Testar URL
-                      </button>
+                    <div className="w-full p-2 bg-red-50 dark:bg-red-950 rounded text-xs overflow-auto max-h-32">
+                      <p className="text-red-600 dark:text-red-400 font-medium mb-1">Erro ao carregar GIF</p>
+                      
+                      {/* URL Validation Status */}
+                      {urlValidation !== null && (
+                        <p className={`mb-1 ${urlValidation ? 'text-green-600' : 'text-red-600'}`}>
+                          Status: {urlValidation ? 'URL acessível' : 'URL inacessível (404/403)'}
+                        </p>
+                      )}
+                      
+                      {/* Raw URL from database */}
+                      <div className="mb-2">
+                        <p className="text-red-500 dark:text-red-300 font-medium">URL original (DB):</p>
+                        <p className="text-red-500 dark:text-red-300 break-all font-mono text-[9px] bg-red-100 dark:bg-red-900 p-1 rounded">
+                          {exercise.gif_url || 'null'}
+                        </p>
+                      </div>
+                      
+                      {/* Formatted URL */}
+                      <div className="mb-2">
+                        <p className="text-red-500 dark:text-red-300 font-medium">URL formatada:</p>
+                        <p className="text-red-500 dark:text-red-300 break-all font-mono text-[9px] bg-red-100 dark:bg-red-900 p-1 rounded">
+                          {finalImageUrl}
+                        </p>
+                      </div>
+                      
+                      {/* Action buttons */}
+                      <div className="flex gap-1 mt-2">
+                        <button 
+                          onClick={testImageUrl}
+                          className="text-red-600 dark:text-red-400 hover:underline flex items-center gap-1 text-[10px]"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          Testar
+                        </button>
+                        <button 
+                          onClick={copyUrlToClipboard}
+                          className="text-red-600 dark:text-red-400 hover:underline flex items-center gap-1 text-[10px]"
+                        >
+                          <Copy className="h-3 w-3" />
+                          Copiar
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -161,7 +218,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                   Imagem não disponível
                 </span>
                 {exercise.gif_url && (
-                  <div className="mt-2 p-2 bg-muted/50 rounded">
+                  <div className="mt-2 p-2 bg-muted/50 rounded max-w-full overflow-auto">
                     <span className="text-xs text-muted-foreground/70 font-mono break-all">
                       Raw: {exercise.gif_url}
                     </span>

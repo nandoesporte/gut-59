@@ -7,8 +7,8 @@ export const formatImageUrl = (url: string | null): string => {
   
   console.log('ImageUtils: Processing URL:', url);
   
-  // Se já é uma URL completa, retorna como está
-  if (url.startsWith('http://') || url.startsWith('https://')) {
+  // Se já é uma URL completa do Supabase, retorna como está
+  if (url.startsWith('https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/')) {
     console.log('ImageUtils: URL is already complete, returning as-is');
     return url;
   }
@@ -20,15 +20,30 @@ export const formatImageUrl = (url: string | null): string => {
     return formattedUrl;
   }
   
-  // Para arquivos GIF, tenta diferentes caminhos baseado no exemplo funcional
+  // Para arquivos GIF, construir URL correta baseada no bucket
   if (url.includes('.gif')) {
-    // Remove qualquer prefixo de bucket e usa apenas o nome do arquivo
-    const fileName = url.replace(/^(exercise-gifs\/batch\/|exercicios\/)?/, '');
+    let finalUrl: string;
     
-    // Primeiro tenta com o bucket 'exercicios' (exemplo funcional)
-    const exerciciosUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/exercicios/${fileName}`;
-    console.log('ImageUtils: Created URL for exercicios bucket:', exerciciosUrl);
-    return exerciciosUrl;
+    // Se a URL já contém o caminho do bucket exercise-gifs/batch
+    if (url.includes('exercise-gifs/batch/')) {
+      // Usar como está, apenas adicionar o domínio se necessário
+      if (url.startsWith('exercise-gifs/batch/')) {
+        finalUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/${url}`;
+      } else {
+        finalUrl = url;
+      }
+    }
+    // Se a URL contém apenas o nome do arquivo ou um caminho parcial
+    else {
+      // Remover qualquer prefixo desnecessário e construir o caminho correto
+      const fileName = url.replace(/^(exercise-gifs\/batch\/|exercicios\/|batch\/)?/, '');
+      
+      // Construir URL completa para o bucket exercise-gifs/batch
+      finalUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/exercise-gifs/batch/${fileName}`;
+    }
+    
+    console.log('ImageUtils: Created URL for exercise-gifs/batch bucket:', finalUrl);
+    return finalUrl;
   }
   
   // Fallback para placeholder
@@ -42,7 +57,7 @@ export const validateGifUrl = async (url: string): Promise<boolean> => {
     console.log('ImageUtils: Validating URL:', url);
     const response = await fetch(url, { method: 'HEAD' });
     const contentType = response.headers.get('Content-Type');
-    const isValid = response.ok && contentType?.includes('image/gif');
+    const isValid = response.ok && (contentType?.includes('image/gif') || contentType?.includes('image/'));
     
     console.log('ImageUtils: URL validation result:', {
       url,
