@@ -1,3 +1,4 @@
+
 import * as React from 'react';
 import { useState, useEffect, useCallback } from 'react';
 import { WorkoutPreferences } from '@/components/workout/types';
@@ -46,74 +47,64 @@ const Workout = () => {
         return;
       }
 
-      const { data: plans, error } = await supabase
-        .from('workout_plans')
-        .select(`
-          *,
-          workout_sessions (
-            *,
-            session_exercises (
-              *,
-              exercise:exercises (*)
-            )
-          )
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+      console.log("📋 Buscando histórico de treinos...");
 
-      if (error) {
-        console.error('Error fetching workout history:', error);
-        toast.error('Erro ao carregar o histórico de treinos');
-        throw error;
-      }
-      
-      // Transform the data to match our WorkoutPlan interface
-      const transformedPlans: WorkoutPlan[] = (plans || []).map(plan => ({
-        id: plan.id,
-        user_id: plan.user_id,
-        goal: plan.goal,
-        start_date: plan.start_date,
-        end_date: plan.end_date,
-        created_at: plan.created_at,
-        critique: plan.critique,
-        workout_sessions: (plan.workout_sessions || []).map(session => ({
-          id: session.id,
-          day_number: session.day_number,
-          day_name: session.day_name,
-          focus: session.focus,
-          intensity: session.intensity,
-          warmup_description: session.warmup_description,
-          cooldown_description: session.cooldown_description,
-          training_load: session.training_load,
-          session_exercises: (session.session_exercises || []).map(sessionExercise => ({
-            id: sessionExercise.id,
-            sets: sessionExercise.sets,
-            reps: sessionExercise.reps,
-            rest_time_seconds: sessionExercise.rest_time_seconds,
-            intensity: sessionExercise.intensity,
-            recommended_weight: sessionExercise.recommended_weight,
-            exercise: sessionExercise.exercise ? {
-              id: sessionExercise.exercise.id || '',
-              name: sessionExercise.exercise.name || 'Exercício não encontrado',
-              gif_url: sessionExercise.exercise.gif_url,
-              description: sessionExercise.exercise.description,
-              muscle_group: sessionExercise.exercise.muscle_group,
-              exercise_type: sessionExercise.exercise.exercise_type
-            } : {
-              id: '',
-              name: 'Exercício não encontrado',
-              gif_url: undefined,
-              description: undefined,
-              muscle_group: undefined,
-              exercise_type: undefined
-            }
-          }))
-        }))
-      }));
-      
-      setHistoryPlans(transformedPlans);
+      // Function to safely fetch plans with proper error handling
+      const fetchPlansWithFallback = async () => {
+        try {
+          // First, try with recommended_weight column
+          const { data: plans, error } = await supabase
+            .from('workout_plans')
+            .select(`
+              *,
+              workout_sessions (
+                *,
+                session_exercises (
+                  *,
+                  recommended_weight,
+                  exercise:exercises (*)
+                )
+              )
+            `)
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false });
+
+          if (error) throw error;
+          return plans;
+        } catch (error: any) {
+          if (error.message?.includes("recommended_weight") && error.message?.includes("does not exist")) {
+            console.log("⚠️ Coluna recommended_weight não existe, buscando sem ela...");
+            
+            const { data: plansWithoutWeight, error: fallbackError } = await supabase
+              .from('workout_plans')
+              .select(`
+                *,
+                workout_sessions (
+                  *,
+                  session_exercises (
+                    *,
+                    exercise:exercises (*)
+                  )
+                )
+              `)
+              .eq('user_id', user.id)
+              .order('created_at', { ascending: false });
+
+            if (fallbackError) throw fallbackError;
+            return plansWithoutWeight;
+          } else {
+            throw error;
+          }
+        }
+      };
+
+      const plans = await fetchPlansWithFallback();
+
+      console.log(`✅ Histórico carregado: ${plans?.length || 0} planos`);
+      setHistoryPlans((plans || []) as WorkoutPlan[]);
     } catch (error) {
       console.error('Error fetching workout history:', error);
+      toast.error('Erro ao carregar o histórico de treinos');
     } finally {
       setIsLoadingHistory(false);
     }

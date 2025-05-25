@@ -28,10 +28,10 @@ serve(async (req) => {
       throw new Error('ID do usuário é obrigatório');
     }
 
-    // Buscar exercícios disponíveis que tenham GIFs na pasta batch
-    console.log('📚 Buscando exercícios da pasta batch no storage...');
+    // Buscar APENAS exercícios com GIFs válidos da pasta batch
+    console.log('📚 Buscando APENAS exercícios com GIFs válidos da pasta batch...');
     const exercisesResponse = await fetch(
-      `${SUPABASE_URL}/rest/v1/exercises?select=id,name,gif_url,description,muscle_group,equipment_needed,exercise_type,min_sets,max_sets,min_reps,max_reps,rest_time_seconds,beginner_weight,moderate_weight,advanced_weight&gif_url=like.*batch*&limit=200`, 
+      `${SUPABASE_URL}/rest/v1/exercises?select=id,name,gif_url,description,muscle_group,equipment_needed,exercise_type,min_sets,max_sets,min_reps,max_reps,rest_time_seconds,beginner_weight,moderate_weight,advanced_weight&gif_url=like.*%2Fstorage%2Fv1%2Fobject%2Fpublic%2Fexercise-gifs%2Fbatch%2F*&limit=500`, 
       {
         headers: {
           'apikey': SUPABASE_SERVICE_ROLE_KEY,
@@ -45,40 +45,62 @@ serve(async (req) => {
     }
 
     const allExercises = await exercisesResponse.json();
-    console.log(`📊 ${allExercises.length} exercícios encontrados com GIFs`);
+    console.log(`📊 ${allExercises.length} exercícios encontrados da pasta batch`);
     
-    // Filtrar apenas exercícios que tenham GIFs da pasta batch no storage
-    const batchExercises = allExercises.filter(exercise => {
+    // Validação extra: filtrar apenas exercícios que realmente têm GIFs válidos
+    const validBatchExercises = allExercises.filter(exercise => {
       const hasValidGif = exercise.gif_url && 
-                         exercise.gif_url.includes('/storage/v1/object/public/exercise-gifs/batch/');
+                         exercise.gif_url.includes('/storage/v1/object/public/exercise-gifs/batch/') &&
+                         exercise.gif_url.trim().length > 50 && // URL deve ter tamanho mínimo
+                         !exercise.gif_url.includes('placeholder') &&
+                         !exercise.gif_url.includes('example') &&
+                         !exercise.gif_url.includes('null') &&
+                         !exercise.gif_url.includes('undefined');
+      
       if (hasValidGif) {
-        console.log(`✅ Exercício da pasta batch: ${exercise.name} - ${exercise.gif_url}`);
+        console.log(`✅ Exercício válido da pasta batch: ${exercise.name} - GIF: ${exercise.gif_url}`);
+      } else {
+        console.log(`❌ Exercício rejeitado (GIF inválido): ${exercise.name} - ${exercise.gif_url || 'sem GIF'}`);
       }
       return hasValidGif;
     });
     
-    console.log(`🎯 ${batchExercises.length} exercícios válidos da pasta batch encontrados`);
+    console.log(`🎯 ${validBatchExercises.length} exercícios válidos confirmados da pasta batch`);
     
-    if (batchExercises.length === 0) {
-      throw new Error('Nenhum exercício com GIFs da pasta batch disponível no banco de dados');
+    if (validBatchExercises.length === 0) {
+      throw new Error('Nenhum exercício com GIFs válidos encontrado na pasta batch');
     }
+
+    // Verificar se temos exercícios suficientes por grupo muscular
+    const exercisesByGroup = {
+      chest: validBatchExercises.filter(ex => ex.muscle_group === 'chest'),
+      back: validBatchExercises.filter(ex => ex.muscle_group === 'back'),
+      legs: validBatchExercises.filter(ex => ex.muscle_group === 'legs'),
+      shoulders: validBatchExercises.filter(ex => ex.muscle_group === 'shoulders'),
+      arms: validBatchExercises.filter(ex => ex.muscle_group === 'arms'),
+      core: validBatchExercises.filter(ex => ex.muscle_group === 'core')
+    };
+
+    Object.entries(exercisesByGroup).forEach(([group, exercises]) => {
+      console.log(`💪 Grupo ${group}: ${exercises.length} exercícios da pasta batch`);
+    });
 
     let aiPlan;
     
     // Tentar usar xAI primeiro, se disponível
     if (XAI_API_KEY) {
-      console.log('🚀 Tentando gerar plano com xAI Grok-3 Mini...');
+      console.log('🚀 Tentando gerar plano com xAI Grok-2...');
       try {
-        aiPlan = await generateWithXAI(preferences, batchExercises);
-        console.log('✅ Plano gerado com sucesso usando Grok-3 Mini');
+        aiPlan = await generateWithXAI(preferences, validBatchExercises);
+        console.log('✅ Plano gerado com sucesso usando Grok-2');
       } catch (xaiError) {
-        console.error('❌ Erro com Grok-3 Mini:', xaiError.message);
+        console.error('❌ Erro com Grok-2:', xaiError.message);
         console.log('🔄 Caindo para geração local...');
-        aiPlan = generateLocalPlan(preferences, batchExercises);
+        aiPlan = generateLocalPlan(preferences, validBatchExercises);
       }
     } else {
       console.log('⚠️ XAI_API_KEY não encontrada, usando geração local');
-      aiPlan = generateLocalPlan(preferences, batchExercises);
+      aiPlan = generateLocalPlan(preferences, validBatchExercises);
     }
 
     // Criar o plano completo
@@ -110,11 +132,11 @@ serve(async (req) => {
           console.log(`💪 Processando ${session.session_exercises.length} exercícios para o dia ${sessionIndex + 1}...`);
           
           processedSession.session_exercises = session.session_exercises.map((exercise, exIndex) => {
-            // Buscar exercício na lista filtrada da pasta batch
-            const foundExercise = batchExercises.find(ex => ex.id === exercise.exercise_id);
+            // Buscar exercício na lista válida da pasta batch
+            const foundExercise = validBatchExercises.find(ex => ex.id === exercise.exercise_id);
             
             if (foundExercise) {
-              console.log(`✅ Exercício da batch encontrado: ${foundExercise.name}`);
+              console.log(`✅ Exercício válido encontrado: ${foundExercise.name} - GIF: ${foundExercise.gif_url}`);
               
               // Determinar carga baseada no nível de atividade e peso recomendado
               const recommendedWeight = determineRecommendedWeight(
@@ -142,9 +164,9 @@ serve(async (req) => {
                 }
               };
             } else {
-              console.warn(`⚠️ Exercício não encontrado na pasta batch: ${exercise.exercise_id}, usando substituto`);
-              // Usar exercício padrão da pasta batch se não encontrar
-              const defaultExercise = batchExercises[exIndex % batchExercises.length];
+              console.warn(`⚠️ Exercício não encontrado: ${exercise.exercise_id}, usando substituto válido`);
+              // Usar exercício padrão válido da pasta batch se não encontrar
+              const defaultExercise = validBatchExercises[exIndex % validBatchExercises.length];
               const recommendedWeight = determineRecommendedWeight(
                 defaultExercise, 
                 preferences.activity_level, 
@@ -152,6 +174,8 @@ serve(async (req) => {
                 preferences.age,
                 preferences.gender
               );
+              
+              console.log(`🔄 Substituindo por: ${defaultExercise.name} - GIF: ${defaultExercise.gif_url}`);
               
               return {
                 id: crypto.randomUUID(),
@@ -177,11 +201,11 @@ serve(async (req) => {
       });
     }
 
-    console.log('🎉 Plano de treino gerado com sucesso pelo Trenner2025!');
+    console.log('🎉 Plano de treino gerado com sucesso!');
     console.log(`📊 Estatísticas do plano:`);
     console.log(`- Sessões: ${workoutPlan.workout_sessions.length}`);
     workoutPlan.workout_sessions.forEach((session, index) => {
-      console.log(`- Dia ${index + 1}: ${session.session_exercises.length} exercícios da pasta batch`);
+      console.log(`- Dia ${index + 1}: ${session.session_exercises.length} exercícios válidos com GIFs`);
     });
     
     return new Response(
@@ -274,24 +298,24 @@ function determineRecommendedWeight(exercise, activityLevel, userWeight, userAge
   return `${recommendedKg}kg`;
 }
 
-async function generateWithXAI(preferences: any, batchExercises: any[]) {
-  console.log('🧠 Preparando prompt para Grok-3 Mini...');
+async function generateWithXAI(preferences: any, validBatchExercises: any[]) {
+  console.log('🧠 Preparando prompt para Grok-2...');
   
   const systemPrompt = `Você é o Trenner2025, um agente de IA especializado em educação física e criação de planos de treino personalizados. 
   Crie um plano de treino detalhado baseado nas preferências do usuário e nos exercícios disponíveis da pasta batch.
   IMPORTANTE: Responda SEMPRE em português do Brasil e retorne APENAS um JSON válido sem formatação markdown.
-  Você deve criar planos científicos, seguros e eficazes usando APENAS exercícios com GIFs da pasta batch.
+  Você deve criar planos científicos, seguros e eficazes usando APENAS exercícios com GIFs válidos da pasta batch.
   
   REGRAS IMPORTANTES:
   - Crie EXATAMENTE ${preferences.days_per_week || 3} dias de treino
   - Cada dia deve ter entre 6-8 exercícios diferentes
   - Varie os exercícios entre os dias focando em diferentes grupos musculares
-  - Use apenas IDs de exercícios que existem na lista fornecida
+  - Use apenas IDs de exercícios que existem na lista fornecida (TODOS têm GIFs válidos)
   - Distribua os exercícios de forma equilibrada entre os grupos musculares
   - Especifique cargas apropriadas baseadas no nível de condicionamento físico`;
 
   const userPrompt = `
-  Eu sou o Trenner2025 e vou criar um plano de treino personalizado baseado nestas informações:
+  Crie um plano de treino personalizado baseado nestas informações:
   
   Preferências do usuário:
   - Objetivo: ${preferences.goal || 'manter forma'}
@@ -303,10 +327,10 @@ async function generateWithXAI(preferences: any, batchExercises: any[]) {
   - Altura: ${preferences.height || 'não informada'}cm
   - Gênero: ${preferences.gender || 'não informado'}
   
-  Exercícios disponíveis da pasta batch (use APENAS estes IDs):
-  ${batchExercises.slice(0, 50).map((ex, index) => `${index + 1}. ID: ${ex.id} - ${ex.name} (${ex.muscle_group}, ${ex.exercise_type}, Séries: ${ex.min_sets}-${ex.max_sets}, Reps: ${ex.min_reps}-${ex.max_reps}, Peso iniciante: ${ex.beginner_weight || 'não especificado'}, Peso intermediário: ${ex.moderate_weight || 'não especificado'}, Peso avançado: ${ex.advanced_weight || 'não especificado'})`).join('\n')}
+  Exercícios disponíveis com GIFs válidos da pasta batch (use APENAS estes IDs):
+  ${validBatchExercises.slice(0, 50).map((ex, index) => `${index + 1}. ID: ${ex.id} - ${ex.name} (${ex.muscle_group}, ${ex.exercise_type}, Séries: ${ex.min_sets}-${ex.max_sets}, Reps: ${ex.min_reps}-${ex.max_reps})`).join('\n')}
   
-  Retorne um JSON com esta estrutura exata (crie ${preferences.days_per_week || 3} dias com 6-8 exercícios cada):
+  Retorne APENAS um JSON válido com esta estrutura exata:
   {
     "workout_sessions": [
       {
@@ -319,30 +343,23 @@ async function generateWithXAI(preferences: any, batchExercises: any[]) {
             "sets": 3,
             "reps": 12,
             "rest_time_seconds": 60,
-            "order_in_session": 1,
-            "recommended_weight": "15kg ou peso corporal"
+            "order_in_session": 1
           }
-          // ... mais 5-7 exercícios diferentes
         ]
       }
-      // ... mais ${(preferences.days_per_week || 3) - 1} dias
     ]
   }
   
   CRITÉRIOS OBRIGATÓRIOS:
-  - Use apenas IDs de exercícios que existem na lista fornecida da pasta batch!
+  - Use apenas IDs de exercícios que existem na lista fornecida!
   - Crie ${preferences.days_per_week || 3} dias de treino
   - Cada dia deve ter 6-8 exercícios diferentes 
   - Inclua order_in_session para cada exercício (1, 2, 3, etc.)
   - Varie os grupos musculares entre os dias
   - Respeite os limites de séries e repetições de cada exercício
-  - Especifique cargas apropriadas para o nível do usuário
-  - Para exercícios de peso corporal, especifique "peso corporal"
-  - Para exercícios com peso, especifique valores em kg apropriados para o nível
-  - Crie aquecimentos e resfriamentos específicos para cada dia
   `;
 
-  // Chamar API da xAI com modelo Grok-3 Mini
+  // Chamar API da xAI com modelo Grok-2
   const xaiResponse = await fetch('https://api.x.ai/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -382,7 +399,23 @@ async function generateWithXAI(preferences: any, batchExercises: any[]) {
   // Parse do JSON retornado
   try {
     const cleanContent = content.replace(/```json|```/g, '').trim();
-    return JSON.parse(cleanContent);
+    const parsedPlan = JSON.parse(cleanContent);
+    
+    // Validar se temos exercícios
+    if (!parsedPlan.workout_sessions || !Array.isArray(parsedPlan.workout_sessions)) {
+      throw new Error('Plano inválido: sem sessões de treino');
+    }
+    
+    // Verificar se cada sessão tem exercícios
+    parsedPlan.workout_sessions.forEach((session, index) => {
+      if (!session.session_exercises || !Array.isArray(session.session_exercises) || session.session_exercises.length === 0) {
+        console.error(`❌ Sessão ${index + 1} sem exercícios`);
+        throw new Error(`Sessão ${index + 1} sem exercícios`);
+      }
+      console.log(`✅ Sessão ${index + 1}: ${session.session_exercises.length} exercícios`);
+    });
+    
+    return parsedPlan;
   } catch (parseError) {
     console.error('❌ Erro ao fazer parse do JSON:', parseError);
     console.error('Conteúdo que falhou:', content);
@@ -390,17 +423,17 @@ async function generateWithXAI(preferences: any, batchExercises: any[]) {
   }
 }
 
-function generateLocalPlan(preferences: any, batchExercises: any[]) {
-  console.log('🏠 Gerando plano localmente com exercícios da pasta batch...');
+function generateLocalPlan(preferences: any, validBatchExercises: any[]) {
+  console.log('🏠 Gerando plano localmente com exercícios válidos da pasta batch...');
   
   const daysPerWeek = preferences.days_per_week || 3;
   const muscleGroups = ["chest", "back", "legs", "shoulders", "arms", "core"];
   
-  // Organizar exercícios da pasta batch por grupo muscular
+  // Organizar exercícios válidos por grupo muscular
   const exercisesByMuscle: Record<string, any[]> = {};
   muscleGroups.forEach(group => {
-    exercisesByMuscle[group] = batchExercises.filter(ex => ex.muscle_group === group);
-    console.log(`💪 Grupo ${group}: ${exercisesByMuscle[group].length} exercícios da pasta batch`);
+    exercisesByMuscle[group] = validBatchExercises.filter(ex => ex.muscle_group === group);
+    console.log(`💪 Grupo ${group}: ${exercisesByMuscle[group].length} exercícios válidos`);
   });
   
   const sessions = [];
@@ -409,7 +442,7 @@ function generateLocalPlan(preferences: any, batchExercises: any[]) {
     const sessionExercises = [];
     let exerciseOrder = 1;
     
-    // Selecionar 6-8 exercícios por sessão da pasta batch
+    // Selecionar 6-8 exercícios por sessão
     const exercisesPerSession = Math.min(8, Math.max(6, Math.floor(24 / daysPerWeek)));
     
     // Distribuir exercícios pelos grupos musculares de forma equilibrada
@@ -428,32 +461,22 @@ function generateLocalPlan(preferences: any, batchExercises: any[]) {
         for (const exercise of selectedFromGroup) {
           if (sessionExercises.length >= exercisesPerSession) break;
           
-          // Determinar carga recomendada
-          const recommendedWeight = determineRecommendedWeight(
-            exercise, 
-            preferences.activity_level, 
-            preferences.weight,
-            preferences.age,
-            preferences.gender
-          );
-          
           sessionExercises.push({
             exercise_id: exercise.id,
             sets: Math.max(exercise.min_sets || 3, 3),
             reps: Math.max(exercise.min_reps || 10, 10),
             rest_time_seconds: exercise.rest_time_seconds || 60,
-            order_in_session: exerciseOrder++,
-            recommended_weight: recommendedWeight
+            order_in_session: exerciseOrder++
           });
           
-          console.log(`✅ Exercício selecionado para o dia ${day}: ${exercise.name} (${exercise.muscle_group}) - Carga: ${recommendedWeight}`);
+          console.log(`✅ Exercício válido selecionado para o dia ${day}: ${exercise.name} (${exercise.muscle_group}) - GIF: ${exercise.gif_url}`);
         }
       }
     }
     
-    // Se ainda precisamos de mais exercícios, pegar de qualquer grupo
-    while (sessionExercises.length < exercisesPerSession && sessionExercises.length < batchExercises.length) {
-      const remainingExercises = batchExercises.filter(ex => 
+    // Se ainda precisamos de mais exercícios, pegar de qualquer grupo (todos são válidos)
+    while (sessionExercises.length < exercisesPerSession && sessionExercises.length < validBatchExercises.length) {
+      const remainingExercises = validBatchExercises.filter(ex => 
         !sessionExercises.some(se => se.exercise_id === ex.id)
       );
       
@@ -461,24 +484,15 @@ function generateLocalPlan(preferences: any, batchExercises: any[]) {
       
       const randomExercise = remainingExercises[Math.floor(Math.random() * remainingExercises.length)];
       
-      const recommendedWeight = determineRecommendedWeight(
-        randomExercise, 
-        preferences.activity_level, 
-        preferences.weight,
-        preferences.age,
-        preferences.gender
-      );
-      
       sessionExercises.push({
         exercise_id: randomExercise.id,
         sets: Math.max(randomExercise.min_sets || 3, 3),
         reps: Math.max(randomExercise.min_reps || 10, 10),
         rest_time_seconds: randomExercise.rest_time_seconds || 60,
-        order_in_session: exerciseOrder++,
-        recommended_weight: recommendedWeight
+        order_in_session: exerciseOrder++
       });
       
-      console.log(`✅ Exercício adicional para o dia ${day}: ${randomExercise.name} (${randomExercise.muscle_group}) - Carga: ${recommendedWeight}`);
+      console.log(`✅ Exercício adicional válido para o dia ${day}: ${randomExercise.name} (${randomExercise.muscle_group}) - GIF: ${randomExercise.gif_url}`);
     }
     
     sessions.push({
@@ -489,9 +503,9 @@ function generateLocalPlan(preferences: any, batchExercises: any[]) {
     });
   }
   
-  console.log(`🎯 Plano local gerado com ${sessions.length} sessões usando exercícios da pasta batch`);
+  console.log(`🎯 Plano local gerado com ${sessions.length} sessões usando apenas exercícios válidos da pasta batch`);
   sessions.forEach((session, index) => {
-    console.log(`📅 Dia ${index + 1}: ${session.session_exercises.length} exercícios`);
+    console.log(`📅 Dia ${index + 1}: ${session.session_exercises.length} exercícios válidos`);
   });
   
   return { workout_sessions: sessions };

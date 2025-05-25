@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Pencil, Trash2, Dumbbell } from "lucide-react";
+import { Pencil, Trash2, Dumbbell, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { formatImageUrl } from "@/utils/imageUtils";
@@ -15,21 +15,49 @@ interface ExerciseCardProps {
 }
 
 export const ExerciseCard = ({ exercise, onUpdate }: ExerciseCardProps) => {
-  const [imageStatus, setImageStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
+  const [imgError, setImgError] = useState(false);
+  const [imgSrc, setImgSrc] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   
   useEffect(() => {
-    setImageStatus('loading');
-  }, [exercise.gif_url, exercise.id]);
+    setIsLoading(true);
+    setImgError(false);
+    
+    if (exercise.gif_url) {
+      const url = formatImageUrl(exercise.gif_url);
+      console.log(`Exercise ${exercise.id} (${exercise.name}) - Formatted URL: ${url}`);
+      setImgSrc(url);
+
+      // Pre-fetch the image to test if it loads correctly
+      const img = new Image();
+      img.onload = () => {
+        console.log(`Pre-fetch successful for exercise card: ${exercise.name}`);
+        setIsLoading(false);
+      };
+      img.onerror = () => {
+        console.error(`Pre-fetch failed for exercise card: ${exercise.name}`);
+        setImgError(true);
+        setImgSrc("/placeholder.svg");
+        setIsLoading(false);
+      };
+      img.src = `${url}?t=${Date.now()}`;
+    } else {
+      setImgSrc("/placeholder.svg");
+      setIsLoading(false);
+    }
+  }, [exercise.gif_url, exercise.id, exercise.name]);
 
   const handleImageLoad = () => {
     console.log(`Successfully loaded image for ${exercise.name}`);
-    setImageStatus('loaded');
+    setIsLoading(false);
   };
 
   const handleImageError = () => {
     console.error(`Error loading GIF for ${exercise.name}:`, exercise.gif_url);
-    setImageStatus('error');
+    setImgError(true);
+    setImgSrc("/placeholder.svg");
+    setIsLoading(false);
   };
 
   const handleDelete = async () => {
@@ -57,9 +85,6 @@ export const ExerciseCard = ({ exercise, onUpdate }: ExerciseCardProps) => {
     toast.success('Exercício atualizado com sucesso!');
   };
 
-  const imageUrl = formatImageUrl(exercise.gif_url);
-  const shouldShowImage = imageUrl && imageUrl !== '/placeholder.svg';
-
   return (
     <>
       <Card>
@@ -77,41 +102,29 @@ export const ExerciseCard = ({ exercise, onUpdate }: ExerciseCardProps) => {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="mb-4 relative pt-[56.25%] flex items-center justify-center bg-gray-100 rounded-md">
-            {shouldShowImage ? (
-              <>
-                <img
-                  src={imageUrl}
-                  alt={exercise.name}
-                  className={`absolute top-0 left-0 w-full h-full object-contain rounded-md transition-opacity duration-300 ${
-                    imageStatus === 'loaded' ? 'opacity-100' : 'opacity-0'
-                  }`}
-                  onError={handleImageError}
-                  onLoad={handleImageLoad}
-                />
-                {imageStatus === 'loading' && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                  </div>
-                )}
-                {imageStatus === 'error' && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-md">
-                    <div className="text-gray-400 text-center p-2">
-                      <Dumbbell className="h-10 w-10 mx-auto mb-1" />
-                      <p className="text-xs">{exercise.name}</p>
-                      <p className="text-xs mt-1">Imagem não disponível</p>
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center">
+          <div className="mb-4 relative pt-[56.25%] flex items-center justify-center bg-white">
+            {isLoading && (
+              <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center bg-gray-100 rounded-md">
+                <Loader2 className="w-8 h-8 text-primary animate-spin" />
+              </div>
+            )}
+            {imgError ? (
+              <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center bg-gray-100 rounded-md">
                 <div className="text-gray-400 text-center p-2">
                   <Dumbbell className="h-10 w-10 mx-auto mb-1" />
                   <p className="text-xs">{exercise.name}</p>
-                  <p className="text-xs mt-1">Sem imagem</p>
+                  <p className="text-xs mt-1">Imagem não disponível</p>
                 </div>
               </div>
+            ) : (
+              <img
+                src={`${imgSrc || "/placeholder.svg"}?t=${Date.now()}`}
+                alt={exercise.name}
+                className="absolute top-0 left-0 w-full h-full object-contain rounded-md"
+                onError={handleImageError}
+                onLoad={handleImageLoad}
+                style={{ display: isLoading ? 'none' : 'block' }}
+              />
             )}
           </div>
           <div className="space-y-2 text-sm">
@@ -120,7 +133,7 @@ export const ExerciseCard = ({ exercise, onUpdate }: ExerciseCardProps) => {
             <p><strong>Séries:</strong> {exercise.min_sets}-{exercise.max_sets}</p>
             <p><strong>Repetições:</strong> {exercise.min_reps}-{exercise.max_reps}</p>
             {exercise.description && (
-              <p className="text-muted-foreground line-clamp-3">{exercise.description}</p>
+              <p className="text-muted-foreground">{exercise.description}</p>
             )}
           </div>
         </CardContent>

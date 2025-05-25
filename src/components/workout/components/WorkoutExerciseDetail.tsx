@@ -2,12 +2,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatImageUrl, validateGifUrl } from '@/utils/imageUtils';
+import { formatImageUrl } from '@/utils/imageUtils';
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dumbbell, AlertCircle, Maximize, Weight, ExternalLink, Copy } from 'lucide-react';
+import { Dumbbell, AlertCircle, RefreshCw, Maximize, Loader2, Weight } from 'lucide-react';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { toast } from 'sonner';
 
 interface WorkoutExerciseDetailProps {
   exerciseSession: any;
@@ -16,222 +15,141 @@ interface WorkoutExerciseDetailProps {
 
 export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: WorkoutExerciseDetailProps) => {
   const exercise = exerciseSession.exercise;
-  const [imageStatus, setImageStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const [expandDescription, setExpandDescription] = useState(false);
-  const [finalImageUrl, setFinalImageUrl] = useState<string | null>(null);
-  const [urlValidation, setUrlValidation] = useState<boolean | null>(null);
+  const [isInView, setIsInView] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const isMobile = useIsMobile();
   
   if (!exercise) {
-    console.log('WorkoutExerciseDetail: Exercise data missing:', exerciseSession);
+    console.log('Exercise data missing:', exerciseSession);
     return null;
   }
 
-  const imageUrl = exercise.gif_url ? formatImageUrl(exercise.gif_url) : null;
-  
-  // Debug da URL final - LOG COMPLETO SEM TRUNCAR
+  // Intersection Observer para lazy loading mais eficiente
   useEffect(() => {
-    console.log(`\n=== WorkoutExerciseDetail: Exercise "${exercise.name}" (ID: ${exercise.id}) ===`);
-    console.log('Raw gif_url from database:', exercise.gif_url);
-    console.log('Formatted imageUrl (COMPLETE - NO TRUNCATION):', imageUrl);
-    console.log('ImageUrl length:', imageUrl?.length);
-    console.log('ImageUrl starts with:', imageUrl?.substring(0, 50));
-    console.log('ImageUrl ends with:', imageUrl?.substring(imageUrl.length - 50));
-    setFinalImageUrl(imageUrl);
-    
-    // Validar URL se disponível
-    if (imageUrl && imageUrl !== '/placeholder.svg') {
-      validateGifUrl(imageUrl).then(isValid => {
-        setUrlValidation(isValid);
-        console.log(`URL validation for ${exercise.name}:`, isValid);
-      });
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsInView(true);
+          observer.disconnect();
+        }
+      },
+      { 
+        rootMargin: '100px', // Começar a carregar 100px antes de aparecer
+        threshold: 0.1 
+      }
+    );
+
+    if (cardRef.current) {
+      observer.observe(cardRef.current);
     }
-  }, [exercise.id, exercise.gif_url, imageUrl, exercise.name]);
-  
-  // Reset image status when exercise changes
+
+    return () => observer.disconnect();
+  }, []);
+
+  // Reset image states if exercise changes
   useEffect(() => {
-    setImageStatus('loading');
-    setUrlValidation(null);
+    setImageLoaded(false);
+    setImageError(false);
     
-    if (finalImageUrl && finalImageUrl !== '/placeholder.svg') {
-      console.log(`\n=== Loading image for ${exercise.name} ===`);
-      console.log('COMPLETE URL (NO TRUNCATION):', finalImageUrl);
-      console.log('URL length:', finalImageUrl.length);
-      console.log('URL structure check:');
-      console.log('- Contains sxjafhzikftdenqnkcri:', finalImageUrl.includes('sxjafhzikftdenqnkcri'));
-      console.log('- Contains storage/v1/object/public:', finalImageUrl.includes('/storage/v1/object/public/'));
-      console.log('- Contains exercise-gifs/batch:', finalImageUrl.includes('exercise-gifs/batch'));
-      console.log('- Ends with .gif:', finalImageUrl.endsWith('.gif'));
-    }
-  }, [exercise.id, finalImageUrl, exercise.name]);
+    console.log(`Loading exercise: ${exercise.name} (${exercise.id})`);
+  }, [exercise.id, exercise.name]);
   
-  const handleImageError = (event: any) => {
-    const imgElement = event.target as HTMLImageElement;
-    console.error(`\n=== IMAGE LOAD ERROR ===`);
-    console.error('Exercise:', exercise.name);
-    console.error('Failed URL (COMPLETE - NO TRUNCATION):', imgElement.src);
-    console.error('Original gif_url from database:', exercise.gif_url);
-    console.error('Event details:', event);
-    console.error('Image element naturalWidth:', imgElement.naturalWidth);
-    console.error('Image element naturalHeight:', imgElement.naturalHeight);
-    setImageStatus('error');
+  const handleImageError = () => {
+    console.error(`Failed to load image for exercise: ${exercise.name} (${exercise.id}). URL: ${exercise.gif_url}`);
+    setImageError(true);
+    setImageLoaded(true);
   };
   
   const handleImageLoad = () => {
-    console.log(`\n=== IMAGE LOAD SUCCESS ===`);
-    console.log('Exercise:', exercise.name);
-    console.log('Successful URL (COMPLETE - NO TRUNCATION):', finalImageUrl);
-    setImageStatus('loaded');
+    console.log(`✅ Image loaded successfully for: ${exercise.name} (${exercise.id})`);
+    setImageLoaded(true);
+    setImageError(false);
   };
   
-  const shouldShowImage = finalImageUrl && 
-                         finalImageUrl !== '/placeholder.svg' && 
-                         !finalImageUrl.includes('placeholder');
-
-  const testImageUrl = () => {
-    if (finalImageUrl) {
-      window.open(finalImageUrl, '_blank');
-    }
-  };
-
-  const copyUrlToClipboard = () => {
-    if (finalImageUrl) {
-      navigator.clipboard.writeText(finalImageUrl);
-      toast.success('URL copiada para a área de transferência');
-    }
-  };
+  const imageUrl = exercise.gif_url ? formatImageUrl(exercise.gif_url) : null;
+  
+  const isLikelyValidUrl = imageUrl && 
+                          !imageUrl.includes('placeholder') && 
+                          !imageUrl.includes('example.') &&
+                          imageUrl.trim().length > 10 &&
+                          imageUrl.includes('/storage/v1/object/public/exercise-gifs/batch/');
   
   return (
-    <Card className="overflow-hidden border-none shadow-sm hover:shadow-md transition-shadow duration-200">
+    <Card ref={cardRef} className="overflow-hidden border-none shadow-sm hover:shadow-md transition-shadow duration-200">
       <CardContent className="p-0">
         <div className="flex flex-col md:flex-row gap-3">
-          {/* Exercise GIF/Image */}
+          {/* Exercise GIF/Image com lazy loading otimizado */}
           <div className="w-full md:w-1/3 bg-gray-100 dark:bg-gray-800 overflow-hidden flex items-center justify-center h-48 md:h-44 relative">
-            {shouldShowImage ? (
-              <>
-                {/* Loading skeleton */}
-                {imageStatus === 'loading' && (
-                  <div className="absolute inset-0">
-                    <Skeleton className="h-full w-full" />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="text-xs text-muted-foreground">Carregando...</div>
-                    </div>
-                  </div>
-                )}
-                
-                {/* Expand button */}
-                {imageStatus === 'loaded' && (
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <button className="absolute top-2 right-2 p-1.5 bg-black/50 rounded-full text-white z-20 hover:bg-black/70 transition-colors">
-                        <Maximize className="h-3.5 w-3.5" />
-                      </button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-lg max-h-[90vh] flex items-center justify-center p-2">
-                      <div className="w-full h-full flex items-center justify-center overflow-hidden">
-                        <img 
-                          src={finalImageUrl}
-                          alt={exercise.name}
-                          className="max-h-[80vh] max-w-full object-contain"
-                        />
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                )}
-
-                {/* Main image - RENDERIZAÇÃO COM URL COMPLETA */}
-                <img 
-                  ref={imageRef}
-                  src={finalImageUrl}
-                  alt={exercise.name}
-                  className={`h-full w-full object-contain transition-opacity duration-300 ${
-                    imageStatus === 'loaded' ? 'opacity-100' : 'opacity-0'
-                  }`}
-                  onLoad={handleImageLoad}
-                  onError={handleImageError}
-                  loading="lazy"
-                />
-                
-                {/* Error state com URL completa visível */}
-                {imageStatus === 'error' && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted text-center px-2 py-2 overflow-auto">
-                    <AlertCircle className="h-6 w-6 mb-2 text-red-500 flex-shrink-0" />
-                    <p className="text-sm text-muted-foreground font-medium mb-2">
-                      {exercise.name}
-                    </p>
-                    <div className="w-full p-2 bg-red-50 dark:bg-red-950 rounded text-xs overflow-auto max-h-32">
-                      <p className="text-red-600 dark:text-red-400 font-medium mb-1">Erro ao carregar GIF</p>
-                      
-                      {/* URL Validation Status */}
-                      {urlValidation !== null && (
-                        <p className={`mb-1 ${urlValidation ? 'text-green-600' : 'text-red-600'}`}>
-                          Status: {urlValidation ? 'URL acessível' : 'URL inacessível (404/403)'}
-                        </p>
-                      )}
-                      
-                      {/* Raw URL from database */}
-                      <div className="mb-2">
-                        <p className="text-red-500 dark:text-red-300 font-medium">URL original (DB):</p>
-                        <p className="text-red-500 dark:text-red-300 break-all font-mono text-[9px] bg-red-100 dark:bg-red-900 p-1 rounded">
-                          {exercise.gif_url || 'null'}
-                        </p>
-                      </div>
-                      
-                      {/* Formatted URL */}
-                      <div className="mb-2">
-                        <p className="text-red-500 dark:text-red-300 font-medium">URL formatada:</p>
-                        <p className="text-red-500 dark:text-red-300 break-all font-mono text-[9px] bg-red-100 dark:bg-red-900 p-1 rounded">
-                          {finalImageUrl}
-                        </p>
-                      </div>
-                      
-                      {/* Action buttons */}
-                      <div className="flex gap-1 mt-2">
-                        <button 
-                          onClick={testImageUrl}
-                          className="text-red-600 dark:text-red-400 hover:underline flex items-center gap-1 text-[10px]"
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                          Testar
-                        </button>
-                        <button 
-                          onClick={copyUrlToClipboard}
-                          className="text-red-600 dark:text-red-400 hover:underline flex items-center gap-1 text-[10px]"
-                        >
-                          <Copy className="h-3 w-3" />
-                          Copiar
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              /* Fallback quando não há imagem válida */
+            {(!imageLoaded && isInView && isLikelyValidUrl) && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <Skeleton className="h-48 md:h-44 w-full absolute inset-0" />
+                <span className="text-xs text-muted-foreground z-10 bg-background/80 px-2 py-1 rounded-md flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Carregando GIF...
+                </span>
+              </div>
+            )}
+            
+            {(!isLikelyValidUrl || imageError) && (
               <div className="flex flex-col items-center justify-center h-full w-full bg-muted text-center px-2">
-                <Dumbbell className="h-8 w-8 mb-2 text-primary/40" />
+                {imageError ? (
+                  <AlertCircle className="h-8 w-8 mb-2 text-amber-500" />
+                ) : (
+                  <Dumbbell className="h-8 w-8 mb-2 text-primary/40" />
+                )}
                 <p className="text-sm text-muted-foreground font-medium">
                   {exercise.name}
                 </p>
                 <span className="text-xs text-muted-foreground/70 mt-1">
-                  Imagem não disponível
+                  {imageError ? 'Imagem não disponível' : 'Sem imagem'}
                 </span>
-                {exercise.gif_url && (
-                  <div className="mt-2 p-2 bg-muted/50 rounded max-w-full overflow-auto">
-                    <span className="text-xs text-muted-foreground/70 font-mono break-all">
-                      Raw: {exercise.gif_url}
-                    </span>
-                  </div>
-                )}
               </div>
+            )}
+            
+            {/* Só renderizar a imagem quando estiver em view */}
+            {isInView && isLikelyValidUrl && (
+              <>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <button 
+                      className={`absolute top-2 right-2 p-1.5 bg-black/50 rounded-full text-white z-20 transition-opacity ${imageLoaded && !imageError ? 'opacity-100' : 'opacity-0'}`}
+                    >
+                      <Maximize className="h-3.5 w-3.5" />
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-lg max-h-[90vh] flex items-center justify-center p-2">
+                    <div className="w-full h-full flex items-center justify-center overflow-hidden">
+                      <img 
+                        src={imageUrl}
+                        alt={exercise.name}
+                        className="max-h-[80vh] max-w-full object-contain"
+                      />
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
+                <img 
+                  ref={imageRef}
+                  src={imageUrl}
+                  alt={exercise.name}
+                  className={`h-48 md:h-44 w-full object-contain transition-opacity duration-300 ${imageLoaded && !imageError ? 'opacity-100' : 'opacity-0'}`}
+                  onLoad={handleImageLoad}
+                  onError={handleImageError}
+                  loading="lazy"
+                  decoding="async"
+                />
+              </>
             )}
           </div>
           
           {/* Exercise Details */}
           <div className="flex-1 p-3 md:p-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-3">
-              <h4 className="font-semibold text-lg line-clamp-2">{exercise.name}</h4>
+              <h4 className="font-semibold text-lg">{exercise.name}</h4>
               <div className="flex flex-wrap gap-1.5 md:gap-2">
                 {exercise.muscle_group && (
                   <Badge variant="outline" className="bg-muted/50 text-xs">
@@ -261,20 +179,21 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                   <span className="bg-primary/10 text-primary px-2 py-1 rounded-md font-medium">
                     {Math.floor(exerciseSession.rest_time_seconds / 60)}:{(exerciseSession.rest_time_seconds % 60).toString().padStart(2, '0')} descanso
                   </span>
-                  {exerciseSession.recommended_weight && (
+                  {/* Agora a carga recomendada vem do banco de dados */}
+                  {(exerciseSession.recommended_weight || exerciseSession.exercise?.recommended_weight) && (
                     <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded-md font-medium flex items-center gap-1">
                       <Weight className="h-3 w-3" />
-                      {exerciseSession.recommended_weight}
+                      {exerciseSession.recommended_weight || exerciseSession.exercise?.recommended_weight}
                     </span>
                   )}
                 </div>
                 
                 {exercise.description && (
                   <div className="mt-2">
-                    <p className={`text-sm text-muted-foreground ${!expandDescription ? 'line-clamp-3' : ''}`}>
+                    <p className={`text-sm text-muted-foreground ${!expandDescription && 'line-clamp-2'}`}>
                       {exercise.description}
                     </p>
-                    {exercise.description.length > 150 && (
+                    {exercise.description.length > 120 && (
                       <button 
                         className="text-sm text-primary mt-1 hover:underline font-medium" 
                         onClick={() => setExpandDescription(!expandDescription)}
