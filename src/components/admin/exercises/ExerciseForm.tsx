@@ -21,7 +21,8 @@ const exerciseSchema = z.object({
   min_reps: z.number().min(1),
   max_reps: z.number().min(1),
   rest_time_seconds: z.number().min(1),
-  goals: z.array(z.string())
+  goals: z.array(z.string()),
+  gif_url: z.string().optional()
 });
 
 interface ExerciseFormProps {
@@ -45,7 +46,8 @@ export const ExerciseForm = ({ onSuccess, onCancel, exerciseData, editMode = fal
       min_reps: 8,
       max_reps: 12,
       rest_time_seconds: 60,
-      goals: []
+      goals: [],
+      gif_url: ''
     }
   });
 
@@ -103,6 +105,19 @@ export const ExerciseForm = ({ onSuccess, onCancel, exerciseData, editMode = fal
               <FormLabel>Descrição</FormLabel>
               <FormControl>
                 <Textarea {...field} />
+              </FormControl>
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="gif_url"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>URL da Imagem GIF</FormLabel>
+              <FormControl>
+                <Input {...field} placeholder="https://exemplo.com/exercicio.gif" />
               </FormControl>
             </FormItem>
           )}

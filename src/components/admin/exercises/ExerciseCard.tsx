@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ExerciseForm } from './ExerciseForm';
+import { formatImageUrl } from '@/utils/imageUtils';
 
 interface ExerciseCardProps {
   exercise: any;
@@ -60,11 +61,19 @@ export const ExerciseCard = ({ exercise, onUpdate }: ExerciseCardProps) => {
         <CardContent>
           <div className="mb-4 relative pt-[56.25%] flex items-center justify-center bg-white">
             <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center bg-gray-100 rounded-md">
-              <div className="text-gray-400 text-center p-2">
-                <Dumbbell className="h-10 w-10 mx-auto mb-1" />
-                <p className="text-xs">{exercise.name}</p>
-                <p className="text-xs mt-1">Sem imagem disponível</p>
-              </div>
+              {exercise.gif_url ? (
+                <img 
+                  src={formatImageUrl(exercise.gif_url)} 
+                  alt={exercise.name}
+                  className="w-full h-full object-cover rounded-md"
+                />
+              ) : (
+                <div className="text-gray-400 text-center p-2">
+                  <Dumbbell className="h-10 w-10 mx-auto mb-1" />
+                  <p className="text-xs">{exercise.name}</p>
+                  <p className="text-xs mt-1">Sem imagem disponível</p>
+                </div>
+              )}
             </div>
           </div>
           <div className="space-y-2 text-sm">

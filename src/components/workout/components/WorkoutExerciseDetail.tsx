@@ -3,6 +3,7 @@ import React, { useState, useRef } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dumbbell, Weight } from 'lucide-react';
+import { formatImageUrl } from '@/utils/imageUtils';
 
 interface WorkoutExerciseDetailProps {
   exerciseSession: any;
@@ -23,17 +24,25 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     <Card ref={cardRef} className="overflow-hidden border-none shadow-sm hover:shadow-md transition-shadow duration-200">
       <CardContent className="p-0">
         <div className="flex flex-col md:flex-row gap-3">
-          {/* Exercise placeholder - no image available */}
+          {/* Exercise image */}
           <div className="w-full md:w-1/3 bg-gray-100 dark:bg-gray-800 overflow-hidden flex items-center justify-center h-48 md:h-44 relative">
-            <div className="flex flex-col items-center justify-center h-full w-full bg-muted text-center px-2">
-              <Dumbbell className="h-8 w-8 mb-2 text-primary/40" />
-              <p className="text-sm text-muted-foreground font-medium">
-                {exercise.name}
-              </p>
-              <span className="text-xs text-muted-foreground/70 mt-1">
-                Sem imagem
-              </span>
-            </div>
+            {exercise.gif_url ? (
+              <img 
+                src={formatImageUrl(exercise.gif_url)} 
+                alt={exercise.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full w-full bg-muted text-center px-2">
+                <Dumbbell className="h-8 w-8 mb-2 text-primary/40" />
+                <p className="text-sm text-muted-foreground font-medium">
+                  {exercise.name}
+                </p>
+                <span className="text-xs text-muted-foreground/70 mt-1">
+                  Sem imagem
+                </span>
+              </div>
+            )}
           </div>
           
           {/* Exercise Details */}
