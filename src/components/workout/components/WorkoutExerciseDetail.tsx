@@ -58,13 +58,14 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     setRetryCount(0);
     
     console.log(`🏋️ Loading exercise: ${exercise.name} (${exercise.id})`);
-    console.log(`🔗 Original GIF URL: ${exercise.gif_url}`);
-  }, [exercise.id, exercise.name]);
+    console.log(`🔗 Original GIF URL from DB:`, exercise.gif_url);
+    console.log(`🔗 Exercise object keys:`, Object.keys(exercise));
+  }, [exercise.id, exercise.name, exercise.gif_url]);
   
   const handleImageError = (event: React.SyntheticEvent<HTMLImageElement, Event>) => {
     console.error(`❌ Failed to load image for exercise: ${exercise.name}`);
     console.error(`🔗 URL that failed: ${imageUrl}`);
-    console.error(`🔗 Original URL: ${exercise.gif_url}`);
+    console.error(`🔗 Original URL from DB: ${exercise.gif_url}`);
     console.error('🔗 Error event:', event);
     setImageError(true);
     setImageLoaded(true);
@@ -72,7 +73,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
   
   const handleImageLoad = () => {
     console.log(`✅ Image loaded successfully for: ${exercise.name}`);
-    console.log(`🔗 Loaded URL: ${imageUrl}`);
+    console.log(`🔗 Successfully loaded URL: ${imageUrl}`);
     setImageLoaded(true);
     setImageError(false);
   };
@@ -93,22 +94,25 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
   };
   
   const imageUrl = formatImageUrl(exercise.gif_url);
-  console.log(`🎯 Formatted URL for ${exercise.name}: ${imageUrl}`);
+  console.log(`🎯 Formatted URL for ${exercise.name}:`, imageUrl);
+  console.log(`🔍 URL Type check:`, typeof exercise.gif_url, 'Length:', exercise.gif_url?.length);
   
-  // Verificar se a URL parece válida - relaxando as validações
+  // Verificar se a URL parece válida
   const hasValidUrl = exercise.gif_url && 
                      typeof exercise.gif_url === 'string' &&
                      exercise.gif_url.trim().length > 5 &&
-                     !exercise.gif_url.includes('null') &&
-                     !exercise.gif_url.includes('undefined') &&
-                     !exercise.gif_url.includes('placeholder');
+                     !exercise.gif_url.toLowerCase().includes('null') &&
+                     !exercise.gif_url.toLowerCase().includes('undefined') &&
+                     !exercise.gif_url.toLowerCase().includes('placeholder');
   
   console.log(`🔍 URL validation for ${exercise.name}:`, {
     original: exercise.gif_url,
     formatted: imageUrl,
     hasValidUrl,
     length: exercise.gif_url?.length || 0,
-    type: typeof exercise.gif_url
+    type: typeof exercise.gif_url,
+    isString: typeof exercise.gif_url === 'string',
+    trimmedLength: exercise.gif_url?.trim?.()?.length || 0
   });
   
   return (
@@ -117,6 +121,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
         <div className="flex flex-col md:flex-row gap-3">
           {/* Exercise GIF/Image */}
           <div className="w-full md:w-1/3 bg-gray-100 dark:bg-gray-800 overflow-hidden flex items-center justify-center h-48 md:h-44 relative">
+            {/* Loading skeleton */}
             {(!imageLoaded && isInView && hasValidUrl) && (
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <Skeleton className="h-48 md:h-44 w-full absolute inset-0" />
@@ -127,6 +132,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
               </div>
             )}
             
+            {/* Error state or no valid URL */}
             {(!hasValidUrl || imageError) && (
               <div className="flex flex-col items-center justify-center h-full w-full bg-muted text-center px-2">
                 {imageError ? (
@@ -138,6 +144,9 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                     <span className="text-xs text-muted-foreground/70 mb-2">
                       Erro ao carregar imagem
                     </span>
+                    <div className="text-xs text-red-400 mb-2 px-2 py-1 bg-red-50 rounded">
+                      URL: {exercise.gif_url || 'Não disponível'}
+                    </div>
                     {retryCount < 3 && (
                       <button
                         onClick={handleRetry}
@@ -157,6 +166,9 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                     <span className="text-xs text-muted-foreground/70 mt-1">
                       Sem imagem disponível
                     </span>
+                    <div className="text-xs text-gray-400 mt-1 px-2 py-1 bg-gray-50 rounded">
+                      URL: {exercise.gif_url || 'Não disponível'}
+                    </div>
                   </>
                 )}
               </div>
