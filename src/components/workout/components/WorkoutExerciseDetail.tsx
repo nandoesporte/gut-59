@@ -19,7 +19,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
   const [imageError, setImageError] = useState(false);
   const [expandDescription, setExpandDescription] = useState(false);
   const [isInView, setIsInView] = useState(false);
-  const [debugInfo, setDebugInfo] = useState('');
+  const [retryCount, setRetryCount] = useState(0);
   const cardRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const isMobile = useIsMobile();
@@ -37,13 +37,10 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
       originalGifUrl: exercise.gif_url,
       hasGifUrl: !!exercise.gif_url,
       gifUrlLength: exercise.gif_url?.length || 0,
-      exerciseSession: exerciseSession
     });
-    
-    setDebugInfo(`ID: ${exercise.id}, GIF: ${exercise.gif_url ? 'exists' : 'missing'}`);
   }, [exercise]);
 
-  // Intersection Observer para lazy loading mais eficiente
+  // Intersection Observer para lazy loading
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -54,7 +51,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
         }
       },
       { 
-        rootMargin: '100px',
+        rootMargin: '50px',
         threshold: 0.1 
       }
     );
@@ -70,6 +67,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
   useEffect(() => {
     setImageLoaded(false);
     setImageError(false);
+    setRetryCount(0);
     
     console.log(`🔄 Loading exercise: ${exercise.name} (${exercise.id})`);
     console.log(`🔗 Original GIF URL: ${exercise.gif_url}`);
@@ -79,8 +77,21 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     console.error(`❌ Failed to load image for exercise: ${exercise.name} (${exercise.id})`);
     console.error(`❌ Failed URL: ${exercise.gif_url}`);
     console.error(`❌ Formatted URL: ${imageUrl}`);
-    setImageError(true);
-    setImageLoaded(true);
+    console.error(`❌ Retry count: ${retryCount}`);
+    
+    if (retryCount < 2) {
+      console.log(`🔄 Retrying image load for ${exercise.name} (attempt ${retryCount + 1})`);
+      setRetryCount(prev => prev + 1);
+      // Force reload after a short delay
+      setTimeout(() => {
+        if (imageRef.current) {
+          imageRef.current.src = imageUrl + `?retry=${retryCount + 1}`;
+        }
+      }, 1000);
+    } else {
+      setImageError(true);
+      setImageLoaded(true);
+    }
   };
   
   const handleImageLoad = () => {
@@ -102,29 +113,33 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
   
   const isLikelyValidUrl = imageUrl && 
                           imageUrl.trim().length > 10 &&
-                          (imageUrl.includes('/storage/v1/object/public/exercise-gifs/') ||
-                           imageUrl.includes('http')) &&
+                          imageUrl.includes('supabase.co') &&
+                          imageUrl.includes('/storage/v1/object/public/') &&
                           !imageUrl.includes('placeholder') && 
                           !imageUrl.includes('example.') &&
                           !imageUrl.includes('null') &&
                           !imageUrl.includes('undefined');
   
   console.log(`🎯 URL validation result for ${exercise.name}: ${isLikelyValidUrl ? 'VALID' : 'INVALID'}`);
+  if (isLikelyValidUrl) {
+    console.log(`📸 Will attempt to load: ${imageUrl}`);
+  }
   
   return (
     <Card ref={cardRef} className="overflow-hidden border-none shadow-sm hover:shadow-md transition-shadow duration-200">
       <CardContent className="p-0">
         <div className="flex flex-col md:flex-row gap-3">
-          {/* Exercise GIF/Image com lazy loading otimizado */}
+          {/* Exercise GIF/Image */}
           <div className="w-full md:w-1/3 bg-gray-100 dark:bg-gray-800 overflow-hidden flex items-center justify-center h-48 md:h-44 relative">
-            {/* Debug info */}
+            {/* Debug info in development */}
             {process.env.NODE_ENV === 'development' && (
               <div className="absolute top-0 left-0 z-30 bg-black/70 text-white text-xs p-1 max-w-full overflow-hidden">
-                {debugInfo}
+                ID: {exercise.id}, GIF: {exercise.gif_url ? 'exists' : 'missing'}
               </div>
             )}
             
-            {(!imageLoaded && isInView && isLikelyValidUrl) && (
+            {/* Loading state */}
+            {(!imageLoaded && isInView && isLikelyValidUrl && !imageError) && (
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <Skeleton className="h-48 md:h-44 w-full absolute inset-0" />
                 <span className="text-xs text-muted-foreground z-10 bg-background/80 px-2 py-1 rounded-md flex items-center gap-1">
@@ -134,28 +149,53 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
               </div>
             )}
             
+            {/* Error state */}
             {(!isLikelyValidUrl || imageError) && (
               <div className="flex flex-col items-center justify-center h-full w-full bg-muted text-center px-2">
                 {imageError ? (
-                  <AlertCircle className="h-8 w-8 mb-2 text-amber-500" />
+                  <>
+                    <AlertCircle className="h-8 w-8 mb-2 text-amber-500" />
+                    <p className="text-sm text-muted-foreground font-medium">
+                      {exercise.name}
+                    </p>
+                    <span className="text-xs text-muted-foreground/70 mt-1">
+                      Erro ao carregar GIF
+                    </span>
+                    <button 
+                      onClick={() => {
+                        setImageError(false);
+                        setImageLoaded(false);
+                        setRetryCount(0);
+                        if (imageRef.current && imageUrl) {
+                          imageRef.current.src = imageUrl + `?retry=${Date.now()}`;
+                        }
+                      }}
+                      className="text-xs text-primary mt-1 hover:underline flex items-center gap-1"
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                      Tentar novamente
+                    </button>
+                  </>
                 ) : (
-                  <Dumbbell className="h-8 w-8 mb-2 text-primary/40" />
+                  <>
+                    <Dumbbell className="h-8 w-8 mb-2 text-primary/40" />
+                    <p className="text-sm text-muted-foreground font-medium">
+                      {exercise.name}
+                    </p>
+                    <span className="text-xs text-muted-foreground/70 mt-1">
+                      GIF não disponível
+                    </span>
+                  </>
                 )}
-                <p className="text-sm text-muted-foreground font-medium">
-                  {exercise.name}
-                </p>
-                <span className="text-xs text-muted-foreground/70 mt-1">
-                  {imageError ? 'Erro ao carregar GIF' : 'GIF não disponível'}
-                </span>
                 {process.env.NODE_ENV === 'development' && (
-                  <span className="text-xs text-red-500 mt-1 break-all">
+                  <span className="text-xs text-red-500 mt-1 break-all max-w-full">
                     URL: {exercise.gif_url || 'N/A'}
                   </span>
                 )}
               </div>
             )}
             
-            {/* Só renderizar a imagem quando estiver em view e URL for válida */}
+            {/* Image element - só renderizar quando estiver em view e URL for válida */}
             {isInView && isLikelyValidUrl && (
               <>
                 <Dialog>
@@ -186,6 +226,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                   onError={handleImageError}
                   loading="lazy"
                   decoding="async"
+                  crossOrigin="anonymous"
                 />
               </>
             )}
