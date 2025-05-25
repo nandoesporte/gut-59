@@ -244,29 +244,15 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
 
     console.log("✅ Plano de treino e cargas salvos com sucesso");
     
-    // Now fetch the complete workout plan with all sessions and exercises
-    // Try with recommended_weight first, fallback if column doesn't exist
-    let { data: completePlan, error: fetchError } = await supabase
-      .from('workout_plans')
-      .select(`
-        *,
-        workout_sessions (
-          *,
-          session_exercises (
-            *,
-            recommended_weight,
-            exercise:exercises (*)
-          )
-        )
-      `)
-      .eq('id', plan.id)
-      .single();
-      
-    // If error is about recommended_weight column not existing, try without it
-    if (fetchError && fetchError.message?.includes("recommended_weight") && fetchError.message?.includes("does not exist")) {
-      console.log("⚠️ Coluna recommended_weight não existe, buscando sem ela...");
-      
-      const { data: fallbackPlan, error: fallbackError } = await supabase
+    // Now fetch the complete workout plan with proper error handling
+    console.log("🔍 Buscando plano completo...");
+    
+    // First try with recommended_weight column
+    let completePlan;
+    let fetchError;
+    
+    try {
+      const { data, error } = await supabase
         .from('workout_plans')
         .select(`
           *,
@@ -274,6 +260,7 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
             *,
             session_exercises (
               *,
+              recommended_weight,
               exercise:exercises (*)
             )
           )
@@ -281,17 +268,58 @@ export const saveWorkoutPlan = async (plan: any, userId: string): Promise<Workou
         .eq('id', plan.id)
         .single();
         
-      if (fallbackError) {
-        console.error("Error fetching complete workout plan (fallback):", fallbackError);
-        return {
-          ...savedPlan,
-          workout_sessions: []
-        } as WorkoutPlan;
+      if (error) throw error;
+      completePlan = data;
+    } catch (error: any) {
+      if (error.message?.includes("recommended_weight") && error.message?.includes("does not exist")) {
+        console.log("⚠️ Coluna recommended_weight não existe, buscando sem ela...");
+        
+        try {
+          const { data, error: fallbackError } = await supabase
+            .from('workout_plans')
+            .select(`
+              *,
+              workout_sessions (
+                *,
+                session_exercises (
+                  *,
+                  exercise:exercises (*)
+                )
+              )
+            `)
+            .eq('id', plan.id)
+            .single();
+            
+          if (fallbackError) throw fallbackError;
+          completePlan = data;
+          
+          // Transform the data to include recommended_weight from our saved plan
+          if (completePlan && completePlan.workout_sessions) {
+            completePlan.workout_sessions.forEach((session: any) => {
+              if (session.session_exercises) {
+                session.session_exercises.forEach((sessionExercise: any) => {
+                  // Find matching exercise in original plan to get recommended_weight
+                  const originalSession = plan.workout_sessions?.find((s: any) => s.id === session.id);
+                  const originalExercise = originalSession?.session_exercises?.find((e: any) => e.id === sessionExercise.id);
+                  if (originalExercise?.recommended_weight) {
+                    sessionExercise.recommended_weight = originalExercise.recommended_weight;
+                  }
+                });
+              }
+            });
+          }
+        } catch (fallbackError) {
+          console.error("Error fetching complete workout plan (fallback):", fallbackError);
+          fetchError = fallbackError;
+        }
+      } else {
+        console.error("Error fetching complete workout plan:", error);
+        fetchError = error;
       }
-      
-      completePlan = fallbackPlan;
-    } else if (fetchError) {
-      console.error("Error fetching complete workout plan:", fetchError);
+    }
+    
+    if (fetchError) {
+      // Return basic plan structure if fetch fails
       return {
         ...savedPlan,
         workout_sessions: []
