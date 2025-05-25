@@ -35,48 +35,32 @@ export const formatImageUrl = (url: string | null): string => {
     return fullUrl;
   }
   
-  // Se contém 'exercise-gifs' ou 'batch', construir a URL correta
-  if (urlString.includes('exercise-gifs') || urlString.includes('batch')) {
-    let cleanPath = urlString;
-    
-    // Remover prefixos desnecessários
-    if (cleanPath.startsWith('/')) {
-      cleanPath = cleanPath.substring(1);
-    }
-    
-    // Se já contém o caminho do bucket, usar como está
-    if (cleanPath.startsWith('exercise-gifs/')) {
-      const fullUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/${cleanPath}`;
-      console.log(`🔗 Built URL for exercise-gifs path: ${fullUrl}`);
+  // Para URLs que contêm batch/ ou exercise-gifs/, construir corretamente
+  if (urlString.includes('batch/') || urlString.includes('exercise-gifs/')) {
+    // Se já contém exercise-gifs no caminho
+    if (urlString.includes('exercise-gifs/')) {
+      // Extrair apenas a parte após exercise-gifs/
+      const parts = urlString.split('exercise-gifs/');
+      const gifPath = parts[parts.length - 1];
+      const fullUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/exercise-gifs/${gifPath}`;
+      console.log(`🔗 Built URL from exercise-gifs path: ${fullUrl}`);
       return fullUrl;
     }
     
-    // Se contém 'batch' mas não está no formato correto
-    if (cleanPath.includes('batch/')) {
-      const batchIndex = cleanPath.indexOf('batch/');
-      const pathFromBatch = cleanPath.substring(batchIndex);
+    // Se contém batch/ mas não exercise-gifs/
+    if (urlString.includes('batch/')) {
+      const batchIndex = urlString.indexOf('batch/');
+      const pathFromBatch = urlString.substring(batchIndex);
       const fullUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/exercise-gifs/${pathFromBatch}`;
       console.log(`🔗 Built URL for batch path: ${fullUrl}`);
       return fullUrl;
     }
-    
-    // Para outros casos com exercise-gifs
-    const fullUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/exercise-gifs/${cleanPath}`;
-    console.log(`🔗 Built URL for general exercise-gifs path: ${fullUrl}`);
-    return fullUrl;
   }
   
-  // Para URLs que podem ser apenas o nome do arquivo ou caminho relativo
-  if (!urlString.startsWith('/')) {
-    const fullUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/exercise-gifs/${urlString}`;
-    console.log(`🔗 Built URL for relative path: ${fullUrl}`);
-    return fullUrl;
-  }
-  
-  // Para outros casos, tentar construir a URL assumindo que é um caminho no bucket exercise-gifs
+  // Para outros casos, assumir que é um caminho relativo no bucket exercise-gifs
   const cleanPath = urlString.startsWith('/') ? urlString.substring(1) : urlString;
   const fullUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/exercise-gifs/${cleanPath}`;
-  console.log(`🔗 Built URL for fallback path: ${fullUrl}`);
+  console.log(`🔗 Built URL for relative path: ${fullUrl}`);
   return fullUrl;
 };
 
@@ -86,10 +70,7 @@ export const testImageUrl = async (url: string): Promise<boolean> => {
     console.log('🔍 Testing URL:', url);
     const response = await fetch(url, { 
       method: 'HEAD',
-      mode: 'cors',
-      headers: {
-        'Accept': 'image/*'
-      }
+      mode: 'cors'
     });
     const isValid = response.ok;
     console.log(`🔍 URL test result: ${isValid ? 'Valid' : 'Invalid'} (${response.status})`);
@@ -100,7 +81,7 @@ export const testImageUrl = async (url: string): Promise<boolean> => {
   }
 };
 
-// Função para validar URLs de GIF com critérios mais rigorosos
+// Função para validar URLs de GIF
 export const validateGifUrl = (url: string | null): boolean => {
   if (!url) return false;
   
@@ -120,20 +101,4 @@ export const validateGifUrl = (url: string | null): boolean => {
   
   console.log(`🔍 URL validation for "${urlString}": ${isValidUrl}`);
   return isValidUrl;
-};
-
-// Nova função para debug de URLs
-export const debugImageUrl = (originalUrl: string | null, exerciseName: string) => {
-  console.log(`🐛 DEBUG - Exercise: ${exerciseName}`);
-  console.log(`🐛 Original URL from DB: "${originalUrl}"`);
-  console.log(`🐛 URL type: ${typeof originalUrl}`);
-  console.log(`🐛 URL length: ${originalUrl?.length || 0}`);
-  
-  const formatted = formatImageUrl(originalUrl);
-  console.log(`🐛 Formatted URL: "${formatted}"`);
-  
-  const isValid = validateGifUrl(originalUrl);
-  console.log(`🐛 Is valid: ${isValid}`);
-  
-  return { original: originalUrl, formatted, isValid };
 };
