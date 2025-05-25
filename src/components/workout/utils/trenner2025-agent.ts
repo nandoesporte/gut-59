@@ -1,3 +1,4 @@
+
 import { WorkoutPreferences } from "../types";
 import { supabase } from "@/integrations/supabase/client";
 import { v4 as uuidv4 } from 'uuid';
@@ -40,13 +41,13 @@ export const generateWorkoutPlanWithTrenner2025 = async (
     const reqId = requestId || `trenner2025_${userId}_${Date.now()}`;
     console.log(`🔑 Trenner2025: Request ID: ${reqId}`);
 
-    // Get available exercises from database - ONLY from batch folder
-    console.log("📚 Trenner2025: Carregando exercícios da pasta batch...");
+    // Get available exercises from database - ONLY valid exercises with batch GIFs
+    console.log("📚 Trenner2025: Carregando exercícios válidos da pasta batch...");
     const { data: exercises, error: exercisesError } = await supabase
       .from("exercises")
       .select("*")
       .like('gif_url', '%/storage/v1/object/public/exercise-gifs/batch/%')
-      .limit(200);
+      .limit(500);
 
     if (exercisesError) {
       console.error("❌ Trenner2025: Erro ao buscar exercícios da pasta batch:", exercisesError);
@@ -59,30 +60,42 @@ export const generateWorkoutPlanWithTrenner2025 = async (
       throw new Error("Nenhum exercício disponível na pasta batch do storage");
     }
 
-    // Filter exercises based on user preferences from batch folder
-    console.log("🔍 Trenner2025: Filtrando exercícios da pasta batch baseado nas preferências...");
-    let filteredExercises = exercises;
+    // Validação extra: filtrar apenas exercícios que realmente têm GIFs válidos
+    const validExercises = exercises.filter(ex => 
+      ex.gif_url && 
+      ex.gif_url.includes('/storage/v1/object/public/exercise-gifs/batch/') &&
+      ex.gif_url.trim().length > 50 && // URL deve ter tamanho mínimo
+      !ex.gif_url.includes('placeholder') &&
+      !ex.gif_url.includes('example') &&
+      !ex.gif_url.includes('null') &&
+      !ex.gif_url.includes('undefined')
+    );
+
+    console.log(`🎯 Trenner2025: ${validExercises.length} exercícios validados com GIFs funcionais`);
+
+    if (validExercises.length === 0) {
+      throw new Error("Nenhum exercício com GIFs válidos encontrado na pasta batch");
+    }
+
+    // Filter exercises based on user preferences
+    console.log("🔍 Trenner2025: Filtrando exercícios baseado nas preferências...");
+    let filteredExercises = validExercises;
     
     if (preferences.preferred_exercise_types && preferences.preferred_exercise_types.length > 0) {
       if (!preferences.preferred_exercise_types.includes("all" as any)) {
-        filteredExercises = exercises.filter(ex => 
+        filteredExercises = validExercises.filter(ex => 
           preferences.preferred_exercise_types.includes(ex.exercise_type)
         );
       }
     }
-    console.log(`🎯 Trenner2025: ${filteredExercises.length} exercícios da pasta batch após filtro de tipo`);
 
-    // Ensure exercises have valid GIF URLs from batch folder
-    const exercisesWithBatchGifs = filteredExercises.filter(ex => 
-      ex.gif_url && 
-      ex.gif_url.includes('/storage/v1/object/public/exercise-gifs/batch/') &&
-      ex.gif_url.trim() !== ''
-    );
-    console.log(`🎬 Trenner2025: ${exercisesWithBatchGifs.length} exercícios com GIFs válidos da pasta batch`);
-
-    if (exercisesWithBatchGifs.length === 0) {
-      throw new Error("Nenhum exercício com GIFs válidos encontrado na pasta batch");
+    // Se filtro muito restritivo, usar todos os exercícios válidos
+    if (filteredExercises.length < 20) {
+      console.log("⚠️ Filtro muito restritivo, usando todos os exercícios válidos");
+      filteredExercises = validExercises;
     }
+
+    console.log(`🎯 Trenner2025: ${filteredExercises.length} exercícios após filtro de preferências`);
 
     // Call edge function for workout plan generation
     console.log(`🚀 Trenner2025: Invocando edge function generate-workout-plan...`);
@@ -113,16 +126,21 @@ export const generateWorkoutPlanWithTrenner2025 = async (
       throw new Error("Nenhum plano de treino foi gerado");
     }
 
-    console.log("✅ Trenner2025: Plano de treino gerado com sucesso usando exercícios da pasta batch!");
+    console.log("✅ Trenner2025: Plano de treino gerado com sucesso usando exercícios válidos da pasta batch!");
     console.log(`📊 Trenner2025: Plano contém ${workoutPlan.workout_sessions?.length || 0} sessões`);
     
-    // Log detalhes de cada sessão incluindo cargas
+    // Log detalhes de cada sessão incluindo cargas e validação de GIFs
     if (workoutPlan.workout_sessions) {
       workoutPlan.workout_sessions.forEach((session: any, index: number) => {
         console.log(`📅 Sessão ${index + 1}: ${session.session_exercises?.length || 0} exercícios`);
         if (session.session_exercises) {
           session.session_exercises.forEach((exercise: any, exIndex: number) => {
-            console.log(`  💪 Exercício ${exIndex + 1}: ${exercise.exercise?.name} - Carga: ${exercise.recommended_weight || 'não especificada'}`);
+            console.log(`  💪 Exercício ${exIndex + 1}: ${exercise.exercise?.name} - Carga: ${exercise.recommended_weight || 'não especificada'} - GIF: ${exercise.exercise?.gif_url ? 'válido' : 'PROBLEMA!'}`);
+            
+            // Validação adicional no cliente
+            if (!exercise.exercise?.gif_url || !exercise.exercise.gif_url.includes('/storage/v1/object/public/exercise-gifs/batch/')) {
+              console.error(`❌ ERRO: Exercício sem GIF válido: ${exercise.exercise?.name}`);
+            }
           });
         }
       });
