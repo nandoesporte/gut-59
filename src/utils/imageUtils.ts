@@ -13,24 +13,19 @@ export const formatImageUrl = (url: string | null): string => {
     return url;
   }
   
-  // Se é uma URL relativa válida do Supabase storage
+  // Se é uma URL relativa do Supabase storage que já está completa
   if (url.includes('/storage/v1/object/public/')) {
     const formattedUrl = url.startsWith('/') ? url : `/${url}`;
     console.log('ImageUtils: Formatted relative storage URL:', formattedUrl);
     return formattedUrl;
   }
   
-  // Se contém apenas o caminho do arquivo na pasta batch
-  if (url.includes('exercise-gifs/batch/')) {
-    const fullUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/${url}`;
-    console.log('ImageUtils: Created full URL for batch file:', fullUrl);
-    return fullUrl;
-  }
-  
-  // Se é apenas um nome de arquivo, assumir que está na pasta batch
-  if (url.includes('.gif') && !url.includes('/')) {
-    const fullUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/exercise-gifs/batch/${url}`;
-    console.log('ImageUtils: Created full URL for filename only:', fullUrl);
+  // Formato padrão para o bucket exercicios (baseado no seu exemplo funcional)
+  if (url.includes('.gif')) {
+    // Remove qualquer pasta inicial se presente
+    const cleanUrl = url.replace(/^(exercise-gifs\/batch\/|exercicios\/)?/, '');
+    const fullUrl = `https://sxjafhzikftdenqnkcri.supabase.co/storage/v1/object/public/exercicios/${cleanUrl}`;
+    console.log('ImageUtils: Created full URL using exercicios bucket:', fullUrl);
     return fullUrl;
   }
   
