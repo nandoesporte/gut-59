@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -310,9 +309,9 @@ export const RehabPlanDisplay = ({ plan }: RehabPlanDisplayProps) => {
                           '30s';
                           
                         // Safely get gif URL
-                        const gifUrl = formatImageUrl(
-                          typeof exercise.gifUrl === 'string' ? exercise.gifUrl : 
+                        const gif_url = formatImageUrl(
                           typeof exercise.gif_url === 'string' ? exercise.gif_url : 
+                          typeof exercise.gifUrl === 'string' ? exercise.gifUrl : 
                           undefined
                         );
                         
@@ -341,7 +340,7 @@ export const RehabPlanDisplay = ({ plan }: RehabPlanDisplayProps) => {
                             sets={sets}
                             reps={reps}
                             restTime={restTime}
-                            gifUrl={gifUrl}
+                            gif_url={gif_url}
                             description={description}
                             notes={notes}
                             exerciseType={exerciseType}

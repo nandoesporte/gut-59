@@ -269,6 +269,7 @@ export type Database = {
           equipment_needed: string[] | null
           exercise_type: Database["public"]["Enums"]["exercise_type"]
           flexibility_requirement: string | null
+          gif_url: string | null
           goals: string[] | null
           id: string
           is_compound_movement: boolean | null
@@ -316,6 +317,7 @@ export type Database = {
           equipment_needed?: string[] | null
           exercise_type: Database["public"]["Enums"]["exercise_type"]
           flexibility_requirement?: string | null
+          gif_url?: string | null
           goals?: string[] | null
           id?: string
           is_compound_movement?: boolean | null
@@ -363,6 +365,7 @@ export type Database = {
           equipment_needed?: string[] | null
           exercise_type?: Database["public"]["Enums"]["exercise_type"]
           flexibility_requirement?: string | null
+          gif_url?: string | null
           goals?: string[] | null
           id?: string
           is_compound_movement?: boolean | null
