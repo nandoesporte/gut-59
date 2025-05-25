@@ -28,13 +28,6 @@ serve(async (req) => {
       throw new Error('ID do usuário é obrigatório');
     }
 
-    if (!XAI_API_KEY) {
-      console.error('❌ Chave XAI_API_KEY não encontrada');
-      throw new Error('Chave da API xAI não configurada. Configure XAI_API_KEY nas configurações do projeto.');
-    }
-
-    console.log('✅ Chave XAI_API_KEY encontrada');
-
     // Buscar exercícios disponíveis
     console.log('📚 Buscando exercícios na base de dados...');
     const exercisesResponse = await fetch(
@@ -58,106 +51,22 @@ serve(async (req) => {
       throw new Error('Nenhum exercício disponível no banco de dados');
     }
 
-    // Preparar prompt para xAI Grok-3 Mini
-    console.log('🧠 Preparando prompt para Grok-3 Mini...');
-    const systemPrompt = `Você é o Trenner2025, um agente de IA especializado em educação física e criação de planos de treino personalizados. 
-    Crie um plano de treino detalhado baseado nas preferências do usuário e nos exercícios disponíveis.
-    IMPORTANTE: Responda SEMPRE em português do Brasil e retorne APENAS um JSON válido sem formatação markdown.
-    Você deve criar planos científicos, seguros e eficazes.`;
-
-    const userPrompt = `
-    Eu sou o Trenner2025 e vou criar um plano de treino personalizado baseado nestas informações:
-    
-    Preferências do usuário:
-    - Objetivo: ${preferences.goal || 'manter forma'}
-    - Nível de atividade: ${preferences.activity_level || 'moderado'}
-    - Dias por semana: ${preferences.days_per_week || 3}
-    - Tipos de exercício preferidos: ${preferences.preferred_exercise_types?.join(', ') || 'todos'}
-    - Idade: ${preferences.age || 'não informada'}
-    - Peso: ${preferences.weight || 'não informado'}kg
-    - Altura: ${preferences.height || 'não informada'}cm
-    - Gênero: ${preferences.gender || 'não informado'}
-    
-    Exercícios disponíveis (use APENAS estes IDs):
-    ${exercises.slice(0, 30).map((ex, index) => `${index + 1}. ID: ${ex.id} - ${ex.name} (${ex.muscle_group}, ${ex.exercise_type}, Séries: ${ex.min_sets}-${ex.max_sets}, Reps: ${ex.min_reps}-${ex.max_reps})`).join('\n')}
-    
-    Retorne um JSON com esta estrutura exata (use exercícios REAIS da lista acima):
-    {
-      "workout_sessions": [
-        {
-          "day_number": 1,
-          "warmup_description": "Aquecimento dinâmico de 5-10 minutos com movimentos específicos",
-          "cooldown_description": "Alongamento e relaxamento de 5-10 minutos",
-          "session_exercises": [
-            {
-              "exercise_id": "ID_REAL_DO_EXERCICIO_DA_LISTA_ACIMA",
-              "sets": 3,
-              "reps": 12,
-              "rest_time_seconds": 60,
-              "order_in_session": 1
-            }
-          ]
-        }
-      ]
-    }
-    
-    REGRAS IMPORTANTES:
-    - Use apenas IDs de exercícios que existem na lista fornecida!
-    - Inclua order_in_session para cada exercício (1, 2, 3, etc.)
-    - Crie ${preferences.days_per_week || 3} dias de treino
-    - Varie os exercícios entre os dias
-    - Respeite os limites de séries e repetições de cada exercício
-    - Crie aquecimentos e resfriamentos específicos para cada dia
-    `;
-
-    // Chamar API da xAI Grok-3 Mini
-    console.log('🚀 Chamando API xAI Grok-3 Mini...');
-    const xaiResponse = await fetch('https://api.x.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${XAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'grok-beta',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: 0.3,
-        max_tokens: 4000,
-        stream: false
-      }),
-    });
-
-    if (!xaiResponse.ok) {
-      const errorText = await xaiResponse.text();
-      console.error(`❌ Erro da API xAI (${xaiResponse.status}):`, errorText);
-      throw new Error(`Erro da API xAI: ${xaiResponse.status} - ${errorText}`);
-    }
-
-    const xaiData = await xaiResponse.json();
-    console.log('✅ Resposta recebida da API xAI');
-    
-    const content = xaiData.choices[0]?.message?.content;
-
-    if (!content) {
-      console.error('❌ Nenhum conteúdo retornado pela API xAI');
-      throw new Error('Nenhum conteúdo retornado pela API xAI');
-    }
-
-    console.log('📝 Conteúdo bruto da IA:', content.substring(0, 200) + '...');
-
-    // Parse do JSON retornado
     let aiPlan;
-    try {
-      const cleanContent = content.replace(/```json|```/g, '').trim();
-      aiPlan = JSON.parse(cleanContent);
-      console.log('✅ JSON parsed com sucesso');
-    } catch (parseError) {
-      console.error('❌ Erro ao fazer parse do JSON:', parseError);
-      console.error('Conteúdo que falhou:', content);
-      throw new Error(`Erro ao processar resposta da IA: ${parseError.message}`);
+    
+    // Tentar usar xAI primeiro, se disponível
+    if (XAI_API_KEY) {
+      console.log('🚀 Tentando gerar plano com xAI Grok...');
+      try {
+        aiPlan = await generateWithXAI(preferences, exercises);
+        console.log('✅ Plano gerado com sucesso usando xAI');
+      } catch (xaiError) {
+        console.error('❌ Erro com xAI:', xaiError.message);
+        console.log('🔄 Caindo para geração local...');
+        aiPlan = generateLocalPlan(preferences, exercises);
+      }
+    } else {
+      console.log('⚠️ XAI_API_KEY não encontrada, usando geração local');
+      aiPlan = generateLocalPlan(preferences, exercises);
     }
 
     // Criar o plano completo
@@ -262,3 +171,153 @@ serve(async (req) => {
     );
   }
 });
+
+async function generateWithXAI(preferences: any, exercises: any[]) {
+  console.log('🧠 Preparando prompt para xAI Grok...');
+  
+  const systemPrompt = `Você é o Trenner2025, um agente de IA especializado em educação física e criação de planos de treino personalizados. 
+  Crie um plano de treino detalhado baseado nas preferências do usuário e nos exercícios disponíveis.
+  IMPORTANTE: Responda SEMPRE em português do Brasil e retorne APENAS um JSON válido sem formatação markdown.
+  Você deve criar planos científicos, seguros e eficazes.`;
+
+  const userPrompt = `
+  Eu sou o Trenner2025 e vou criar um plano de treino personalizado baseado nestas informações:
+  
+  Preferências do usuário:
+  - Objetivo: ${preferences.goal || 'manter forma'}
+  - Nível de atividade: ${preferences.activity_level || 'moderado'}
+  - Dias por semana: ${preferences.days_per_week || 3}
+  - Tipos de exercício preferidos: ${preferences.preferred_exercise_types?.join(', ') || 'todos'}
+  - Idade: ${preferences.age || 'não informada'}
+  - Peso: ${preferences.weight || 'não informado'}kg
+  - Altura: ${preferences.height || 'não informada'}cm
+  - Gênero: ${preferences.gender || 'não informado'}
+  
+  Exercícios disponíveis (use APENAS estes IDs):
+  ${exercises.slice(0, 30).map((ex, index) => `${index + 1}. ID: ${ex.id} - ${ex.name} (${ex.muscle_group}, ${ex.exercise_type}, Séries: ${ex.min_sets}-${ex.max_sets}, Reps: ${ex.min_reps}-${ex.max_reps})`).join('\n')}
+  
+  Retorne um JSON com esta estrutura exata (use exercícios REAIS da lista acima):
+  {
+    "workout_sessions": [
+      {
+        "day_number": 1,
+        "warmup_description": "Aquecimento dinâmico de 5-10 minutos com movimentos específicos",
+        "cooldown_description": "Alongamento e relaxamento de 5-10 minutos",
+        "session_exercises": [
+          {
+            "exercise_id": "ID_REAL_DO_EXERCICIO_DA_LISTA_ACIMA",
+            "sets": 3,
+            "reps": 12,
+            "rest_time_seconds": 60,
+            "order_in_session": 1
+          }
+        ]
+      }
+    ]
+  }
+  
+  REGRAS IMPORTANTES:
+  - Use apenas IDs de exercícios que existem na lista fornecida!
+  - Inclua order_in_session para cada exercício (1, 2, 3, etc.)
+  - Crie ${preferences.days_per_week || 3} dias de treino
+  - Varie os exercícios entre os dias
+  - Respeite os limites de séries e repetições de cada exercício
+  - Crie aquecimentos e resfriamentos específicos para cada dia
+  `;
+
+  // Chamar API da xAI com modelo correto
+  const xaiResponse = await fetch('https://api.x.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${XAI_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'grok-2-1212', // Usar modelo correto disponível
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0.3,
+      max_tokens: 4000,
+      stream: false
+    }),
+  });
+
+  if (!xaiResponse.ok) {
+    const errorText = await xaiResponse.text();
+    console.error(`❌ Erro da API xAI (${xaiResponse.status}):`, errorText);
+    throw new Error(`Erro da API xAI: ${xaiResponse.status} - ${errorText}`);
+  }
+
+  const xaiData = await xaiResponse.json();
+  console.log('✅ Resposta recebida da API xAI');
+  
+  const content = xaiData.choices[0]?.message?.content;
+
+  if (!content) {
+    console.error('❌ Nenhum conteúdo retornado pela API xAI');
+    throw new Error('Nenhum conteúdo retornado pela API xAI');
+  }
+
+  console.log('📝 Conteúdo bruto da IA:', content.substring(0, 200) + '...');
+
+  // Parse do JSON retornado
+  try {
+    const cleanContent = content.replace(/```json|```/g, '').trim();
+    return JSON.parse(cleanContent);
+  } catch (parseError) {
+    console.error('❌ Erro ao fazer parse do JSON:', parseError);
+    console.error('Conteúdo que falhou:', content);
+    throw new Error(`Erro ao processar resposta da IA: ${parseError.message}`);
+  }
+}
+
+function generateLocalPlan(preferences: any, exercises: any[]) {
+  console.log('🏠 Gerando plano localmente...');
+  
+  const daysPerWeek = preferences.days_per_week || 3;
+  const muscleGroups = ["chest", "back", "legs", "shoulders", "arms", "core"];
+  
+  // Organizar exercícios por grupo muscular
+  const exercisesByMuscle: Record<string, any[]> = {};
+  muscleGroups.forEach(group => {
+    exercisesByMuscle[group] = exercises.filter(ex => ex.muscle_group === group);
+  });
+  
+  const sessions = [];
+  
+  for (let day = 1; day <= daysPerWeek; day++) {
+    const sessionExercises = [];
+    let exerciseOrder = 1;
+    
+    // Selecionar 4-6 exercícios por sessão
+    const exercisesPerSession = Math.min(6, Math.max(4, Math.floor(12 / daysPerWeek)));
+    
+    for (let i = 0; i < exercisesPerSession; i++) {
+      const muscleGroup = muscleGroups[i % muscleGroups.length];
+      const groupExercises = exercisesByMuscle[muscleGroup];
+      
+      if (groupExercises && groupExercises.length > 0) {
+        const randomExercise = groupExercises[Math.floor(Math.random() * groupExercises.length)];
+        
+        sessionExercises.push({
+          exercise_id: randomExercise.id,
+          sets: Math.max(randomExercise.min_sets || 3, 3),
+          reps: Math.max(randomExercise.min_reps || 10, 10),
+          rest_time_seconds: randomExercise.rest_time_seconds || 60,
+          order_in_session: exerciseOrder++
+        });
+      }
+    }
+    
+    sessions.push({
+      day_number: day,
+      warmup_description: `Aquecimento dinâmico de 5-10 minutos - Dia ${day}`,
+      cooldown_description: `Alongamento específico de 5-10 minutos - Dia ${day}`,
+      session_exercises: sessionExercises
+    });
+  }
+  
+  return { workout_sessions: sessions };
+}
