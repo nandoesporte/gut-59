@@ -19,6 +19,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
   const [imageError, setImageError] = useState(false);
   const [expandDescription, setExpandDescription] = useState(false);
   const [isInView, setIsInView] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const cardRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const isMobile = useIsMobile();
@@ -28,7 +29,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
     return null;
   }
 
-  // Intersection Observer para lazy loading mais eficiente
+  // Intersection Observer para lazy loading
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -38,7 +39,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
         }
       },
       { 
-        rootMargin: '100px', // Começar a carregar 100px antes de aparecer
+        rootMargin: '100px',
         threshold: 0.1 
       }
     );
@@ -54,37 +55,63 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
   useEffect(() => {
     setImageLoaded(false);
     setImageError(false);
+    setRetryCount(0);
     
-    console.log(`Loading exercise: ${exercise.name} (${exercise.id})`);
+    console.log(`🏋️ Loading exercise: ${exercise.name} (${exercise.id})`);
+    console.log(`🔗 Original GIF URL: ${exercise.gif_url}`);
   }, [exercise.id, exercise.name]);
   
   const handleImageError = () => {
-    console.error(`Failed to load image for exercise: ${exercise.name} (${exercise.id}). URL: ${exercise.gif_url}`);
+    console.error(`❌ Failed to load image for exercise: ${exercise.name}`);
+    console.error(`🔗 URL that failed: ${imageUrl}`);
+    console.error(`🔗 Original URL: ${exercise.gif_url}`);
     setImageError(true);
     setImageLoaded(true);
   };
   
   const handleImageLoad = () => {
-    console.log(`✅ Image loaded successfully for: ${exercise.name} (${exercise.id})`);
+    console.log(`✅ Image loaded successfully for: ${exercise.name}`);
+    console.log(`🔗 Loaded URL: ${imageUrl}`);
     setImageLoaded(true);
     setImageError(false);
   };
+
+  const handleRetry = () => {
+    console.log(`🔄 Retrying image load for: ${exercise.name} (attempt ${retryCount + 1})`);
+    setRetryCount(prev => prev + 1);
+    setImageError(false);
+    setImageLoaded(false);
+    
+    if (imageRef.current) {
+      // Force reload by changing src
+      const url = formatImageUrl(exercise.gif_url);
+      imageRef.current.src = `${url}?retry=${retryCount + 1}`;
+    }
+  };
   
-  const imageUrl = exercise.gif_url ? formatImageUrl(exercise.gif_url) : null;
+  const imageUrl = formatImageUrl(exercise.gif_url);
+  console.log(`🎯 Formatted URL for ${exercise.name}: ${imageUrl}`);
   
-  const isLikelyValidUrl = imageUrl && 
-                          !imageUrl.includes('placeholder') && 
-                          !imageUrl.includes('example.') &&
-                          imageUrl.trim().length > 10 &&
-                          imageUrl.includes('/storage/v1/object/public/exercise-gifs/batch/');
+  // Verificar se a URL parece válida
+  const hasValidUrl = exercise.gif_url && 
+                     exercise.gif_url.trim().length > 10 &&
+                     !exercise.gif_url.includes('null') &&
+                     !exercise.gif_url.includes('undefined');
+  
+  console.log(`🔍 URL validation for ${exercise.name}:`, {
+    original: exercise.gif_url,
+    formatted: imageUrl,
+    hasValidUrl,
+    length: exercise.gif_url?.length || 0
+  });
   
   return (
     <Card ref={cardRef} className="overflow-hidden border-none shadow-sm hover:shadow-md transition-shadow duration-200">
       <CardContent className="p-0">
         <div className="flex flex-col md:flex-row gap-3">
-          {/* Exercise GIF/Image com lazy loading otimizado */}
+          {/* Exercise GIF/Image */}
           <div className="w-full md:w-1/3 bg-gray-100 dark:bg-gray-800 overflow-hidden flex items-center justify-center h-48 md:h-44 relative">
-            {(!imageLoaded && isInView && isLikelyValidUrl) && (
+            {(!imageLoaded && isInView && hasValidUrl) && (
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <Skeleton className="h-48 md:h-44 w-full absolute inset-0" />
                 <span className="text-xs text-muted-foreground z-10 bg-background/80 px-2 py-1 rounded-md flex items-center gap-1">
@@ -94,24 +121,41 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
               </div>
             )}
             
-            {(!isLikelyValidUrl || imageError) && (
+            {(!hasValidUrl || imageError) && (
               <div className="flex flex-col items-center justify-center h-full w-full bg-muted text-center px-2">
                 {imageError ? (
-                  <AlertCircle className="h-8 w-8 mb-2 text-amber-500" />
+                  <>
+                    <AlertCircle className="h-8 w-8 mb-2 text-amber-500" />
+                    <p className="text-sm text-muted-foreground font-medium mb-2">
+                      {exercise.name}
+                    </p>
+                    <span className="text-xs text-muted-foreground/70 mb-2">
+                      Erro ao carregar imagem
+                    </span>
+                    <button
+                      onClick={handleRetry}
+                      className="text-xs bg-primary/10 text-primary px-2 py-1 rounded hover:bg-primary/20 transition-colors flex items-center gap-1"
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                      Tentar novamente
+                    </button>
+                  </>
                 ) : (
-                  <Dumbbell className="h-8 w-8 mb-2 text-primary/40" />
+                  <>
+                    <Dumbbell className="h-8 w-8 mb-2 text-primary/40" />
+                    <p className="text-sm text-muted-foreground font-medium">
+                      {exercise.name}
+                    </p>
+                    <span className="text-xs text-muted-foreground/70 mt-1">
+                      Sem imagem disponível
+                    </span>
+                  </>
                 )}
-                <p className="text-sm text-muted-foreground font-medium">
-                  {exercise.name}
-                </p>
-                <span className="text-xs text-muted-foreground/70 mt-1">
-                  {imageError ? 'Imagem não disponível' : 'Sem imagem'}
-                </span>
               </div>
             )}
             
-            {/* Só renderizar a imagem quando estiver em view */}
-            {isInView && isLikelyValidUrl && (
+            {/* Renderizar imagem quando estiver em view */}
+            {isInView && hasValidUrl && (
               <>
                 <Dialog>
                   <DialogTrigger asChild>
@@ -141,6 +185,7 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                   onError={handleImageError}
                   loading="lazy"
                   decoding="async"
+                  crossOrigin="anonymous"
                 />
               </>
             )}
@@ -179,7 +224,6 @@ export const WorkoutExerciseDetail = ({ exerciseSession, showDetails = true }: W
                   <span className="bg-primary/10 text-primary px-2 py-1 rounded-md font-medium">
                     {Math.floor(exerciseSession.rest_time_seconds / 60)}:{(exerciseSession.rest_time_seconds % 60).toString().padStart(2, '0')} descanso
                   </span>
-                  {/* Agora a carga recomendada vem do banco de dados */}
                   {(exerciseSession.recommended_weight || exerciseSession.exercise?.recommended_weight) && (
                     <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded-md font-medium flex items-center gap-1">
                       <Weight className="h-3 w-3" />

@@ -1,16 +1,29 @@
+
 export const formatImageUrl = (url: string | null): string => {
   if (!url) return '/placeholder.svg';
   
-  // If it's already a complete URL, return it
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    return url;
+  // Remover espaços em branco
+  const cleanUrl = url.trim();
+  
+  // Se é uma URL vazia ou inválida
+  if (!cleanUrl || cleanUrl === 'null' || cleanUrl === 'undefined') {
+    return '/placeholder.svg';
   }
   
-  // If it's a relative URL without leading slash, add it
-  if (!url.startsWith('/')) {
-    return `/${url}`;
+  // Se já é uma URL completa, retornar como está
+  if (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://')) {
+    console.log(`🔗 Using complete URL: ${cleanUrl}`);
+    return cleanUrl;
   }
   
-  // Otherwise, it's a relative URL with leading slash
-  return url;
+  // Se é uma URL relativa sem barra inicial, adicionar
+  if (!cleanUrl.startsWith('/')) {
+    const formattedUrl = `/${cleanUrl}`;
+    console.log(`🔗 Added leading slash: ${formattedUrl}`);
+    return formattedUrl;
+  }
+  
+  // URL relativa com barra inicial
+  console.log(`🔗 Using relative URL: ${cleanUrl}`);
+  return cleanUrl;
 };
