@@ -33,7 +33,7 @@ export const MentalResourcesTab = () => {
         .order('display_order');
 
       if (error) throw error;
-      setResources(data || []);
+      setResources((data || []) as MentalResource[]);
     } catch (error) {
       console.error('Error:', error);
       toast.error('Erro ao carregar recursos');
@@ -53,7 +53,7 @@ export const MentalResourcesTab = () => {
 
       if (error) throw error;
 
-      setResources([...resources, data]);
+      setResources([...resources, data as MentalResource]);
       setNewResource({
         title: '',
         description: '',
