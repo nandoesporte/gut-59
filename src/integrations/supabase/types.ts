@@ -50,6 +50,36 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_model_settings: {
+        Row: {
+          active_model: string | null
+          created_at: string | null
+          groq_api_key: string | null
+          id: string
+          system_prompt: string | null
+          updated_at: string | null
+          use_custom_prompt: boolean | null
+        }
+        Insert: {
+          active_model?: string | null
+          created_at?: string | null
+          groq_api_key?: string | null
+          id?: string
+          system_prompt?: string | null
+          updated_at?: string | null
+          use_custom_prompt?: boolean | null
+        }
+        Update: {
+          active_model?: string | null
+          created_at?: string | null
+          groq_api_key?: string | null
+          id?: string
+          system_prompt?: string | null
+          updated_at?: string | null
+          use_custom_prompt?: boolean | null
+        }
+        Relationships: []
+      }
       daily_tips: {
         Row: {
           content: string

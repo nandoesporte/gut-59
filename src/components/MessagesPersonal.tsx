@@ -41,7 +41,7 @@ const MessagesPersonal = () => {
   }, [isOpen, hasNewMessage, markMessagesAsRead]);
 
   const checkPersonalRole = async () => {
-    const { data } = await supabase.rpc('has_role', { role: 'personal' });
+    const { data } = await supabase.rpc('has_role', { _role: 'personal' } as any);
     setIsPersonal(!!data);
   };
 
