@@ -182,6 +182,54 @@ export type Database = {
         }
         Relationships: []
       }
+      exercise_feedback: {
+        Row: {
+          created_at: string | null
+          difficulty_feedback: string | null
+          exercise_id: string | null
+          id: string
+          notes: string | null
+          rating: number | null
+          user_id: string
+          workout_plan_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          difficulty_feedback?: string | null
+          exercise_id?: string | null
+          id?: string
+          notes?: string | null
+          rating?: number | null
+          user_id: string
+          workout_plan_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          difficulty_feedback?: string | null
+          exercise_id?: string | null
+          id?: string
+          notes?: string | null
+          rating?: number | null
+          user_id?: string
+          workout_plan_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercise_feedback_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exercise_feedback_workout_plan_id_fkey"
+            columns: ["workout_plan_id"]
+            isOneToOne: false
+            referencedRelation: "workout_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exercises: {
         Row: {
           balance_requirement: string | null
@@ -660,6 +708,89 @@ export type Database = {
         }
         Relationships: []
       }
+      nutrition_preferences: {
+        Row: {
+          activity_level: string | null
+          allergies: string[] | null
+          created_at: string | null
+          dietary_restrictions: string[] | null
+          goal: string | null
+          id: string
+          selected_foods: string[] | null
+          target_calories: number | null
+          target_carbs: number | null
+          target_fats: number | null
+          target_protein: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          activity_level?: string | null
+          allergies?: string[] | null
+          created_at?: string | null
+          dietary_restrictions?: string[] | null
+          goal?: string | null
+          id?: string
+          selected_foods?: string[] | null
+          target_calories?: number | null
+          target_carbs?: number | null
+          target_fats?: number | null
+          target_protein?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          activity_level?: string | null
+          allergies?: string[] | null
+          created_at?: string | null
+          dietary_restrictions?: string[] | null
+          goal?: string | null
+          id?: string
+          selected_foods?: string[] | null
+          target_calories?: number | null
+          target_carbs?: number | null
+          target_fats?: number | null
+          target_protein?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      payment_notifications: {
+        Row: {
+          created_at: string | null
+          id: string
+          message: string
+          payment_id: string | null
+          read: boolean | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          message: string
+          payment_id?: string | null
+          read?: boolean | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          message?: string
+          payment_id?: string | null
+          read?: boolean | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_notifications_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_settings: {
         Row: {
           created_at: string | null
@@ -684,6 +815,42 @@ export type Database = {
           plan_type?: string
           price?: number
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string | null
+          external_id: string | null
+          id: string
+          payment_method: string | null
+          plan_type: string
+          status: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          external_id?: string | null
+          id?: string
+          payment_method?: string | null
+          plan_type: string
+          status?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          external_id?: string | null
+          id?: string
+          payment_method?: string | null
+          plan_type?: string
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -1413,14 +1580,31 @@ export type Database = {
             }
             Returns: boolean
           }
+      process_transfer: { Args: { _qr_code_id: string }; Returns: Json }
+      update_nutrition_selected_foods: {
+        Args: { _food_ids: string[] }
+        Returns: undefined
+      }
       update_user_water_goal: { Args: { _goal_ml: number }; Returns: undefined }
     }
     Enums: {
+      activity_level:
+        | "sedentary"
+        | "light"
+        | "moderate"
+        | "active"
+        | "very_active"
       agent_type: "meal_plan" | "workout" | "physiotherapy" | "mental_health"
       app_role: "admin" | "moderator" | "user" | "personal"
       assessment_type: "burnout" | "anxiety" | "stress" | "depression"
       exercise_difficulty: "beginner" | "intermediate" | "advanced"
       exercise_type_enum: "strength" | "cardio" | "mobility"
+      nutritional_goal:
+        | "weight_loss"
+        | "weight_gain"
+        | "maintenance"
+        | "muscle_gain"
+        | "health_improvement"
       plan_type: "workout" | "nutrition" | "rehabilitation"
       resource_type: "emergency_contact" | "educational_content" | "useful_link"
       status_type: "active" | "inactive"
@@ -1565,11 +1749,25 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      activity_level: [
+        "sedentary",
+        "light",
+        "moderate",
+        "active",
+        "very_active",
+      ],
       agent_type: ["meal_plan", "workout", "physiotherapy", "mental_health"],
       app_role: ["admin", "moderator", "user", "personal"],
       assessment_type: ["burnout", "anxiety", "stress", "depression"],
       exercise_difficulty: ["beginner", "intermediate", "advanced"],
       exercise_type_enum: ["strength", "cardio", "mobility"],
+      nutritional_goal: [
+        "weight_loss",
+        "weight_gain",
+        "maintenance",
+        "muscle_gain",
+        "health_improvement",
+      ],
       plan_type: ["workout", "nutrition", "rehabilitation"],
       resource_type: [
         "emergency_contact",

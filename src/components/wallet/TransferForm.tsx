@@ -92,11 +92,8 @@ export function TransferForm() {
         return;
       }
 
-      const { data: transferResult, error } = await supabase.rpc('process_transfer', {
-        sender_wallet_id: wallet.user_id,
-        recipient_wallet_id: recipientProfile.id,
-        transfer_amount: values.amount,
-        description: values.description || 'Transferência de FITs'
+      const { data: transferResult, error } = await (supabase.rpc as any)('process_transfer', {
+        _qr_code_id: recipientProfile.id
       });
 
       if (error) {
