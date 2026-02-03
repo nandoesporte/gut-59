@@ -33,7 +33,7 @@ export const PaymentSettingsList = () => {
         .order('plan_type');
 
       if (error) throw error;
-      setSettings(data);
+      setSettings((data || []) as PaymentSetting[]);
     } catch (error) {
       console.error('Error fetching payment settings:', error);
       toast.error('Erro ao carregar configurações de pagamento');

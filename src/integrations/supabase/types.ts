@@ -80,6 +80,30 @@ export type Database = {
         }
         Relationships: []
       }
+      breathing_exercise_logs: {
+        Row: {
+          created_at: string | null
+          duration_seconds: number
+          exercise_type: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          duration_seconds: number
+          exercise_type?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          duration_seconds?: number
+          exercise_type?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       daily_tips: {
         Row: {
           content: string
@@ -127,6 +151,33 @@ export type Database = {
           id?: string
           phase?: number | null
           updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      emotion_logs: {
+        Row: {
+          created_at: string | null
+          emotion: string
+          id: string
+          intensity: number | null
+          notes: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          emotion: string
+          id?: string
+          intensity?: number | null
+          notes?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          emotion?: string
+          id?: string
+          intensity?: number | null
+          notes?: string | null
           user_id?: string
         }
         Relationships: []
@@ -613,6 +664,7 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
+          is_active: boolean | null
           plan_type: string
           price: number
           updated_at: string | null
@@ -620,6 +672,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: string
+          is_active?: boolean | null
           plan_type: string
           price?: number
           updated_at?: string | null
@@ -627,6 +680,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           id?: string
+          is_active?: boolean | null
           plan_type?: string
           price?: number
           updated_at?: string | null
@@ -678,6 +732,39 @@ export type Database = {
           joint_area?: string | null
           muscle_group?: string | null
           name?: string
+        }
+        Relationships: []
+      }
+      plan_access: {
+        Row: {
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          is_active: boolean | null
+          payment_required: boolean | null
+          plan_type: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          payment_required?: boolean | null
+          plan_type: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          payment_required?: boolean | null
+          plan_type?: string
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -751,6 +838,7 @@ export type Database = {
         Row: {
           age: number | null
           created_at: string | null
+          daily_water_goal_ml: number | null
           email: string | null
           health_conditions: string | null
           id: string
@@ -761,6 +849,7 @@ export type Database = {
         Insert: {
           age?: number | null
           created_at?: string | null
+          daily_water_goal_ml?: number | null
           email?: string | null
           health_conditions?: string | null
           id: string
@@ -771,6 +860,7 @@ export type Database = {
         Update: {
           age?: number | null
           created_at?: string | null
+          daily_water_goal_ml?: number | null
           email?: string | null
           health_conditions?: string | null
           id?: string
@@ -1138,6 +1228,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_food_preferences: {
+        Row: {
+          allergies: string[] | null
+          created_at: string | null
+          dietary_restrictions: string[] | null
+          disliked_foods: string[] | null
+          favorite_foods: string[] | null
+          id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          allergies?: string[] | null
+          created_at?: string | null
+          dietary_restrictions?: string[] | null
+          disliked_foods?: string[] | null
+          favorite_foods?: string[] | null
+          id?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          allergies?: string[] | null
+          created_at?: string | null
+          dietary_restrictions?: string[] | null
+          disliked_foods?: string[] | null
+          favorite_foods?: string[] | null
+          id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -1290,6 +1413,7 @@ export type Database = {
             }
             Returns: boolean
           }
+      update_user_water_goal: { Args: { _goal_ml: number }; Returns: undefined }
     }
     Enums: {
       agent_type: "meal_plan" | "workout" | "physiotherapy" | "mental_health"
