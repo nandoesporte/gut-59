@@ -35,7 +35,7 @@ export const AgentPromptsList = () => {
         return;
       }
       
-      setPrompts(data || []);
+      setPrompts((data || []) as AIAgentPrompt[]);
     } catch (error) {
       console.error('Erro:', error);
       toast.error('Erro ao processar dados dos prompts');
