@@ -1,15 +1,1 @@
-
-project_id = "sxjafhzikftdenqnkcri"
-
-# Funções principais - mantendo apenas estas habilitadas e desabilitando o resto
-[functions.mental-health-chat]
-verify_jwt = false
-
-[functions.groq-chat]
-verify_jwt = false
-
-[functions.generate-rehab-plan-groq]
-verify_jwt = false
-
-[functions.generate-workout-plan]
-verify_jwt = false
+project_id = "tshmlcmcfihrvybokhgp"
