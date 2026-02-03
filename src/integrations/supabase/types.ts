@@ -415,6 +415,27 @@ export type Database = {
           },
         ]
       }
+      mental_health_settings: {
+        Row: {
+          breathing_exercise_daily_limit: number | null
+          created_at: string | null
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          breathing_exercise_daily_limit?: number | null
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Update: {
+          breathing_exercise_daily_limit?: number | null
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       mental_modules: {
         Row: {
           created_at: string | null
@@ -923,6 +944,33 @@ export type Database = {
         }
         Relationships: []
       }
+      step_rewards: {
+        Row: {
+          created_at: string | null
+          id: string
+          reward_amount: number | null
+          reward_date: string
+          steps_counted: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          reward_amount?: number | null
+          reward_date: string
+          steps_counted?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          reward_amount?: number | null
+          reward_date?: string
+          steps_counted?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       symptoms: {
         Row: {
           created_at: string | null
@@ -1200,17 +1248,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
+      has_role:
+        | {
+            Args: { _role: Database["public"]["Enums"]["app_role"] }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              _role: Database["public"]["Enums"]["app_role"]
+              _user_id: string
+            }
+            Returns: boolean
+          }
     }
     Enums: {
       agent_type: "meal_plan" | "workout" | "physiotherapy" | "mental_health"
-      app_role: "admin" | "moderator" | "user"
+      app_role: "admin" | "moderator" | "user" | "personal"
       assessment_type: "burnout" | "anxiety" | "stress" | "depression"
       exercise_difficulty: "beginner" | "intermediate" | "advanced"
       exercise_type_enum: "strength" | "cardio" | "mobility"
@@ -1359,7 +1412,7 @@ export const Constants = {
   public: {
     Enums: {
       agent_type: ["meal_plan", "workout", "physiotherapy", "mental_health"],
-      app_role: ["admin", "moderator", "user"],
+      app_role: ["admin", "moderator", "user", "personal"],
       assessment_type: ["burnout", "anxiety", "stress", "depression"],
       exercise_difficulty: ["beginner", "intermediate", "advanced"],
       exercise_type_enum: ["strength", "cardio", "mobility"],
