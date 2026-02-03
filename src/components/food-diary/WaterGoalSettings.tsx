@@ -28,10 +28,8 @@ export const WaterGoalSettings = ({ onGoalUpdated }: WaterGoalSettingsProps) => 
         return;
       }
 
-      const { error } = await supabase.rpc('update_user_water_goal', {
-        p_user_id: user.id,
-        p_weight: weightNum,
-        p_height: 0 // Height is no longer used in calculation
+      const { error } = await (supabase.rpc as any)('update_user_water_goal', {
+        _goal_ml: Math.round(weightNum * 35) // 35ml por kg de peso corporal
       });
 
       if (error) throw error;

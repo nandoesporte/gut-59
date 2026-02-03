@@ -105,12 +105,12 @@ export const MessagesTab = () => {
       
       const nutritionistUsersWithUnreadCount = nutritionistUsers?.map(user => ({
         ...user,
-        unread_messages: user.unread_messages?.[0]?.count || 0
+        unread_messages: (user.unread_messages as any)?.[0]?.count || 0
       })) || [];
 
       const personalUsersWithUnreadCount = personalUsers?.map(user => ({
         ...user,
-        unread_messages: user.unread_messages?.[0]?.count || 0
+        unread_messages: (user.unread_messages as any)?.[0]?.count || 0
       })) || [];
       
       setUsers(nutritionistUsersWithUnreadCount);
@@ -154,9 +154,9 @@ export const MessagesTab = () => {
       if (error) throw error;
       
       if (type === 'nutritionist') {
-        setNutriMessages(data || []);
+        setNutriMessages((data || []) as any);
       } else {
-        setPersonalMessages(data || []);
+        setPersonalMessages((data || []) as any);
       }
       
       setHasNewMessage(false);
