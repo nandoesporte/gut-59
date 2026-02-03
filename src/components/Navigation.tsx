@@ -16,7 +16,7 @@ const Navigation = () => {
 
   useEffect(() => {
     const checkAdminRole = async () => {
-      const { data } = await supabase.rpc('has_role', { role: 'admin' });
+      const { data } = await supabase.rpc('has_role', { _role: 'admin' } as any);
       setIsAdmin(!!data);
     };
 
